@@ -1,0 +1,38 @@
+{
+  "name": "Terra",
+  "image": "cornellmarsrover/daemon:latest",
+  "mounts": [
+    "source=${localWorkspaceFolder}/..,target=/cmr,type=bind"
+  ],
+  "workspaceFolder": "/cmr/terra",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+		"ms-python.python",
+		"ms-vscode.cpptools",
+		"eamodio.gitlens",
+		"zachflower.uncrustify",
+		"ms-iot.vscode-ros",
+		"twxs.cmake",
+		"smilerobotics.urdf",
+		"redhat.vscode-yaml",
+		"ms-vscode.cmake-tools",
+		"bungcip.better-toml",
+		"codezombiech.gitignore",
+		"llvm-vs-code-extensions.vscode-clangd",
+		"DotJoshJohnson.xml"
+	]
+    }
+  },
+  "containerEnv": {
+    "DISPLAY": "host.docker.internal:0"
+  },
+  "runArgs": [
+    "--network=host",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt=seccomp:unconfined",
+    "--security-opt=apparmor:unconfined",
+    "--volume=/tmp/.X11-unix:/tmp/.X11-unix"
+  ]
+  // X11 can be set up with https://gist.github.com/paul-krohn/e45f96181b1cf5e536325d1bdee6c949
+}

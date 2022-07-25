@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "name": "Debug Rover",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/install/cmr_fabric/lib/cmr_fabric/fabric",
+      "args": [],
+      "preLaunchTask": "build",
+      "cwd": "/cmr/terra",
+      "avoidWindowsConsoleRedirection": true,
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

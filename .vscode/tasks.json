@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "detail": "Build terra (debug)",
+      "type": "shell",
+      "command": "bash scripts/build.sh -DCMAKE_BUILD_TYPE=Debug",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "clean",
+      "detail": "Clean terra",
+      "type": "shell",
+      "command": "bash scripts/clean.sh",
+    },
+    {
+      "label": "prerun",
+      "type": "shell",
+      "command": "source install/setup.bash"
+    },
+    {
+      "label": "test",
+      "detail": "Run all unit tests",
+      "type": "shell",
+      "command": "bash scripts/test.sh",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    }
+  ],
+}

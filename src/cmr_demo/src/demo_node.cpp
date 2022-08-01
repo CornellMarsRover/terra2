@@ -20,6 +20,7 @@ public:
   bool onActivate() override
   {
     printf("Activating...\n");
+    throw std::invalid_argument("Activation failed");
     return true;
   }
 

@@ -2,6 +2,7 @@
 
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "cmr_utils/tomlcpp.hpp"
+#include "cmr_msgs/srv/recover_fault.hpp"
 
 namespace cmr::fabric
 {
@@ -16,6 +17,9 @@ public:
     declare_parameter("restart_attempts", 0);
     declare_parameter("restart_delay", 0);
     declare_parameter("num_restarts", 0);
+
+    recover_fault_client =
+      this->create_client<cmr_msgs::srv::RecoverFault>("/fabric/recover_fault");
   }
 
   virtual ~FabricNode() = default;
@@ -58,6 +62,9 @@ public:
   rclcpp_lifecycle::LifecycleNode::CallbackReturn on_error(const rclcpp_lifecycle::State &)
   override;
 
+private:
+  std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>> recover_fault_client;
+  void scheduleRestart();
 };
 
 }

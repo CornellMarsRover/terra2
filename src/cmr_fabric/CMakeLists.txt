@@ -62,6 +62,25 @@ ament_export_targets(
   export_${PROJECT_NAME}
 )
 
+# BEGIN NODE fault_handler
+add_executable(fault_handler
+  src/fault_handler.cpp
+)
+ament_target_dependencies(fault_handler
+  rclcpp
+  std_msgs
+  cmr_msgs
+  cmr_utils
+)
+target_include_directories(fault_handler PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(fault_handler PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+install(TARGETS fault_handler
+  DESTINATION lib/${PROJECT_NAME})
+# END NODE fault_handler
+
 # PHOBOS_APPEND
 
 ament_export_include_directories(

@@ -1,5 +1,7 @@
 #include <cstdio>
 #include "rclcpp/rclcpp.hpp"
+#include "cmr_utils/services.hpp"
+#include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
 
 class FaultHandler : public rclcpp::Node
@@ -14,20 +16,39 @@ public:
 
 private:
   std::shared_ptr<rclcpp::Service<cmr_msgs::srv::RecoverFault>> recover_fault_service;
-  std::vector<std::string> nodes_to_restart;
+  std::shared_ptr<rclcpp::TimerBase> timer;
+
+  std::unordered_set<std::string> nodes_to_restart;
+  // we use a mutex to make sure we don't add any nodes while the timer is executing its callback.
+  // otherwise we might end up losing some nodes in the process
+  std::mutex nodes_to_restart_mutex;
 
   void initialize()
   {
     auto recover_fault_callback =
       [this](const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request> request,
         std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>) {
-        RCLCPP_INFO(get_logger(), "Recovering fault for node %s...\n", request->node_name.c_str());
-        // TODO trigger restart
-        nodes_to_restart.push_back(request->node_name);
+        std::lock_guard<std::mutex> guard(nodes_to_restart_mutex);
+        nodes_to_restart.emplace(request->node_name);
       };
     recover_fault_service = this->create_service<cmr_msgs::srv::RecoverFault>(
       get_effective_namespace() + "/recover_fault",
       recover_fault_callback);
+
+    auto timer_callback = [this]() {
+        std::lock_guard<std::mutex> guard(nodes_to_restart_mutex);
+
+        for (auto node : nodes_to_restart) {
+          RCLCPP_INFO(get_logger(), "Recovering fault for node %s...\n", node.c_str());
+          auto request = std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
+          request->node_name = node;
+          cmr::sendRequest<cmr_msgs::srv::ActivateNode>("/fabric/activate_node", request);
+        }
+
+        nodes_to_restart.clear();
+      };
+    timer = this->create_wall_timer(1s, timer_callback);
+
     RCLCPP_INFO(get_logger(), "fault handler initialized");
   }
 

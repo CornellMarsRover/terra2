@@ -80,16 +80,19 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
   const rclcpp_lifecycle::State &)
 {
   int num_restarts = get_parameter("num_restarts").as_int();
+  RCLCPP_INFO(get_logger(), "Num restarts: %d", num_restarts);
 
   if (num_restarts < get_parameter("restart_attempts").as_int()) {
     scheduleRestart();
-    return rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
   } else {
+    // reset the counter in case the user wants to try and enable this again later
+    set_parameter(rclcpp::Parameter("num_restarts", 0));
     RCLCPP_ERROR(
       get_logger(),
       "Node will not attempt to restart because it has restarted the maximum amount of times.");
-    return rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
   }
+  // returning SUCCESS will tell ROS2 to move the node into the Unconfigured state.
+  return rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
 }
 
 void FabricNode::scheduleRestart()

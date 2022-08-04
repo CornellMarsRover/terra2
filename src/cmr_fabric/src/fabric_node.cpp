@@ -80,7 +80,6 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
   const rclcpp_lifecycle::State &)
 {
   int num_restarts = get_parameter("num_restarts").as_int();
-  RCLCPP_INFO(get_logger(), "Num restarts: %d", num_restarts);
 
   if (num_restarts < get_parameter("restart_attempts").as_int()) {
     scheduleRestart();

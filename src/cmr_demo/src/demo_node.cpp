@@ -6,21 +6,26 @@ class DemoNode : public cmr::fabric::FabricNode
 {
 public:
   DemoNode()
-  : cmr::fabric::FabricNode::FabricNode("demo") {}
-
-  bool onConfigure(std::shared_ptr<toml::Table> config) override
+  : cmr::fabric::FabricNode::FabricNode("demo")
   {
-    printf("Configuring...\n");
-    printf(
-      "Restart attempts: %ld\n",
-      config->getTable("fault_handling")->getInt("restart_attempts").second);
+    declare_parameter("test", "");
+  }
+
+  bool onConfigure(std::shared_ptr<toml::Table> table) override
+  {
+    auto nodeSettings = table->getTable("node");
+    auto [ok, test] = nodeSettings->getString("test");
+    if (!ok) {
+      return false;
+    }
+    set_parameter(rclcpp::Parameter("test", test));
     return true;
   }
 
   bool onActivate() override
   {
     printf("Activating...\n");
-    throw std::invalid_argument("Activation failed");
+    RCLCPP_INFO(get_logger(), "test is %s", get_parameter("test").as_string().c_str());
     return true;
   }
 
@@ -41,8 +46,6 @@ public:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-
-  printf("The demo_node node.\n");
 
   auto node = std::make_shared<DemoNode>();
 

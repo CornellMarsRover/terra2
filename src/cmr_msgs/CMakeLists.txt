@@ -17,6 +17,8 @@ rosidl_generate_interfaces(
   srv/DeactivateNode.srv
   srv/GetNodeState.srv
   srv/ReconfigureNode.srv
+  srv/AcquireDependency.srv
+  srv/ReleaseDependency.srv
 )
 
 if(BUILD_TESTING)

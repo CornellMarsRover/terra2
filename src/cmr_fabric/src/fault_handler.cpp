@@ -21,6 +21,9 @@ private:
   std::unordered_set<std::string> nodes_to_restart;
   // we use a mutex to make sure we don't add any nodes while the timer is executing its callback.
   // otherwise we might end up losing some nodes in the process
+  // TODO not sure that this mutex is needed, because we are using a single-threaded executor and
+  // so the timer and service callbacks might just be executed in series. but maybe it's worth
+  // leaving here to be agnostic to the kind of executor we're dealing with?
   std::mutex nodes_to_restart_mutex;
 
   void initialize()

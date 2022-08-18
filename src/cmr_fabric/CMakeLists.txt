@@ -102,6 +102,25 @@ install(TARGETS lifecycle_manager
   DESTINATION lib/${PROJECT_NAME})
 # END NODE lifecycle_manager
 
+# BEGIN NODE dependency_manager
+add_executable(dependency_manager
+  src/dependency_manager.cpp
+)
+ament_target_dependencies(dependency_manager
+  rclcpp
+  std_msgs
+  cmr_msgs
+  cmr_utils
+)
+target_include_directories(dependency_manager PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(dependency_manager PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+install(TARGETS dependency_manager
+  DESTINATION lib/${PROJECT_NAME})
+# END NODE dependency_manager
+
 # PHOBOS_APPEND
 
 ament_export_include_directories(

@@ -103,7 +103,6 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_cleanup(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_shutdown(
   const rclcpp_lifecycle::State &)
 {
-  // TODO notify dependency manager that this node is shutting down
   return onShutdown() ?
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS :
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;

@@ -18,7 +18,7 @@ private:
   std::shared_ptr<rclcpp::Service<cmr_msgs::srv::RecoverFault>> recover_fault_service;
   std::shared_ptr<rclcpp::TimerBase> timer;
 
-  std::unordered_set<std::string> nodes_to_restart;
+  std::unordered_map<std::string, int> nodes_to_restart;
   // we use a mutex to make sure we don't add any nodes while the timer is executing its callback.
   // otherwise we might end up losing some nodes in the process
   // TODO not sure that this mutex is needed, because we are using a single-threaded executor and
@@ -32,7 +32,7 @@ private:
       [this](const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request> request,
         std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>) {
         std::lock_guard<std::mutex> guard(nodes_to_restart_mutex);
-        nodes_to_restart.emplace(request->node_name);
+        nodes_to_restart.emplace(request->node_name, request->restart_delay);
       };
     recover_fault_service = this->create_service<cmr_msgs::srv::RecoverFault>(
       get_effective_namespace() + "/recover_fault",
@@ -41,14 +41,21 @@ private:
     auto timer_callback = [this]() {
         std::lock_guard<std::mutex> guard(nodes_to_restart_mutex);
 
-        for (auto node : nodes_to_restart) {
-          RCLCPP_INFO(get_logger(), "Recovering fault for node %s...\n", node.c_str());
-          auto request = std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
-          request->node_name = node;
-          cmr::sendRequest<cmr_msgs::srv::ActivateNode>("/fabric/activate_node", request);
+        for (auto it = nodes_to_restart.cbegin(); it != nodes_to_restart.cend(); ) {
+          auto node_name = it->first;
+          auto delay = it->second;
+          if (delay > 0) {
+            delay--;
+            nodes_to_restart[node_name] = delay;
+            it++;
+          } else {
+            RCLCPP_INFO(get_logger(), "Recovering fault for node %s...\n", node_name.c_str());
+            auto request = std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
+            request->node_name = node_name;
+            cmr::sendRequest<cmr_msgs::srv::ActivateNode>("/fabric/activate_node", request);
+            it = nodes_to_restart.erase(it);
+          }
         }
-
-        nodes_to_restart.clear();
       };
     timer = this->create_wall_timer(1s, timer_callback);
 

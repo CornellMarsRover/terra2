@@ -1,5 +1,8 @@
 #include <chrono>
 #include "cmr_fabric/fabric_node.hpp"
+#include "cmr_utils/services.hpp"
+#include "cmr_msgs/srv/acquire_dependency.hpp"
+#include "cmr_msgs/srv/release_dependency.hpp"
 
 using namespace std::chrono_literals;
 
@@ -33,6 +36,19 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
   }
   set_parameter(rclcpp::Parameter("restart_attempts", restart_attempts));
 
+  auto [delay_ok, restart_delay] = faultHandlingSettings->getInt("restart_delay");
+  if (!delay_ok) {
+    RCLCPP_ERROR(
+      get_logger(), "Failed to parse fault_handling.restart_delay: %s", toml.errmsg.c_str());
+    return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
+  }
+  set_parameter(rclcpp::Parameter("restart_delay", restart_delay));
+
+  auto dependencies = config->getArray("dependencies");
+  if (dependencies) {
+    this->dependencies = *dependencies->getStringVector();
+  }
+
   return onConfigure(std::move(config)) ?
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS :
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -41,7 +57,16 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
   const rclcpp_lifecycle::State &)
 {
-  // TODO notify dependency manager that this node is activating
+  for (auto dep_name : this->get_dependencies()) {
+    auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
+    request->dependent = get_name();
+    request->target = dep_name;
+    auto response = cmr::sendRequest<cmr_msgs::srv::AcquireDependency>("/fabric/acquire", request);
+    if (!response) {
+      RCLCPP_ERROR(get_logger(), "Failed to acquire dependency %s", dep_name.c_str());
+      return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
+    }
+  }
   return onActivate() ?
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS :
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -50,7 +75,16 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
   const rclcpp_lifecycle::State &)
 {
-  // TODO notify dependency manager that this node is deactivating
+  for (auto dep_name : this->get_dependencies()) {
+    auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();
+    request->dependent = get_name();
+    request->target = dep_name;
+    auto response = cmr::sendRequest<cmr_msgs::srv::ReleaseDependency>("/fabric/release", request);
+    if (!response) {
+      RCLCPP_ERROR(get_logger(), "Failed to acquire dependency %s", dep_name.c_str());
+      return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
+    }
+  }
   return onDeactivate() ?
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS :
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -59,7 +93,6 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_cleanup(
   const rclcpp_lifecycle::State &)
 {
-  // TODO notify dependency manager that this node is shutting down.
   // We treat on_cleanup and on_shutdown in the same way, we just invoke onShutdown()
   return onShutdown() ?
          rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS :

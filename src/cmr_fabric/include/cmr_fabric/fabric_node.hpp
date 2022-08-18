@@ -44,6 +44,17 @@ public:
     return true;
   }
 
+  /**
+   * @brief Returns the vector of dependencies defined by this node. There is no guarantee that
+   * everything in this list is a valid dependency (i.e. that they each exist as a node).
+   *
+   * @return std::vector<std::string> list of dependency names
+   */
+  std::vector<std::string> get_dependencies()
+  {
+    return dependencies;
+  }
+
   rclcpp_lifecycle::LifecycleNode::CallbackReturn on_configure(const rclcpp_lifecycle::State &)
   override;
 
@@ -64,6 +75,7 @@ public:
 
 private:
   std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>> recover_fault_client;
+  std::vector<std::string> dependencies;
   void scheduleRestart();
 };
 

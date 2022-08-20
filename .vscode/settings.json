@@ -11,9 +11,8 @@
     "--max-line-length=100"
   ],
   // CPP configuration
-  "uncrustify.configPath.linux": "/opt/ros/humble/lib/python3.10/site-packages/ament_uncrustify/configuration/ament_code_style.cfg",
   "[cpp]": {
-    "editor.defaultFormatter": "zachflower.uncrustify"
+    "editor.defaultFormatter": "xaver.clang-format"
   },
   "clangd.arguments": [
     "--compile-commands-dir=${workspaceFolder}/build",
@@ -24,9 +23,9 @@
   ],
   "C_Cpp.intelliSenseEngine": "Disabled",
   // Editor configuration
-  "editor.tabSize": 2,
+  "editor.tabSize": 4,
   "editor.rulers": [
-    100
+    80
   ],
   "editor.formatOnSave": true,
   "files.associations": {
@@ -113,4 +112,14 @@
     "**/log": true
   },
   "python.formatting.provider": "black",
+  "clang-tidy.buildPath": "${workspaceFolder}/build",
+  "clang-tidy.blacklist": [
+    "${workspaceFolder}/install/**"
+  ],
+  "clang-tidy.compilerArgs": [
+    "-Isrc/cmr_fabric/include",
+    "-Isrc/cmr_demo/include",
+    "-Isrc/cmr_msgs/include",
+    "-I/cmr/terra/install/cmr_utils/include/cmr_msgs"
+  ],
 }

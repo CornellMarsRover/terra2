@@ -6,14 +6,16 @@
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/deactivate_node.hpp"
 #include "cmr_msgs/srv/release_dependency.hpp"
+#include "cmr_utils/cmr_error.hpp"
 #include "cmr_utils/services.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-class DependencyManager : public rclcpp::Node {
-   public:
+class DependencyManager : public rclcpp::Node
+{
+  public:
     DependencyManager() : Node("dependency_manager", "fabric") {}
 
-   private:
+  private:
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::AcquireDependency>>
         acquire_dependency_service;
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReleaseDependency>>
@@ -27,13 +29,15 @@ class DependencyManager : public rclcpp::Node {
     // be disabled when they no longer have any users
     std::unordered_set<std::string> started_as_deps;
 
-    void init() {
+    void init()
+    {
         createAcquireDependencyService();
         createReleaseDependencyService();
         RCLCPP_INFO(get_logger(), "dependency manager initialized");
     }
 
-    void createAcquireDependencyService() {
+    void createAcquireDependencyService()
+    {
         auto acquire_dep_callback =
             [this](
                 const std::shared_ptr<cmr_msgs::srv::AcquireDependency::Request> request,
@@ -43,8 +47,8 @@ class DependencyManager : public rclcpp::Node {
                 auto response =
                     std::make_shared<cmr_msgs::srv::AcquireDependency::Response>();
 
-                RCLCPP_DEBUG(get_logger(), "Acquiring dependency %s for node %s...",
-                             target.c_str(), dependent.c_str());
+                CMR_LOG(DEBUG, "Acquiring dependency %s for node %s...", target.c_str(),
+                        dependent.c_str());
 
                 if (users.find(target) == users.end()) {
                     auto request =
@@ -75,7 +79,8 @@ class DependencyManager : public rclcpp::Node {
             get_effective_namespace() + "/acquire", acquire_dep_callback);
     }
 
-    void createReleaseDependencyService() {
+    void createReleaseDependencyService()
+    {
         auto release_dep_callback =
             [this](
                 const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request> request,
@@ -83,17 +88,17 @@ class DependencyManager : public rclcpp::Node {
                 auto target = request->target;
                 auto dependent = request->dependent;
 
-                RCLCPP_DEBUG(get_logger(), "Releasing dependency %s for node %s...",
-                             target.c_str(), dependent.c_str());
+                CMR_LOG(DEBUG, "Releasing dependency %s for node %s...", target.c_str(),
+                        dependent.c_str());
 
                 if (users.find(target) == users.end()) {
                     // target node was never acquired; just return success in
                     // this case although this suggests misuse of the dependency
                     // manager
-                    RCLCPP_WARN(get_logger(),
-                                "attempting to release node %s, but it was "
-                                "never acquired",
-                                target.c_str());
+                    CMR_LOG(WARN,
+                            "attempting to release node %s, but it was "
+                            "never acquired",
+                            target.c_str());
                     response->success = true;
                     return response;
                 }
@@ -127,7 +132,8 @@ class DependencyManager : public rclcpp::Node {
     }
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     rclcpp::init(argc, argv);
 
     printf("The dependency_manager node.\n");

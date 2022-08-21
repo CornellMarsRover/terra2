@@ -4,7 +4,7 @@
 
 pushd "$CMR_ROOT/terra" &>/dev/null
 source install/setup.bash
-colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "$@"
+colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -Duse_libclang=ON "$@"
 retval=$?
 if [[ $retval -ne 0 ]];
 then

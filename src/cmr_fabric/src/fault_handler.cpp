@@ -5,11 +5,12 @@
 #include "cmr_utils/services.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-class FaultHandler : public rclcpp::Node {
-   public:
+class FaultHandler : public rclcpp::Node
+{
+  public:
     FaultHandler() : rclcpp::Node("fault_handler", "fabric") { initialize(); }
 
-   private:
+  private:
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::RecoverFault>> recover_fault_service;
     std::shared_ptr<rclcpp::TimerBase> timer;
 
@@ -22,7 +23,8 @@ class FaultHandler : public rclcpp::Node {
     // dealing with?
     std::mutex nodes_to_restart_mutex;
 
-    void initialize() {
+    void initialize()
+    {
         auto recover_fault_callback =
             [this](const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request> request,
                    std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>) {
@@ -60,7 +62,8 @@ class FaultHandler : public rclcpp::Node {
     }
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     rclcpp::init(argc, argv);
     auto node = std::make_shared<FaultHandler>();
     rclcpp::spin(node);

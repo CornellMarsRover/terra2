@@ -2,8 +2,11 @@
 Checks:
   "clang-diagnostic-*,clang-analyzer-*,cppcoreguidelines-*,readability-identifier-naming,modernize-*,bugprone-*,\
   -cppcoreguidelines-pro-type-vararg,readability-braces-around-statements,readability-function-size,\
-  -modernize-use-trailing-return-type,google-*"
-WarningsAsErrors: ""
+  -modernize-use-trailing-return-type,google-*,readability-function-cognitive-complexity,\
+  readability-make-member-function-const,readability-simplify-boolean-expr,readability-implicit-bool-conversion,\
+  performance-*,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,misc-const-correctness,\
+  misc-new-delete-overloads,misc-unused-*,misc-misplaced-const,misc-,-modernize-use-nodiscard"
+WarningsAsErrors: "readability-identifier-naming"
 HeaderFilterRegex: "(cmr)_.*\\.hpp"
 AnalyzeTemporaryDtors: false
 FormatStyle: none
@@ -42,17 +45,17 @@ CheckOptions:
     value: lower_case
   - key: llvm-else-after-return.WarnOnUnfixable
     value: "false"
-  - key: google-readability-function-size.StatementThreshold
-    value: "800"
   - { key: readability-identifier-naming.NamespaceCase, value: lower_case }
   - { key: readability-identifier-naming.ClassCase, value: CamelCase }
-  - { key: readability-identifier-naming.ClassMemberPrefix, value: m_ }
+  - { key: readability-identifier-naming.MemberPrefix, value: m_ }
   - { key: readability-identifier-naming.ClassMethodCase, value: lower_case }
   - { key: readability-identifier-naming.StructCase, value: CamelCase }
   - { key: readability-identifier-naming.FunctionCase, value: lower_case }
   - { key: readability-identifier-naming.VariableCase, value: lower_case }
   - { key: readability-identifier-naming.GlobalConstantCase, value: CamelCase }
   - { key: readability-identifier-naming.GlobalVariablePrefix, value: g_ }
+  - { key: readability-identifier-nameing.ConstexprVariableCase, value: CamelCase }
+  - { key: readability-identifier-nameing.ParameterCase, value: lower_case }
   - key: readability-identifier-naming.TemplateParameterCase
     value: CamelCase
   - key: readability-identifier-naming.StaticConstantCase
@@ -61,11 +64,16 @@ CheckOptions:
     value: CamelCase
   - key: readability-identifier-naming.EnumConstantCase
     value: CamelCase
-  - key: readability-function-size.NestingThreshold
-    value: 4
+  - key: readability-function-size.StatementThreshold
+    value: -1
   - key: readability-function-size.ParameterThreshold
     value: 4
-  - key: readability-function-size.VariableThreshold
-    value: 10
+  - key: readability-function-size.LineThreshold
+    value: 40
+  - key: readability-function-cognitive-complexity.IgnoreMacros
+    value: true
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: true
+
 ---
 

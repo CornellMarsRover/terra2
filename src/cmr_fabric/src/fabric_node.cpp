@@ -4,25 +4,27 @@
 
 #include "cmr_msgs/srv/acquire_dependency.hpp"
 #include "cmr_msgs/srv/release_dependency.hpp"
+#include "cmr_utils/cmr_error.hpp"
 #include "cmr_utils/services.hpp"
 
 using namespace std::chrono_literals;
 
-namespace cmr::fabric {
+namespace cmr::fabric
+{
 
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
-    const rclcpp_lifecycle::State &) {
+    const rclcpp_lifecycle::State &)
+{
     auto config_path = get_parameter("config_path").as_string();
     if (config_path.empty()) {
-        RCLCPP_ERROR(get_logger(), "No config_path parameter specified");
+        CMR_LOG(ERROR, "No config_path parameter specified");
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
 
     auto toml = toml::parseFile(config_path);
 
     if (!toml.table) {
-        RCLCPP_ERROR(get_logger(), "Failed to parse config file: %s",
-                     toml.errmsg.c_str());
+        CMR_LOG(ERROR, "Failed to parse config file: %s", toml.errmsg.c_str());
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
 
@@ -31,16 +33,16 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
     auto faultHandlingSettings = config->getTable("fault_handling");
     auto [ok, restart_attempts] = faultHandlingSettings->getInt("restart_attempts");
     if (!ok) {
-        RCLCPP_ERROR(get_logger(), "Failed to parse fault_handling.restart_attempts: %s",
-                     toml.errmsg.c_str());
+        CMR_LOG(ERROR, "Failed to parse fault_handling.restart_attempts: %s",
+                toml.errmsg.c_str());
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     set_parameter(rclcpp::Parameter("restart_attempts", restart_attempts));
 
     auto [delay_ok, restart_delay] = faultHandlingSettings->getInt("restart_delay");
     if (!delay_ok) {
-        RCLCPP_ERROR(get_logger(), "Failed to parse fault_handling.restart_delay: %s",
-                     toml.errmsg.c_str());
+        CMR_LOG(ERROR, "Failed to parse fault_handling.restart_delay: %s",
+                toml.errmsg.c_str());
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     set_parameter(rclcpp::Parameter("restart_delay", restart_delay));
@@ -56,7 +58,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 }
 
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
-    const rclcpp_lifecycle::State &) {
+    const rclcpp_lifecycle::State &)
+{
     for (auto dep_name : this->get_dependencies()) {
         auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
         request->dependent = get_name();
@@ -64,8 +67,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
         auto response = cmr::sendRequest<cmr_msgs::srv::AcquireDependency>(
             "/fabric/acquire", request);
         if (!response) {
-            RCLCPP_ERROR(get_logger(), "Failed to acquire dependency %s",
-                         dep_name.c_str());
+            CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
             return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
         }
     }
@@ -74,7 +76,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
 }
 
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
-    const rclcpp_lifecycle::State &) {
+    const rclcpp_lifecycle::State &)
+{
     for (auto dep_name : this->get_dependencies()) {
         auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();
         request->dependent = get_name();
@@ -82,8 +85,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
         auto response = cmr::sendRequest<cmr_msgs::srv::ReleaseDependency>(
             "/fabric/release", request);
         if (!response) {
-            RCLCPP_ERROR(get_logger(), "Failed to acquire dependency %s",
-                         dep_name.c_str());
+            CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
             return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
         }
     }
@@ -92,7 +94,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
 }
 
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_cleanup(
-    const rclcpp_lifecycle::State &) {
+    const rclcpp_lifecycle::State &)
+{
     // We treat on_cleanup and on_shutdown in the same way, we just invoke
     // onShutdown()
     return onShutdown() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
@@ -100,13 +103,15 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_cleanup(
 }
 
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_shutdown(
-    const rclcpp_lifecycle::State &) {
+    const rclcpp_lifecycle::State &)
+{
     return onShutdown() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
                         : rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
 }
 
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
-    const rclcpp_lifecycle::State &) {
+    const rclcpp_lifecycle::State &)
+{
     int num_restarts = get_parameter("num_restarts").as_int();
 
     if (num_restarts < get_parameter("restart_attempts").as_int()) {
@@ -115,25 +120,26 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
         // reset the counter in case the user wants to try and enable this again
         // later
         set_parameter(rclcpp::Parameter("num_restarts", 0));
-        RCLCPP_ERROR(get_logger(),
-                     "Node will not attempt to restart because it has restarted "
-                     "the maximum amount of times.");
+        CMR_LOG(ERROR,
+                "Node will not attempt to restart because it has restarted "
+                "the maximum amount of times.");
     }
     // returning SUCCESS will tell ROS2 to move the node into the Unconfigured
     // state.
     return rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
 }
 
-void FabricNode::scheduleRestart() {
+void FabricNode::scheduleRestart()
+{
     // make sure the fault handler is available before doing anything else
     while (!recover_fault_client->wait_for_service(1s)) {
         if (!rclcpp::ok()) {
-            RCLCPP_ERROR(get_logger(),
-                         "Interrupted while waiting for the fault handler. Not "
-                         "scheduling restart.");
+            CMR_LOG(ERROR,
+                    "Interrupted while waiting for the fault handler. Not "
+                    "scheduling restart.");
             return;
         }
-        RCLCPP_INFO(get_logger(), "Fault handler not available, waiting again...");
+        CMR_LOG(INFO, "Fault handler not available, waiting again...");
     }
 
     auto num_restarts = get_parameter("num_restarts").as_int();

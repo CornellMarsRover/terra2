@@ -14,7 +14,7 @@ class DemoNode : public cmr::fabric::FabricNode
 
     bool onConfigure(std::shared_ptr<toml::Table> table) override
     {
-        auto nodeSettings = table->getTable("node");
+        auto node_settings = table->getTable("node");
         auto [ok, test] = nodeSettings->getString("test");
         if (!ok) {
             return false;

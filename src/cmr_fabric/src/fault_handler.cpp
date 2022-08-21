@@ -5,8 +5,7 @@
 #include "cmr_utils/services.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-class FaultHandler : public rclcpp::Node
-{
+class FaultHandler : public rclcpp::Node{
   public:
     FaultHandler() : rclcpp::Node("fault_handler", "fabric") { initialize(); }
 

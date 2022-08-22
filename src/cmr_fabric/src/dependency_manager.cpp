@@ -39,16 +39,16 @@ class DependencyManager : public rclcpp::Node
     void createAcquireDependencyService()
     {
         auto acquire_dep_callback =
-            [this](
-                const std::shared_ptr<cmr_msgs::srv::AcquireDependency::Request> request,
-                std::shared_ptr<cmr_msgs::srv::AcquireDependency::Response>) {
+            [this](const std::shared_ptr<cmr_msgs::srv::AcquireDependency::Request>
+                       request,
+                   std::shared_ptr<cmr_msgs::srv::AcquireDependency::Response>) {
                 auto target = request->target;
                 auto dependent = request->dependent;
                 auto response =
                     std::make_shared<cmr_msgs::srv::AcquireDependency::Response>();
 
-                CMR_LOG(DEBUG, "Acquiring dependency %s for node %s...", target.c_str(),
-                        dependent.c_str());
+                CMR_LOG(DEBUG, "Acquiring dependency %s for node %s...",
+                        target.c_str(), dependent.c_str());
 
                 if (users.find(target) == users.end()) {
                     auto request =
@@ -82,14 +82,15 @@ class DependencyManager : public rclcpp::Node
     void createReleaseDependencyService()
     {
         auto release_dep_callback =
-            [this](
-                const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request> request,
-                std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response> response) {
+            [this](const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>
+                       request,
+                   std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>
+                       response) {
                 auto target = request->target;
                 auto dependent = request->dependent;
 
-                CMR_LOG(DEBUG, "Releasing dependency %s for node %s...", target.c_str(),
-                        dependent.c_str());
+                CMR_LOG(DEBUG, "Releasing dependency %s for node %s...",
+                        target.c_str(), dependent.c_str());
 
                 if (users.find(target) == users.end()) {
                     // target node was never acquired; just return success in
@@ -110,8 +111,8 @@ class DependencyManager : public rclcpp::Node
                     // started as a dependency
                     users.erase(target);
                     if (started_as_deps.find(target) != started_as_deps.end()) {
-                        auto request =
-                            std::make_shared<cmr_msgs::srv::DeactivateNode::Request>();
+                        auto request = std::make_shared<
+                            cmr_msgs::srv::DeactivateNode::Request>();
                         request->node_name = target;
                         auto deactivate_response =
                             cmr::sendRequest<cmr_msgs::srv::DeactivateNode>(

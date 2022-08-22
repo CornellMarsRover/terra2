@@ -5,7 +5,8 @@ Checks:
   -modernize-use-trailing-return-type,google-*,readability-function-cognitive-complexity,\
   readability-make-member-function-const,readability-simplify-boolean-expr,readability-implicit-bool-conversion,\
   performance-*,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,misc-const-correctness,\
-  misc-new-delete-overloads,misc-unused-*,misc-misplaced-const,misc-,-modernize-use-nodiscard"
+  misc-new-delete-overloads,misc-unused-*,misc-misplaced-const,misc-,-modernize-use-nodiscard,\
+  -bugprone-exception-escape"
 WarningsAsErrors: "readability-identifier-naming"
 HeaderFilterRegex: "(cmr)_.*\\.hpp"
 AnalyzeTemporaryDtors: false
@@ -64,8 +65,6 @@ CheckOptions:
     value: CamelCase
   - key: readability-identifier-naming.EnumConstantCase
     value: CamelCase
-  - key: readability-function-size.StatementThreshold
-    value: -1
   - key: readability-function-size.ParameterThreshold
     value: 4
   - key: readability-function-size.LineThreshold

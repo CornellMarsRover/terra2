@@ -8,6 +8,8 @@
 #include "cmr_msgs/srv/release_dependency.hpp"
 #include "cmr_utils/cmr_error.hpp"
 #include "cmr_utils/services.hpp"
+#include "lifecycle_msgs/srv/change_state.hpp"
+#include "lifecycle_msgs/srv/get_state.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 class DependencyManager : public rclcpp::Node
@@ -33,7 +35,7 @@ class DependencyManager : public rclcpp::Node
     {
         create_acquire_dependency_service();
         create_release_dependency_service();
-        RCLCPP_INFO(get_logger(), "dependency manager initialized");
+        CMR_LOG(INFO, "dependency manager initialized");
     }
 
     void create_acquire_dependency_service()
@@ -46,17 +48,12 @@ class DependencyManager : public rclcpp::Node
                 auto target = request->target;
                 auto dependent = request->dependent;
 
-                CMR_LOG(DEBUG, "Acquiring dependency %s for node %s...",
-                        target.c_str(), dependent.c_str());
-
                 if (m_users.find(target) == m_users.end()) {
                     auto request =
                         std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
                     request->node_name = target;
 
-                    auto activate_response =
-                        cmr::send_request<cmr_msgs::srv::ActivateNode>(
-                            get_effective_namespace() + "/activate_node", request);
+                    auto activate_response = activate_dependency(target);
 
                     if (!activate_response) {
                         // failed to activate
@@ -114,10 +111,7 @@ class DependencyManager : public rclcpp::Node
                         auto request = std::make_shared<
                             cmr_msgs::srv::DeactivateNode::Request>();
                         request->node_name = target;
-                        auto deactivate_response =
-                            cmr::send_request<cmr_msgs::srv::DeactivateNode>(
-                                get_effective_namespace() + "/deactivate_node",
-                                request);
+                        auto deactivate_response = deactivate_dependency(target);
                         if (!deactivate_response) {
                             // failed to deactivate
                             response->success = false;
@@ -132,6 +126,79 @@ class DependencyManager : public rclcpp::Node
         m_release_dependency_service =
             this->create_service<cmr_msgs::srv::ReleaseDependency>(
                 get_effective_namespace() + "/release", release_dep_callback);
+    }
+
+    /*
+     * The following two helpers call the lifecycle management services exposed
+     * by dependencies directly. This code looks very similar to how Fabric's
+     * lifecycle manager node performs activation and deactivation, which
+     * understandably begs the question: why not just use the lifecycle manager's
+     * activate and deactivate services? The reason is because the dependency manager
+     * is invoked during the lifecycle manager's activate and deactivate callbacks;
+     * if we were to call them from within the dependency manager, we would enter
+     * into a deadlock because the lifecycle manager's services are busy waiting for
+     * the dependency manager, but the dependency manager is busy waiting for the
+     * lifecycle manager. So we just have to cut out the middleman here, even if it
+     * means some regrettable code duplication.
+     */
+
+    bool activate_dependency(const std::string& target)
+    {
+        // check if node is configured
+        auto request = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
+        auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
+            "/" + target + "/get_state", request);
+        if (response->current_state.id ==
+            lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
+            // configure first
+            CMR_LOG(INFO, "configuring dependency %s", target.c_str());
+            auto request =
+                std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+            request->transition.id =
+                lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
+            auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
+                "/" + target + "/change_state", request);
+            if (!response->success) {
+                return false;
+            }
+        }
+        // we can activate now
+        CMR_LOG(INFO, "activating dependency %s", target.c_str());
+        auto activate_request =
+            std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+        activate_request->transition.id =
+            lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+        auto activate_response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
+            "/" + target + "/change_state", activate_request);
+        return activate_response->success;
+    }
+
+    bool deactivate_dependency(const std::string& target)
+    {
+        // check if node is configured
+        auto request = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
+        auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
+            "/" + target + "/get_state", request);
+        if (response->current_state.id ==
+            lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+            // This suggests that something is wrong, but since the node is
+            // deactivating anyway, this isn't real cause for alarm enough for an
+            // error log.
+            CMR_LOG(WARN,
+                    "Attempted to deactivate dependency %s, but it was already "
+                    "inactive.",
+                    target.c_str());
+            return true;
+        }
+        // we can deactivate now
+        CMR_LOG(INFO, "deactivating dependency %s", target.c_str());
+        auto activate_request =
+            std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+        activate_request->transition.id =
+            lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
+        auto activate_response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
+            "/" + target + "/change_state", activate_request);
+        return activate_response->success;
     }
 };
 

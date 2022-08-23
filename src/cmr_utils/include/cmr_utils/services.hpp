@@ -5,8 +5,6 @@
 
 #include "rclcpp/rclcpp.hpp"
 
-using namespace std::chrono_literals;
-
 namespace cmr
 {
 /**
@@ -25,16 +23,19 @@ std::shared_ptr<typename SrvT::Response> send_request(
         std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
     auto client = node->create_client<SrvT>(service_name);
 
+    using namespace std::chrono_literals;
     while (!client->wait_for_service(3s)) {
         if (!rclcpp::ok()) {
             RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                          "Interrupted while waiting for the service. Exiting.");
             return nullptr;
         }
-        RCLCPP_INFO(node->get_logger(), "service not available, waiting again...");
+        RCLCPP_INFO(node->get_logger(), "service %s not available, waiting again...",
+                    service_name.c_str());
     }
 
     auto future = client->async_send_request(request);
+    RCLCPP_INFO(node->get_logger(), "Request sent");
     if (rclcpp::spin_until_future_complete(node, future) !=
         rclcpp::FutureReturnCode::SUCCESS) {
         RCLCPP_ERROR(node->get_logger(), "failed request to %s",

@@ -5,6 +5,8 @@
 #include "cmr_utils/services.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+using namespace std::chrono_literals;
+
 class FaultHandler : public rclcpp::Node
 {
   public:
@@ -56,7 +58,7 @@ class FaultHandler : public rclcpp::Node
                         std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
                     request->node_name = node_name;
                     cmr::send_request<cmr_msgs::srv::ActivateNode>(
-                        get_effective_namespace() + "/activate_node", request);
+                        get_effective_namespace() + "/activate", request);
                     it = m_nodes_to_restart.erase(it);
                 }
             }

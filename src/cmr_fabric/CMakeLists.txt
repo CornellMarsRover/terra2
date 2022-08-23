@@ -110,6 +110,8 @@ add_executable(dependency_manager
 )
 ament_target_dependencies(dependency_manager
   rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
   std_msgs
   cmr_msgs
   cmr_utils

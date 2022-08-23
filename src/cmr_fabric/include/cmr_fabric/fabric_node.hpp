@@ -10,8 +10,13 @@ namespace cmr::fabric
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
   public:
-    explicit FabricNode(const std::string &name)
-        : rclcpp_lifecycle::LifecycleNode(name)
+    // we generate an ugly unique name for each fabric node with the expectation
+    // that the node will be renamed appropriately during the launch process.
+    explicit FabricNode()
+        : rclcpp_lifecycle::LifecycleNode(
+              "fabric_untitled_" +
+              std::to_string(
+                  std::chrono::system_clock::now().time_since_epoch().count()))
     {
         declare_parameter("config_path", "");
         declare_parameter("composition_ns", "");

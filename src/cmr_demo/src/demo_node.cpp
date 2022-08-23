@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 class DemoNode : public cmr::fabric::FabricNode
 {
   public:
-    DemoNode() : cmr::fabric::FabricNode::FabricNode("demo")
+    DemoNode() : cmr::fabric::FabricNode::FabricNode()
     {
         declare_parameter("test", "");
     }
@@ -29,11 +29,13 @@ class DemoNode : public cmr::fabric::FabricNode
     {
         printf("Activating...\n");
         CMR_LOG(INFO, "test is %s", get_parameter("test").as_string().c_str());
-        auto timer_cb = [this]() {
-            this->panic();
-            m_timer->cancel();
-        };
-        m_timer = this->create_wall_timer(1s, timer_cb);
+        CMR_LOG(INFO, "composition_ns is %s",
+                get_parameter("composition_ns").as_string().c_str());
+        // auto timer_cb = [this]() {
+        //     this->panic();
+        //     m_timer->cancel();
+        // };
+        // m_timer = this->create_wall_timer(1s, timer_cb);
         return true;
     }
 
@@ -53,7 +55,7 @@ class DemoNode : public cmr::fabric::FabricNode
     rclcpp::TimerBase::SharedPtr m_timer;
 };
 
-int main(int argc, char** argv)
+int main(int argc, char* argv[])
 {
     rclcpp::init(argc, argv);
 

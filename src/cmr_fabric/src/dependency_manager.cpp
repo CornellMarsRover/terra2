@@ -13,7 +13,7 @@
 class DependencyManager : public rclcpp::Node
 {
   public:
-    DependencyManager() : Node("dependency_manager", "fabric") { init(); }
+    DependencyManager() : Node("dependency_manager", "fabric") { initialize(); }
 
   private:
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::AcquireDependency>>
@@ -29,7 +29,7 @@ class DependencyManager : public rclcpp::Node
     // be disabled when they no longer have any users
     std::unordered_set<std::string> m_started_as_deps;
 
-    void init()
+    void initialize()
     {
         create_acquire_dependency_service();
         create_release_dependency_service();

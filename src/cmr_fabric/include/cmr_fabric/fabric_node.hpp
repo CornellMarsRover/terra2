@@ -4,38 +4,42 @@
 #include "cmr_utils/tomlcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
-namespace cmr::fabric {
+namespace cmr::fabric
+{
 
-class FabricNode : public rclcpp_lifecycle::LifecycleNode {
-   public:
-    FabricNode(std::string name) : rclcpp_lifecycle::LifecycleNode(name) {
+class FabricNode : public rclcpp_lifecycle::LifecycleNode
+{
+  public:
+    explicit FabricNode(const std::string &name)
+        : rclcpp_lifecycle::LifecycleNode(name)
+    {
         declare_parameter("config_path", "");
         declare_parameter("restart_attempts", 0);
         declare_parameter("restart_delay", 0);
         declare_parameter("num_restarts", 0);
 
-        recover_fault_client =
-            this->create_client<cmr_msgs::srv::RecoverFault>("/fabric/recover_fault");
+        m_recover_fault_client = this->create_client<cmr_msgs::srv::RecoverFault>(
+            "/fabric/recover_fault");
     }
 
-    virtual ~FabricNode() = default;
+    ~FabricNode() override = default;
 
-    virtual bool onConfigure(std::shared_ptr<toml::Table>) { return true; }
+    virtual bool configure(const std::shared_ptr<toml::Table> &) { return true; }
 
-    virtual bool onActivate() { return true; }
+    virtual bool activate() { return true; }
 
-    virtual bool onDeactivate() { return true; }
+    virtual bool deactivate() { return true; }
 
-    virtual bool onShutdown() { return true; }
+    virtual bool cleanup() { return true; }
 
     /**
      * @brief Returns the vector of dependencies defined by this node. There is no
-     * guarantee that everything in this list is a valid dependency (i.e. that they each
-     * exist as a node).
+     * guarantee that everything in this list is a valid dependency (i.e. that they
+     * each exist as a node).
      *
      * @return std::vector<std::string> list of dependency names
      */
-    std::vector<std::string> get_dependencies() { return dependencies; }
+    std::vector<std::string> get_dependencies() { return m_dependencies; }
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_configure(
         const rclcpp_lifecycle::State &) override;
@@ -55,10 +59,20 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode {
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_error(
         const rclcpp_lifecycle::State &) override;
 
-   private:
-    std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>> recover_fault_client;
-    std::vector<std::string> dependencies;
-    void scheduleRestart();
+  protected:
+    /**
+     * @brief A node can internally call panic() when it has entered an invalid state
+     * during its execution. This function must only be called within a callback; if
+     * a node's state is illegal outside of a callback, return false in the lifecycle
+     * function instead.
+     */
+    void panic();
+
+  private:
+    std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
+        m_recover_fault_client;
+    std::vector<std::string> m_dependencies;
+    void schedule_restart();
 };
 
 }  // namespace cmr::fabric

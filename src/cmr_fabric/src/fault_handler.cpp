@@ -70,6 +70,7 @@ class FaultHandler : public rclcpp::Node
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
+    
     auto node = std::make_shared<FaultHandler>();
     rclcpp::spin(node);
     rclcpp::shutdown();

@@ -4,6 +4,8 @@
 #include "cmr_utils/cmr_error.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+using namespace std::chrono_literals;
+
 class DemoNode : public cmr::fabric::FabricNode
 {
   public:
@@ -12,7 +14,7 @@ class DemoNode : public cmr::fabric::FabricNode
         declare_parameter("test", "");
     }
 
-    bool onConfigure(std::shared_ptr<toml::Table> table) override
+    bool configure(const std::shared_ptr<toml::Table>& table) override
     {
         auto node_settings = table->getTable("node");
         auto [ok, test] = node_settings->getString("test");
@@ -23,24 +25,32 @@ class DemoNode : public cmr::fabric::FabricNode
         return true;
     }
 
-    bool onActivate() override
+    bool activate() override
     {
         printf("Activating...\n");
         CMR_LOG(INFO, "test is %s", get_parameter("test").as_string().c_str());
+        auto timer_cb = [this]() {
+            this->panic();
+            m_timer->cancel();
+        };
+        m_timer = this->create_wall_timer(1s, timer_cb);
         return true;
     }
 
-    bool onDeactivate() override
+    bool deactivate() override
     {
         printf("Deactivating...\n");
         return true;
     }
 
-    bool onShutdown() override
+    bool cleanup() override
     {
         printf("Shutting down...\n");
         return true;
     }
+
+  private:
+    rclcpp::TimerBase::SharedPtr m_timer;
 };
 
 int main(int argc, char** argv)

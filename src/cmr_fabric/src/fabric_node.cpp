@@ -30,8 +30,9 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 
     auto config = toml.table;
 
-    auto faultHandlingSettings = config->getTable("fault_handling");
-    auto [ok, restart_attempts] = faultHandlingSettings->getInt("restart_attempts");
+    auto fault_handling_settings = config->getTable("fault_handling");
+    auto [ok, restart_attempts] =
+        fault_handling_settings->getInt("restart_attempts");
     if (!ok) {
         CMR_LOG(ERROR, "Failed to parse fault_handling.restart_attempts: %s",
                 toml.errmsg.c_str());
@@ -39,7 +40,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
     }
     set_parameter(rclcpp::Parameter("restart_attempts", restart_attempts));
 
-    auto [delay_ok, restart_delay] = faultHandlingSettings->getInt("restart_delay");
+    auto [delay_ok, restart_delay] =
+        fault_handling_settings->getInt("restart_delay");
     if (!delay_ok) {
         CMR_LOG(ERROR, "Failed to parse fault_handling.restart_delay: %s",
                 toml.errmsg.c_str());
@@ -60,11 +62,11 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
     const rclcpp_lifecycle::State &)
 {
-    for (auto dep_name : this->get_dependencies()) {
+    for (const auto &dep_name : this->get_dependencies()) {
         auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
         request->dependent = get_name();
         request->target = dep_name;
-        auto response = cmr::sendRequest<cmr_msgs::srv::AcquireDependency>(
+        auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
             "/fabric/acquire", request);
         if (!response) {
             CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
@@ -78,11 +80,11 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
     const rclcpp_lifecycle::State &)
 {
-    for (auto dep_name : this->get_dependencies()) {
+    for (const auto &dep_name : this->get_dependencies()) {
         auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();
         request->dependent = get_name();
         request->target = dep_name;
-        auto response = cmr::sendRequest<cmr_msgs::srv::ReleaseDependency>(
+        auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
             "/fabric/release", request);
         if (!response) {
             CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());

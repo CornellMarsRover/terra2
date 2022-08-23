@@ -26,10 +26,8 @@ install(
 )
 
 if(BUILD_TESTING)
-  #find_package(ament_lint_auto REQUIRED)
-  #set(ament_cmake_copyright_FOUND TRUE)
-  #set(ament_cmake_cpplint_FOUND TRUE)
-  #ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(fabric_test tests/fabric_test.cpp)
 endif()
 
 # BEGIN LIBRARY cmr_fabric
@@ -55,6 +53,7 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
+
 # END LIBRARY cmr_fabric
 
 ament_export_libraries(

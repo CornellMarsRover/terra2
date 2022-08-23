@@ -13,7 +13,7 @@
 class DependencyManager : public rclcpp::Node
 {
   public:
-    DependencyManager() : Node("dependency_manager", "fabric") {}
+    DependencyManager() : Node("dependency_manager", "fabric") { init(); }
 
   private:
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::AcquireDependency>>
@@ -56,7 +56,7 @@ class DependencyManager : public rclcpp::Node
 
                     auto activate_response =
                         cmr::send_request<cmr_msgs::srv::ActivateNode>(
-                            "/fabric/activate_node", request);
+                            get_effective_namespace() + "/activate_node", request);
 
                     if (!activate_response) {
                         // failed to activate
@@ -74,8 +74,9 @@ class DependencyManager : public rclcpp::Node
                 return response;
             };
 
-        this->create_service<cmr_msgs::srv::AcquireDependency>(
-            get_effective_namespace() + "/acquire", acquire_dep_callback);
+        m_acquire_dependency_service =
+            this->create_service<cmr_msgs::srv::AcquireDependency>(
+                get_effective_namespace() + "/acquire", acquire_dep_callback);
     }
 
     void create_release_dependency_service()
@@ -115,7 +116,8 @@ class DependencyManager : public rclcpp::Node
                         request->node_name = target;
                         auto deactivate_response =
                             cmr::send_request<cmr_msgs::srv::DeactivateNode>(
-                                "/fabric/deactivate_node", request);
+                                get_effective_namespace() + "/deactivate_node",
+                                request);
                         if (!deactivate_response) {
                             // failed to deactivate
                             response->success = false;
@@ -127,8 +129,9 @@ class DependencyManager : public rclcpp::Node
                 response->success = true;
                 return response;
             };
-        this->create_service<cmr_msgs::srv::ReleaseDependency>(
-            get_effective_namespace() + "/release", release_dep_callback);
+        m_release_dependency_service =
+            this->create_service<cmr_msgs::srv::ReleaseDependency>(
+                get_effective_namespace() + "/release", release_dep_callback);
     }
 };
 
@@ -136,8 +139,8 @@ int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
-    printf("The dependency_manager node.\n");
-
+    auto node = std::make_shared<DependencyManager>();
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }

@@ -8,7 +8,7 @@
 class FaultHandler : public rclcpp::Node
 {
   public:
-    FaultHandler() : rclcpp::Node("fault_handler", "fabric") { initialize(); }
+    FaultHandler() : rclcpp::Node("fault_handler") { initialize(); }
 
   private:
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::RecoverFault>>
@@ -29,8 +29,8 @@ class FaultHandler : public rclcpp::Node
     {
         auto recover_fault_callback =
             [this](
-                const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request> request,
-                std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>) {
+                const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request>& request,
+                const std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>&) {
                 std::lock_guard<std::mutex> guard(m_nodes_to_restart_mutex);
                 m_nodes_to_restart.emplace(request->node_name,
                                            request->restart_delay);
@@ -56,7 +56,7 @@ class FaultHandler : public rclcpp::Node
                         std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
                     request->node_name = node_name;
                     cmr::send_request<cmr_msgs::srv::ActivateNode>(
-                        "/fabric/activate_node", request);
+                        get_effective_namespace() + "/activate_node", request);
                     it = m_nodes_to_restart.erase(it);
                 }
             }
@@ -70,7 +70,7 @@ class FaultHandler : public rclcpp::Node
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
-    
+
     auto node = std::make_shared<FaultHandler>();
     rclcpp::spin(node);
     rclcpp::shutdown();

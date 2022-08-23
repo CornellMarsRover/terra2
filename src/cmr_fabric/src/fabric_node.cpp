@@ -68,7 +68,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
         request->dependent = get_name();
         request->target = dep_name;
         auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
-            "/fabric/acquire", request);
+            m_composition_ns + "/acquire", request);
         if (!response) {
             CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
             return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -86,7 +86,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
         request->dependent = get_name();
         request->target = dep_name;
         auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
-            "/fabric/release", request);
+            m_composition_ns + "/release", request);
         if (!response) {
             CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
             return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;

@@ -14,12 +14,14 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
         : rclcpp_lifecycle::LifecycleNode(name)
     {
         declare_parameter("config_path", "");
+        declare_parameter("composition_ns", "");
         declare_parameter("restart_attempts", 0);
         declare_parameter("restart_delay", 0);
         declare_parameter("num_restarts", 0);
 
+        m_composition_ns = get_parameter("composition_ns").as_string();
         m_recover_fault_client = this->create_client<cmr_msgs::srv::RecoverFault>(
-            "/fabric/recover_fault");
+            m_composition_ns + "/recover_fault");
     }
 
     ~FabricNode() override = default;
@@ -69,6 +71,7 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     void panic();
 
   private:
+    std::string m_composition_ns;
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
     std::vector<std::string> m_dependencies;

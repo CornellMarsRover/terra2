@@ -17,10 +17,7 @@ using namespace std::chrono_literals;
 class LifecycleManager : public rclcpp::Node
 {
   public:
-    LifecycleManager() : rclcpp::Node("lifecycle_manager", "fabric")
-    {
-        initialize();
-    }
+    LifecycleManager() : rclcpp::Node("lifecycle_manager") { initialize(); }
 
   private:
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ActivateNode>> m_activate_srv;
@@ -43,8 +40,9 @@ class LifecycleManager : public rclcpp::Node
     {
         auto activate_cb =
             [this](
-                const std::shared_ptr<cmr_msgs::srv::ActivateNode::Request> request,
-                std::shared_ptr<cmr_msgs::srv::ActivateNode::Response> response) {
+                const std::shared_ptr<cmr_msgs::srv::ActivateNode::Request>& request,
+                const std::shared_ptr<cmr_msgs::srv::ActivateNode::Response>&
+                    response) {
                 // check if node is configured
                 auto state = call_get_state_client(request->node_name);
                 if (state == cmr::fabric::LifecycleState::Unconfigured) {
@@ -68,16 +66,16 @@ class LifecycleManager : public rclcpp::Node
                 response->success = result;
             };
         m_activate_srv = this->create_service<cmr_msgs::srv::ActivateNode>(
-            get_effective_namespace() + "/activate_node", activate_cb);
+            get_effective_namespace() + "/activate", activate_cb);
     }
 
     void create_deactivate_service()
     {
         auto deactivate_cb =
-            [this](
-                const std::shared_ptr<cmr_msgs::srv::DeactivateNode::Request>
-                    request,
-                std::shared_ptr<cmr_msgs::srv::DeactivateNode::Response> response) {
+            [this](const std::shared_ptr<cmr_msgs::srv::DeactivateNode::Request>&
+                       request,
+                   const std::shared_ptr<cmr_msgs::srv::DeactivateNode::Response>&
+                       response) {
                 // check if node is active
                 auto state = call_get_state_client(request->node_name.c_str());
                 if (state != cmr::fabric::LifecycleState::Active) {
@@ -97,16 +95,16 @@ class LifecycleManager : public rclcpp::Node
                 response->success = result;
             };
         m_deactivate_srv = this->create_service<cmr_msgs::srv::DeactivateNode>(
-            get_effective_namespace() + "/deactivate_node", deactivate_cb);
+            get_effective_namespace() + "/deactivate", deactivate_cb);
     }
 
     void create_reconfigure_service()
     {
         auto reconfigure_cb =
-            [this](
-                const std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Request>
-                    request,
-                std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Response> response) {
+            [this](const std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Request>&
+                       request,
+                   const std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Response>&
+                       response) {
                 // we have to go through four transitions: deactivate, cleanup,
                 // configure, activate
                 auto state = call_get_state_client(request->node_name.c_str());
@@ -148,7 +146,7 @@ class LifecycleManager : public rclcpp::Node
                 response->success = success;
             };
         m_reconfigure_srv = this->create_service<cmr_msgs::srv::ReconfigureNode>(
-            get_effective_namespace() + "/reconfigure_node", reconfigure_cb);
+            get_effective_namespace() + "/reconfigure", reconfigure_cb);
     }
 
     void create_state_service()

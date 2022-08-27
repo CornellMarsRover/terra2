@@ -12,7 +12,7 @@
   ],
   // CPP configuration
   "[cpp]": {
-    "editor.defaultFormatter": "xaver.clang-format"
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
   },
   "clangd.arguments": [
     "--compile-commands-dir=${workspaceFolder}/build",
@@ -108,7 +108,7 @@
     "**/bower_components": true,
     "**/*.code-search": true,
     "**/build": true,
-    "**/install": true,
+    "**/install/**": true,
     "**/log": true
   },
   "python.formatting.provider": "black",

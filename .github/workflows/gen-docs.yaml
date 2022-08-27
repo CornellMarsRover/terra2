@@ -1,4 +1,4 @@
-name: Generate docs and push
+name: Generate docs and push to gh-pages
 on:
   push:
   pull_request:
@@ -21,7 +21,11 @@ jobs:
           path: install
           ref: main
 
-      - name: Gen docs
+      - name: Create docs output folder
+        run: |
+          mkdir -p build/cmr_docs
+
+      - name: Generate docs
         uses: mattnotmitt/doxygen-action@v1.9.4
 
       - name: Push to gh-pages

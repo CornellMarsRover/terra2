@@ -2,6 +2,8 @@
 #include <csignal>
 #include <optional>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 #include <variant>
 
 #include "rclcpp/rclcpp.hpp"
@@ -9,6 +11,22 @@
 /// Gets the default logger. Called if logging outside a node and `get_logger`
 /// is not shadowed
 inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
+
+using assert_handler_t = void (*)();
+
+/**
+ * @brief Set the assert handler callback
+ *
+ * @param handler the new assert handler
+ * @return the old assert handler
+ */
+assert_handler_t set_assert_handler(assert_handler_t handler) noexcept;
+/**
+ * @brief Get the assert handler object
+ *
+ * @return assert_handler_t
+ */
+assert_handler_t get_assert_handler() noexcept;
 
 /**
  * Logs a message of the specified level.
@@ -29,19 +47,13 @@ inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
         CMR_LOG(FATAL, "ASSERT: '%s' FAILED in %s:%d", #CONDITION, __FILE__, \
                 __LINE__);                                                   \
         CMR_LOG(FATAL, __VA_ARGS__);                                         \
-        raise(SIGTRAP);                                                      \
+        get_assert_handler()();                                              \
     }
 
 /// Helper function for macro. Aborts the program with the specified error
 /// information
 [[noreturn]] inline void cmr_invalid(const char* file, unsigned line,
-                                     const char* msg) noexcept
-{
-    CMR_LOG(FATAL, "CMR_INVALID triggered at %s:%u", file, line);
-    CMR_LOG(FATAL, "%s", msg);
-    raise(SIGTRAP);
-    std::terminate();
-}
+                                     const char* msg) noexcept;
 
 /**
  * Asserts that a statement should not be reached
@@ -65,115 +77,159 @@ inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
 #endif
 /// @}
 
-enum class ErrorCode {
-    /// An error ocurred but we give the user no further information
-    OpaqueError
+/**
+ * @brief Base class for all custom exceptions for our code
+ *
+ * You should use distinct exception classes if you expect a user would want to
+ * handle the errors differently.
+ *
+ * If a user would want different debug information, than you should use a single
+ * exception class that is constructed from an error code which returns different
+ * messages based on that error code in `what()`
+ *
+ * Exceptions should be used for external errors that can occur even when our code
+ * is bugfree, and should be thrown only if there is a reasonable thing that the
+ * user can do to handler the exception.
+ *
+ * ## Example
+ * ```C++
+ * enum class ECEIOErrorCode
+ * {
+ *      Malformed, InvalidData, Timeout
+ * };
+ *
+ *
+ * class ECEIOException : public CmrException
+ * {
+ *      ECEIOErrorCode m_error;
+ *    public:
+ *      ECEIOException(ECEIOErrorCode code) : m_error(code) {}
+ *
+ *      const char* what() const noexcept
+ *      {
+ *         switch(m_error) {
+ *              case ECEIOErrorCode::Malformed:
+ *                  return "Malformed packet";
+ *              // ...
+ *          }
+ *      }
+ * }
+ * ```
+ *
+ * Notice how in this example, a client can't really do any different error
+ * handling for each case besides retry. However someone debugging an issue
+ * may want this information. Further note how even if our code is
+ * bug free, this exception could occur. The exception is an external problem.
+ * This is a good usage of an exception
+ *
+ */
+class CmrException : public std::exception
+{
 };
 
-/// Base class for all errors
-class Error
+/**
+ * @brief Namespace of helper functions for monads.
+ *
+ * [Read more here](https://cs3110.github.io/textbook/chapters/ds/monads.html)
+ *
+ * In this sense, I use the term monad slightly loosely, to mean some class that
+ * wraps a type and can be augmented to be a monad. Specifically, I am targetting
+ * `std::optional`to add the monad functions available to it in C++23.
+ *
+ *
+ */
+namespace monad
 {
-  public:
-    virtual ~Error() = default;
 
-    /// Gets a description of the error. Can be empty
-    virtual std::string_view what() const noexcept = 0;
-
-    /// Gets an error code for the error.
-    virtual ErrorCode code() const noexcept = 0;
+/** SFINAE helpers for determining if a class is "monad like"
+ * I say something is "monad like" if it has a `has_value()`, `value()`, default
+ * constructor, and constructor that takes the value the monad wraps.
+ * @{
+ */
+template <typename T, typename = void>
+struct IsMonadLike : std::false_type {
 };
 
-/// An error type with only an error code and its description
-class BasicError : public Error
-{
-    ErrorCode m_code;
-
-  public:
-    explicit BasicError(ErrorCode code) : m_code(code) {}
-
-    ErrorCode code() const noexcept override { return m_code; }
-    std::string_view what() const noexcept override
-    {
-        switch (m_code) {
-            case ErrorCode::OpaqueError:
-                return {"No information available"};
-            default:
-                CMR_INVALID("Unimplemented error code");
-        }
-    }
+template <typename T>
+struct IsMonadLike<T,
+                   std::void_t<std::enable_if_t<std::is_same_v<
+                                   decltype(std::declval<T>().has_value()), bool>>,
+                               decltype(std::declval<T>().value()),
+                               decltype(T(std::declval<T>().value()))>>
+    : std::true_type {
 };
 
-/// A result type that holds either a value, or an error
-/// @tparam T the type of the value
-/// @tparam E the type of the error
-template <typename T, typename E = std::unique_ptr<Error>>
-class Result
-{
-    std::variant<T, E> m_data;
+template <typename T>
+constexpr bool is_monad_like_v = IsMonadLike<T>::value;
+/// @}
 
-  public:
-    Result() : m_data(T{}) {}
-    Result(T&& t) : m_data(std::move(t)) {}  // NOLINT(google-explicit-constructor)
-    Result(E&& e) : m_data(std::move(e)) {}  // NOLINT(google-explicit-constructor)
-    Result(const T& t) : m_data(t) {}        // NOLINT(google-explicit-constructor)
+/**
+ * @brief Converts a monad of one type to a monad of another type.
+ * This function is equivalent to `bind` in traditional functional programming
+ * monad literature.
+ *
+ * Has the same exception guaruntee as `f`
+ *
+ * @tparam T Monad type
+ * @tparam Func a function which takes the value of a monad and returns a new monad
+ * @param monad the input monad
+ * @param f the monad transformation function
+ * @return the monad converted by `f`, or an empty monad of the return type of `f`
+ */
+template <typename T, typename Func>
+constexpr auto bind(T&& monad, Func f) noexcept(noexcept(f(monad.value())))
+    -> std::enable_if_t<is_monad_like_v<T>,
+                        std::remove_reference_t<decltype(f(monad.value()))>>;
 
-    template <typename EArg>
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    Result(std::unique_ptr<EArg>&& e) : m_data(E(e.release()))
-    {
-    }
+/**
+ * @brief Converts a monad of one type to a monad of another.
+ * This is equivalent to `map` in Rust and `transform` in C++23 `std::optional`
+ *
+ * Has the same exception guaruntee as `f`
+ *
+ * @tparam T monad wrapper type
+ * @tparam U monad value type
+ * @tparam Func a function which takes `U` and returns `V` for any `V` and `U`
+ * @param monad the input monad
+ * @param f function which takes the value and returns a different value. Not
+ * executed if `monad` does not contain a value
+ * @return A monad of the returned value of `f` or an empty monad of the same type
+ */
+template <template <typename> class T, typename U, typename Func>
+constexpr auto map(const T<U>& monad, Func f) noexcept(noexcept(f(monad.value())))
+    -> std::enable_if_t<is_monad_like_v<T<U>>,
+                        T<std::remove_reference_t<decltype(f(monad.value()))>>>;
 
-    /// `true` if the result holds the error type.
-    inline bool has_error() const noexcept
-    {
-        return std::holds_alternative<E>(m_data);
-    }
+/**
+ * @brief Gets the value contained within the monad or the default if it is empty
+ *
+ * @tparam T monad type
+ * @tparam U default type
+ * @param monad
+ * @param default_val
+ * @return the value within `monad` or `default_val`
+ */
+template <typename T, typename U>
+constexpr auto value_or(T&& monad, U&& default_val) noexcept
+    -> std::enable_if_t<is_monad_like_v<T>, U>;
 
-    /// `true` if the result holds the value type.
-    inline bool has_value() const noexcept
-    {
-        return std::holds_alternative<T>(m_data);
-    }
+/**
+ * @brief Gets the value contained within the monad or the value returned by the
+ * function if it is empty
+ *
+ * Has the same exception guaruntees as `f`
+ *
+ * @tparam T monad type
+ * @tparam Func a function which takes nothing and returns a value of the wrapped
+ *  monad value
+ * @param monad
+ * @param f
+ * @return
+ */
+template <typename T, typename Func>
+constexpr auto value_or_else(T&& monad, Func f) noexcept(noexcept(f()))
+    -> std::enable_if_t<is_monad_like_v<T>,
+                        std::remove_reference_t<decltype(monad.value())>>;
+}  // namespace monad
 
-    /// Gets an optional to the value
-    std::optional<T> maybe_get_val() const noexcept
-    {
-        if (std::holds_alternative<T>(m_data)) {
-            return {std::get<T>(m_data)};
-        } else {
-            return {};
-        }
-    }
-
-    /// Gets an optional to the error type
-    std::optional<T> maybe_get_err() const noexcept
-    {
-        if (std::holds_alternative<E>(m_data)) {
-            return {std::get<E>(m_data)};
-        } else {
-            return {};
-        }
-    }
-
-    const T& value() const& noexcept
-    {
-        CMR_ASSERT(has_value(), "Called value() on an error Result");
-        return std::get<T>(m_data);
-    }
-    T& value() & noexcept
-    {
-        CMR_ASSERT(has_value(), "Called value() on an error Result");
-        return std::get<T>(m_data);
-    }
-    T value() && noexcept
-    {
-        CMR_ASSERT(has_value(), "Called value() on an error Result");
-        return std::move(std::get<T>(m_data));
-    }
-};
-
-template <typename T, typename E>
-inline Result<T> make_opaque_result(E&& error) noexcept
-{
-    return {std::make_unique<E>(std::forward<E>(error))};
-}
+#include "cmr_utils/cmr_error.inl"

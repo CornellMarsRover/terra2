@@ -3,12 +3,11 @@
 #include <optional>
 
 #include "cmr_utils/cmr_error.hpp"
-#include "cmr_utils/cmr_monad.hpp"
 
 TEST(Monad, optionalIsAMondad)
 {
     std::optional<int> maybe_int = {5};
-    static_assert(monad::IsMonadLikeV<std::optional<int>>);
+    static_assert(monad::is_monad_like_v<std::optional<int>>);
     auto r = monad::map(maybe_int, [](int i) { return i + 10; });
     ASSERT_TRUE(r.has_value());
     ASSERT_EQ(r.value(), 15);
@@ -18,21 +17,24 @@ TEST(Monad, optionalIsAMondad)
     std::optional<void*> maybe_ptr = {};
     ASSERT_EQ(monad::value_or_else(maybe_ptr, []() { return nullptr; }), nullptr);
 }
+void test_assert_handler() { throw std::invalid_argument(""); }
 
-TEST(Monad, errorIsAMonad)
+void invoke_assert() { CMR_ASSERT(false, "TEST"); }
+
+TEST(Error, changeAssertHandler)
 {
-    static_assert(monad::IsMonadLikeV<Result<int>>);
-    Result<int> res = {5};
+    const auto old = set_assert_handler(test_assert_handler);
+    ASSERT_THROW(invoke_assert(), std::invalid_argument);
+    set_assert_handler(old);
+}
+
+TEST(Monad, bindTest)
+{
+    std::optional<int> res = {5};
     ASSERT_TRUE(res.has_value());
     constexpr auto num = 0xFFFFFFFFFF;
-    ASSERT_EQ(monad::bind(res, [](auto) { return Result<long long>(num); }).value(),
+    ASSERT_EQ(monad::bind(res, [num](auto) { return std::optional<long long>(num); })
+                  .value(),
               num);
-    ASSERT_TRUE(res.maybe_get_val().has_value());
+    ASSERT_TRUE(res.has_value());
 }
-
-auto test_fun()
-{
-    return make_opaque_result<int>(BasicError{ErrorCode::OpaqueError});
-}
-
-TEST(Error, basicErrorToError) { ASSERT_TRUE(test_fun().has_error()); }

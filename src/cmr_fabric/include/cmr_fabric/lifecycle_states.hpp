@@ -2,12 +2,14 @@
 
 #include "cmr_msgs/msg/state.hpp"
 
-namespace cmr::fabric {
+namespace cmr::fabric
+{
 /** A LifecycleState is Fabric's representation of the state of a node. */
 enum class LifecycleState {
     /** Unknown state, indicates that something might be wrong. **/
     Unknown,
-    /** Node has been created, but its persisted configuration has not been loaded. */
+    /** Node has been created, but its persisted configuration has not been loaded.
+     */
     Unconfigured,
     /** Node has been configured, but it's not doing anything. */
     Inactive,

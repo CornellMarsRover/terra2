@@ -1,0 +1,31 @@
+name: Generate docs and push
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  gen:
+    runs-on: self-hosted
+    container: ros:humble
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Check out doxygen format files
+        uses: actions/checkout@v3
+        with:
+          repository: jothepro/doxygen-awesome-css
+          path: install
+          ref: main
+
+      - name: Gen docs
+        uses: mattnotmitt/doxygen-action@v1.9.4
+
+      - name: Push to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/cmr_docs/html

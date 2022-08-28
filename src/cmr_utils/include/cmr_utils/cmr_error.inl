@@ -1,11 +1,11 @@
-/// \file Inline definitions for cmr_error.hpp
+/// @file Inline definitions for cmr_error.hpp
 
 [[noreturn]] inline void cmr_invalid(const char* file, unsigned line,
-                                     const char* msg) noexcept
+                                     const char* msg)
 {
     CMR_LOG(FATAL, "CMR_INVALID triggered at %s:%u", file, line);
     CMR_LOG(FATAL, "%s", msg);
-    get_assert_handler()();
+    get_assert_handler()();  // the assert handler could throw an exception
     std::terminate();
     // To use cmr_invalid to end control paths (ie. need not explicitly return from
     // a function after calling it), we must make sure we actually abort

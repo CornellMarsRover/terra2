@@ -1,13 +1,13 @@
 #pragma once
 
-#include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace cmr
 {
 /**
- * Format a string using <code>std::snprintf</code>.
+ * Format a string using `std::snprintf`.
  *
  * @param format format string
  * @param args format arguments
@@ -27,32 +27,19 @@ std::string string_format(const std::string& format, Args... args)
     // result anywhere but just use the size it returns. this also gives us a chance
     // to do some error handling which is the advantage of this longer-winded
     // approach over std::sprintf.
-    int size_s = std::snprintf(nullptr, 0, format.c_str(), args...) +
-                 1;  // add extra space for terminator '\0'
+    const int size_s = std::snprintf(nullptr, 0, format.c_str(), args...) +
+                       1;  // add extra space for terminator '\0'
     if (size_s <= 0) {
         throw std::runtime_error("string format failed");
     }
-    auto size = static_cast<size_t>(size_s);
+    const auto size = static_cast<size_t>(size_s);
 
     // now that we know the size, and we know that the format is valid, we finally
     // create our char buffer and use std::snprintf to write it
-    std::unique_ptr<char[]> buf(new char[size]);
-    std::snprintf(buf.get(), size, format.c_str(), args...);
-    return {buf.get(),
-            buf.get() + size - 1};  // We don't want the terminator '\0' inside
+    std::vector<char> buf(size);
+    std::snprintf(buf.data(), size, format.c_str(), args...);
+    return {buf.data(),
+            buf.data() + size - 1};  // We don't want the terminator '\0' inside
 }
 
-/**
- * Check whether a string ends with the given substring.
- * @param value the string to check
- * @param ending the ending
- * @return true if the string ends in the ending, false otherwise
- */
-inline bool ends_with(const std::string& value, const std::string& ending)
-{
-    if (ending.size() > value.size()) {
-        return false;
-    }
-    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
-}
 }  // namespace cmr

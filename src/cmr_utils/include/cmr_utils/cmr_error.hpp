@@ -1,69 +1,106 @@
 #pragma once
-#include <csignal>
-#include <optional>
-#include <string_view>
 #include <type_traits>
 #include <utility>
-#include <variant>
 
 #include "rclcpp/rclcpp.hpp"
 
-/// Gets the default logger. Called if logging outside a node and `get_logger`
-/// is not shadowed
+/** @file Contains general error handling, debug, and assertion utilities for the
+ * code base
+ */
+
+/** Gets the default ROS logger. Called if logging outside a node and `get_logger`
+ * is not shadowed */
 inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
 
+/** An assert handler is the function that is called when an assert fails
+ * or an `CMR_INVALID` is triggered.
+ *
+ * The default assert handler will trap a debugger if one is attached, otherwise it
+ * will terminate the program
+ */
 using assert_handler_t = void (*)();
 
 /**
- * @brief Set the assert handler callback
+ * @brief Set the assert handler callback.
+ *
+ * This function doesn't have to be called since there is a default handler. It is
+ * here only for hooking asserts for unit tests.
  *
  * @param handler the new assert handler
  * @return the old assert handler
  */
 assert_handler_t set_assert_handler(assert_handler_t handler) noexcept;
-/**
- * @brief Get the assert handler object
- *
- * @return assert_handler_t
- */
+
+/** Gets the assert handler object */
 assert_handler_t get_assert_handler() noexcept;
 
 /**
+ * @def CMR_LOG
+ *
  * Logs a message of the specified level.
  * Uses the node logger if called from a node, otherwise uses the default logger
  * @param LEVEL the level of the message, such as WARN, INFO, DEBUG, FATAL
+ * @param ... A format string followed by format arguments, like `printf`
  */
 // NOLINTNEXTLINE
 #define CMR_LOG(LEVEL, ...) RCLCPP_##LEVEL(get_logger(), __VA_ARGS__)
 
 /**
- * Asserts a condition is true.
- * If the condition is false, creates a `FATAL` log and signals to trap the debugger
- * if one is attached, otherwise aborts the program.
+ * @def CMR_ASSERT
+ *
+ * Asserts a condition is true. Optionally pass a format string to log.
+ * If the condition is false, creates a `FATAL` log and calls the assert handler
+ * which by default traps the debugger or terminates the program
+ * @param CONDITION condition to assert
  */
 // NOLINTNEXTLINE
-#define CMR_ASSERT(CONDITION, ...)                                           \
+#define CMR_ASSERT(CONDITION)                                                \
     if (!(CONDITION)) {                                                      \
         CMR_LOG(FATAL, "ASSERT: '%s' FAILED in %s:%d", #CONDITION, __FILE__, \
                 __LINE__);                                                   \
-        CMR_LOG(FATAL, __VA_ARGS__);                                         \
         get_assert_handler()();                                              \
     }
 
-/// Helper function for macro. Aborts the program with the specified error
-/// information
-[[noreturn]] inline void cmr_invalid(const char* file, unsigned line,
-                                     const char* msg) noexcept;
+/**
+ * @def CMR_ASSERT_MSG
+ * Like `CMR_ASSERT` but also supplied a format string followed by format arguments,
+ * just like `printf`
+ *
+ * ### Example
+ * - `CMR_ASSERT_MSG(x == 10, "%s was %d instead of 10", "x", x)`
+ * - `CMR_ASSERT(x == 10);`
+ *
+ */
+// NOLINTNEXTLINE
+#define CMR_ASSERT_MSG(CONDITION, ...) \
+    CMR_ASSERT(CONDITION);             \
+    CMR_LOG(FATA, __VA_ARGS__);
 
 /**
+ * @brief Helper function for `CMR_INVALID` macro.
+ * This function will log debug info, call the assert handler, then terminate the
+ * program
+ *
+ * @param file file that the invalid state occurred at
+ * @param line line number of invalid statement
+ * @param msg debug message to log
+ * @see CMR_INVALID
+ */
+[[noreturn]] inline void cmr_invalid(const char* file, unsigned line,
+                                     const char* msg);
+
+/**
+ * @def CMR_INVALID
  * Asserts that a statement should not be reached
  */
 // NOLINTNEXTLINE
 #define CMR_INVALID(MSG) cmr_invalid(__FILE__, __LINE__, MSG)
 
-/// @{
-/// Debug versions of `CMR_LOG` and `CMR_ASSERT`
-/// Only enabled in debug builds and should be used VERY sparingly
+/** @defgroup DEBUG_MACROS
+ * Debug versions of `CMR_LOG` and `CMR_ASSERT`
+ * Only enabled in debug builds and should be used VERY sparingly
+ * @{
+ */
 #ifndef NDEBUG
 // NOLINTNEXTLINE
 #define CMR_ASSSERT_D(CONDITION, ...) CMR_ASSERT(CONDITION, __VA_ARGS__)
@@ -75,7 +112,7 @@ assert_handler_t get_assert_handler() noexcept;
 // NOLINTNEXTLINE
 #define CMR_LOG_D(LEVEL, ...)
 #endif
-/// @}
+/** @} */
 
 /**
  * @brief Base class for all custom exceptions for our code
@@ -132,6 +169,13 @@ class CmrException : public std::exception
  *
  * [Read more here](https://cs3110.github.io/textbook/chapters/ds/monads.html)
  *
+ * I use the term `monad` here to mean a type that wraps another value. They key
+ * features for general a monad are that it can be constructed from a value it wraps,
+ * it can return the value it wraps, and it can transform itself into a new monad
+ * type. This namespace requires that monads may *not necessarily* contain a value
+ * and thus should have a default constructor and a way to determine if they contain
+ * a value or not.
+ *
  * In this sense, I use the term monad slightly loosely, to mean some class that
  * wraps a type and can be augmented to be a monad. Specifically, I am targetting
  * `std::optional`to add the monad functions available to it in C++23.
@@ -141,7 +185,8 @@ class CmrException : public std::exception
 namespace monad
 {
 
-/** SFINAE helpers for determining if a class is "monad like"
+/**
+ * SFINAE helpers for determining if a class is "monad like"
  * I say something is "monad like" if it has a `has_value()`, `value()`, default
  * constructor, and constructor that takes the value the monad wraps.
  * @{
@@ -161,7 +206,7 @@ struct IsMonadLike<T,
 
 template <typename T>
 constexpr bool is_monad_like_v = IsMonadLike<T>::value;
-/// @}
+/** @} */
 
 /**
  * @brief Converts a monad of one type to a monad of another type.

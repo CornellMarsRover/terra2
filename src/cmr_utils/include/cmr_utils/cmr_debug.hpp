@@ -74,7 +74,7 @@ assert_handler_t get_assert_handler() noexcept;
 // NOLINTNEXTLINE
 #define CMR_ASSERT_MSG(CONDITION, ...) \
     CMR_ASSERT(CONDITION);             \
-    CMR_LOG(FATA, __VA_ARGS__);
+    CMR_LOG(FATAL, __VA_ARGS__);
 
 /**
  * @brief Helper function for `CMR_INVALID` macro.

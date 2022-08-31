@@ -2,7 +2,8 @@
 
 #include <optional>
 
-#include "cmr_utils/cmr_error.hpp"
+#include "cmr_utils/cmr_debug.hpp"
+#include "cmr_utils/monad.hpp"
 
 TEST(Monad, optionalIsAMondad)
 {

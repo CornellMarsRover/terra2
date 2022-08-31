@@ -41,7 +41,7 @@ find_package(rclcpp REQUIRED)
 add_library(${PROJECT_NAME} SHARED
   src/toml.c
   src/tomlcpp.cxx
-  src/cmr_error.cpp)
+  src/cmr_debug.cpp)
 
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
@@ -63,7 +63,7 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   #ament_lint_auto_find_test_dependencies()
 
-  cmr_test(error_test SOURCES test/error_test.cpp src/cmr_error.cpp DEPS rclcpp)
+  cmr_test(error_test SOURCES test/error_test.cpp src/cmr_debug.cpp DEPS rclcpp)
 endif()
 
 ament_package()

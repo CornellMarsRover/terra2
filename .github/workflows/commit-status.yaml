@@ -27,7 +27,7 @@ jobs:
   test:
     needs: build
     runs-on: self-hosted
-    container: ros:humble
+    container: cornellmarsrover:latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
@@ -49,7 +49,7 @@ jobs:
       - name: Get clang tools
         id: tools
         run: |
-          sudo apt install clang-format clang-tidy
+          sudo apt install clang-format clang-tidy -y
 
       - name: Static analysis
         id: analyze

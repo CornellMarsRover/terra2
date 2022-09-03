@@ -38,21 +38,16 @@ jobs:
         id: get-self-packages
         uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
 
-      - name: Install code coverage tools
-        id: cctools
+      - name: Get clang tools
+        id: tools
         run: |
-          sudo apt install lcov -y
+          sudo apt-get update && sudo apt-get install clang-format clang-tidy llvm-cov lcov -y
 
       - name: Test
         id: test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
         run: |
           export TERRA_DIR=$(pwd) && bash scripts/test_wd.sh
-
-      - name: Get clang tools
-        id: tools
-        run: |
-          sudo apt install clang-format clang-tidy -y
 
       - name: Clean compile commands
         id: clean_db

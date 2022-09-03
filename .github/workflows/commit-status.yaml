@@ -54,9 +54,9 @@ jobs:
       - name: Clean compile commands
         id: clean_db
         run: |
-          bash scripts/clean_build_db.sh
+          bash scripts/clean_build_db_wd.sh
 
       - name: Static analysis
         id: analyze
         run: |
-          bash scripts/check.sh
+          bash scripts/check_wd.sh

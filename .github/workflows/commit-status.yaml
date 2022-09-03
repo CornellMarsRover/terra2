@@ -50,15 +50,15 @@ jobs:
         id: ccoverage
         run: |
           sudo apt-get update && sudo apt-get install lcov
-          lcov --directory . --base-directory . --capture -o build/cov.info
-          lcov -r build/cov.info "/opt/*" -o build/cov.info
-          lcov -r build/cov.info "*/cmr_msgs/*" -o build/cov.info
-          lcov -r build/cov.info "*/cmr_*/test/*" -o build/cov.info
-          lcov -r build/cov.info "*.cxx" -o build/cov.info
-          lcov -r build/cov.info "*.hxx" -o build/cov.info
-          lcov -r build/cov.info "*.c" -o build/cov.info
-          lcov -r build/cov.info "*.h" -o build/cov.info
-          lcov -r build/cov.info "/usr/*" -o build/cov.info
+          lcov --directory . --base-directory . --capture -o build/cov.info > /dev/null
+          lcov -r build/cov.info "/opt/*" -o build/cov.info > /dev/null
+          lcov -r build/cov.info "*/cmr_msgs/*" -o build/cov.info > /dev/null
+          lcov -r build/cov.info "*/cmr_*/test/*" -o build/cov.info > /dev/null
+          lcov -r build/cov.info "*.cxx" -o build/cov.info > /dev/null
+          lcov -r build/cov.info "*.hxx" -o build/cov.info > /dev/null
+          lcov -r build/cov.info "*.c" -o build/cov.info > /dev/null
+          lcov -r build/cov.info "*.h" -o build/cov.info > /dev/null
+          lcov -r build/cov.info "/usr/*" -o build/cov.info > /dev/null
 
       - name: Get clang tools
         id: tools

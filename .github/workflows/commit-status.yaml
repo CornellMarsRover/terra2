@@ -38,6 +38,11 @@ jobs:
         id: get-self-packages
         uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
 
+      - name: Install code coverage tools
+        id: cctools
+        run: |
+          sudo apt install lcov -y
+
       - name: Test
         id: test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}

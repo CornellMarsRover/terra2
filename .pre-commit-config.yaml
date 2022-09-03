@@ -2,17 +2,17 @@
 # See https://pre-commit.com/hooks.html for more hooks
 default_stages: [commit]
 repos:
-    - repo: https://github.com/pre-commit/mirrors-clang-format
-      rev: v14.0.0
-      hooks:
-          - id: clang-format
-            files: src/.*pp
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v14.0.0
+    hooks:
+      - id: clang-format
+        files: src/.*pp
 
-    - repo: https://github.com/pocc/pre-commit-hooks
-      rev: v1.3.5
-      hooks:
-          - id: clang-tidy
-            args: [-p=build/compile_commands.json]
-            # Ignore tests because gtest has tons of false-positives
-            stages: [push]
-            files: src/.*/src/.*\.cpp
+  # - repo: https://github.com/pocc/pre-commit-hooks
+  #   rev: v1.3.5
+  #   hooks:
+  #       - id: clang-tidy
+  #         args: [-p=build/compile_commands.json]
+  #         # Ignore tests because gtest has tons of false-positives
+  #         stages: [push]
+  #         files: src/.*/src/.*\.cpp

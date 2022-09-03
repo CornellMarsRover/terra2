@@ -45,3 +45,14 @@ jobs:
         with:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+
+      - name: Get clang tools
+        id: tools
+        run: |
+          sudo apt install clang-format clang-tidy
+
+      - name: Static analysis
+        id: analyze
+        run: |
+          chmod +x scripts/clean_build_db.sh && chmod +x scripts/check.sh && \
+          ./scripts/clean_build_db.sh && ./scripts/check.sh

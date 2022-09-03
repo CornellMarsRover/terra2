@@ -5,7 +5,7 @@
       "label": "build",
       "detail": "Build terra (debug)",
       "type": "shell",
-      "command": "bash scripts/build.sh -DCMAKE_BUILD_TYPE=Debug",
+      "command": "bash scripts/build.sh -DCMAKE_BUILD_TYPE=Debug && bash scripts/clean_build_db.sh",
       "group": {
         "kind": "build",
         "isDefault": true

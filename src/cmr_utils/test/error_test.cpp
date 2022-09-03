@@ -5,7 +5,7 @@
 #include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/monad.hpp"
 
-TEST(Monad, optionalIsAMondad)
+TEST(Monad, optionalIsAMonad)
 {
     std::optional<int> maybe_int = {5};
     static_assert(monad::is_monad_like_v<std::optional<int>>);

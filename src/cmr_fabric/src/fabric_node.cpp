@@ -4,7 +4,7 @@
 
 #include "cmr_msgs/srv/acquire_dependency.hpp"
 #include "cmr_msgs/srv/release_dependency.hpp"
-#include "cmr_utils/cmr_error.hpp"
+#include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
 
 using namespace std::chrono_literals;

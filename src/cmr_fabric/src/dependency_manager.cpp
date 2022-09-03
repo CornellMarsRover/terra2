@@ -6,7 +6,7 @@
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/deactivate_node.hpp"
 #include "cmr_msgs/srv/release_dependency.hpp"
-#include "cmr_utils/cmr_error.hpp"
+#include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
 #include "lifecycle_msgs/srv/change_state.hpp"
 #include "lifecycle_msgs/srv/get_state.hpp"

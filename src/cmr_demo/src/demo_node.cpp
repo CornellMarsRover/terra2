@@ -1,7 +1,7 @@
 #include <cstdio>
 
 #include "cmr_fabric/fabric_node.hpp"
-#include "cmr_utils/cmr_error.hpp"
+#include "cmr_utils/cmr_debug.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 using namespace std::chrono_literals;

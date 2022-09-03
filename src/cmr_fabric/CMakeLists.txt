@@ -8,6 +8,27 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
+function (cmr_test NAME)
+	set (BOOLEAN_ARGS "")
+	set (ONEVALUE_ARGS "")
+	set (MULTIVALUE_ARGS "SOURCES" "DEPS")
+	cmake_parse_arguments(
+		MK_TEST
+		"${BOOLEAN_ARGS}"
+		"${ONEVALUE_ARGS}"
+		"${MULTIVALUE_ARGS}"
+		${ARGN}
+	)
+
+  ament_add_gtest(${PROJECT_NAME}_${NAME} ${MK_TEST_SOURCES})
+  ament_target_dependencies(${PROJECT_NAME}_${NAME} ${MK_TEST_DEPS})
+  target_include_directories(${PROJECT_NAME}_${NAME} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+  target_compile_options(${PROJECT_NAME}_${NAME} PUBLIC --coverage)
+  target_link_options(${PROJECT_NAME}_${NAME} PUBLIC --coverage)
+endfunction()
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -27,7 +48,7 @@ install(
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(fabric_test tests/fabric_test.cpp)
+  cmr_test(fabric_test SOURCES test/fabric_test.cpp)
 endif()
 
 # BEGIN LIBRARY cmr_fabric
@@ -53,6 +74,10 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
+if(BUILD_TESTING)
+  target_compile_options(${PROJECT_NAME} PUBLIC --coverage)
+  target_link_options(${PROJECT_NAME} PUBLIC --coverage)
+endif()
 
 # END LIBRARY cmr_fabric
 
@@ -78,6 +103,10 @@ target_include_directories(fault_handler PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(fault_handler PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+if(BUILD_TESTING)
+  target_compile_options(fault_handler PUBLIC --coverage)
+  target_link_options(fault_handler PUBLIC --coverage)
+endif()
 
 install(TARGETS fault_handler
   DESTINATION lib/${PROJECT_NAME})
@@ -99,6 +128,10 @@ target_include_directories(lifecycle_manager PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(lifecycle_manager PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+if(BUILD_TESTING)
+  target_compile_options(lifecycle_manager PUBLIC --coverage)
+  target_link_options(lifecycle_manager PUBLIC --coverage)
+endif()
 
 install(TARGETS lifecycle_manager
   DESTINATION lib/${PROJECT_NAME})
@@ -120,6 +153,10 @@ target_include_directories(dependency_manager PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(dependency_manager PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+if(BUILD_TESTING)
+  target_compile_options(dependency_manager PUBLIC --coverage)
+  target_link_options(dependency_manager PUBLIC --coverage)
+endif()
 
 install(TARGETS dependency_manager
   DESTINATION lib/${PROJECT_NAME})

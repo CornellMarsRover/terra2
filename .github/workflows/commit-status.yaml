@@ -41,10 +41,8 @@ jobs:
       - name: Test
         id: test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
-        uses: autowarefoundation/autoware-github-actions/colcon-test@v1
-        with:
-          rosdistro: humble
-          target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+        run: |
+          export TERRA_DIR=$(pwd) && bash scripts/test_wd.sh
 
       - name: Get clang tools
         id: tools

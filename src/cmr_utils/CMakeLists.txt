@@ -32,6 +32,8 @@ function (cmr_test NAME)
   target_include_directories(${PROJECT_NAME}_${NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
+  target_compile_options(${PROJECT_NAME}_${NAME} PUBLIC --coverage)
+  target_link_options(${PROJECT_NAME}_${NAME} PUBLIC --coverage)
 endfunction()
 
 # find dependencies
@@ -50,6 +52,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(${PROJECT_NAME} PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+if(BUILD_TESTING)
+  target_compile_options(${PROJECT_NAME} PUBLIC --coverage)
+  target_link_options(${PROJECT_NAME} PUBLIC --coverage)
+endif()
 
 # Export old-style CMake variables
 ament_export_include_directories(include)

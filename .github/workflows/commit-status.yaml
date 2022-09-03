@@ -51,8 +51,12 @@ jobs:
         run: |
           sudo apt install clang-format clang-tidy -y
 
+      - name: Clean compile commands
+        id: clean_db
+        run: |
+          bash scripts/clean_build_db.sh
+
       - name: Static analysis
         id: analyze
         run: |
-          chmod +x scripts/clean_build_db.sh && chmod +x scripts/check.sh && \
-          ./scripts/clean_build_db.sh && ./scripts/check.sh
+          bash scripts/check.sh

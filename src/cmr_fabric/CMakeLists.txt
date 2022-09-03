@@ -48,7 +48,8 @@ install(
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  cmr_test(fabric_test SOURCES test/fabric_test.cpp)
+  cmr_test(fabric_test SOURCES test/fabric_test.cpp src/fabric_node.cpp 
+    DEPS rclcpp rclcpp_lifecycle cmr_msgs cmr_utils)
 endif()
 
 # BEGIN LIBRARY cmr_fabric

@@ -41,7 +41,7 @@ jobs:
       - name: Get clang tools
         id: tools
         run: |
-          sudo apt-get update && sudo apt-get install clang-format clang-tidy llvm-cov lcov -y
+          sudo apt-get update && sudo apt-get install clang-format clang-tidy llvm-cov-14 lcov -y
 
       - name: Test
         id: test

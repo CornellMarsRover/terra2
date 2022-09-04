@@ -7,7 +7,7 @@ include(CmrUtils)
 find_package(rclcpp REQUIRED)
 
 cmr_add_lib(${PROJECT_NAME} SHARED 
-  SOURCES src/toml.c src/tomlcpp.cxx src/cmr_debug.cpp
+  SOURCES src/external/toml.c src/external/tomlcpp.cxx src/cmr_debug.cpp
   DEPS rclcpp)
 
 # Export old-style CMake variables

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cmr_msgs/srv/recover_fault.hpp"
-#include "cmr_utils/tomlcpp.hxx"
+#include "cmr_utils/external/tomlcpp.hxx"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 namespace cmr::fabric

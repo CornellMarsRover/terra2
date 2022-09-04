@@ -24,12 +24,12 @@
   SOFTWARE.
 
 */
-#include "../include/cmr_utils/tomlcpp.hxx"
+#include "../include/cmr_utils/external/tomlcpp.hxx"
 
 #include <cstring>
 #include <fstream>
 
-#include "../include/cmr_utils/toml.h"
+#include "../include/cmr_utils/external/toml.h"
 
 using namespace toml;
 using std::pair;

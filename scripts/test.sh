@@ -3,7 +3,14 @@
 # Runs all unit tests in the ROS workspace.
 
 pushd "$CMR_ROOT/terra" &> /dev/null
-export TERRA_DIR="$CMR_ROOT/terra"
-bash scripts/test_wd.sh
-genhtml build/cov.info -o build/cov-output
+source install/setup.bash
+find . -name "*.gcda" -delete
+colcon test
+colcon test-result --verbose
+test_result_code=$?
+if [ $test_result_code != 0 ]; then 
+    exit $test_result_code
+fi
+chmod +x $CMR_ROOT/terra/scripts/llvm-cov-wrapper.sh
+bash scripts/code_coverage.sh --gcov-tool $CMR_ROOT/terra/scripts/llvm-cov-wrapper.sh
 popd &>/dev/null

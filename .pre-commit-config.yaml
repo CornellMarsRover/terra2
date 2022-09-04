@@ -8,11 +8,9 @@ repos:
       - id: clang-format
         files: src/.*pp
 
-  # - repo: https://github.com/pocc/pre-commit-hooks
-  #   rev: v1.3.5
-  #   hooks:
-  #       - id: clang-tidy
-  #         args: [-p=build/compile_commands.json]
-  #         # Ignore tests because gtest has tons of false-positives
-  #         stages: [push]
-  #         files: src/.*/src/.*\.cpp
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.3.0
+    hooks:
+      - id: no-commit-to-branch
+        args: ["--branch", "main"]
+        stages: [commit, push]

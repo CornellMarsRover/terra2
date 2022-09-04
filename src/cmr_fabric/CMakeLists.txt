@@ -1,34 +1,70 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_fabric)
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/../../cmake")
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
+                      "${PROJECT_SOURCE_DIR}/../../cmake")
 include(CmrUtils)
 
 # find dependencies
 cmr_std_find_pkgs(rclcpp_lifecycle lifecycle_msgs)
-# Add additional dependencies here. Make sure you update package.xml if you're depending
-# on other packages.
-# find_package(<dependency> REQUIRED)
+# Add additional dependencies here. Make sure you update package.xml if you're
+# depending on other packages. find_package(<dependency> REQUIRED)
 
-cmr_add_test(fabric_test SOURCES test/fabric_test.cpp src/fabric_node.cpp 
-    DEPS rclcpp rclcpp_lifecycle cmr_msgs cmr_utils)
+cmr_add_test(
+  fabric_test
+  SOURCES
+  test/fabric_test.cpp
+  src/fabric_node.cpp
+  DEPS
+  rclcpp
+  rclcpp_lifecycle
+  cmr_msgs
+  cmr_utils)
 
-cmr_add_lib(cmr_fabric SOURCES src/fabric_node.cpp 
-  DEPS rclcpp rclcpp_lifecycle lifecycle_msgs
-  std_msgs cmr_msgs cmr_utils)
+cmr_add_lib(
+  cmr_fabric
+  SOURCES
+  src/fabric_node.cpp
+  DEPS
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  std_msgs
+  cmr_msgs
+  cmr_utils)
 
+cmr_add_node(
+  fault_handler
+  SOURCES
+  src/fault_handler.cpp
+  DEPS
+  rclcpp
+  std_msgs
+  cmr_msgs
+  cmr_utils)
 
-cmr_add_node(fault_handler SOURCES src/fault_handler.cpp
-  DEPS rclcpp std_msgs cmr_msgs cmr_utils)
+cmr_add_node(
+  lifecycle_manager
+  SOURCES
+  src/lifecycle_manager.cpp
+  DEPS
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  std_msgs
+  cmr_msgs
+  cmr_utils)
 
-cmr_add_node(lifecycle_manager SOURCES src/lifecycle_manager.cpp
-  DEPS rclcpp rclcpp_lifecycle lifecycle_msgs
-  std_msgs cmr_msgs cmr_utils)
-
-cmr_add_node(dependency_manager SOURCES src/dependency_manager 
-  SOURCES src/dependency_manager.cpp
-  DEPS rclcpp rclcpp_lifecycle lifecycle_msgs
-  std_msgs cmr_msgs cmr_utils)
-
+cmr_add_node(
+  dependency_manager
+  SOURCES
+  src/dependency_manager.cpp
+  DEPS
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  std_msgs
+  cmr_msgs
+  cmr_utils)
 
 # PHOBOS_APPEND
 cmr_install()

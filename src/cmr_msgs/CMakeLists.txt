@@ -18,7 +18,6 @@ rosidl_generate_interfaces(
   srv/GetNodeState.srv
   srv/ReconfigureNode.srv
   srv/AcquireDependency.srv
-  srv/ReleaseDependency.srv
-)
+  srv/ReleaseDependency.srv)
 
 ament_package()

@@ -20,13 +20,11 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: jothepro/doxygen-awesome-css
-          path: install
+          path: install/doxygen-awesome-css-main
           ref: main
 
       - name: Create docs output folder
         run: |
-          ls install
-          ls install/doxygen-awesome-css-main
           mkdir -p build/cmr_docs
 
       - name: Generate docs

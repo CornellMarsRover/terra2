@@ -8,18 +8,18 @@ find_package(rclcpp REQUIRED)
 
 cmr_add_lib(
   ${PROJECT_NAME}
-  shared
+  SHARED
   SOURCES
   src/external/toml.c
   src/external/tomlcpp.cxx
   src/cmr_debug.cpp
-  DEPS
+  DEPENDS
   rclcpp)
 
 # Export old-style CMake variables
 cmr_export()
 
-cmr_add_test(error_test SOURCES test/error_test.cpp src/cmr_debug.cpp DEPS
+cmr_add_test(error_test SOURCES test/error_test.cpp src/cmr_debug.cpp DEPENDS
              rclcpp)
 
 ament_package()

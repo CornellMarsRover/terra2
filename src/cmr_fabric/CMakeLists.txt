@@ -6,15 +6,15 @@ include(CmrUtils)
 
 # find dependencies
 cmr_std_find_pkgs(rclcpp_lifecycle lifecycle_msgs)
+
 # Add additional dependencies here. Make sure you update package.xml if you're
 # depending on other packages. find_package(<dependency> REQUIRED)
-
 cmr_add_test(
   fabric_test
   SOURCES
   test/fabric_test.cpp
   src/fabric_node.cpp
-  DEPS
+  DEPENDS
   rclcpp
   rclcpp_lifecycle
   cmr_msgs
@@ -24,7 +24,7 @@ cmr_add_lib(
   cmr_fabric
   SOURCES
   src/fabric_node.cpp
-  DEPS
+  DEPENDS
   rclcpp
   rclcpp_lifecycle
   lifecycle_msgs
@@ -36,7 +36,7 @@ cmr_add_node(
   fault_handler
   SOURCES
   src/fault_handler.cpp
-  DEPS
+  DEPENDS
   rclcpp
   std_msgs
   cmr_msgs
@@ -46,7 +46,7 @@ cmr_add_node(
   lifecycle_manager
   SOURCES
   src/lifecycle_manager.cpp
-  DEPS
+  DEPENDS
   rclcpp
   rclcpp_lifecycle
   lifecycle_msgs
@@ -58,7 +58,7 @@ cmr_add_node(
   dependency_manager
   SOURCES
   src/dependency_manager.cpp
-  DEPS
+  DEPENDS
   rclcpp
   rclcpp_lifecycle
   lifecycle_msgs

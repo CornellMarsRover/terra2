@@ -6,16 +6,16 @@ include(CmrUtils)
 
 # find dependencies
 cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle)
+
 # Add additional dependencies here. Make sure you update package.xml if you're
 # depending on other packages.
-
 cmr_install(LAUNCH)
 
 cmr_add_node(
   demo_node
   SOURCES
   src/demo_node.cpp
-  DEPS
+  DEPENDS
   rclcpp
   rclcpp_lifecycle
   std_msgs
@@ -24,7 +24,6 @@ cmr_add_node(
   cmr_utils)
 
 # PHOBOS_APPEND
-
 cmr_export()
 
 ament_package()

@@ -7,22 +7,22 @@ find_package(ament_cmake REQUIRED)
 # * <name> - the name of the test. The full test name will be
 #   <PROJECT_NAME>_<name>
 # * <SOURCES> - source files for the test
-# * <DEPS> - dependencies of the test
+# * <DEPENDS> - dependencies of the test
 #
 # ## Example:
 #
 # `cmr_test(error_test SOURCES test/error_test.cpp test/error_test_helper.cpp
-# DEPS rclcpp)`
+# DEPENDS rclcpp)`
 function(cmr_add_test name)
   set(bool_args "")
   set(one_val_args "")
-  set(multi_val_args "SOURCES" "DEPS")
+  set(multi_val_args "SOURCES" "DEPENDS")
   cmake_parse_arguments(MK_TEST "${bool_args}" "${one_val_args}"
                         "${multi_val_args}" ${ARGN})
 
   if(BUILD_TESTING)
     ament_add_gtest(${PROJECT_NAME}_${name} ${MK_TEST_SOURCES})
-    ament_target_dependencies(${PROJECT_NAME}_${name} ${MK_TEST_DEPS})
+    ament_target_dependencies(${PROJECT_NAME}_${name} ${MK_TEST_DEPENDS})
     target_include_directories(
       ${PROJECT_NAME}_${name}
       PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -41,16 +41,16 @@ endfunction()
 # * <SHARED> - optional flag, if set, builds a shared library by passing SHARED
 #   to add_library
 # * <SOURCES> - multivalue argument of all source files for the node
-# * <DEPS> - multivalue argument of all dependencies for the node
+# * <DEPENDS> - multivalue argument of all dependencies for the node
 #
 # ## Examples:
 #
-# * `cmr_add_lib(cmr_utils SOURCES src/cmr_debug.cpp DEPS rclcpp)`
-# * `cmr_add_lib(cmr_utils SHARED SOURCES src/cmr_debug.cpp DEPS rclcpp)`
+# * `cmr_add_lib(cmr_utils SOURCES src/cmr_debug.cpp DEPENDS rclcpp)`
+# * `cmr_add_lib(cmr_utils SHARED SOURCES src/cmr_debug.cpp DEPENDS rclcpp)`
 function(cmr_add_lib name)
   set(bool_args "SHARED")
   set(one_val_args "")
-  set(multi_val_args "SOURCES" "DEPS")
+  set(multi_val_args "SOURCES" "DEPENDS")
   cmake_parse_arguments(MK_LIB "${bool_args}" "${one_val_args}"
                         "${multi_val_args}" ${ARGN})
 
@@ -60,14 +60,14 @@ function(cmr_add_lib name)
     add_library(${name} ${MK_LIB_SOURCES})
   endif()
 
-  ament_target_dependencies(${name} ${MK_LIB_DEPS})
+  ament_target_dependencies(${name} ${MK_LIB_DEPENDS})
   target_include_directories(
     ${name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                    $<INSTALL_INTERFACE:include>)
 
   target_compile_features(${name} PUBLIC c_std_99 cxx_std_17) # Require C99 and
-                                                              # C++17
 
+  # C++17
   if(BUILD_TESTING)
     target_compile_options(${name} PUBLIC --coverage)
     target_link_options(${name} PUBLIC --coverage)
@@ -83,7 +83,6 @@ function(cmr_add_lib name)
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin)
-
 endfunction()
 
 # Adds a node or other executable. Sets default include directories and
@@ -94,33 +93,32 @@ endfunction()
 #
 # * <name> - name of the build target
 # * <SOURCES> - multivalue argument of all source files for the node
-# * <DEPS> - multivalue argument of all dependencies for the node
+# * <DEPENDS> - multivalue argument of all dependencies for the node
 #
 # ## Examples:
 #
-# * `cmr_add_node(demo_node SOURCES src/demo_node.cpp DEPS rclcpp cmr_utils)`
+# * `cmr_add_node(demo_node SOURCES src/demo_node.cpp DEPENDS rclcpp cmr_utils)`
 function(cmr_add_node name)
   set(bool_args "")
   set(one_val_args "")
-  set(multi_val_args "SOURCES" "DEPS")
+  set(multi_val_args "SOURCES" "DEPENDS")
   cmake_parse_arguments(MK_NODE "${bool_args}" "${one_val_args}"
                         "${multi_val_args}" ${ARGN})
 
   add_executable(${name} ${MK_NODE_SOURCES})
-  ament_target_dependencies(${name} ${MK_NODE_DEPS})
+  ament_target_dependencies(${name} ${MK_NODE_DEPENDS})
   target_include_directories(
     ${name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                    $<INSTALL_INTERFACE:include>)
   target_compile_features(${name} PUBLIC c_std_99 cxx_std_17) # Require C99 and
-                                                              # C++17
 
+  # C++17
   install(TARGETS ${name} DESTINATION lib/${PROJECT_NAME})
 
   if(BUILD_TESTING)
     target_compile_options(${name} PUBLIC --coverage)
     target_link_options(${name} PUBLIC --coverage)
   endif()
-
 endfunction()
 
 # Exports the include directory and all libraries added with cmr_add_lib This
@@ -129,6 +127,7 @@ endfunction()
 # This exports old CMake variables
 macro(CMR_EXPORT)
   ament_export_include_directories(include)
+
   if(NOT "${CMR_LIBS}" STREQUAL "")
     ament_export_targets(export_${PROJECT_NAME})
     ament_export_libraries(${CMR_LIBS})
@@ -168,7 +167,6 @@ macro(CMR_STD_FIND_PKGS)
 endmacro()
 
 # The following is run for every CMakeLists.txt that includes this module
-
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 else()

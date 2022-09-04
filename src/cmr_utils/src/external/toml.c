@@ -208,9 +208,9 @@ int toml_utf8_to_ucs(const char * orig, int len, int64_t * ret)
 }
 
 /**
- *	Convert a UCS char to utf8 code, and return it in buf.
- *	Return #bytes used in buf to encode the char, or
- *	-1 on error.
+ *    Convert a UCS char to utf8 code, and return it in buf.
+ *    Return #bytes used in buf to encode the char, or
+ *    -1 on error.
  */
 int toml_ucs_to_utf8(int64_t code, char buf[6])
 {
@@ -297,8 +297,8 @@ int toml_ucs_to_utf8(int64_t code, char buf[6])
 }
 
 /*
- *	TOML has 3 data structures: value, array, table.
- *	Each of them can have identification key.
+ *    TOML has 3 data structures: value, array, table.
+ *    Each of them can have identification key.
  */
 typedef struct toml_keyval_t toml_keyval_t;
 struct toml_keyval_t

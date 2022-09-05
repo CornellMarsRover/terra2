@@ -153,8 +153,9 @@ class LifecycleManager : public rclcpp::Node
     {
         auto get_node_state_cb =
             [this](
-                const std::shared_ptr<cmr_msgs::srv::GetNodeState::Request> request,
-                std::shared_ptr<cmr_msgs::srv::GetNodeState::Response> response) {
+                const std::shared_ptr<cmr_msgs::srv::GetNodeState::Request>& request,
+                const std::shared_ptr<cmr_msgs::srv::GetNodeState::Response>&
+                    response) {
                 auto result = call_get_state_client(request->node_name);
                 response->state.id = static_cast<uint8_t>(result);
             };

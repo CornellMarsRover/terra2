@@ -9,4 +9,3 @@ class FabricTest : public ::testing::Test
     ~FabricTest() override = default;
 };
 // TODO(@fad35)
-TEST_F(FabricTest, NodeDoesEnable) { ASSERT_FALSE(false); }

@@ -23,10 +23,10 @@ namespace monad
 {
 
 /**
+ * @{
  * SFINAE helpers for determining if a class is "monad like"
  * I say something is "monad like" if it has a `has_value()`, `value()`, default
  * constructor, and constructor that takes the value the monad wraps.
- * @{
  */
 template <typename T, typename = void>
 struct IsMonadLike : std::false_type {
@@ -40,7 +40,11 @@ struct IsMonadLike<T,
                                decltype(T(std::declval<T>().value()))>>
     : std::true_type {
 };
+/** @} */
 
+/**
+ * @brief Either true or false, depending on if `T` is like a monad
+ */
 template <typename T>
 constexpr bool is_monad_like_v = IsMonadLike<T>::value;
 /** @} */

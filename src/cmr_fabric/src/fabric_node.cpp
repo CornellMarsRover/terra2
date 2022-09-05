@@ -18,7 +18,7 @@ bool set_config_params(FabricNode &node, const toml::Result &toml)
 {
     const auto table = toml.table;
 
-    if (table) {
+    if (!table) {
         RCLCPP_ERROR(node.get_logger(), "Failed to parse config file: %s",
                      toml.errmsg.c_str());
         return false;

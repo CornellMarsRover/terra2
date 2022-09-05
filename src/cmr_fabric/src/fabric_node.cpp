@@ -13,42 +13,57 @@ using lifecycle_msgs::msg::Transition;
 namespace cmr::fabric
 {
 
+// Basic guarantee. This is ok because if this fails, entire node is reset anyway
+bool set_config_params(FabricNode &node, const toml::Result &toml)
+{
+    const auto table = toml.table;
+
+    if (table) {
+        RCLCPP_ERROR(node.get_logger(), "Failed to parse config file: %s",
+                     toml.errmsg.c_str());
+        return false;
+    }
+
+    const auto fault_handling_settings = table->getTable("fault_handling");
+    const auto [ok, restart_attempts] =
+        fault_handling_settings->getInt("restart_attempts");
+    if (!ok) {
+        RCLCPP_ERROR(node.get_logger(),
+                     "Failed to parse fault_handling.restart_attempts: %s",
+                     toml.errmsg.c_str());
+        return false;
+    }
+    node.set_parameter(rclcpp::Parameter("restart_attempts", restart_attempts));
+
+    const auto [delay_ok, restart_delay] =
+        fault_handling_settings->getInt("restart_delay");
+    if (!delay_ok) {
+        RCLCPP_ERROR(node.get_logger(),
+                     "Failed to parse fault_handling.restart_delay: %s",
+                     toml.errmsg.c_str());
+        return false;
+    }
+    node.set_parameter(rclcpp::Parameter("restart_delay", restart_delay));
+    return true;
+}
+
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
     const rclcpp_lifecycle::State &)
 {
-    auto config_path = get_parameter("config_path").as_string();
+    const auto config_path = get_parameter("config_path").as_string();
     if (config_path.empty()) {
         CMR_LOG(ERROR, "No config_path parameter specified");
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
 
-    auto toml = toml::parseFile(config_path);
+    const auto toml = toml::parseFile(config_path);
 
-    if (!toml.table) {
-        CMR_LOG(ERROR, "Failed to parse config file: %s", toml.errmsg.c_str());
+    if (!set_config_params(*this, toml)) {
+        // error logging done in set_config_params
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
 
-    auto config = toml.table;
-
-    auto fault_handling_settings = config->getTable("fault_handling");
-    auto [ok, restart_attempts] =
-        fault_handling_settings->getInt("restart_attempts");
-    if (!ok) {
-        CMR_LOG(ERROR, "Failed to parse fault_handling.restart_attempts: %s",
-                toml.errmsg.c_str());
-        return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
-    }
-    set_parameter(rclcpp::Parameter("restart_attempts", restart_attempts));
-
-    auto [delay_ok, restart_delay] =
-        fault_handling_settings->getInt("restart_delay");
-    if (!delay_ok) {
-        CMR_LOG(ERROR, "Failed to parse fault_handling.restart_delay: %s",
-                toml.errmsg.c_str());
-        return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
-    }
-    set_parameter(rclcpp::Parameter("restart_delay", restart_delay));
+    const auto config = toml.table;
 
     auto dependencies = config->getArray("dependencies");
     if (dependencies) {

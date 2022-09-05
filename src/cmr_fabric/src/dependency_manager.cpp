@@ -76,53 +76,57 @@ class DependencyManager : public rclcpp::Node
                 get_effective_namespace() + "/acquire", acquire_dep_callback);
     }
 
-    void create_release_dependency_service()
+    auto release_dependency_callback(
+        const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& request,
+        std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response> response)
     {
-        auto release_dep_callback =
-            [this](const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>&
-                       request,
-                   std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>
-                       response) {
-                auto target = request->target;
-                auto dependent = request->dependent;
+        const auto target = request->target;
+        const auto dependent = request->dependent;
 
-                CMR_LOG(DEBUG, "Releasing dependency %s for node %s...",
-                        target.c_str(), dependent.c_str());
+        CMR_LOG(DEBUG, "Releasing dependency %s for node %s...", target.c_str(),
+                dependent.c_str());
 
-                if (m_users.find(target) == m_users.end()) {
-                    // target node was never acquired; just return success in
-                    // this case although this suggests misuse of the dependency
-                    // manager
-                    CMR_LOG(WARN,
-                            "attempting to release node %s, but it was "
-                            "never acquired",
-                            target.c_str());
-                    response->success = true;
+        if (m_users.find(target) == m_users.end()) {
+            // target node was never acquired; just return success in
+            // this case although this suggests misuse of the dependency
+            // manager
+            CMR_LOG(WARN,
+                    "attempting to release node %s, but it was "
+                    "never acquired",
+                    target.c_str());
+            response->success = true;
+            return response;
+        }
+
+        m_users[target].erase(dependent);
+
+        if (m_users[target].empty()) {
+            // no more users of the target node; deactivate it if it was
+            // started as a dependency
+            m_users.erase(target);
+            if (m_started_as_deps.find(target) != m_started_as_deps.end()) {
+                auto request =
+                    std::make_shared<cmr_msgs::srv::DeactivateNode::Request>();
+                request->node_name = target;
+                auto deactivate_response = deactivate_dependency(target);
+                if (!deactivate_response) {
+                    // failed to deactivate
+                    response->success = false;
                     return response;
                 }
+                m_started_as_deps.erase(target);
+            }
+        }
+        response->success = true;
+        return response;
+    }
 
-                m_users[target].erase(dependent);
+    void create_release_dependency_service()
+    {
+        auto release_dep_callback = [this](auto req, auto resp) {
+            return release_dependency_callback(req, resp);
+        };
 
-                if (m_users[target].empty()) {
-                    // no more users of the target node; deactivate it if it was
-                    // started as a dependency
-                    m_users.erase(target);
-                    if (m_started_as_deps.find(target) != m_started_as_deps.end()) {
-                        auto request = std::make_shared<
-                            cmr_msgs::srv::DeactivateNode::Request>();
-                        request->node_name = target;
-                        auto deactivate_response = deactivate_dependency(target);
-                        if (!deactivate_response) {
-                            // failed to deactivate
-                            response->success = false;
-                            return response;
-                        }
-                        m_started_as_deps.erase(target);
-                    }
-                }
-                response->success = true;
-                return response;
-            };
         m_release_dependency_service =
             this->create_service<cmr_msgs::srv::ReleaseDependency>(
                 get_effective_namespace() + "/release", release_dep_callback);

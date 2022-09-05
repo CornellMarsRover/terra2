@@ -98,53 +98,56 @@ class LifecycleManager : public rclcpp::Node
             get_effective_namespace() + "/deactivate", deactivate_cb);
     }
 
+    void reconfigure_callback(
+        const std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Request>& request,
+        const std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Response>& response)
+    {
+        // we have to go through four transitions: deactivate, cleanup,
+        // configure, activate
+        const auto state = call_get_state_client(request->node_name.c_str());
+        if (state == cmr::fabric::LifecycleState::Active) {
+            RCLCPP_INFO(get_logger(), "deactivating node %s",
+                        request->node_name.c_str());
+            auto success = call_change_state_client(
+                request->node_name,
+                lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE);
+            if (!success) {
+                response->success = false;
+                return;
+            }
+        }
+        // cleanup the node
+        auto success = call_change_state_client(
+            request->node_name, lifecycle_msgs::msg::Transition::TRANSITION_CLEANUP);
+        if (!success) {
+            response->success = false;
+            return;
+        }
+        // configure the node
+        RCLCPP_INFO(get_logger(), "configuring node %s", request->node_name.c_str());
+        success = call_change_state_client(
+            request->node_name,
+            lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+        if (!success) {
+            response->success = false;
+            return;
+        }
+        // activate the node
+        RCLCPP_INFO(get_logger(), "activating node %s", request->node_name.c_str());
+        success = call_change_state_client(
+            request->node_name,
+            lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
+        response->success = success;
+    }
+
     void create_reconfigure_service()
     {
-        auto reconfigure_cb =
+        const auto reconfigure_cb =
             [this](const std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Request>&
                        request,
                    const std::shared_ptr<cmr_msgs::srv::ReconfigureNode::Response>&
-                       response) {
-                // we have to go through four transitions: deactivate, cleanup,
-                // configure, activate
-                auto state = call_get_state_client(request->node_name.c_str());
-                if (state == cmr::fabric::LifecycleState::Active) {
-                    RCLCPP_INFO(get_logger(), "deactivating node %s",
-                                request->node_name.c_str());
-                    auto success = call_change_state_client(
-                        request->node_name,
-                        lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE);
-                    if (!success) {
-                        response->success = false;
-                        return;
-                    }
-                }
-                // cleanup the node
-                auto success = call_change_state_client(
-                    request->node_name,
-                    lifecycle_msgs::msg::Transition::TRANSITION_CLEANUP);
-                if (!success) {
-                    response->success = false;
-                    return;
-                }
-                // configure the node
-                RCLCPP_INFO(get_logger(), "configuring node %s",
-                            request->node_name.c_str());
-                success = call_change_state_client(
-                    request->node_name,
-                    lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
-                if (!success) {
-                    response->success = false;
-                    return;
-                }
-                // activate the node
-                RCLCPP_INFO(get_logger(), "activating node %s",
-                            request->node_name.c_str());
-                success = call_change_state_client(
-                    request->node_name,
-                    lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
-                response->success = success;
-            };
+                       response) { return reconfigure_callback(request, response); };
+
         m_reconfigure_srv = this->create_service<cmr_msgs::srv::ReconfigureNode>(
             get_effective_namespace() + "/reconfigure", reconfigure_cb);
     }
@@ -156,7 +159,7 @@ class LifecycleManager : public rclcpp::Node
                 const std::shared_ptr<cmr_msgs::srv::GetNodeState::Request>& request,
                 const std::shared_ptr<cmr_msgs::srv::GetNodeState::Response>&
                     response) {
-                auto result = call_get_state_client(request->node_name);
+                const auto result = call_get_state_client(request->node_name);
                 response->state.id = static_cast<uint8_t>(result);
             };
         m_get_node_state_srv = this->create_service<cmr_msgs::srv::GetNodeState>(
@@ -165,9 +168,10 @@ class LifecycleManager : public rclcpp::Node
 
     bool call_change_state_client(const std::string& targetNode, uint8_t transition)
     {
-        auto request = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+        const auto request =
+            std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
         request->transition.id = transition;
-        auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
+        const auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
             "/" + targetNode + "/change_state", request);
         return response->success;
     }

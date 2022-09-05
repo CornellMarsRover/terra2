@@ -78,7 +78,7 @@ class DependencyManager : public rclcpp::Node
 
     auto release_dependency_callback(
         const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& request,
-        std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response> response)
+        const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>& response)
     {
         const auto target = request->target;
         const auto dependent = request->dependent;
@@ -108,7 +108,7 @@ class DependencyManager : public rclcpp::Node
                 auto request =
                     std::make_shared<cmr_msgs::srv::DeactivateNode::Request>();
                 request->node_name = target;
-                auto deactivate_response = deactivate_dependency(target);
+                const auto deactivate_response = deactivate_dependency(target);
                 if (!deactivate_response) {
                     // failed to deactivate
                     response->success = false;
@@ -123,9 +123,11 @@ class DependencyManager : public rclcpp::Node
 
     void create_release_dependency_service()
     {
-        auto release_dep_callback = [this](auto req, auto resp) {
-            return release_dependency_callback(req, resp);
-        };
+        const auto release_dep_callback =
+            [this](const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>&
+                       req,
+                   const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>&
+                       resp) { return release_dependency_callback(req, resp); };
 
         m_release_dependency_service =
             this->create_service<cmr_msgs::srv::ReleaseDependency>(

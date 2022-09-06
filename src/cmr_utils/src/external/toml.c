@@ -1,3 +1,7 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma gcc diagnostic push
+#pragma gcc diagnostic ignored "-Wconversion"
 /*
 
   MIT License
@@ -2674,3 +2678,5 @@ static int parse_millisec(const char * p, const char ** endp)
   *endp = p;
   return ret;
 }
+#pragma clang diagnostic pop
+#pragma gcc diagnostic pop

@@ -1,7 +1,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
-#pragma gcc diagnostic push
-#pragma gcc diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
 /*
 
   MIT License
@@ -414,4 +414,4 @@ toml::Result toml::parseFile(const string &path)
     return toml::parse(conf);
 }
 #pragma clang diagnostic pop
-#pragma gcc diagnostic pop
+#pragma GCC diagnostic pop

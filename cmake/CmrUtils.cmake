@@ -169,9 +169,22 @@ endmacro()
 
 # The following is run for every CMakeLists.txt that includes this module
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+  add_compile_options(
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Werror
+    -Wshadow
+    -Wconversion
+    -Wnarrowing
+    -Wno-unknown-pragmas)
 else()
   message(FATAL_ERROR "Unsupported compiler: ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wnon-gcc -Wsometimes-uninitialized -Wshadow-all -Wunused
+                      -Wno-unused-function)
 endif()
 
 if(BUILD_TESTING)

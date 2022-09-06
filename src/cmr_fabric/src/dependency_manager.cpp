@@ -93,9 +93,9 @@ class DependencyManager : public rclcpp::Node
             // started as a dependency
             m_users.erase(target);
             if (m_started_as_deps.find(target) != m_started_as_deps.end()) {
-                auto request =
+                /*auto request =
                     std::make_shared<cmr_msgs::srv::DeactivateNode::Request>();
-                request->node_name = target;
+                request->node_name = target;*/
                 const auto deactivate_response = deactivate_dependency(target);
                 if (!deactivate_response) {
                     // failed to deactivate

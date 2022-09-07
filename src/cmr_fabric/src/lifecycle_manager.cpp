@@ -173,16 +173,22 @@ class LifecycleManager : public rclcpp::Node
         request->transition.id = transition;
         const auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
             "/" + targetNode + "/change_state", request);
-        return response->success;
+        return response && response.value()->success;
     }
 
     cmr::fabric::LifecycleState call_get_state_client(const std::string& targetNode)
     {
-        auto request = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
-        auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
+        const auto request =
+            std::make_shared<lifecycle_msgs::srv::GetState::Request>();
+        const auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
             "/" + targetNode + "/get_state", request);
 
-        auto ros_state_id = response->current_state.id;
+        if (!response) {
+            return cmr::fabric::LifecycleState::Unknown;
+            // Is this correct?
+        }
+
+        const auto ros_state_id = response.value()->current_state.id;
         switch (ros_state_id) {
             case lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED:
                 return cmr::fabric::LifecycleState::Unconfigured;

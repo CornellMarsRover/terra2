@@ -151,11 +151,12 @@ class DependencyManager : public rclcpp::Node
     bool activate_dependency(const std::string& target)
     {
         // check if node is configured
-        auto request = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
-        auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
-            "/" + target + "/get_state", request);
-        if (response->current_state.id ==
-            lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
+        const auto first_response = cmr::send_request<lifecycle_msgs::srv::GetState>(
+            "/" + target + "/get_state",
+            std::make_shared<lifecycle_msgs::srv::GetState::Request>());
+        if (first_response &&
+            first_response.value()->current_state.id ==
+                lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
             // configure first
             CMR_LOG(INFO, "configuring dependency %s", target.c_str());
             auto request =
@@ -164,7 +165,7 @@ class DependencyManager : public rclcpp::Node
                 lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
             auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
                 "/" + target + "/change_state", request);
-            if (!response->success) {
+            if (!response || !response.value()->success) {
                 return false;
             }
         }
@@ -174,19 +175,21 @@ class DependencyManager : public rclcpp::Node
             std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
         activate_request->transition.id =
             lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-        auto activate_response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
-            "/" + target + "/change_state", activate_request);
-        return activate_response->success;
+        const auto activate_response =
+            cmr::send_request<lifecycle_msgs::srv::ChangeState>(
+                "/" + target + "/change_state", activate_request);
+        return !(activate_response && activate_response.value()->success);
     }
 
     bool deactivate_dependency(const std::string& target)
     {
         // check if node is configured
-        auto request = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
-        auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
+        const auto request =
+            std::make_shared<lifecycle_msgs::srv::GetState::Request>();
+        const auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
             "/" + target + "/get_state", request);
-        if (response->current_state.id ==
-            lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
+        if (response && response.value()->current_state.id ==
+                            lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
             // This suggests that something is wrong, but since the node is
             // deactivating anyway, this isn't real cause for alarm enough for an
             // error log.
@@ -198,13 +201,14 @@ class DependencyManager : public rclcpp::Node
         }
         // we can deactivate now
         CMR_LOG(INFO, "deactivating dependency %s", target.c_str());
-        auto activate_request =
+        const auto activate_request =
             std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
         activate_request->transition.id =
             lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
-        auto activate_response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
-            "/" + target + "/change_state", activate_request);
-        return activate_response->success;
+        const auto activate_response =
+            cmr::send_request<lifecycle_msgs::srv::ChangeState>(
+                "/" + target + "/change_state", activate_request);
+        return activate_response && activate_response.value()->success;
     }
 };
 

@@ -14,15 +14,7 @@
 
 class DependencyManager : public rclcpp::Node
 {
-  public:
-    DependencyManager() : Node("dependency_manager", "fabric") { initialize(); }
-
   private:
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::AcquireDependency>>
-        m_acquire_dependency_service;
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReleaseDependency>>
-        m_release_dependency_service;
-
     // maps names of acquired nodes to the names of the nodes that depend on
     // them
     std::unordered_map<std::string, std::unordered_set<std::string>> m_users;
@@ -31,29 +23,27 @@ class DependencyManager : public rclcpp::Node
     // be disabled when they no longer have any users
     std::unordered_set<std::string> m_started_as_deps;
 
-    void initialize()
-    {
-        create_acquire_dependency_service();
-        create_release_dependency_service();
-        CMR_LOG(INFO, "dependency manager initialized");
-    }
+    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::AcquireDependency>>
+        m_acquire_dependency_srv;
+    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReleaseDependency>>
+        m_release_dependency_srv;
 
-    void create_acquire_dependency_service()
+    auto create_acquire_dependency_service()
     {
-        auto acquire_dep_callback =
+        const auto acquire_dep_callback =
             [this](const std::shared_ptr<cmr_msgs::srv::AcquireDependency::Request>&
                        request,
                    std::shared_ptr<cmr_msgs::srv::AcquireDependency::Response>
                        response) {
-                auto target = request->target;
-                auto dependent = request->dependent;
+                const auto [target, dependent] = *request;
 
                 if (m_users.find(target) == m_users.end()) {
-                    auto request =
+                    // TODO(@fad35)
+                    /*auto request =
                         std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
-                    request->node_name = target;
+                    request->node_name = target; */
 
-                    auto activate_response = activate_dependency(target);
+                    const auto activate_response = activate_dependency(target);
 
                     if (!activate_response) {
                         // failed to activate
@@ -71,17 +61,15 @@ class DependencyManager : public rclcpp::Node
                 return response;
             };
 
-        m_acquire_dependency_service =
-            this->create_service<cmr_msgs::srv::AcquireDependency>(
-                get_effective_namespace() + "/acquire", acquire_dep_callback);
+        return this->create_service<cmr_msgs::srv::AcquireDependency>(
+            get_effective_namespace() + "/acquire", acquire_dep_callback);
     }
 
     auto release_dependency_callback(
         const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& request,
         const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>& response)
     {
-        const auto target = request->target;
-        const auto dependent = request->dependent;
+        const auto [target, dependent] = *request;
 
         CMR_LOG(DEBUG, "Releasing dependency %s for node %s...", target.c_str(),
                 dependent.c_str());
@@ -121,7 +109,7 @@ class DependencyManager : public rclcpp::Node
         return response;
     }
 
-    void create_release_dependency_service()
+    auto create_release_dependency_service()
     {
         const auto release_dep_callback =
             [this](const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>&
@@ -129,9 +117,8 @@ class DependencyManager : public rclcpp::Node
                    const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>&
                        resp) { return release_dependency_callback(req, resp); };
 
-        m_release_dependency_service =
-            this->create_service<cmr_msgs::srv::ReleaseDependency>(
-                get_effective_namespace() + "/release", release_dep_callback);
+        return this->create_service<cmr_msgs::srv::ReleaseDependency>(
+            get_effective_namespace() + "/release", release_dep_callback);
     }
 
     /*
@@ -159,19 +146,20 @@ class DependencyManager : public rclcpp::Node
                 lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
             // configure first
             CMR_LOG(INFO, "configuring dependency %s", target.c_str());
-            auto request =
+            const auto request =
                 std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
             request->transition.id =
                 lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
-            auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
-                "/" + target + "/change_state", request);
+            const auto response =
+                cmr::send_request<lifecycle_msgs::srv::ChangeState>(
+                    "/" + target + "/change_state", request);
             if (!response || !response.value()->success) {
                 return false;
             }
         }
         // we can activate now
         CMR_LOG(INFO, "activating dependency %s", target.c_str());
-        auto activate_request =
+        const auto activate_request =
             std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
         activate_request->transition.id =
             lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
@@ -210,13 +198,21 @@ class DependencyManager : public rclcpp::Node
                 "/" + target + "/change_state", activate_request);
         return activate_response && activate_response.value()->success;
     }
+
+  public:
+    DependencyManager() : Node("dependency_manager", "fabric")
+    {
+        m_acquire_dependency_srv = create_acquire_dependency_service();
+        m_release_dependency_srv = create_release_dependency_service();
+        CMR_LOG(INFO, "dependency manager initialized");
+    }
 };
 
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<DependencyManager>();
+    const auto node = std::make_shared<DependencyManager>();
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

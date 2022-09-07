@@ -1,0 +1,38 @@
+name: Generate docs and push to gh-pages
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+jobs:
+  gen:
+    runs-on: self-hosted
+    container: ros:humble
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Check out doxygen format files
+        uses: actions/checkout@v3
+        with:
+          repository: jothepro/doxygen-awesome-css
+          path: install/doxygen-awesome-css-main
+          ref: main
+
+      - name: Create docs output folder
+        run: |
+          mkdir -p build/cmr_docs
+
+      - name: Generate docs
+        uses: mattnotmitt/doxygen-action@v1.9.4
+
+      - name: Push to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          publish_dir: ./build/cmr_docs/html
+          external_repository: CornellMarsRover/CornellMarsRover.github.io

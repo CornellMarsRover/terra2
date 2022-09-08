@@ -7,37 +7,22 @@
 namespace cmr::fabric
 {
 
+/**
+ * @brief The FabricNode is the base class for All CMR nodes
+ *
+ * Derived classes must implement the `configure`, `activate`, `deactivate`,
+ * and `cleanup` methods.
+ *
+ * This node sets up the ROS 2 lifecycle services to communicate with the CMR
+ * Dependency and Lifecycle manager nodes
+ *
+ */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
   public:
-    // we generate an ugly unique name for each fabric node with the expectation
-    // that the node will be renamed appropriately during the launch process.
-    explicit FabricNode()
-        : rclcpp_lifecycle::LifecycleNode(
-              "fabric_untitled_" +
-              std::to_string(
-                  std::chrono::system_clock::now().time_since_epoch().count()))
-    {
-        declare_parameter("config_path", "");
-        declare_parameter("composition_ns", "");
-        declare_parameter("restart_attempts", 0);
-        declare_parameter("restart_delay", 0);
-        declare_parameter("num_restarts", 0);
-
-        m_composition_ns = get_parameter("composition_ns").as_string();
-        m_recover_fault_client = this->create_client<cmr_msgs::srv::RecoverFault>(
-            m_composition_ns + "/recover_fault");
-    }
+    FabricNode();
 
     ~FabricNode() override = default;
-
-    virtual bool configure(const std::shared_ptr<toml::Table> &) { return true; }
-
-    virtual bool activate() { return true; }
-
-    virtual bool deactivate() { return true; }
-
-    virtual bool cleanup() { return true; }
 
     /**
      * @brief Returns the vector of dependencies defined by this node. There is no
@@ -76,11 +61,26 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     void panic();
 
   private:
-    std::string m_composition_ns;
+    /** The name of the namespace? */
+    std::string m_composition_namespace;
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
     std::vector<std::string> m_dependencies;
+
+    /** TODO(@fad35) */
     void schedule_restart();
+
+    /** Derived class hook for configuring the node */
+    virtual bool configure(const std::shared_ptr<toml::Table> &) = 0;
+
+    /** Derived  class hook for activation */
+    virtual bool activate() = 0;
+
+    /** Derived class hook for deactivation */
+    virtual bool deactivate() = 0;
+
+    /** Derived class hook for cleanup */
+    virtual bool cleanup() = 0;
 };
 
 }  // namespace cmr::fabric

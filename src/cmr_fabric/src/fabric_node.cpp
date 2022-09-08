@@ -13,6 +13,25 @@ using lifecycle_msgs::msg::Transition;
 namespace cmr::fabric
 {
 
+// we generate an ugle name for the fabric node because they should be named
+// appropriately during the launch process
+FabricNode::FabricNode()
+    : rclcpp_lifecycle::LifecycleNode(
+          "fabric_untitled_" +
+          std::to_string(
+              std::chrono::system_clock::now().time_since_epoch().count()))
+{
+    declare_parameter("config_path", "");
+    declare_parameter("composition_ns", "");
+    declare_parameter("restart_attempts", 0);
+    declare_parameter("restart_delay", 0);
+    declare_parameter("num_restarts", 0);
+
+    m_composition_namespace = get_parameter("composition_ns").as_string();
+    m_recover_fault_client = this->create_client<cmr_msgs::srv::RecoverFault>(
+        m_composition_namespace + "/recover_fault");
+}
+
 // Basic guarantee. This is ok because if this fails, entire node is reset anyway
 bool set_config_params(FabricNode &node, const toml::Result &toml)
 {
@@ -65,7 +84,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 
     const auto config = toml.table;
 
-    auto dependencies = config->getArray("dependencies");
+    const auto dependencies = config->getArray("dependencies");
     if (dependencies) {
         this->m_dependencies = *dependencies->getStringVector();
     }
@@ -82,8 +101,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
         auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
         request->dependent = get_name();
         request->target = dep_name;
-        auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
-            m_composition_ns + "/acquire", request);
+        const auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
+            m_composition_namespace + "/acquire", request);
         if (!response) {
             CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
             return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -100,8 +119,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
         auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();
         request->dependent = get_name();
         request->target = dep_name;
-        auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
-            m_composition_ns + "/release", request);
+        const auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
+            m_composition_namespace + "/release", request);
         if (!response) {
             CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
             return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -137,7 +156,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
 
 void FabricNode::schedule_restart()
 {
-    int64_t num_restarts = get_parameter("num_restarts").as_int();
+    const int64_t num_restarts = get_parameter("num_restarts").as_int();
 
     if (num_restarts >= get_parameter("restart_attempts").as_int()) {
         // reset the counter in case the user wants to try and enable this again

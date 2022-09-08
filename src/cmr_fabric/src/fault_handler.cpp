@@ -35,15 +35,13 @@ class FaultHandler : public rclcpp::Node
 {
   private:
     std::unordered_map<std::string, int> m_nodes_to_restart;
-    // we use a mutex to make sure we don't add any nodes while the timer is
-    // executing its callback. otherwise we might end up losing some nodes in the
-    // process
-    std::mutex m_nodes_to_restart_mutex;
 
     // Destruction occurs in reverse order of construction. Therefore, m_timer should
     // be declared last so that all members used in its callback get destroyed after
     // it does. This prevents a situation where the callback is called while the node
     // is being destroyed, and some of the members have already been destroyed
+    // This isn't technically necessary here, bc we're not using multithreading, but
+    // it's good practice
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_service;
     std::shared_ptr<rclcpp::TimerBase> m_timer;
@@ -56,8 +54,6 @@ class FaultHandler : public rclcpp::Node
      */
     void timer_callback()
     {
-        std::unique_lock guard(m_nodes_to_restart_mutex);
-
         // Reference type is safe here since it will not outlive m_nodes_to_restart
         // keep nodes_to_remove local to this function
         std::vector<std::reference_wrapper<const std::string>> nodes_to_remove;
@@ -71,7 +67,6 @@ class FaultHandler : public rclcpp::Node
         for (const auto& node_name : nodes_to_remove) {
             m_nodes_to_restart.erase(m_nodes_to_restart.find(node_name));
         }
-        guard.unlock();
         send_activate_requests(*this, std::move(nodes_to_remove));
     }
 
@@ -82,7 +77,6 @@ class FaultHandler : public rclcpp::Node
             [this](
                 const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request>& request,
                 const std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>&) {
-                std::lock_guard<std::mutex> guard(m_nodes_to_restart_mutex);
                 m_nodes_to_restart.emplace(request->node_name,
                                            request->restart_delay);
             };

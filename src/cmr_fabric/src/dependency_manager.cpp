@@ -12,6 +12,10 @@
 #include "lifecycle_msgs/srv/get_state.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+/**
+ * @brief TODO(@fad35)
+ *
+ */
 class DependencyManager : public rclcpp::Node
 {
   private:

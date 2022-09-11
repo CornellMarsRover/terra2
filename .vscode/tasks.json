@@ -5,7 +5,7 @@
       "label": "build",
       "detail": "Build terra (debug)",
       "type": "shell",
-      "command": "bash scripts/build.sh -DCMAKE_BUILD_TYPE=Debug",
+      "command": "bash scripts/build.sh -DCMAKE_BUILD_TYPE=Debug && bash scripts/clean_build_db.sh",
       "group": {
         "kind": "build",
         "isDefault": true
@@ -17,6 +17,7 @@
       "detail": "Clean terra",
       "type": "shell",
       "command": "bash scripts/clean.sh",
+      "problemMatcher": []
     },
     {
       "label": "prerun",
@@ -32,6 +33,18 @@
         "kind": "test",
         "isDefault": true
       }
+    },
+    {
+      "label": "docs",
+      "detail": "Generate doxygen documentation",
+      "type": "shell",
+      "command": "bash scripts/docs.sh"
+    },
+    {
+      "label": "check",
+      "detail": "Manually format and run static analysis on all files",
+      "type": "shell",
+      "command": "bash scripts/check.sh"
     }
   ],
 }

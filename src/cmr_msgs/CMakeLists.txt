@@ -9,18 +9,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 # Add paths to additional messages, services, and actions here.
-# rosidl_generate_interfaces(
-#   ${PROJECT_NAME}
-#   srv/Enable.srv
-#   srv/Disable.srv
-#   srv/Status.srv
-# )
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+rosidl_generate_interfaces(
+  ${PROJECT_NAME}
+  msg/State.msg
+  srv/RecoverFault.srv
+  srv/ActivateNode.srv
+  srv/DeactivateNode.srv
+  srv/GetNodeState.srv
+  srv/ReconfigureNode.srv
+  srv/AcquireDependency.srv
+  srv/ReleaseDependency.srv)
 
 ament_package()

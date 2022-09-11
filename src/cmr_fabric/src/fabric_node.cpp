@@ -6,6 +6,7 @@
 #include "cmr_msgs/srv/release_dependency.hpp"
 #include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
+#include "lifecycle_msgs/msg/state.hpp"
 
 using namespace std::chrono_literals;
 using lifecycle_msgs::msg::Transition;
@@ -145,16 +146,51 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_shutdown(
                      : rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
 }
 
-rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
-    const rclcpp_lifecycle::State &)
+// Performs the necessary cleanup for `node` during the `ErrorProcessing` state
+static bool cleanup_on_error(FabricNode &node,
+                             const rclcpp_lifecycle::State &current_state)
 {
-    schedule_restart();
-    // returning SUCCESS will tell ROS2 to move the node into the Unconfigured
-    // state.
-    return rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
+    using namespace lifecycle_msgs::msg;  // NOLINT(google-build-using-namespace)
+    constexpr auto success =
+        rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
+    constexpr auto error = rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
+    switch (current_state.id()) {
+        case State::PRIMARY_STATE_UNCONFIGURED:
+            return true;
+        case State::PRIMARY_STATE_ACTIVE: {
+            const auto deactive_code = node.on_deactivate(current_state);
+            if (deactive_code == error) {
+                return false;
+            }
+            return node.on_cleanup(current_state) == success;
+        }
+        case State::TRANSITION_STATE_ACTIVATING:
+        case State::TRANSITION_STATE_DEACTIVATING:
+        case State::PRIMARY_STATE_INACTIVE:
+            return node.on_cleanup(current_state) == success;
+        default:
+            CMR_LOG(ERROR, "Reached on_error from state %d", current_state.id());
+            return false;
+    }
 }
 
-void FabricNode::schedule_restart()
+rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
+    const rclcpp_lifecycle::State &current_state)
+{
+    const auto cleanup_success = cleanup_on_error(*this, current_state);
+    if (cleanup_success) {
+        // returning SUCCESS will tell ROS2 to move the node into the Unconfigured
+        // state.
+        // returning ERROR will tell ROS2 to move the node into the Finalized state
+        // and prep for destruction
+        return schedule_restart()
+                   ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
+                   : rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
+    }
+    return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
+}
+
+bool FabricNode::schedule_restart()
 {
     const int64_t num_restarts = get_parameter("num_restarts").as_int();
 
@@ -165,7 +201,7 @@ void FabricNode::schedule_restart()
         CMR_LOG(ERROR,
                 "Node will not attempt to restart because it has restarted "
                 "the maximum amount of times.");
-        return;
+        return false;
     }
 
     // make sure the fault handler is available before doing anything else
@@ -174,7 +210,7 @@ void FabricNode::schedule_restart()
             CMR_LOG(ERROR,
                     "Interrupted while waiting for the fault handler. Not "
                     "scheduling restart.");
-            return;
+            return false;
         }
         CMR_LOG(INFO, "Fault handler not available, waiting again...");
     }
@@ -187,6 +223,8 @@ void FabricNode::schedule_restart()
     auto req = std::make_shared<cmr_msgs::srv::RecoverFault::Request>();
     req->node_name = get_name();
     m_recover_fault_client->async_send_request(req);
+    // do we want to wait for the response?
+    return true;
 }
 
 void FabricNode::panic()

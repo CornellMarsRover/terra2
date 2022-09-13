@@ -2,6 +2,7 @@
 
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
+#include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
 #include "rclcpp/rclcpp.hpp"
 
@@ -77,6 +78,7 @@ class FaultHandler : public rclcpp::Node
             [this](
                 const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request>& request,
                 const std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>&) {
+                CMR_LOG(INFO, "Got schedule request");
                 m_nodes_to_restart.emplace(request->node_name,
                                            request->restart_delay);
             };

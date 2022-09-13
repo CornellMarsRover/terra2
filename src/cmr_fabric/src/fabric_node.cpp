@@ -193,6 +193,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
 bool FabricNode::schedule_restart()
 {
     const int64_t num_restarts = get_parameter("num_restarts").as_int();
+    CMR_LOG(INFO, "Scheduling restart");
 
     if (num_restarts >= get_parameter("restart_attempts").as_int()) {
         // reset the counter in case the user wants to try and enable this again
@@ -226,12 +227,4 @@ bool FabricNode::schedule_restart()
     // do we want to wait for the response?
     return true;
 }
-
-void FabricNode::panic()
-{
-    this->trigger_transition(
-        rclcpp_lifecycle::Transition(Transition::TRANSITION_DEACTIVATE));
-    this->schedule_restart();
-}
-
 }  // namespace cmr::fabric

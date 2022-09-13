@@ -42,11 +42,6 @@ class DependencyManager : public rclcpp::Node
                 const auto [target, dependent] = *request;
 
                 if (m_users.find(target) == m_users.end()) {
-                    // TODO(@fad35)
-                    /*auto request =
-                        std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
-                    request->node_name = target; */
-
                     const auto activate_response = activate_dependency(target);
 
                     if (!activate_response) {

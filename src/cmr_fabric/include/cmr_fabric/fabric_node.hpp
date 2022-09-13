@@ -51,15 +51,6 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_error(
         const rclcpp_lifecycle::State &) override;
 
-  protected:
-    /**
-     * @brief A node can internally call panic() when it has entered an invalid state
-     * during its execution. This function must only be called within a callback; if
-     * a node's state is illegal outside of a callback, return false in the lifecycle
-     * function instead.
-     */
-    void panic();
-
   private:
     /** The name of the namespace? */
     std::string m_composition_namespace;

@@ -55,10 +55,6 @@ int main(int argc, char* argv[])
 
     auto node = std::make_shared<DemoNode>();
 
-    std::stringstream ss;
-    ss << std::this_thread::get_id();
-    RCLCPP_INFO(node->get_logger(), "Starting demo node on thread: pid %s",
-                ss.str().c_str());
     rclcpp::spin(node->get_node_base_interface());
     rclcpp::shutdown();
     return 0;

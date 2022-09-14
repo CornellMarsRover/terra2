@@ -31,7 +31,10 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      *
      * @return std::vector<std::string> list of dependency names
      */
-    std::vector<std::string> get_dependencies() { return m_dependencies; }
+    const std::vector<std::string> &get_dependencies() const
+    {
+        return m_dependencies;
+    }
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_configure(
         const rclcpp_lifecycle::State &) override;
@@ -52,11 +55,30 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
         const rclcpp_lifecycle::State &) override;
 
   private:
-    /** The name of the namespace? */
+    /** The name of the namespace */
     std::string m_composition_namespace;
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
     std::vector<std::string> m_dependencies;
+    /** Invairant: must be the same size as m_dependencies */
+    std::vector<bool> m_activated_dependencies;
+
+    /**
+     * Attempts to activate all dependencies of this node.
+     *
+     * Indicates which dependencies were activated by setting their corresponding bit
+     * in m_activated_dependencies
+     *
+     * @return true if all dependencies were activated
+     */
+    bool activate_dependencies();
+
+    /**
+     * @brief Attempts to deactivate all activated dependencies of this node
+     *
+     * @return true if all dependencies were deactivated
+     */
+    bool deactivate_dependencies();
 
     /**
      * Schedules a restart by sending a request to the lifecycle manager.
@@ -64,6 +86,14 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * @return true if the restart was scheduled successfully
      */
     bool schedule_restart();
+
+    /**
+     * @brief Cleans up any state when an error occurs
+     *
+     * @param current_state the state befre the error
+     * @return true if the error was handled successfully
+     */
+    bool cleanup_on_error(const rclcpp_lifecycle::State &current_state);
 
     /**
      * Derived class hook for configuring the node.
@@ -94,6 +124,9 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * > actually active, such as access to hardware. Ideally, no preparation that
      * > requires significant time (such as lengthy hardware initialisation) should
      * > be performed in this callback.
+     *
+     * This method MUST have the strong error guarantee. If it returns false, or an
+     * exception is thrown `deactivate()` will NOT be called.
      *
      * @see `FabricNode::deactivate`
      * @return true on success, false otherwise which will cause transition to

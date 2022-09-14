@@ -5,6 +5,12 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 
+/**
+ * The TestController is a node that listens for messages published to the
+ * /test/set_target topic of type geometry_msgs::Point. It then creates a goal to
+ * move the robot to the specified point via an action. This node will log feedback
+ * updates of position and notify the user when the robot has reached to goal.
+ */
 class TestControllerClient : public rclcpp::Node
 {
     std::shared_ptr<rclcpp_action::Client<cmr_msgs::action::TestTargetPosition>>
@@ -32,6 +38,12 @@ class TestControllerClient : public rclcpp::Node
     }
 
   private:
+    /**
+     * @brief Callback for receiving a new target point
+     *
+     *
+     * @param msg
+     */
     void handle_target(const std::shared_ptr<geometry_msgs::msg::Point>& msg)
     {
         RCLCPP_INFO(get_logger(), "Controller got target {%f, %f, %f}", msg->x,

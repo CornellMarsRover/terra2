@@ -15,7 +15,8 @@ def generate_launch_description():
             os.path.join(pkg_ros_gz_sim, "launch", "ign_gazebo.launch.py")
         ),
         launch_arguments={
-            "ign_args": "-r /cmr/terra/src/cmr_test/config/visualize_lidar.sdf"
+            # "ign_args": "-r /cmr/terra/src/cmr_test/config/visualize_lidar.sdf"
+            "ign_args": "-r diff_drive_skid.sdf"
         }.items(),
     )
     return LaunchDescription(
@@ -35,13 +36,20 @@ def generate_launch_description():
                 output="screen",
             ),
             Node(
-                executable="/cmr/terra/install/cmr_test/lib/cmr_test/test_tf2",
+                package="cmr_test",
+                executable="test_tf2",
                 name="position_controller",
                 output="screen",
                 emulate_tty=True,
+                parameters=[
+                    {"rotation_angle_tolerance": 0.15},
+                    {"linear_vel": 0.2},
+                    {"angular_vel": 0.2},
+                ],
             ),
             Node(
-                executable="/cmr/terra/install/cmr_test/lib/cmr_test/test_controller",
+                package="cmr_test",
+                executable="test_controller",
                 name="position_client",
                 output="screen",
                 emulate_tty=True,

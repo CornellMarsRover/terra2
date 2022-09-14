@@ -12,10 +12,13 @@
 #include "cmr_msgs/action/test_target_position.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
-//#include "rclcpp_components/register_node_macro.hpp"
 
-// Note that the test "rover" can only move along the x-direction
-
+/**
+ * The PositionControllerNode listens for odometry messages and publishes tf frames
+ * for the base link based on that data. This node also provides an action server for
+ * moving the robot via the test_target action.
+ *
+ */
 class PositionControllerNode : public rclcpp::Node
 {
     std::shared_ptr<rclcpp::Subscription<nav_msgs::msg::Odometry>> m_odom_listener;
@@ -23,6 +26,9 @@ class PositionControllerNode : public rclcpp::Node
     std::unique_ptr<tf2_ros::TransformBroadcaster> m_frame_broadcaster;
     std::shared_ptr<tf2_ros::TransformListener> m_frame_listener;
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    double m_rotation_angle_tolerance;
+    double m_linear_vel;
+    double m_angular_vel;
 
     using target_pos_t = cmr_msgs::action::TestTargetPosition;
     using target_pos_goal_t = target_pos_t::Goal;
@@ -32,15 +38,15 @@ class PositionControllerNode : public rclcpp::Node
 
     std::shared_ptr<rclcpp_action::Server<target_pos_t>> m_target_server;
     std::shared_ptr<rclcpp::WallTimer<std::function<void()>>> m_goal_timer;
-    std::optional<std::chrono::time_point<std::chrono::system_clock>>
-        m_goal_start_time = {};
 
+    /** Received goal callback */
     auto handle_goal(const rclcpp_action::GoalUUID&,
                      std::shared_ptr<const target_pos_goal_t>)
     {
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
+    /** Cancelled goal callback */
     auto handle_cancel(const std::shared_ptr<target_pos_handle_t> goal_handle)
     {
         const auto it = std::find_if(m_active_goals.begin(), m_active_goals.end(),
@@ -55,10 +61,21 @@ class PositionControllerNode : public rclcpp::Node
         return rclcpp_action::CancelResponse::ACCEPT;
     }
 
+    /** Accecpted goal callback */
+    void handle_accepted(std::shared_ptr<target_pos_handle_t> goal_handle)
+    {
+        // this needs to return quickly to avoid blocking the executor
+        RCLCPP_INFO(get_logger(), "Accepted goal");
+        m_active_goals.emplace_back(std::move(goal_handle));
+    }
+
   public:
     PositionControllerNode() : rclcpp::Node("test_position_controller")
     {
         using namespace std::placeholders;  // NOLINT
+        declare_parameter("rotation_angle_tolerance", 0.1);
+        declare_parameter("linear_vel", 0.2);
+        declare_parameter("angular_vel", 0.2);
         m_odom_listener = this->create_subscription<nav_msgs::msg::Odometry>(
             "/test/odometry", 10,
             // NOLINTNEXTLINE(performance-*)
@@ -82,9 +99,19 @@ class PositionControllerNode : public rclcpp::Node
             std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
         m_cmd_vel_pub =
             create_publisher<geometry_msgs::msg::Twist>("/test/cmd_vel", 10);
+        m_linear_vel = get_parameter("linear_vel").as_double();
+        m_angular_vel = get_parameter("angular_vel").as_double();
+        m_rotation_angle_tolerance =
+            get_parameter("rotation_angle_tolerance").as_double();
     }
 
   private:
+    /**
+     * @brief Odometry message callback
+     * Publishes a frame in our simple tf tree based on odometry readings
+     *
+     * @param msg
+     */
     void handle_odom_msg(const std::shared_ptr<nav_msgs::msg::Odometry>& msg)
     {
         // If rover gets stuck, but keeps spinning wheels, odom thinks
@@ -102,86 +129,93 @@ class PositionControllerNode : public rclcpp::Node
         m_frame_broadcaster->sendTransform(frame);
     }
 
-    void handle_accepted(std::shared_ptr<target_pos_handle_t> goal_handle)
-    {
-        // this needs to return quickly to avoid blocking the executor, so spin up a
-        // new thread
-        RCLCPP_INFO(get_logger(), "Accepted goal");
-        m_active_goals.emplace_back(std::move(goal_handle));
-    }
-
-    /*std::optional<tf2::Quaternion> turn_towards_goal(
-        std::chrono::milliseconds goal_duration, const target_pos_goal_t& target_pos,
-        const geometry_msgs::msg::TransformStamped& world_pos)
-    {
-        const tf2::Vector3 target{target_pos.x, target_pos.y, 0};
-        const tf2::Vector3 current{world_pos.transform.translation.x,
-                                   world_pos.transform.translation.y, 0};
-        const auto angle_diff = std::abs(tf2::tf2Angle(target, current));
-        if ((angle_diff > 0 && angle_diff < 0.5) ||
-            (angle_diff > 5.9 && angle_diff < 6.6)) {
-            const auto target_rot = tf2::shortestArcQuat(target, current);
-            const auto cur_quat = tf2::Quaternion(
-                world_pos.transform.rotation.x, world_pos.transform.rotation.y,
-                world_pos.transform.rotation.z, world_pos.transform.rotation.w);
-            return tf2::slerp(cur_quat, target_rot,
-                              static_cast<double>(goal_duration.count()) / 1300.0);
-        }
-        return {};
-    }*/
-
-    /// Returns true if we reached the target
+    /**
+     * Sends out a new message to /cmd_vel to move towards the goal
+     * @return true if we reached the target
+     */
     bool update_cmd_vel_and_check_reach_target(const tf2::Vector3& target,
-                                               const tf2::Vector3& current)
+                                               const tf2::Vector3& current,
+                                               const tf2::Quaternion& current_rot)
     {
         if (tf2::tf2Distance(target, current) > 0.1) {
             geometry_msgs::msg::Twist update_msg;
-            const auto linear = (target - current).normalize() * 0.2;
-            update_msg.linear.x = linear.x();
-            update_msg.linear.y = linear.y();
-            update_msg.linear.z = linear.z();
+            const auto target_dir =
+                tf2::quatRotate(current_rot, {1, 0, 0}).normalized();
+            const auto current_dir = (target - current).normalized();
+            const auto angle = tf2::tf2Angle(current_dir, target_dir);
+            if (angle > m_rotation_angle_tolerance) {
+                RCLCPP_INFO(get_logger(), "Rotating towards goal: %lf", angle);
+                update_msg.angular.z = m_angular_vel;
+            } else if (angle < -m_rotation_angle_tolerance) {
+                RCLCPP_INFO(get_logger(), "Rotating towards goal: %lf", angle);
+                update_msg.angular.z = -m_angular_vel;  // turn around z axis
+            } else {
+                update_msg.angular.z = 0;
+                RCLCPP_INFO(get_logger(), "Aligned with goal!");
+                update_msg.linear.x = m_linear_vel;  // move forward
+            }
             m_cmd_vel_pub->publish(update_msg);
             RCLCPP_INFO(get_logger(), "Moving towards goal!");
             return false;
         } else {
+            geometry_msgs::msg::Twist update_msg;
+            // publish empty message to stop moving
+            m_cmd_vel_pub->publish(update_msg);
             RCLCPP_INFO(get_logger(), "Move complete!");
             m_active_goals.pop_front();
-            m_goal_start_time = {};
             return true;
         }
     }
 
+    /**
+     * @brief Get the latest transformation for the base link in the world reference
+     * frame
+     *
+     * @return the transformation or empty on error
+     */
+    std::optional<geometry_msgs::msg::TransformStamped> get_latest_base_to_world()
+    {
+        try {
+            return m_tf_buffer->lookupTransform("world", "base", tf2::TimePointZero);
+        } catch (const tf2::TransformException& ex) {
+            RCLCPP_WARN(get_logger(), "Could not get transform: %s", ex.what());
+            return {};
+        }
+    }
+
+    /**
+     * @brief Callback functions that occurs at every clock tick to move the robot
+     * closer to the goal.
+     *
+     * First the robot will rotate itself to point towards the goal, then it will
+     * move itself by sending updates to /cmd_vel
+     */
     void move_towards_goal()
     {
         if (!m_active_goals.empty()) {
             auto handle = m_active_goals.front();
-            if (!m_goal_start_time) {
-                m_goal_start_time = std::chrono::system_clock::now();
-            }
             const auto target_pos = handle->get_goal();
-            geometry_msgs::msg::TransformStamped world_pos;
-            try {
-                world_pos = m_tf_buffer->lookupTransform("world", "base",
-                                                         tf2::TimePointZero);
-            } catch (tf2::TransformException&) {
-                RCLCPP_WARN(get_logger(), "Could not transform frame");
-                return;
-            }
-
-            const tf2::Vector3 target{target_pos->x, target_pos->y, 0};
-            const tf2::Vector3 current{world_pos.transform.translation.x,
-                                       world_pos.transform.translation.y, 0};
-            if (update_cmd_vel_and_check_reach_target(target, current)) {
-                auto result = std::make_shared<target_pos_t::Result>();
-                result->success = true;
-                handle->succeed(result);
-                RCLCPP_INFO(get_logger(), "Sending back success response");
-            } else {
-                auto feedback = std::make_shared<target_pos_t::Feedback>();
-                feedback->distance =
-                    static_cast<float>(tf2::tf2Distance(target, current));
-                RCLCPP_INFO(get_logger(), "Sending feedback");
-                handle->publish_feedback(feedback);
+            if (const auto world_pos = get_latest_base_to_world(); world_pos) {
+                const tf2::Vector3 target{target_pos->x, target_pos->y, 0};
+                const tf2::Vector3 current{world_pos->transform.translation.x,
+                                           world_pos->transform.translation.y, 0};
+                const tf2::Quaternion orientation(world_pos->transform.rotation.x,
+                                                  world_pos->transform.rotation.y,
+                                                  world_pos->transform.rotation.z,
+                                                  world_pos->transform.rotation.w);
+                if (update_cmd_vel_and_check_reach_target(target, current,
+                                                          orientation)) {
+                    auto result = std::make_shared<target_pos_t::Result>();
+                    result->success = true;
+                    handle->succeed(result);
+                    RCLCPP_INFO(get_logger(), "Sending back success response");
+                } else {
+                    auto feedback = std::make_shared<target_pos_t::Feedback>();
+                    feedback->distance =
+                        static_cast<float>(tf2::tf2Distance(target, current));
+                    RCLCPP_INFO(get_logger(), "Sending feedback");
+                    handle->publish_feedback(feedback);
+                }
             }
         }
     }

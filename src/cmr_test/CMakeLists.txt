@@ -5,8 +5,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
 include(CmrUtils)
 
 # find dependencies
-cmr_std_find_pkgs(tf2 tf2_ros geometry_msgs nav_msgs rosidl_default_generators
-                  rclcpp_action)
+cmr_std_find_pkgs(tf2 tf2_ros geometry_msgs nav_msgs rclcpp_action)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages.

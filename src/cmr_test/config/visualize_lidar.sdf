@@ -158,6 +158,26 @@
               <size>20 20 0.1</size>
             </box>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1000</mu>
+                <mu2>1000</mu2>
+                <slip1>0</slip1>
+                <slip2>0</slip2>
+              </ode>
+            </friction>
+            <contact>
+              <ode>
+                <soft_cfm>0</soft_cfm>
+                <soft_erp>0.2</soft_erp>
+                <kp>1e+13</kp>
+                <kd>1</kd>
+                <max_vel>0.01</max_vel>
+                <min_depth>0.01</min_depth>
+              </ode>
+            </contact>
+          </surface>
         </collision>
         <visual name="visual">
           <geometry>
@@ -393,19 +413,26 @@
           <surface>
             <friction>
               <ode>
-                <mu>0.9</mu>
-                <mu2>0.9</mu2>
+                <mu>1000</mu>
+                <mu2>1000</mu2>
+                <slip1>0</slip1>
+                <slip2>0</slip2>
               </ode>
             </friction>
+            <contact>
+              <ode>
+                <soft_cfm>0</soft_cfm>
+                <soft_erp>0.2</soft_erp>
+                <kp>1e+13</kp>
+                <kd>1</kd>
+                <max_vel>0.01</max_vel>
+                <min_depth>0.01</min_depth>
+              </ode>
+            </contact>
           </surface>
         </collision>
       </link>
-      <gazebo reference="left_wheel">
-        <turnGravityOff>false</turnGravityOff>
-        <mu1>0.9</mu1>
-        <mu2>0.9</mu2>
-        <material>Gazebo/Gold</material>
-      </gazebo>
+
 
       <link name='right_wheel'>
         <pose>0.554282 -0.625029 -0.025 -1.5707 0 0</pose>
@@ -441,10 +468,22 @@
           <surface>
             <friction>
               <ode>
-                <mu>0.9</mu>
-                <mu2>0.9</mu2>
+                <mu>1000</mu>
+                <mu2>1000</mu2>
+                <slip1>0</slip1>
+                <slip2>0</slip2>
               </ode>
             </friction>
+            <contact>
+              <ode>
+                <soft_cfm>0</soft_cfm>
+                <soft_erp>0.2</soft_erp>
+                <kp>1e+13</kp>
+                <kd>1</kd>
+                <max_vel>0.01</max_vel>
+                <min_depth>0.01</min_depth>
+              </ode>
+            </contact>
           </surface>
         </collision>
       </link>
@@ -480,6 +519,26 @@
               <radius>0.2</radius>
             </sphere>
           </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1000</mu>
+                <mu2>1000</mu2>
+                <slip1>0</slip1>
+                <slip2>0</slip2>
+              </ode>
+            </friction>
+            <contact>
+              <ode>
+                <soft_cfm>0</soft_cfm>
+                <soft_erp>0.2</soft_erp>
+                <kp>1e+13</kp>
+                <kd>1</kd>
+                <max_vel>0.01</max_vel>
+                <min_depth>0.01</min_depth>
+              </ode>
+            </contact>
+          </surface>
         </collision>
       </link>
 
@@ -526,10 +585,10 @@
       </plugin>
     </model>
 
-    <include>
+    <!-- <include>
       <pose>0 0 0 0 0 1.57</pose>
       <uri>https://fuel.ignitionrobotics.org/1.0/openrobotics/models/Playground</uri>
-    </include>
+    </include> -->
 
   </world>
 </sdf>

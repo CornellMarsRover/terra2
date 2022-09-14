@@ -16,20 +16,27 @@ using namespace std::chrono_literals;
  *
  * @param node The node who is sending the request
  * @param nodes_to_remove list of node names to send the request to
+ * @return a vector of node names which could not be activated
  */
-void send_activate_requests(
-    const rclcpp::Node& node,
-    std::vector<std::reference_wrapper<const std::string>>&& nodes_to_remove)
+auto send_activate_requests(const rclcpp::Node& node,
+                            std::vector<std::string>&& nodes_to_remove)
 {
-    for (const auto node_name : nodes_to_remove) {
+    std::vector<std::string> failed_nodes;
+    for (const auto& node_name : nodes_to_remove) {
         RCLCPP_INFO(node.get_logger(), "Recovering fault for node %s...\n",
-                    node_name.get().c_str());
+                    node_name.c_str());
         const auto request =
             std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
         request->node_name = node_name;
-        cmr::send_request<cmr_msgs::srv::ActivateNode>(
-            node.get_effective_namespace() + "/activate", request);
+        if (!cmr::send_request<cmr_msgs::srv::ActivateNode>(
+                node.get_effective_namespace() + "/activate", request)) {
+            failed_nodes.emplace_back(node_name);
+            RCLCPP_WARN(node.get_logger(),
+                        "Failed to activate node %s. Will try again\n",
+                        node_name.c_str());
+        }
     }
+    return failed_nodes;
 }
 
 class FaultHandler : public rclcpp::Node
@@ -37,12 +44,12 @@ class FaultHandler : public rclcpp::Node
   private:
     std::unordered_map<std::string, int> m_nodes_to_restart;
 
+    std::mutex m_nodes_to_restart_mutex;
+
     // Destruction occurs in reverse order of construction. Therefore, m_timer should
     // be declared last so that all members used in its callback get destroyed after
     // it does. This prevents a situation where the callback is called while the node
     // is being destroyed, and some of the members have already been destroyed
-    // This isn't technically necessary here, bc we're not using multithreading, but
-    // it's good practice
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_service;
     std::shared_ptr<rclcpp::TimerBase> m_timer;
@@ -55,10 +62,8 @@ class FaultHandler : public rclcpp::Node
      */
     void timer_callback()
     {
-        // Reference type is safe here since it will not outlive m_nodes_to_restart
-        // keep nodes_to_remove local to this function
-        std::vector<std::reference_wrapper<const std::string>> nodes_to_remove;
-
+        std::vector<std::string> nodes_to_remove;
+        std::unique_lock lock(m_nodes_to_restart_mutex);
         for (auto& [node_name, delay] : m_nodes_to_restart) {
             if (delay-- <= 0) {
                 nodes_to_remove.emplace_back(node_name);
@@ -68,7 +73,15 @@ class FaultHandler : public rclcpp::Node
         for (const auto& node_name : nodes_to_remove) {
             m_nodes_to_restart.erase(m_nodes_to_restart.find(node_name));
         }
-        send_activate_requests(*this, std::move(nodes_to_remove));
+        lock.unlock();
+        const auto failed_nodes =
+            send_activate_requests(*this, std::move(nodes_to_remove));
+        if (!failed_nodes.empty()) {
+            lock.lock();
+            for (const auto& node_name : failed_nodes) {
+                m_nodes_to_restart[node_name] = 1;
+            }
+        }
     }
 
   public:
@@ -79,6 +92,7 @@ class FaultHandler : public rclcpp::Node
                 const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request>& request,
                 const std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>&) {
                 CMR_LOG(INFO, "Got schedule request");
+                std::lock_guard lk(m_nodes_to_restart_mutex);
                 m_nodes_to_restart.emplace(request->node_name,
                                            request->restart_delay);
             };

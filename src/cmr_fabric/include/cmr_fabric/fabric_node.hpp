@@ -81,13 +81,6 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     bool deactivate_dependencies();
 
     /**
-     * Schedules a restart by sending a request to the lifecycle manager.
-     *
-     * @return true if the restart was scheduled successfully
-     */
-    bool schedule_restart();
-
-    /**
      * @brief Cleans up any state when an error occurs
      *
      * @param current_state the state befre the error
@@ -159,6 +152,20 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * `ErrorProcessing`
      */
     virtual bool cleanup() = 0;
+
+  protected:
+    /**
+     * @brief Transitions us to the error state and schedules a restart
+     *
+     */
+    void error_transition();
+
+    /**
+     * Schedules a restart by sending a request to the lifecycle manager.
+     *
+     * @return true if the restart was scheduled successfully
+     */
+    bool schedule_restart();
 };
 
 }  // namespace cmr::fabric

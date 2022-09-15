@@ -11,6 +11,12 @@
 using namespace std::chrono_literals;
 using lifecycle_msgs::msg::Transition;
 
+constexpr auto param_config_path = "config_path";
+constexpr auto param_composition_namespace = "composition_ns";
+constexpr auto param_max_restarts = "restart_attempts";
+constexpr auto param_restart_delay = "restart_delay";
+constexpr auto param_num_attempted_restarts = "num_restarts";
+
 namespace cmr::fabric
 {
 
@@ -22,11 +28,11 @@ FabricNode::FabricNode()
           std::to_string(
               std::chrono::system_clock::now().time_since_epoch().count()))
 {
-    declare_parameter("config_path", "");
-    declare_parameter("composition_ns", "");
-    declare_parameter("restart_attempts", 0);
-    declare_parameter("restart_delay", 0);
-    declare_parameter("num_restarts", 0);
+    declare_parameter(param_config_path, "");
+    declare_parameter(param_composition_namespace, "");
+    declare_parameter(param_max_restarts, 2);
+    declare_parameter(param_restart_delay, 0);
+    declare_parameter(param_num_attempted_restarts, 0);
 
     m_composition_namespace = get_parameter("composition_ns").as_string();
     m_recover_fault_client = this->create_client<cmr_msgs::srv::RecoverFault>(
@@ -45,32 +51,35 @@ bool set_config_params(FabricNode &node, const toml::Result &toml)
     }
 
     const auto fault_handling_settings = table->getTable("fault_handling");
-    const auto [ok, restart_attempts] =
-        fault_handling_settings->getInt("restart_attempts");
+    const auto [ok, max_restart_attempts] =
+        fault_handling_settings->getInt(param_max_restarts);
     if (!ok) {
         RCLCPP_ERROR(node.get_logger(),
                      "Failed to parse fault_handling.restart_attempts: %s",
                      toml.errmsg.c_str());
         return false;
     }
-    node.set_parameter(rclcpp::Parameter("restart_attempts", restart_attempts));
+    node.set_parameter(rclcpp::Parameter(param_max_restarts, max_restart_attempts));
+    CMR_LOG(INFO, "Set max restarts to %zd", max_restart_attempts);
+    node.set_parameter({param_num_attempted_restarts, 0});
 
     const auto [delay_ok, restart_delay] =
-        fault_handling_settings->getInt("restart_delay");
+        fault_handling_settings->getInt(param_restart_delay);
     if (!delay_ok) {
         RCLCPP_ERROR(node.get_logger(),
                      "Failed to parse fault_handling.restart_delay: %s",
                      toml.errmsg.c_str());
         return false;
     }
-    node.set_parameter(rclcpp::Parameter("restart_delay", restart_delay));
+    node.set_parameter(rclcpp::Parameter(param_restart_delay, restart_delay));
     return true;
 }
 
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
     const rclcpp_lifecycle::State &)
 {
-    const auto config_path = get_parameter("config_path").as_string();
+    CMR_LOG(INFO, "Configuring fabric node");
+    const auto config_path = get_parameter(param_config_path).as_string();
     if (config_path.empty()) {
         CMR_LOG(ERROR, "No config_path parameter specified");
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -78,6 +87,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 
     const auto toml = toml::parseFile(config_path);
 
+    CMR_LOG(INFO, "About to set config params");
     if (!set_config_params(*this, toml)) {
         // error logging done in set_config_params
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -221,13 +231,16 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_error(
 
 bool FabricNode::schedule_restart()
 {
-    const int64_t num_restarts = get_parameter("num_restarts").as_int();
+    const int64_t num_restarts =
+        get_parameter(param_num_attempted_restarts).as_int();
     CMR_LOG(INFO, "Scheduling restart");
-
-    if (num_restarts >= get_parameter("restart_attempts").as_int()) {
+    CMR_LOG(INFO, "num_restarts: %zd", num_restarts);
+    const int64_t max_restart_attempts = get_parameter(param_max_restarts).as_int();
+    CMR_LOG(INFO, "max_restart_attempts: %zd", max_restart_attempts);
+    if (num_restarts >= max_restart_attempts) {
         // reset the counter in case the user wants to try and enable this again
         // later
-        set_parameter(rclcpp::Parameter("num_restarts", 0));
+        set_parameter(rclcpp::Parameter(param_num_attempted_restarts, 0));
         CMR_LOG(ERROR,
                 "Node will not attempt to restart because it has restarted "
                 "the maximum amount of times.");
@@ -255,5 +268,28 @@ bool FabricNode::schedule_restart()
     m_recover_fault_client->async_send_request(req);
     // do we want to wait for the response?
     return true;
+}
+
+void FabricNode::error_transition()
+{
+    CMR_LOG(INFO, "Transitioning to ErrorProcessing");
+    switch (get_current_state().id()) {
+        case lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED:
+            break;
+        case lifecycle_msgs::msg::State::TRANSITION_STATE_ACTIVATING:
+        case lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE:
+            trigger_transition(Transition::TRANSITION_DEACTIVATE);
+            [[fallthrough]];
+        case lifecycle_msgs::msg::State::TRANSITION_STATE_DEACTIVATING:
+        case lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE:
+        case lifecycle_msgs::msg::State::TRANSITION_STATE_CONFIGURING:
+            trigger_transition(Transition::TRANSITION_CLEANUP);
+            break;
+        default:
+            CMR_LOG(FATAL, "Failed to make error transition, shutting down");
+            trigger_transition(Transition::TRANSITION_DESTROY);
+            return;
+    }
+    schedule_restart();
 }
 }  // namespace cmr::fabric

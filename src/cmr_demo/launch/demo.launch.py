@@ -55,5 +55,5 @@ def fabric_node(conf_path: str) -> Node:
                 "composition_ns": "/" + composition_ns,
             }
         ],
-        arguments=["--ros-args", "--log-level", "debug"],
+        # arguments=["--ros-args", "--log-level", "debug"],
     )

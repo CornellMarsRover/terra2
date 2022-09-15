@@ -11,6 +11,8 @@ using namespace std::chrono_literals;
 
 class DemoNode : public cmr::fabric::FabricNode
 {
+    std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Bool>> m_sub;
+
   public:
     DemoNode() : cmr::fabric::FabricNode::FabricNode()
     {
@@ -21,6 +23,13 @@ class DemoNode : public cmr::fabric::FabricNode
     {
         const auto node_settings = table->getTable("node");
         const auto [ok, test] = node_settings->getString("test");
+        m_sub = create_subscription<std_msgs::msg::Bool>(
+            get_name() + std::string("/kill"), 10,
+            [this](const std_msgs::msg::Bool::SharedPtr msg) {
+                CMR_CALLBACK(RCLCPP_INFO(get_logger(), "Got kill message: %s",
+                                         msg->data ? "true" : "false");
+                             CMR_ASSERT_MSG(false, "Killed by kill message");)
+            });
         if (ok) {
             set_parameter(rclcpp::Parameter("test", test));
         }
@@ -33,7 +42,7 @@ class DemoNode : public cmr::fabric::FabricNode
         CMR_LOG(INFO, "test is %s", get_parameter("test").as_string().c_str());
         CMR_LOG(INFO, "composition_ns is %s",
                 get_parameter("composition_ns").as_string().c_str());
-        return false;
+        return true;
     }
 
     bool deactivate() override

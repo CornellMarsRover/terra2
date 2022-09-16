@@ -5,6 +5,7 @@
 #include "cmr_msgs/srv/acquire_dependency.hpp"
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/deactivate_node.hpp"
+#include "cmr_msgs/srv/notify_deactivate.hpp"
 #include "cmr_msgs/srv/release_dependency.hpp"
 #include "rclcpp/rclcpp.hpp"
 

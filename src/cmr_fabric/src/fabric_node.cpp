@@ -121,7 +121,9 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
     CMR_LOG(INFO, "Configuring fabric node");
     m_composition_namespace = get_parameter("composition_ns").as_string();
     m_recover_fault_client = this->create_client<cmr_msgs::srv::RecoverFault>(
-        m_composition_namespace + "/recover_fault");
+        "/" + m_composition_namespace + "/recover_fault");
+    CMR_LOG(INFO, "Created recover fault client targetting /%s/recover_fault",
+            m_composition_namespace.c_str());
 
     const auto toml = parse_toml(get_parameter(param_config_path).as_string(),
                                  get_parameter(param_config_data).as_string());
@@ -156,6 +158,8 @@ bool FabricNode::activate_dependencies()
         auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
         request->dependent = get_name();
         request->target = dep_name;
+        CMR_LOG_D(INFO, "Sending activation to %s/acquire for %s from %s",
+                  m_composition_namespace.c_str(), dep_name.c_str(), get_name());
         const auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
             m_composition_namespace + "/acquire", request);
         if (!response) {

@@ -74,6 +74,9 @@ FaultHandler::FaultHandler(const std::string& node_name,
             m_nodes_to_restart.emplace(
                 request->node_name,
                 time_now() + std::chrono::seconds(request->restart_delay));
+            CMR_LOG(
+                INFO, "Scheduled restart for %s at %zd", request->node_name.c_str(),
+                m_nodes_to_restart[request->node_name].time_since_epoch().count());
         };
     m_recover_fault_service = this->create_service<cmr_msgs::srv::RecoverFault>(
         get_effective_namespace() + "/recover_fault", recover_fault_callback);

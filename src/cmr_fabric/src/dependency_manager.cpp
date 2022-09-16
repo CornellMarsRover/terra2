@@ -15,22 +15,30 @@ DependencyManager::create_acquire_dependency_service()
             const std::shared_ptr<cmr_msgs::srv::AcquireDependency::Request>&
                 request,
             std::shared_ptr<cmr_msgs::srv::AcquireDependency::Response> response) {
-            const auto [target, dependent] = *request;
+            const auto [dependent, target] = *request;
 
+            CMR_LOG(INFO, "Acquiring dependency for %s of %s", dependent.c_str(),
+                    target.c_str());
             if (m_users.find(target) == m_users.end()) {
                 const auto activate_response = activate_dependency(target);
 
                 if (!activate_response) {
                     // failed to activate
+                    CMR_LOG(ERROR, "Failed to activate dependency %s",
+                            target.c_str());
                     response->success = false;
                     return response;
                 }
 
-                m_started_as_deps.emplace(target);
+                CMR_LOG(INFO, "Adding %s to m_started_as_deps and m_users",
+                        target.c_str());
+                m_started_as_deps.insert(target);
                 m_users[target] = std::unordered_set<std::string>();
             }
 
-            m_users[target].emplace(dependent);
+            m_users[target].insert(dependent);
+            CMR_LOG(INFO, "Added %s to m_users[%s]", dependent.c_str(),
+                    target.c_str());
 
             response->success = true;
             return response;
@@ -45,7 +53,7 @@ DependencyManager::release_dependency_callback(
     const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& request,
     const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>& response)
 {
-    const auto [target, dependent] = *request;
+    const auto [dependent, target] = *request;
 
     CMR_LOG(DEBUG, "Releasing dependency %s for node %s...", target.c_str(),
             dependent.c_str());
@@ -111,6 +119,7 @@ DependencyManager::create_release_dependency_service()
 bool DependencyManager::activate_dependency(const std::string& target)
 {
     // check if node is configured
+    CMR_LOG(INFO, "Request to activate dependency %s", target.c_str());
     const auto first_response = cmr::send_request<lifecycle_msgs::srv::GetState>(
         "/" + target + "/get_state",
         std::make_shared<lifecycle_msgs::srv::GetState::Request>());
@@ -138,7 +147,7 @@ bool DependencyManager::activate_dependency(const std::string& target)
     const auto activate_response =
         cmr::send_request<lifecycle_msgs::srv::ChangeState>(
             "/" + target + "/change_state", activate_request);
-    return !(activate_response && activate_response.value()->success);
+    return activate_response && activate_response.value()->success;
 }
 
 bool DependencyManager::deactivate_dependency(const std::string& target)

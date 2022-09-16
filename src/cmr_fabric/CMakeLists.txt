@@ -36,6 +36,7 @@ cmr_add_node(
   fault_handler
   SOURCES
   src/fault_handler.cpp
+  src/fault_handler_node.cpp
   DEPENDS
   rclcpp
   std_msgs
@@ -46,6 +47,7 @@ cmr_add_node(
   lifecycle_manager
   SOURCES
   src/lifecycle_manager.cpp
+  src/lifecycle_manager_node.cpp
   DEPENDS
   rclcpp
   rclcpp_lifecycle
@@ -58,6 +60,7 @@ cmr_add_node(
   dependency_manager
   SOURCES
   src/dependency_manager.cpp
+  src/dependency_manager_node.cpp
   DEPENDS
   rclcpp
   rclcpp_lifecycle

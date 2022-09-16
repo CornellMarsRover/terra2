@@ -15,6 +15,7 @@ cmr_add_node(
   demo_node
   SOURCES
   src/demo_node.cpp
+  src/demo_node_main.cpp
   DEPENDS
   rclcpp
   rclcpp_lifecycle

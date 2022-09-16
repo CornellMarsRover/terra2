@@ -1,3 +1,5 @@
+#include "cmr_demo/demo_node.hpp"
+
 #include <cstdio>
 #include <sstream>
 #include <thread>
@@ -9,62 +11,46 @@
 
 using namespace std::chrono_literals;
 
-class DemoNode : public cmr::fabric::FabricNode
+DemoNode::DemoNode(const std::optional<cmr::fabric::FabricNodeConfig>& config)
+    : cmr::fabric::FabricNode::FabricNode(config)
 {
-    std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Bool>> m_sub;
+    declare_parameter("test", "");
+}
 
-  public:
-    DemoNode() : cmr::fabric::FabricNode::FabricNode()
-    {
-        declare_parameter("test", "");
-    }
-
-    bool configure(const std::shared_ptr<toml::Table>& table) override
-    {
-        const auto node_settings = table->getTable("node");
-        const auto [ok, test] = node_settings->getString("test");
-        m_sub = create_subscription<std_msgs::msg::Bool>(
-            get_name() + std::string("/kill"), 10,
-            [this](const std_msgs::msg::Bool::SharedPtr msg) {
-                CMR_RETRY_ON_ERR(RCLCPP_INFO(get_logger(), "Got kill message: %s",
-                                             msg->data ? "true" : "false");
-                                 CMR_ASSERT_MSG(false, "Killed by kill message");)
-            });
-        if (ok) {
-            set_parameter(rclcpp::Parameter("test", test));
-        }
-        return ok;
-    }
-
-    bool activate() override
-    {
-        printf("Activating...\n");
-        CMR_LOG(INFO, "test is %s", get_parameter("test").as_string().c_str());
-        CMR_LOG(INFO, "composition_ns is %s",
-                get_parameter("composition_ns").as_string().c_str());
-        return true;
-    }
-
-    bool deactivate() override
-    {
-        printf("Deactivating...\n");
-        return true;
-    }
-
-    bool cleanup() override
-    {
-        printf("Shutting down...\n");
-        return true;
-    }
-};
-
-int main(int argc, char* argv[])
+bool DemoNode::configure(const std::shared_ptr<toml::Table>& table)
 {
-    rclcpp::init(argc, argv);
+    const auto node_settings = table->getTable("node");
+    const auto [ok, test] = node_settings->getString("test");
+    m_sub = create_subscription<std_msgs::msg::Bool>(
+        get_name() + std::string("/kill"), 10,
+        [this](const std_msgs::msg::Bool::SharedPtr msg) {
+            CMR_RETRY_ON_ERR(RCLCPP_INFO(get_logger(), "Got kill message: %s",
+                                         msg->data ? "true" : "false");
+                             CMR_ASSERT_MSG(false, "Killed by kill message");)
+        });
+    if (ok) {
+        set_parameter(rclcpp::Parameter("test", test));
+    }
+    return ok;
+}
 
-    auto node = std::make_shared<DemoNode>();
+bool DemoNode::activate()
+{
+    printf("Activating...\n");
+    CMR_LOG(INFO, "test is %s", get_parameter("test").as_string().c_str());
+    CMR_LOG(INFO, "composition_ns is %s",
+            get_parameter("composition_ns").as_string().c_str());
+    return true;
+}
 
-    rclcpp::spin(node->get_node_base_interface());
-    rclcpp::shutdown();
-    return 0;
+bool DemoNode::deactivate()
+{
+    printf("Deactivating...\n");
+    return true;
+}
+
+bool DemoNode::cleanup()
+{
+    printf("Shutting down...\n");
+    return true;
 }

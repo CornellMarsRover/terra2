@@ -1,17 +1,15 @@
+#include "cmr_fabric/lifecycle_manager.hpp"
+
 #include <chrono>
-#include <cstdio>
 
 #include "cmr_fabric/lifecycle_states.hpp"
 #include "cmr_msgs/msg/state.hpp"
-#include "cmr_msgs/srv/activate_node.hpp"
-#include "cmr_msgs/srv/deactivate_node.hpp"
-#include "cmr_msgs/srv/get_node_state.hpp"
-#include "cmr_msgs/srv/reconfigure_node.hpp"
 #include "cmr_utils/services.hpp"
 #include "lifecycle_msgs/srv/change_state.hpp"
 #include "lifecycle_msgs/srv/get_state.hpp"
-#include "rclcpp/rclcpp.hpp"
 
+namespace cmr::fabric
+{
 using namespace std::chrono_literals;
 
 static bool call_change_state_client(const std::string& targetNode,
@@ -177,41 +175,15 @@ static auto create_state_service(rclcpp::Node& node)
     return node.create_service<cmr_msgs::srv::GetNodeState>(
         node.get_effective_namespace() + "/get_node_state", get_node_state_cb);
 }
-class LifecycleManager : public rclcpp::Node
+
+LifecycleManager::LifecycleManager(const std::string& node_name,
+                                   const std::string& node_namespace)
+    : rclcpp::Node(node_name, node_namespace)
 {
-  private:
-    /**
-     * A service that gets requests from the dependency manager and fault handler to
-     * activate a node. Does this forwarding the request to ROS's lifecycle node
-     */
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ActivateNode>> m_activate_srv;
-    /**
-     * A service that gets requests from the dependency manager to deactive a node.
-     * Handles this by forwarding a reqeust to ROS's lifecycle node
-     */
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::DeactivateNode>> m_deactivate_srv;
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReconfigureNode>>
-        m_reconfigure_srv;
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::GetNodeState>>
-        m_get_node_state_srv;
-
-  public:
-    LifecycleManager() : rclcpp::Node("lifecycle_manager")
-    {
-        m_activate_srv = create_activate_service(*this);
-        m_deactivate_srv = create_deactivate_service(*this);
-        m_reconfigure_srv = create_reconfigure_service(*this);
-        m_get_node_state_srv = create_state_service(*this);
-        RCLCPP_INFO(get_logger(), "lifecycle manager initialized");
-    }
-};
-
-int main(int argc, char** argv)
-{
-    rclcpp::init(argc, argv);
-
-    auto node = std::make_shared<LifecycleManager>();
-    rclcpp::spin(node);
-    rclcpp::shutdown();
-    return 0;
+    m_activate_srv = create_activate_service(*this);
+    m_deactivate_srv = create_deactivate_service(*this);
+    m_reconfigure_srv = create_reconfigure_service(*this);
+    m_get_node_state_srv = create_state_service(*this);
+    RCLCPP_INFO(get_logger(), "lifecycle manager initialized");
 }
+}  // namespace cmr::fabric

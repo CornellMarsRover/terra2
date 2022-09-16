@@ -1,11 +1,19 @@
 #pragma once
 
+#include <filesystem>
+
 #include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/external/tomlcpp.hxx"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 namespace cmr::fabric
 {
+
+struct FabricNodeConfig {
+    std::string node_name;
+    std::string composition_namespace;
+    std::variant<std::filesystem::path, std::string> toml_config;
+};
 
 /**
  * @brief The FabricNode is the base class for All CMR nodes
@@ -20,7 +28,13 @@ namespace cmr::fabric
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
   public:
-    FabricNode();
+    explicit FabricNode(
+        const std::optional<FabricNodeConfig>& config = std::nullopt);
+
+    explicit FabricNode(std::optional<FabricNodeConfig>&& config = std::nullopt)
+        : FabricNode(config)
+    {
+    }
 
     ~FabricNode() override = default;
 
@@ -31,28 +45,28 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      *
      * @return std::vector<std::string> list of dependency names
      */
-    const std::vector<std::string> &get_dependencies() const
+    const std::vector<std::string>& get_dependencies() const
     {
         return m_dependencies;
     }
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_configure(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_activate(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_deactivate(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_cleanup(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_shutdown(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_error(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
   private:
     /** The name of the namespace */
@@ -86,7 +100,7 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * @param current_state the state befre the error
      * @return true if the error was handled successfully
      */
-    bool cleanup_on_error(const rclcpp_lifecycle::State &current_state);
+    bool cleanup_on_error(const rclcpp_lifecycle::State& current_state);
 
     /**
      * Derived class hook for configuring the node.
@@ -107,7 +121,7 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * @return true on success, false otherwise which will cause transition to
      * `ErrorProcessing`
      */
-    virtual bool configure(const std::shared_ptr<toml::Table> &) = 0;
+    virtual bool configure(const std::shared_ptr<toml::Table>&) = 0;
 
     /**
      * Derived  class hook for activation.

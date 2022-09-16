@@ -24,7 +24,7 @@ inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
 bool is_debugger_attached();
 
 /**
- * Empty function that is called if `CMR_ASSERT` is called from outside a
+ * Empty function that is called if `CMR_RETRY_ON_ERR` is called from outside a
  * FabricNode.
  *
  * This function will be shadowed if we assert within a FabricNode
@@ -207,6 +207,10 @@ class CmrException : public std::exception
 {
 };
 
+/**
+ * @brief An exception that is thrown by the default assert handler
+ *
+ */
 class CmrAssertionException : public CmrException
 {
 };

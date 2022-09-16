@@ -2,21 +2,38 @@
 #include <type_traits>
 #include <utility>
 
+#include "cmr_utils/external/debug_break.h"
 #include "rclcpp/rclcpp.hpp"
 
 /** @file Contains general error handling, debug, and assertion utilities for the
  * code base
  */
 
-/** Gets the default ROS logger. Called if logging outside a node and `get_logger`
- * is not shadowed */
+/**
+ * Gets the default ROS logger. Called if logging outside a node and `get_logger`
+ * is not shadowed
+ * */
 inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
 
-/** An assert handler is the function that is called when an assert fails
- * or an `CMR_INVALID` is triggered.
+/**
+ * @brief Determines if a debugger is attached to the current process.
  *
- * The default assert handler will trap a debugger if one is attached, otherwise it
- * will terminate the program
+ * Not very efficient in debug mode, but always returns `false` in release mode.
+ *
+ */
+bool is_debugger_attached();
+
+/**
+ * Empty function that is called if `CMR_RETRY_ON_ERR` is called from outside a
+ * FabricNode.
+ *
+ * This function will be shadowed if we assert within a FabricNode
+ */
+inline auto error_transition() {}
+
+/**
+ * An assert handler is the function that is called when an assert fails
+ * or an `CMR_INVALID` is triggered.
  */
 using assert_handler_t = void (*)();
 
@@ -41,6 +58,11 @@ assert_handler_t get_assert_handler() noexcept;
  * Uses the node logger if called from a node, otherwise uses the default logger
  * @param LEVEL the level of the message, such as WARN, INFO, DEBUG, FATAL
  * @param ... A format string followed by format arguments, like `printf`
+ *
+ * ## Example
+ * `CMR_LOG(INFO, "test is %s", get_parameter("test").as_string().c_str());`
+ *
+ * `CMR_LOG(WARN, "we got %d", my_num);
  */
 // NOLINTNEXTLINE
 #define CMR_LOG(LEVEL, ...) RCLCPP_##LEVEL(get_logger(), __VA_ARGS__)
@@ -48,16 +70,31 @@ assert_handler_t get_assert_handler() noexcept;
 /**
  * @def CMR_ASSERT
  *
- * Asserts a condition is true. Optionally pass a format string to log.
- * If the condition is false, creates a `FATAL` log and calls the assert handler
- * which by default traps the debugger or terminates the program
- * @param CONDITION condition to assert
+ * Asserts a condition is true.
+ * If the condition is false, creates a `FATAL` log and, if debugging is enabled,
+ * traps the debugger otherwise invokes `error_transition` and the assert handler.
+ *
+ * IMPORTANT: This does not instantly fail the program if the condition is false,
+ * you MUST still take into consideration the path of execution if the condition you
+ * assert on is false.
+ *
+ * @param CONDITION condition to assert. In debug mode, if this is false, sets a
+ * breakpoint. In release mode it triggers a transition to the error state for
+ * FabricNodes
+ *
+ * ## Example:
+ * - `CMR_ASSERT(x == 10);`
+ *
+ * @see `CMR_ASSERT_MSG`
  */
 // NOLINTNEXTLINE
 #define CMR_ASSERT(CONDITION)                                                \
     if (!(CONDITION)) {                                                      \
         CMR_LOG(FATAL, "ASSERT: '%s' FAILED in %s:%d", #CONDITION, __FILE__, \
                 __LINE__);                                                   \
+        if (is_debugger_attached()) {                                        \
+            debug_break();                                                   \
+        }                                                                    \
         get_assert_handler()();                                              \
     }
 
@@ -68,13 +105,15 @@ assert_handler_t get_assert_handler() noexcept;
  *
  * ### Example
  * - `CMR_ASSERT_MSG(x == 10, "%s was %d instead of 10", "x", x)`
- * - `CMR_ASSERT(x == 10);`
  *
+ * @see `CMR_ASSERT`
  */
 // NOLINTNEXTLINE
 #define CMR_ASSERT_MSG(CONDITION, ...) \
-    CMR_ASSERT(CONDITION);             \
-    CMR_LOG(FATAL, __VA_ARGS__);
+    if (!(CONDITION)) {                \
+        CMR_LOG(FATAL, __VA_ARGS__);   \
+        CMR_ASSERT(CONDITION);         \
+    }
 
 /**
  * @brief Helper function for `CMR_INVALID` macro.
@@ -168,6 +207,14 @@ class CmrException : public std::exception
 {
 };
 
+/**
+ * @brief An exception that is thrown by the default assert handler
+ *
+ */
+class CmrAssertionException : public CmrException
+{
+};
+
 [[noreturn]] inline void cmr_invalid(const char* file, unsigned line,
                                      const char* msg)
 {
@@ -178,4 +225,70 @@ class CmrException : public std::exception
     // To use cmr_invalid to end control paths (ie. need not explicitly return from
     // a function after calling it), we must make sure we actually abort
     // Returning from a [[noreturn]] function is undefined behavior
+}
+
+/**
+ * @def CMR_RETRY_ON_ERROR
+ *
+ * @brief Macro for declaring a callback function for a FabricNode
+ *
+ * This macro essentially wraps a try-catch around the code you provide to turn any
+ * assetion errors into calls to `error_transition()` to restart the node instead of
+ * terminating it
+ *
+ * This should be used in all service, topic, etc. callback handlers
+ *
+ * ## Example:
+ * ```C++
+ * m_sub = create_subscription<std_msgs::msg::Bool>(
+ *           get_name() + std::string("/kill"), 10,
+ *           [this](const std_msgs::msg::Bool::SharedPtr msg) {
+ *               CMR_RETRY_ON_ERR(RCLCPP_INFO(get_logger(), "Got kill message: %s",
+ *                                            msg->data ? "true" : "false");
+ *                                CMR_ASSERT_MSG(false, "Killed by kill message");)
+ *           });
+ * ```
+ */
+// NOLINTNEXTLINE
+#define CMR_RETRY_ON_ERR(CODE)               \
+    try {                                    \
+        CODE                                 \
+    } catch (const CmrAssertionException&) { \
+        error_transition();                  \
+    }
+
+/**
+ * @brief `narrow_cast` Casts a type of type `T` to type `U` with extra checks to
+ * ensure that no information is lost during the conversion
+ *
+ * @tparam U output type
+ * @tparam T input type
+ * @param t value of type T to cast
+ * @return value of type U
+ *
+ * @throws CmrAssertionException if the value of `t` cannot be represented by type
+ *
+ * ## Example
+ *
+ * ```C++
+ * auto x = narrow_cast<int>(1.5); // will fail
+ * auto y = narrow_cast<char>(1); // will succeed
+ * auto z = narrow_cast<unsigned>(-1); // will fail
+ * auto y2 = narrow_cast<double>(1); // will succeed
+ * auto x2 = narrow_cast<char>(128); // will fail
+ * ```
+ */
+template <typename U, typename T>
+auto narrow_cast(T&& t)
+{
+    using ValT = std::remove_reference<T>;
+    if constexpr (std::is_signed_v<ValT> && std::is_unsigned_v<U>) {
+        CMR_ASSERT_MSG(t >= 0, "Cannot narrow negative value");
+    } else if constexpr (std::is_unsigned_v<ValT> && std::is_signed_v<U>) {
+        CMR_ASSERT_MSG(static_cast<U>(std::forward<T>(t)) >= 0,
+                       "Cannot narrow unsigned value");
+    }
+    const auto u = static_cast<U>(std::forward<T>(t));
+    CMR_ASSERT_MSG(static_cast<ValT>(u) == t, "Cannot narrow value");
+    return u;
 }

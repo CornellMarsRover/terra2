@@ -18,4 +18,12 @@ enum class LifecycleState {
     /** Node has shut down, and can no longer be configured or activated. */
     Finalized
 };
+
+/** The reason why a node is deactivated */
+enum class DeactivationReason : uint8_t {
+    /** Node has been deactivated due to an error transition */
+    Error,
+    /** Node has been deactivated  */
+    Manual,
+};
 }  // namespace cmr::fabric

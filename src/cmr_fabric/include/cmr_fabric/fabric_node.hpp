@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+
 #include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/external/tomlcpp.hxx"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
@@ -8,19 +10,45 @@ namespace cmr::fabric
 {
 
 /**
+ * @brief Configuration parameters for a FabricNode
+ *
+ */
+struct FabricNodeConfig {
+    std::string node_name;
+    std::string composition_namespace;
+    /** Either a path to a config file or the data of a config file */
+    std::variant<std::filesystem::path, std::string> toml_config;
+};
+
+/**
  * @brief The FabricNode is the base class for All CMR nodes
  *
  * Derived classes must implement the `configure`, `activate`, `deactivate`,
  * and `cleanup` methods.
  *
  * This node sets up the ROS 2 lifecycle services to communicate with the CMR
- * Dependency and Lifecycle manager nodes
+ * Dependency and Lifecycle manager nodes.
+ *
+ * When a FabricNode is activated or deactivated, it communicates with the dependency
+ * manager to ensure all dependencies are running and on deactivation, notifies the
+ * dependency manager that those dependents are no needed by this node. The
+ * dependency manager will activate all dependents via the lifecycle manager.
+ *
+ * If an error occurs in a state transition or if the `error_transition` method is
+ * invoked, the FabricNode communicates with the fault handler to notify it of the
+ * error. The fault handler will then schedule this node for restart.
  *
  */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
   public:
-    FabricNode();
+    explicit FabricNode(
+        const std::optional<FabricNodeConfig>& config = std::nullopt);
+
+    explicit FabricNode(std::optional<FabricNodeConfig>&& config = std::nullopt)
+        : FabricNode(config)
+    {
+    }
 
     ~FabricNode() override = default;
 
@@ -31,48 +59,67 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      *
      * @return std::vector<std::string> list of dependency names
      */
-    std::vector<std::string> get_dependencies() { return m_dependencies; }
+    const std::vector<std::string>& get_dependencies() const
+    {
+        return m_dependencies;
+    }
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_configure(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_activate(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_deactivate(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_cleanup(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_shutdown(
-        const rclcpp_lifecycle::State &) override;
+        const rclcpp_lifecycle::State&) override;
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_error(
-        const rclcpp_lifecycle::State &) override;
-
-  protected:
-    /**
-     * @brief A node can internally call panic() when it has entered an invalid state
-     * during its execution. This function must only be called within a callback; if
-     * a node's state is illegal outside of a callback, return false in the lifecycle
-     * function instead.
-     */
-    void panic();
+        const rclcpp_lifecycle::State&) override;
 
   private:
-    /** The name of the namespace? */
+    /** The name of the namespace */
     std::string m_composition_namespace;
+    /**
+     * A client which communicates to the fault handler to restart us if we
+     * encounter an error
+     */
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
+    /** The list of dependencies defined by this node */
     std::vector<std::string> m_dependencies;
+    /** Invairant: must be the same size as m_dependencies */
+    std::vector<bool> m_activated_dependencies;
 
     /**
-     * Schedules a restart by sending a request to the lifecycle manager.
+     * Attempts to activate all dependencies of this node.
      *
-     * @return true if the restart was scheduled successfully
+     * Indicates which dependencies were activated by setting their corresponding bit
+     * in m_activated_dependencies
+     *
+     * @return true if all dependencies were activated
      */
-    bool schedule_restart();
+    bool activate_dependencies();
+
+    /**
+     * @brief Attempts to deactivate all activated dependencies of this node
+     *
+     * @return true if all dependencies were deactivated
+     */
+    bool deactivate_dependencies();
+
+    /**
+     * @brief Cleans up any state when an error occurs
+     *
+     * @param current_state the state befre the error
+     * @return true if the error was handled successfully
+     */
+    bool cleanup_on_error(const rclcpp_lifecycle::State& current_state);
 
     /**
      * Derived class hook for configuring the node.
@@ -93,7 +140,7 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * @return true on success, false otherwise which will cause transition to
      * `ErrorProcessing`
      */
-    virtual bool configure(const std::shared_ptr<toml::Table> &) = 0;
+    virtual bool configure(const std::shared_ptr<toml::Table>&) = 0;
 
     /**
      * Derived  class hook for activation.
@@ -103,6 +150,9 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * > actually active, such as access to hardware. Ideally, no preparation that
      * > requires significant time (such as lengthy hardware initialisation) should
      * > be performed in this callback.
+     *
+     * This method MUST have the strong error guarantee. If it returns false, or an
+     * exception is thrown `deactivate()` will NOT be called.
      *
      * @see `FabricNode::deactivate`
      * @return true on success, false otherwise which will cause transition to
@@ -135,6 +185,24 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      * `ErrorProcessing`
      */
     virtual bool cleanup() = 0;
+
+  protected:
+    /**
+     * @brief Transitions us to the error state and schedules a restart.
+     *
+     * The transition is made manually, as ROS 2 does not support transitions to
+     * ErrorProcessing from a PrimaryState
+     */
+    void error_transition();
+
+    /**
+     * Schedules a restart by sending a request to the fault handler.
+     * The restart will be scheduled `t` seconds after the fault handler receives our
+     * request where `t` is the value of the `restart_delay` parameter.
+     *
+     * @return true if the restart was scheduled successfully
+     */
+    bool schedule_restart();
 };
 
 }  // namespace cmr::fabric

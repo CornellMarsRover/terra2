@@ -1,5 +1,6 @@
 #include "cmr_fabric/dependency_manager.hpp"
 
+#include "cmr_fabric/lifecycle_states.hpp"
 #include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
 #include "lifecycle_msgs/srv/change_state.hpp"
@@ -37,6 +38,7 @@ DependencyManager::create_acquire_dependency_service()
             }
 
             m_users[target].insert(dependent);
+            m_dependers[dependent].insert(target);
             CMR_LOG(INFO, "Added %s to m_users[%s]", dependent.c_str(),
                     target.c_str());
 
@@ -71,6 +73,7 @@ DependencyManager::release_dependency_callback(
     }
 
     m_users[target].erase(dependent);
+    m_dependers[dependent].erase(target);
 
     if (m_users[target].empty()) {
         // no more users of the target node; deactivate it if it was
@@ -179,12 +182,37 @@ bool DependencyManager::deactivate_dependency(const std::string& target)
     return activate_response && activate_response.value()->success;
 }
 
+const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>&
+DependencyManager::notify_deactivate_callback(
+    const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request>&,
+    const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>& response)
+{
+    // TODO(sev47)
+
+    return response;
+}
+
+rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
+DependencyManager::create_notify_deactivate_service()
+{
+    const auto notify_dep_callback =
+        [this](
+            const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request>& req,
+            const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>& resp) {
+            return notify_deactivate_callback(req, resp);
+        };
+
+    return this->create_service<cmr_msgs::srv::NotifyDeactivate>(
+        get_effective_namespace() + "/notify_deactivate", notify_dep_callback);
+}
+
 DependencyManager::DependencyManager(const std::string& node_name,
                                      const std::string& node_namespace)
     : Node(node_name, node_namespace)
 {
     m_acquire_dependency_srv = create_acquire_dependency_service();
     m_release_dependency_srv = create_release_dependency_service();
+    m_notify_deactivate_srv = create_notify_deactivate_service();
     CMR_LOG(INFO, "dependency manager initialized");
 }
 }  // namespace cmr::fabric

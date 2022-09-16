@@ -66,6 +66,13 @@ static auto create_base_threads(const std::atomic<bool>& end_test,
                            std::move(fault_handler_thread));
 }
 
+/**
+ * @brief Create a thread for a FabricTestNode
+ *
+ * @param end_test
+ * @param config
+ * @return auto
+ */
 static auto create_test_thread(const std::atomic<bool>& end_test,
                                const cmr::fabric::FabricNodeConfig& config)
 {
@@ -211,6 +218,125 @@ TEST(FabricTest, startDependency)
     test_thread2.join();
 }
 
+// WIP
+auto create_dependee(std::atomic<bool>& end_test, const std::string& node_name,
+                     const char* namespace_name)
+{
+    cmr::fabric::FabricNodeConfig config{node_name, namespace_name,
+                                         std::string(config_a)};
+    return create_test_thread(end_test, config);
+}
+
+// WIP
+template <typename... Args>
+void add_to_stream(std::stringstream& stream, const std::string& node_name,
+                   Args&&... rest)
+{
+    stream << '"' << node_name << '"' << ',';
+    if constexpr (sizeof...(rest) > 0) {
+        add_to_stream(stream, std::forward<Args>(rest)...);
+    }
+}
+
+// WIP
+template <typename... Dependees>
+auto create_depender(std::atomic<bool>& end_test, const std::string& node_name,
+                     const char* namespace_name, Dependees&&... dependee_names)
+{
+    std::array<char, 1024> depender_toml = {};
+    std::stringstream ss;
+    add_to_stream(ss, std::forward<Dependees>(dependee_names)...);
+    CMR_LOG(INFO, "Deps length: %zd", ss.str().length());
+    CMR_LOG(INFO, "Dependencies: %s", ss.str().c_str());
+    std::snprintf(depender_toml.data(), sizeof(depender_toml), config_b,
+                  ss.str().c_str());
+
+    CMR_LOG(INFO, "Config: %s", depender_toml.data());
+
+    cmr::fabric::FabricNodeConfig config_depender{node_name, namespace_name,
+                                                  std::string(depender_toml.data())};
+
+    auto test_thread2 = create_test_thread(end_test, config_depender);
+    return test_thread2;
+}
+
+// This needs to be fixed
+// Currently not supported
+// TODO(@sev47)
+// NOLINTNEXTLINE
+TEST(FabricTest, DISABLED_startDependencyChain)
+{
+    std::atomic<bool> end_test = false;
+    constexpr auto test_namespace = "dependency_chain_test";
+    constexpr auto node_name_a = "test_6a";
+    constexpr auto node_name_b = "test_6b";
+    constexpr auto node_name_c = "test_6c";
+    constexpr auto node_name_d = "test_6d";
+    constexpr auto node_name_e = "test_6e";
+
+    /*        c -> a
+     *       /
+     * e -> d
+     *       \
+     *        b
+     */
+
+    auto [lifecycle_manager_thread, dep_manager_thread, fault_handler_thread] =
+        create_base_threads(end_test, test_namespace);
+
+    cmr::fabric::FabricNodeConfig config_dependee{node_name_a, test_namespace,
+                                                  std::string(config_a)};
+    auto test_thread_a = create_test_thread(end_test, config_dependee);
+
+    cmr::fabric::FabricNodeConfig config_dependee_b{node_name_b, test_namespace,
+                                                    std::string(config_a)};
+    auto test_thread_b = create_test_thread(end_test, config_dependee_b);
+
+    std::array<char, 1024> depender_toml = {};
+
+    std::snprintf(depender_toml.data(), sizeof(depender_toml), config_b,
+                  cmr::build_string('"', node_name_a, '"').c_str());
+    cmr::fabric::FabricNodeConfig config_depender_c{
+        node_name_c, test_namespace, std::string(depender_toml.data())};
+    auto test_thread_c = create_test_thread(end_test, config_depender_c);
+
+    std::snprintf(
+        depender_toml.data(), sizeof(depender_toml), config_b,
+        cmr::build_string('"', node_name_c, "\", \"", node_name_b, "\"").c_str());
+    cmr::fabric::FabricNodeConfig config_depender_d{
+        node_name_d, test_namespace, std::string(depender_toml.data())};
+    auto test_thread_d = create_test_thread(end_test, config_depender_d);
+
+    std::snprintf(depender_toml.data(), sizeof(depender_toml), config_b,
+                  cmr::build_string('"', node_name_d, "\"").c_str());
+    cmr::fabric::FabricNodeConfig config_depender_e{
+        node_name_e, test_namespace, std::string(depender_toml.data())};
+    auto test_thread_e = create_test_thread(end_test, config_depender_e);
+
+    ASSERT_TRUE(activate_node(node_name_e, test_namespace));
+
+    ASSERT_EQ(get_state(node_name_b)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    ASSERT_EQ(get_state(node_name_a)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    ASSERT_EQ(get_state(node_name_c)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    ASSERT_EQ(get_state(node_name_d)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    ASSERT_EQ(get_state(node_name_e)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    end_test = true;
+    lifecycle_manager_thread.join();
+    dep_manager_thread.join();
+    fault_handler_thread.join();
+    test_thread_a.join();
+    test_thread_b.join();
+    test_thread_c.join();
+    test_thread_d.join();
+    test_thread_e.join();
+}
+
 TEST(FabricTest, killDependender)
 {
     std::atomic<bool> end_test = false;
@@ -257,7 +383,10 @@ TEST(FabricTest, killDependender)
     test_thread2.join();
 }
 
-TEST(FabricTest, killDependendent)
+// This needs to be fixed
+// currently not supported
+// TODO(@sev47)
+TEST(FabricTest, DISABLED_killDependendent)
 {
     std::atomic<bool> end_test = false;
     constexpr auto test_namespace = "kill_dependent_test";

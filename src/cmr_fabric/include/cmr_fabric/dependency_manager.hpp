@@ -19,10 +19,17 @@ class DependencyManager : public rclcpp::Node
 {
   private:
     /**
-     * maps names of acquired nodes to the names of the nodes that depend on
-     * them
+     * maps names of acquired nodes to the set of names of the nodes that it depends
+     * on
      */
     std::unordered_map<std::string, std::unordered_set<std::string>> m_users;
+
+    /**
+     * @brief This is the reverse of `m_users`. It maps names of nodes to the set of
+     * names of nodes that depend on it
+     *
+     */
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_dependers;
 
     /** set of nodes that the dependency manager started; nodes in this set will
      * be disabled when they no longer have any users
@@ -46,6 +53,14 @@ class DependencyManager : public rclcpp::Node
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReleaseDependency>>
         m_release_dependency_srv;
 
+    /**
+     * A service that listens on `/<effective_namespace>/notify_deactivate` that
+     * allows a node that is deactivating which is depndened upon by other nodes to
+     * deactive those other nodes
+     */
+    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>>
+        m_notify_deactivate_srv;
+
     rclcpp::Service<cmr_msgs::srv::AcquireDependency>::SharedPtr
     create_acquire_dependency_service();
 
@@ -54,8 +69,16 @@ class DependencyManager : public rclcpp::Node
         const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& request,
         const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>& response);
 
+    const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>&
+    notify_deactivate_callback(
+        const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request>& request,
+        const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>& response);
+
     rclcpp::Service<cmr_msgs::srv::ReleaseDependency>::SharedPtr
     create_release_dependency_service();
+
+    rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
+    create_notify_deactivate_service();
 
     bool activate_dependency(const std::string& target);
 

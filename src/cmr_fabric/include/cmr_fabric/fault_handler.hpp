@@ -1,4 +1,4 @@
-
+#pragma once
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/cmr_debug.hpp"

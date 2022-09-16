@@ -1,3 +1,4 @@
+#pragma once
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/deactivate_node.hpp"
 #include "cmr_msgs/srv/get_node_state.hpp"

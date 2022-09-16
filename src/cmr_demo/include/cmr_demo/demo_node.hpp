@@ -1,3 +1,4 @@
+#pragma once
 #include "cmr_fabric/fabric_node.hpp"
 #include "std_msgs/msg/bool.hpp"
 

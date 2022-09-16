@@ -5,7 +5,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
 include(CmrUtils)
 
 # find dependencies
-cmr_std_find_pkgs(rclcpp_lifecycle lifecycle_msgs)
+cmr_std_find_pkgs(rclcpp_lifecycle lifecycle_msgs std_msgs)
 
 # Add additional dependencies here. Make sure you update package.xml if you're
 # depending on other packages. find_package(<dependency> REQUIRED)
@@ -14,11 +14,16 @@ cmr_add_test(
   SOURCES
   test/fabric_test.cpp
   src/fabric_node.cpp
+  src/fault_handler.cpp
+  src/dependency_manager.cpp
+  src/lifecycle_manager.cpp
   DEPENDS
   rclcpp
   rclcpp_lifecycle
   cmr_msgs
-  cmr_utils)
+  cmr_utils
+  std_msgs
+  lifecycle_msgs)
 
 cmr_add_lib(
   cmr_fabric

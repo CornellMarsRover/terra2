@@ -7,6 +7,8 @@
 #include "rclcpp/rclcpp.hpp"
 
 using namespace std::chrono_literals;
+using time_pt_t = std::chrono::time_point<std::chrono::system_clock>;
+constexpr auto time_now = std::chrono::system_clock::now;
 
 /**
  * @brief Sends the activate node request (handled by the lifecycle manager) to all
@@ -42,7 +44,7 @@ auto send_activate_requests(const rclcpp::Node& node,
 class FaultHandler : public rclcpp::Node
 {
   private:
-    std::unordered_map<std::string, int> m_nodes_to_restart;
+    std::unordered_map<std::string, time_pt_t> m_nodes_to_restart;
 
     std::mutex m_nodes_to_restart_mutex;
 
@@ -56,17 +58,18 @@ class FaultHandler : public rclcpp::Node
 
     /**
      * @brief This is the callback called by the timer
-     * This keeps track of the restart delay for all nodes waiting to be restarted,
-     * by being called at each 1s clock tick and decrementing all the nodes' restart
-     * delay
+     * This checks all nodes waiting to be restarted and if the current time is past
+     * the restart time, it sends the restart request
      */
     void timer_callback()
     {
         std::vector<std::string> nodes_to_remove;
         std::unique_lock lock(m_nodes_to_restart_mutex);
-        for (auto& [node_name, delay] : m_nodes_to_restart) {
-            if (delay-- <= 0) {
+        for (const auto& [node_name, restart_time] : m_nodes_to_restart) {
+            if (time_now() > restart_time) {
                 nodes_to_remove.emplace_back(node_name);
+                CMR_LOG(DEBUG, "Restarting node %s at %zd", node_name.c_str(),
+                        restart_time.time_since_epoch().count());
             }
         }
 
@@ -79,7 +82,7 @@ class FaultHandler : public rclcpp::Node
         if (!failed_nodes.empty()) {
             lock.lock();
             for (const auto& node_name : failed_nodes) {
-                m_nodes_to_restart[node_name] = 1;
+                m_nodes_to_restart[node_name] = time_now() + 1s;
             }
         }
     }
@@ -93,8 +96,9 @@ class FaultHandler : public rclcpp::Node
                 const std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>&) {
                 CMR_LOG(INFO, "Got schedule request");
                 std::lock_guard lk(m_nodes_to_restart_mutex);
-                m_nodes_to_restart.emplace(request->node_name,
-                                           request->restart_delay);
+                m_nodes_to_restart.emplace(
+                    request->node_name,
+                    time_now() + std::chrono::seconds(request->restart_delay));
             };
         m_recover_fault_service = this->create_service<cmr_msgs::srv::RecoverFault>(
             get_effective_namespace() + "/recover_fault", recover_fault_callback);

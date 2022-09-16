@@ -265,6 +265,8 @@ bool FabricNode::schedule_restart()
     // serious problem.
     auto req = std::make_shared<cmr_msgs::srv::RecoverFault::Request>();
     req->node_name = get_name();
+    req->restart_delay =
+        static_cast<int32_t>(get_parameter(param_restart_delay).as_int());
     m_recover_fault_client->async_send_request(req);
     // do we want to wait for the response?
     return true;

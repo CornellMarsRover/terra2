@@ -26,9 +26,9 @@ class DemoNode : public cmr::fabric::FabricNode
         m_sub = create_subscription<std_msgs::msg::Bool>(
             get_name() + std::string("/kill"), 10,
             [this](const std_msgs::msg::Bool::SharedPtr msg) {
-                CMR_CALLBACK(RCLCPP_INFO(get_logger(), "Got kill message: %s",
-                                         msg->data ? "true" : "false");
-                             CMR_ASSERT_MSG(false, "Killed by kill message");)
+                CMR_RETRY_ON_ERR(RCLCPP_INFO(get_logger(), "Got kill message: %s",
+                                             msg->data ? "true" : "false");
+                                 CMR_ASSERT_MSG(false, "Killed by kill message");)
             });
         if (ok) {
             set_parameter(rclcpp::Parameter("test", test));

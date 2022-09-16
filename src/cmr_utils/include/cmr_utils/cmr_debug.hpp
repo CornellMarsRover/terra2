@@ -110,8 +110,10 @@ assert_handler_t get_assert_handler() noexcept;
  */
 // NOLINTNEXTLINE
 #define CMR_ASSERT_MSG(CONDITION, ...) \
-    CMR_LOG(FATAL, __VA_ARGS__);       \
-    CMR_ASSERT(CONDITION);
+    if (!(CONDITION)) {                \
+        CMR_LOG(FATAL, __VA_ARGS__);   \
+        CMR_ASSERT(CONDITION);         \
+    }
 
 /**
  * @brief Helper function for `CMR_INVALID` macro.
@@ -221,10 +223,68 @@ class CmrAssertionException : public CmrException
     // Returning from a [[noreturn]] function is undefined behavior
 }
 
+/**
+ * @def CMR_RETRY_ON_ERROR
+ *
+ * @brief Macro for declaring a callback function for a FabricNode
+ *
+ * This macro essentially wraps a try-catch around the code you provide to turn any
+ * assetion errors into calls to `error_transition()` to restart the node instead of
+ * terminating it
+ *
+ * This should be used in all service, topic, etc. callback handlers
+ *
+ * ## Example:
+ * ```C++
+ * m_sub = create_subscription<std_msgs::msg::Bool>(
+ *           get_name() + std::string("/kill"), 10,
+ *           [this](const std_msgs::msg::Bool::SharedPtr msg) {
+ *               CMR_RETRY_ON_ERR(RCLCPP_INFO(get_logger(), "Got kill message: %s",
+ *                                            msg->data ? "true" : "false");
+ *                                CMR_ASSERT_MSG(false, "Killed by kill message");)
+ *           });
+ * ```
+ */
 // NOLINTNEXTLINE
-#define CMR_CALLBACK(CODE)                   \
+#define CMR_RETRY_ON_ERR(CODE)               \
     try {                                    \
         CODE                                 \
     } catch (const CmrAssertionException&) { \
         error_transition();                  \
     }
+
+/**
+ * @brief `narrow_cast` Casts a type of type `T` to type `U` with extra checks to
+ * ensure that no information is lost during the conversion
+ *
+ * @tparam U output type
+ * @tparam T input type
+ * @param t value of type T to cast
+ * @return value of type U
+ *
+ * @throws CmrAssertionException if the value of `t` cannot be represented by type
+ *
+ * ## Example
+ *
+ * ```C++
+ * auto x = narrow_cast<int>(1.5); // will fail
+ * auto y = narrow_cast<char>(1); // will succeed
+ * auto z = narrow_cast<unsigned>(-1); // will fail
+ * auto y2 = narrow_cast<double>(1); // will succeed
+ * auto x2 = narrow_cast<char>(128); // will fail
+ * ```
+ */
+template <typename U, typename T>
+auto narrow_cast(T&& t)
+{
+    using ValT = std::remove_reference<T>;
+    if constexpr (std::is_signed_v<ValT> && std::is_unsigned_v<U>) {
+        CMR_ASSERT_MSG(t >= 0, "Cannot narrow negative value");
+    } else if constexpr (std::is_unsigned_v<ValT> && std::is_signed_v<U>) {
+        CMR_ASSERT_MSG(static_cast<U>(std::forward<T>(t)) >= 0,
+                       "Cannot narrow unsigned value");
+    }
+    const auto u = static_cast<U>(std::forward<T>(t));
+    CMR_ASSERT_MSG(static_cast<ValT>(u) == t, "Cannot narrow value");
+    return u;
+}

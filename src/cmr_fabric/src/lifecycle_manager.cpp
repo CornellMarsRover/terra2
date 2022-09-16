@@ -34,7 +34,6 @@ static cmr::fabric::LifecycleState call_get_state_client(
 
     if (!response) {
         return cmr::fabric::LifecycleState::Unknown;
-        // Is this correct?
     }
 
     const auto ros_state_id = response.value()->current_state.id;

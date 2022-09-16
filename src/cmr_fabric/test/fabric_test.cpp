@@ -101,6 +101,13 @@ static auto get_state(const char* node_name)
     return state_req.value();
 }
 
+/**
+ * @brief Activate a node via the lifecycle manager
+ *
+ * @param node_name
+ * @param namespace_name
+ * @return auto
+ */
 static auto activate_node(const std::string& node_name, const char* namespace_name)
 {
     auto req = std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
@@ -110,6 +117,7 @@ static auto activate_node(const std::string& node_name, const char* namespace_na
     return resp.has_value() && *resp;
 }
 
+// Kill a test node via the kill topic
 static auto kill_node(const char* node_name)
 {
     auto node = std::make_shared<rclcpp::Node>(

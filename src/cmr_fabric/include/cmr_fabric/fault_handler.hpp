@@ -8,11 +8,21 @@
 namespace cmr::fabric
 {
 
+/**
+ * @brief The FaultHandler class provides a service interface to allow nodes to
+ * restart themselves if an error occurs.
+ *
+ * The service is created on `/<namespace>/recover_fault` and takes messages of type
+ * `cmr_msgs::srv::RecoverFault`.
+ *
+ * The fault handler will activate nodes through the lifecycle manager.
+ */
 class FaultHandler : public rclcpp::Node
 {
     using time_pt_t = std::chrono::time_point<std::chrono::system_clock>;
 
   private:
+    /** Nodes to restart, and the time at which we can restart them */
     std::unordered_map<std::string, time_pt_t> m_nodes_to_restart;
 
     std::mutex m_nodes_to_restart_mutex;

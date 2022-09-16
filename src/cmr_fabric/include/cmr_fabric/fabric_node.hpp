@@ -9,9 +9,14 @@
 namespace cmr::fabric
 {
 
+/**
+ * @brief Configuration parameters for a FabricNode
+ *
+ */
 struct FabricNodeConfig {
     std::string node_name;
     std::string composition_namespace;
+    /** Either a path to a config file or the data of a config file */
     std::variant<std::filesystem::path, std::string> toml_config;
 };
 
@@ -22,7 +27,16 @@ struct FabricNodeConfig {
  * and `cleanup` methods.
  *
  * This node sets up the ROS 2 lifecycle services to communicate with the CMR
- * Dependency and Lifecycle manager nodes
+ * Dependency and Lifecycle manager nodes.
+ *
+ * When a FabricNode is activated or deactivated, it communicates with the dependency
+ * manager to ensure all dependencies are running and on deactivation, notifies the
+ * dependency manager that those dependents are no needed by this node. The
+ * dependency manager will activate all dependents via the lifecycle manager.
+ *
+ * If an error occurs in a state transition or if the `error_transition` method is
+ * invoked, the FabricNode communicates with the fault handler to notify it of the
+ * error. The fault handler will then schedule this node for restart.
  *
  */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
@@ -71,8 +85,13 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
   private:
     /** The name of the namespace */
     std::string m_composition_namespace;
+    /**
+     * A client which communicates to the fault handler to restart us if we
+     * encounter an error
+     */
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
+    /** The list of dependencies defined by this node */
     std::vector<std::string> m_dependencies;
     /** Invairant: must be the same size as m_dependencies */
     std::vector<bool> m_activated_dependencies;
@@ -169,13 +188,17 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
 
   protected:
     /**
-     * @brief Transitions us to the error state and schedules a restart
+     * @brief Transitions us to the error state and schedules a restart.
      *
+     * The transition is made manually, as ROS 2 does not support transitions to
+     * ErrorProcessing from a PrimaryState
      */
     void error_transition();
 
     /**
-     * Schedules a restart by sending a request to the lifecycle manager.
+     * Schedules a restart by sending a request to the fault handler.
+     * The restart will be scheduled `t` seconds after the fault handler receives our
+     * request where `t` is the value of the `restart_delay` parameter.
      *
      * @return true if the restart was scheduled successfully
      */

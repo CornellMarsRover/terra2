@@ -3,6 +3,12 @@
 #include "cmr_utils/cmr_debug.hpp"
 #include "std_msgs/msg/bool.hpp"
 
+/**
+ * @brief this node provides a simple test of dependency management and fault
+ * handling. It provides one topic, /kill, which, will cause the node to trigger the
+ * fault handler
+ *
+ */
 class FabricTestNode : public cmr::fabric::FabricNode
 {
     std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Bool>> m_sub;

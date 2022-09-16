@@ -7,6 +7,18 @@
 
 namespace cmr::fabric
 {
+
+/**
+ * @brief This node provides a service interface for activating and deactivating
+ * other nodes.
+ *
+ * The activation service is on `/<namespace>/activate` and takes messages of
+ * `cmr_msgs::srv::ActivateNode`. The deactivation service is on
+ * `/<namespace>/deactivate` and takes messages of
+ * `cmr_msgs::srv::DeactivateNode`.
+ *
+ *
+ */
 class LifecycleManager : public rclcpp::Node
 {
   private:
@@ -22,6 +34,7 @@ class LifecycleManager : public rclcpp::Node
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::DeactivateNode>> m_deactivate_srv;
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReconfigureNode>>
         m_reconfigure_srv;
+    /** A service which gets the current state of a specified node */
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::GetNodeState>>
         m_get_node_state_srv;
 

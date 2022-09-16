@@ -12,8 +12,17 @@
 namespace cmr::fabric
 {
 /**
- * @brief TODO(@fad35)
+ * The dependency manager provides a service interface for nodes to acquire their
+ * dependencies.
  *
+ * When a node acquires its dependencies, we make sure that all nodes it depends on
+ * are already running. When it releases its dependencies, will allow the dependent
+ * nodes to deactivate if there are no other nodes that depend on them.
+ *
+ * The acquire service is created on `/<namespace>/acquire` and takes messages of
+ * `cmr_msgs::srv::AcquireDependency`.
+ * The release service is created on `/<namespace>/release` and takes messages of
+ * `cmr_msgs::srv::ReleaseDependency`.
  */
 class DependencyManager : public rclcpp::Node
 {

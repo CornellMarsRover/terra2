@@ -344,7 +344,7 @@ TEST(FabricTest, killDependender)
 // This needs to be fixed
 // currently not supported
 // TODO(@sev47)
-TEST(FabricTest, DISABLED_killDependendent)
+TEST(FabricTest, killDependendent)
 {
     std::atomic<bool> end_test = false;
     constexpr auto test_namespace = "kill_dependent_test";

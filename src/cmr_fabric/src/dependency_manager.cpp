@@ -85,29 +85,71 @@ DependencyHandler::create_acquire_dependency_service(
             }
         });
 }
-/*
+
+/**
+ * @brief Notify all the nodes in `dependers` that `node` is being deactivated
+ *
+ * @param node the node being deactivated
+ * @param dependers the nodes that depend on `node`. All nodes successfully notified
+ * will be removed from this set
+ *
+ * @return true if all nodes were successfully notified
+ */
+static bool notify_deactivation_to_dependenders(
+    rclcpp_lifecycle::LifecycleNode& node,
+    std::unordered_set<std::string>& dependers)
+{
+    const auto req = std::make_shared<cmr_msgs::srv::NotifyDeactivate::Request>();
+    req->node_name = node.get_name();
+    bool success = true;
+    std::vector<std::string> notified_nodes;
+    for (const auto& depender : dependers) {
+        RCLCPP_INFO(node.get_logger(), "Notifying %s of deactivation of %s",
+                    depender.c_str(), node.get_name());
+        auto opt = cmr::send_request<cmr_msgs::srv::NotifyDeactivate>(
+            depender + "/notify_deactivate", req);
+        const auto notify_success = opt && opt.value()->success;
+        if (!notify_success) {
+            RCLCPP_ERROR(node.get_logger(),
+                         "Failed to notify %s about deactivation of %s",
+                         depender.c_str(), node.get_name());
+        } else {
+            notified_nodes.push_back(depender);
+        }
+        success &= notify_success;
+    }
+    for (const auto& depender : notified_nodes) {
+        dependers.erase(depender);
+    }
+    RCLCPP_INFO(node.get_logger(), "Notified dependenders success: %d", success);
+    return success;
+}
+
 rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
 DependencyHandler::create_notify_deactivate_service(
     rclcpp_lifecycle::LifecycleNode& node)
 {
     return node.create_service<cmr_msgs::srv::NotifyDeactivate>(
-        cmr::build_string(node.get_namespace(), "/", node.get_name(),
-                          "/notify_deactivate"),
+        cmr::build_string("/", node.get_name(), "/notify_deactivate"),
         [this, &node](
             const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request> request,
             const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>
                 response) {
             const auto node_name = request->node_name;
-            if (m_dependencies.find(node_name) != m_dependencies.end()) {
-                std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request> req;
-                for (const auto& depender : m_dependers) {
-                    cmr::send_request<cmr_msgs::srv::NotifyDeactivate>(
-                        depender + "/notify_deactivate", node_name);
-                        const std::shared_ptr<typename SrvT::Request> request)
-                }
+            if (auto it = m_dependencies.find(node_name);
+                it != m_dependencies.end()) {
+                it->second = false;
+                response->success =
+                    notify_deactivation_to_dependenders(node, m_dependers) &&
+                    transition_to_inactive(node);
+            } else {
+                response->success = false;
+                RCLCPP_WARN(
+                    node.get_logger(),
+                    "Received deactivation notification from a non-dependency");
             }
         });
-}*/
+}
 
 bool DependencyHandler::acquire_all_dependencies()
 {
@@ -151,10 +193,16 @@ bool DependencyHandler::release_all_dependencies()
     return success;
 }
 
+bool DependencyHandler::notify_deactivate()
+{
+    return notify_deactivation_to_dependenders(m_node.get(), m_dependers);
+}
+
 DependencyHandler::DependencyHandler(rclcpp_lifecycle::LifecycleNode& node)
     : m_dependencies({}), m_dependers({}), m_started_as_dep(false), m_node(node)
 {
     m_acquire_dependency_srv = create_acquire_dependency_service(node);
     m_release_dependency_srv = create_release_dependency_service(node);
+    m_notify_deactivate_srv = create_notify_deactivate_service(node);
 }
 }  // namespace cmr::fabric

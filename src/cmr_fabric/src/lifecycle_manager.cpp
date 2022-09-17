@@ -1,17 +1,17 @@
 #include "cmr_fabric/lifecycle_manager.hpp"
 
-#include <chrono>
-
 #include "cmr_fabric/lifecycle_states.hpp"
 #include "cmr_msgs/msg/state.hpp"
+#include "cmr_msgs/srv/activate_node.hpp"
+#include "cmr_msgs/srv/deactivate_node.hpp"
 #include "cmr_utils/services.hpp"
 #include "cmr_utils/string_utils.hpp"
 #include "lifecycle_msgs/srv/change_state.hpp"
 #include "lifecycle_msgs/srv/get_state.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 namespace cmr::fabric
 {
-using namespace std::chrono_literals;
 
 static bool call_change_state_client(const std::string& targetNode,
                                      uint8_t transition)

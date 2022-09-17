@@ -21,12 +21,21 @@ class DependencyHandler
     bool m_started_as_dep;
 
     std::reference_wrapper<rclcpp_lifecycle::LifecycleNode> m_node;
+
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::AcquireDependency>>
         m_acquire_dependency_srv;
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReleaseDependency>>
         m_release_dependency_srv;
+    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>>
+        m_notify_deactivate_srv;
 
   public:
+    /**
+     * @brief Construct a new Dependency Handler object
+     *
+     * @param node the parent node for this handler. IT MUST NOT OUTLIVE the
+     * DependencyHandler
+     */
     explicit DependencyHandler(rclcpp_lifecycle::LifecycleNode& node);
 
     template <typename It>
@@ -65,6 +74,13 @@ class DependencyHandler
      */
     bool release_all_dependencies();
 
+    /**
+     * @brief Attempts to notify all dependers that this node is being deactivated
+     *
+     * @return true if all dependers were notified successfully
+     */
+    bool notify_deactivate();
+
   private:
     rclcpp::Service<cmr_msgs::srv::AcquireDependency>::SharedPtr
     create_acquire_dependency_service(rclcpp_lifecycle::LifecycleNode& node);
@@ -72,7 +88,7 @@ class DependencyHandler
     rclcpp::Service<cmr_msgs::srv::ReleaseDependency>::SharedPtr
     create_release_dependency_service(rclcpp_lifecycle::LifecycleNode& node);
 
-    // rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
-    // create_notify_deactivate_service(rclcpp_lifecycle::LifecycleNode& node);
+    rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
+    create_notify_deactivate_service(rclcpp_lifecycle::LifecycleNode& node);
 };
 }  // namespace cmr::fabric

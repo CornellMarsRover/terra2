@@ -164,7 +164,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
     const rclcpp_lifecycle::State&)
 {
-    if (!m_dependency_manager->release_all_dependencies()) {
+    if (!m_dependency_manager->release_all_dependencies() ||
+        !m_dependency_manager->notify_deactivate()) {
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     return deactivate() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
@@ -205,6 +206,7 @@ bool FabricNode::cleanup_on_error(const rclcpp_lifecycle::State& current_state)
         }
         case State::TRANSITION_STATE_ACTIVATING:
             return m_dependency_manager->release_all_dependencies() &&
+                   m_dependency_manager->notify_deactivate() &&
                    on_cleanup(current_state) == success;
         case State::TRANSITION_STATE_DEACTIVATING:
         case State::PRIMARY_STATE_INACTIVE:

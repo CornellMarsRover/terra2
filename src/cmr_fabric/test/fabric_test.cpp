@@ -29,6 +29,16 @@ restart_attempts = 2
 restart_delay = 0
 )";
 
+constexpr auto config_c = R"(
+dependencies = [%s]
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 2
+)";
+
+// TODO(sev47) clean this up
+
 /**
  * @brief Create threads for each of the dependency manager, fault handler, and
  * lifecycle manager
@@ -341,9 +351,6 @@ TEST(FabricTest, killDependender)
     test_thread2.join();
 }
 
-// This needs to be fixed
-// currently not supported
-// TODO(@sev47)
 TEST(FabricTest, killDependendent)
 {
     std::atomic<bool> end_test = false;
@@ -377,6 +384,141 @@ TEST(FabricTest, killDependendent)
     fault_handler_thread.join();
     test_thread.join();
     test_thread2.join();
+}
+
+TEST(FabricTest, restartDependendent)
+{
+    std::atomic<bool> end_test = false;
+    constexpr auto test_namespace = "restart_dependent_test";
+    constexpr auto node_name_a = "test_7a";
+    constexpr auto node_name_b = "test_7b";
+
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
+    cmr::fabric::FabricNodeConfig config_dependee{node_name_a, test_namespace,
+                                                  std::string(config_a)};
+    auto test_thread = create_test_thread(end_test, config_dependee);
+    std::array<char, 1024> depender_toml = {};
+    std::snprintf(depender_toml.data(), sizeof(depender_toml), config_b,
+                  cmr::build_string('"', node_name_a, '"').c_str());
+
+    cmr::fabric::FabricNodeConfig config_depender{node_name_b, test_namespace,
+                                                  std::string(depender_toml.data())};
+
+    auto test_thread2 = create_test_thread(end_test, config_depender);
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_b));
+
+    kill_node(node_name_a);
+
+    std::this_thread::sleep_for(5s);
+
+    ASSERT_EQ(get_state(node_name_b)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    ASSERT_EQ(get_state(node_name_a)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    end_test = true;
+    fault_handler_thread.join();
+    test_thread.join();
+    test_thread2.join();
+}
+
+TEST(FabricTest, killDependencyChain)
+{
+    std::atomic<bool> end_test = false;
+    constexpr auto test_namespace = "kill_chain_test";
+    constexpr auto node_name_a = "test_8a";
+    constexpr auto node_name_b = "test_8b";
+    constexpr auto node_name_c = "test_8c";
+    constexpr auto node_name_d = "test_8d";
+    constexpr auto node_name_e = "test_8e";
+
+    /*        c -> a
+     *       /
+     * e -> d
+     *       \
+     *        b
+     */
+
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
+
+    cmr::fabric::FabricNodeConfig config_dependee{node_name_a, test_namespace,
+                                                  std::string(config_a)};
+    auto test_thread_a = create_test_thread(end_test, config_dependee);
+
+    cmr::fabric::FabricNodeConfig config_dependee_b{node_name_b, test_namespace,
+                                                    std::string(config_a)};
+    auto test_thread_b = create_test_thread(end_test, config_dependee_b);
+
+    std::array<char, 1024> depender_toml = {};
+
+    std::snprintf(depender_toml.data(), sizeof(depender_toml), config_c,
+                  cmr::build_string('"', node_name_a, '"').c_str());
+    cmr::fabric::FabricNodeConfig config_depender_c{
+        node_name_c, test_namespace, std::string(depender_toml.data())};
+    auto test_thread_c = create_test_thread(end_test, config_depender_c);
+
+    std::snprintf(
+        depender_toml.data(), sizeof(depender_toml), config_c,
+        cmr::build_string('"', node_name_c, "\", \"", node_name_b, "\"").c_str());
+    cmr::fabric::FabricNodeConfig config_depender_d{
+        node_name_d, test_namespace, std::string(depender_toml.data())};
+    auto test_thread_d = create_test_thread(end_test, config_depender_d);
+
+    std::snprintf(depender_toml.data(), sizeof(depender_toml), config_c,
+                  cmr::build_string('"', node_name_d, "\"").c_str());
+    cmr::fabric::FabricNodeConfig config_depender_e{
+        node_name_e, test_namespace, std::string(depender_toml.data())};
+    auto test_thread_e = create_test_thread(end_test, config_depender_e);
+
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_a));
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_e));
+
+    kill_node(node_name_c);
+
+    ASSERT_EQ(get_state(node_name_a)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    ASSERT_EQ(get_state(node_name_d)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_EQ(get_state(node_name_b)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_EQ(get_state(node_name_c)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
+
+    std::this_thread::sleep_for(4700ms);
+
+    ASSERT_EQ(get_state(node_name_e)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_EQ(get_state(node_name_b)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    ASSERT_EQ(get_state(node_name_d)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+    ASSERT_EQ(get_state(node_name_a)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    std::this_thread::sleep_for(2s);
+
+    ASSERT_EQ(get_state(node_name_e)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    kill_node(node_name_d);
+
+    ASSERT_EQ(get_state(node_name_b)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_EQ(get_state(node_name_c)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_EQ(get_state(node_name_e)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
+    ASSERT_EQ(get_state(node_name_a)->current_state.id,
+              lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
+
+    end_test = true;
+    fault_handler_thread.join();
+    test_thread_a.join();
+    test_thread_b.join();
+    test_thread_c.join();
+    test_thread_d.join();
+    test_thread_e.join();
 }
 
 int main(int argc, char** argv)

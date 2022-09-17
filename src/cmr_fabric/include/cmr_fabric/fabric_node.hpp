@@ -85,6 +85,8 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
 
+    bool m_processing_fault = false;
+
     /**
      * @brief Cleans up any state when an error occurs
      *

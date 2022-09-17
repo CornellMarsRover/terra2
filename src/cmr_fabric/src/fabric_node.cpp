@@ -165,7 +165,10 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
     const rclcpp_lifecycle::State&)
 {
     if (!m_dependency_manager->release_all_dependencies() ||
-        !m_dependency_manager->notify_deactivate()) {
+        !m_dependency_manager->notify_deactivate(
+            m_processing_fault ? DeactivationReason::Error
+                               : DeactivationReason::Manual,
+            static_cast<int32_t>(get_parameter(param_restart_delay).as_int()))) {
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     return deactivate() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
@@ -190,6 +193,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_shutdown(
 // Performs the necessary cleanup for `node` during the `ErrorProcessing` state
 bool FabricNode::cleanup_on_error(const rclcpp_lifecycle::State& current_state)
 {
+    m_processing_fault = true;
+    ALWAYS(this) { m_processing_fault = false; };
     using namespace lifecycle_msgs::msg;  // NOLINT(google-build-using-namespace)
     constexpr auto success =
         rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
@@ -206,7 +211,10 @@ bool FabricNode::cleanup_on_error(const rclcpp_lifecycle::State& current_state)
         }
         case State::TRANSITION_STATE_ACTIVATING:
             return m_dependency_manager->release_all_dependencies() &&
-                   m_dependency_manager->notify_deactivate() &&
+                   m_dependency_manager->notify_deactivate(
+                       DeactivationReason::Error,
+                       static_cast<int32_t>(
+                           get_parameter(param_restart_delay).as_int())) &&
                    on_cleanup(current_state) == success;
         case State::TRANSITION_STATE_DEACTIVATING:
         case State::PRIMARY_STATE_INACTIVE:
@@ -278,6 +286,8 @@ bool FabricNode::schedule_restart()
 
 void FabricNode::error_transition()
 {
+    m_processing_fault = true;
+    ALWAYS(this) { m_processing_fault = false; };
     CMR_LOG(INFO, "Transitioning to ErrorProcessing");
     switch (get_current_state().id()) {
         case lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED:

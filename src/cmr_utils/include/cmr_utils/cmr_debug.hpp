@@ -228,7 +228,7 @@ class CmrAssertionException : public CmrException
 }
 
 /**
- * @def CMR_RETRY_ON_ERROR
+ * @def CMR_RETRY_ON_ERR
  *
  * @brief Macro for declaring a callback function for a FabricNode
  *
@@ -292,3 +292,56 @@ auto narrow_cast(T&& t)
     CMR_ASSERT_MSG(static_cast<ValT>(u) == t, "Cannot narrow value");
     return u;
 }
+
+/**
+ * @brief A RAII helper class that simply provides a way to call a function when it
+ * is destroyed
+ *
+ */
+class CmrRAII
+{
+    std::function<void()> m_func;
+
+  public:
+    /**
+     * @brief Construct a new CmrRAII object from a callable object
+     *
+     * @tparam T callable `void(void)` type
+     * @param func
+     */
+    template <typename T>  // NOLINTNEXTLINE
+    CmrRAII(T&& func, decltype(std::declval<T>()())* = 0) : m_func(func)
+    {
+    }
+
+    ~CmrRAII() { m_func(); }
+
+    CmrRAII(const CmrRAII&) = delete;
+    CmrRAII& operator=(const CmrRAII&) = delete;
+
+    CmrRAII(CmrRAII&&) = default;
+    CmrRAII& operator=(CmrRAII&&) = default;
+};
+
+/**
+ * @def ALWAYS
+ *
+ * Macro for easily creating a `CmrRAII` object that calls the code when it is
+ * destroyed
+ *
+ * The paramaters of this macro are the captures of the `CmrRAII`'s lambda which is
+ * called upon destruction. This macro essentially creates a lambda and assigns it to
+ * a uniqurely names `CmrRAII`
+ *
+ * ## Example
+ *
+ * ```C++
+ * ALWAYS(this) { m_error_processing = false; };
+ *
+ * // when the function exits, by any return path, m_error_processing will be set to
+ * // false
+ * ```
+ *
+ */
+// NOLINTNEXTLINE
+#define ALWAYS(...) CmrRAII raii__##__LINE__ = [__VA_ARGS__]()

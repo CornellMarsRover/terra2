@@ -11,14 +11,27 @@ namespace cmr
  * Spins up a service client owned by a temporary node and calls the service with the
  * given request. Returns the response if successful, or empty optional otherwise.
  *
- * This function blocks until the service response is received and YIELDS TO ROS
- * THIS IS VERY IMPORTANT AND POSSIBLY DANGEROUS, DO NOT CALL WITHIN A CRITICAL
- * SECTION OR ANY AREA OF CODE THAT SHOULD NOT BE INTERUPTED!!! WHEN YOU CALL THIS
- * FUNCTION ANY ROS CALLBACK MAY BE INVOKED
+ * **DATA RACE WARNING:** This function blocks until the service response is received
+ * and **YIELDS TO ROS! THIS IS VERY IMPORTANT AND POSSIBLY DANGEROUS, DO NOT CALL
+ * WITHIN A CRITICAL SECTION OR ANY AREA OF CODE THAT SHOULD NOT BE INTERUPTED!!!**
+ *
+ * **DEADLOCK WARNING:** This function creates a new node for the client and spins
+ * it, this means that **THIS FUNCTION BLOCKS THE ENTIRE THREAD, PREVENTING ANY OTHER
+ * ROS CALLBACKS FROM BEING INVOKED.** Thus any service dispatched from this function
+ * **CANNOT RELY ON A SERVICE PROVIDED FROM THE SAME THREAD**
+ *
+ * This is quite possibly **THE MOST DANGEROUS** FUNCTION IN THE ENTIRE
+ * CODEBASE, use with EXTREME CAUTION
+ *
+ * If you can use it, prefer to use an asynchronous service directly, rather than
+ * using this function to block a response
  *
  * @tparam ServiceT The type of the service
  * @param service_name The name of the service
  * @param request The request to send
+ *
+ * @return The response from the service, or empty optional if the service call
+ * failed
  */
 template <typename SrvT>
 std::optional<std::shared_ptr<typename SrvT::Response>> send_request(

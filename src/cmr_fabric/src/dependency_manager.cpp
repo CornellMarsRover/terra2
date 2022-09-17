@@ -2,6 +2,7 @@
 
 #include "cmr_fabric/lifecycle_manager.hpp"
 #include "cmr_fabric/lifecycle_states.hpp"
+#include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
 #include "cmr_utils/string_utils.hpp"
@@ -97,10 +98,13 @@ DependencyHandler::create_acquire_dependency_service(
  */
 static bool notify_deactivation_to_dependenders(
     rclcpp_lifecycle::LifecycleNode& node,
-    std::unordered_set<std::string>& dependers)
+    std::unordered_set<std::string>& dependers, DeactivationReason reason,
+    int32_t restart_delay)
 {
     const auto req = std::make_shared<cmr_msgs::srv::NotifyDeactivate::Request>();
     req->node_name = node.get_name();
+    req->deactivation_reason = static_cast<uint8_t>(reason);
+    req->restart_delay = restart_delay;
     bool success = true;
     std::vector<std::string> notified_nodes;
     for (const auto& depender : dependers) {
@@ -125,6 +129,33 @@ static bool notify_deactivation_to_dependenders(
     return success;
 }
 
+/**
+ * @brief Determines if we should ask the fault handler to restart outselves
+ *
+ * @param reason the reason why we are being deactivated. If this is an error, we
+ * will restart
+ * @param restart_delay the delay before restarting, taking into account the delay of
+ * our dependencies
+ * @param node
+ *
+ * @return true if we don't need to restart or the scheduling was successful
+ */
+static bool trigger_restart_if_necessary(DeactivationReason reason,
+                                         int32_t restart_delay,
+                                         rclcpp_lifecycle::LifecycleNode& node)
+{
+    const auto comp_namespace = node.get_parameter("composition_ns").as_string();
+    if (reason == DeactivationReason::Error) {
+        auto req = std::make_shared<cmr_msgs::srv::RecoverFault::Request>();
+        req->node_name = node.get_name();
+        req->restart_delay = restart_delay;
+        const auto resp = cmr::send_request<cmr_msgs::srv::RecoverFault>(
+            "/" + comp_namespace + "/recover_fault", req);
+        return resp.has_value();
+    }
+    return true;
+}
+
 rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
 DependencyHandler::create_notify_deactivate_service(
     rclcpp_lifecycle::LifecycleNode& node)
@@ -138,10 +169,22 @@ DependencyHandler::create_notify_deactivate_service(
             const auto node_name = request->node_name;
             if (auto it = m_dependencies.find(node_name);
                 it != m_dependencies.end()) {
+                // setthing this to false prevents us trying to release this
+                // dependency
                 it->second = false;
+                const auto node_restart_delay = static_cast<int32_t>(
+                    node.get_parameter("restart_delay").as_int());
                 response->success =
-                    notify_deactivation_to_dependenders(node, m_dependers) &&
-                    transition_to_inactive(node);
+                    notify_deactivation_to_dependenders(
+                        node, m_dependers,
+                        static_cast<DeactivationReason>(
+                            request->deactivation_reason),
+                        request->restart_delay + node_restart_delay) &&
+                    transition_to_inactive(node) &&
+                    trigger_restart_if_necessary(
+                        static_cast<DeactivationReason>(
+                            request->deactivation_reason),
+                        request->restart_delay + node_restart_delay, node);
             } else {
                 response->success = false;
                 RCLCPP_WARN(
@@ -193,9 +236,11 @@ bool DependencyHandler::release_all_dependencies()
     return success;
 }
 
-bool DependencyHandler::notify_deactivate()
+bool DependencyHandler::notify_deactivate(DeactivationReason reason,
+                                          int32_t restart_delay)
 {
-    return notify_deactivation_to_dependenders(m_node.get(), m_dependers);
+    return notify_deactivation_to_dependenders(m_node.get(), m_dependers, reason,
+                                               restart_delay);
 }
 
 DependencyHandler::DependencyHandler(rclcpp_lifecycle::LifecycleNode& node)

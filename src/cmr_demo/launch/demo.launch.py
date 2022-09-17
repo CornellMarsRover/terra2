@@ -17,18 +17,6 @@ def generate_launch_description():
                 namespace=composition_ns,
                 arguments=["--ros-args", "--log-level", "debug"],
             ),
-            Node(
-                package="cmr_fabric",
-                executable="dependency_manager",
-                namespace=composition_ns,
-                arguments=["--ros-args", "--log-level", "debug"],
-            ),
-            Node(
-                package="cmr_fabric",
-                executable="lifecycle_manager",
-                namespace=composition_ns,
-                arguments=["--ros-args", "--log-level", "debug"],
-            ),
             *fabric_composition("/cmr/terra/src/cmr_demo/config"),
         ]
     )

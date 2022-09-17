@@ -40,20 +40,6 @@ restart_delay = 0
 static auto create_base_threads(const std::atomic<bool>& end_test,
                                 const char* test_namespace)
 {
-    std::thread lifecycle_manager_thread([&end_test, test_namespace]() {
-        auto lifecycle_manager =
-            std::make_shared<cmr::fabric::LifecycleManager>("lfm", test_namespace);
-        while (!end_test) {
-            rclcpp::spin_some(lifecycle_manager);
-        }
-    });
-    std::thread dep_manager_thread([&end_test, test_namespace]() {
-        auto dep_manager =
-            std::make_shared<cmr::fabric::DependencyManager>("dm", test_namespace);
-        while (!end_test) {
-            rclcpp::spin_some(dep_manager);
-        }
-    });
     std::thread fault_handler_thread([&end_test, test_namespace]() {
         auto fault_handler =
             std::make_shared<cmr::fabric::FaultHandler>("fh", test_namespace);
@@ -61,9 +47,7 @@ static auto create_base_threads(const std::atomic<bool>& end_test,
             rclcpp::spin_some(fault_handler);
         }
     });
-    return std::make_tuple(std::move(lifecycle_manager_thread),
-                           std::move(dep_manager_thread),
-                           std::move(fault_handler_thread));
+    return fault_handler_thread;
 }
 
 /**
@@ -101,22 +85,6 @@ static auto get_state(const char* node_name)
     return state_req.value();
 }
 
-/**
- * @brief Activate a node via the lifecycle manager
- *
- * @param node_name
- * @param namespace_name
- * @return auto
- */
-static auto activate_node(const std::string& node_name, const char* namespace_name)
-{
-    auto req = std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
-    req->node_name = node_name;
-    auto resp = cmr::send_request<cmr_msgs::srv::ActivateNode>(
-        cmr::build_string("/", namespace_name, "/activate"), req);
-    return resp.has_value() && *resp;
-}
-
 // Kill a test node via the kill topic
 static auto kill_node(const char* node_name)
 {
@@ -136,8 +104,7 @@ TEST(FabricTest, activateTest)
     constexpr auto test_namespace = "activate_test";
     constexpr auto node_name = "test_1a";
 
-    auto [lifecycle_manager_thread, dep_manager_thread, fault_handler_thread] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
     cmr::fabric::FabricNodeConfig config{node_name, test_namespace,
                                          std::string(config_a)};
     auto test_thread = create_test_thread(end_test, config);
@@ -145,14 +112,12 @@ TEST(FabricTest, activateTest)
     ASSERT_EQ(get_state(node_name)->current_state.id,
               lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
 
-    ASSERT_TRUE(activate_node(node_name, test_namespace));
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name));
 
     ASSERT_EQ(get_state(node_name)->current_state.id,
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
 
     end_test = true;
-    lifecycle_manager_thread.join();
-    dep_manager_thread.join();
     fault_handler_thread.join();
     test_thread.join();
 }
@@ -163,12 +128,11 @@ TEST(FabricTest, restartOnKillTest)
     constexpr auto test_namespace = "restart_on_kill_test";
     constexpr auto node_name = "test_2a";
 
-    auto [lifecycle_manager_thread, dep_manager_thread, fault_handler_thread] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
     cmr::fabric::FabricNodeConfig config{node_name, test_namespace,
                                          std::string(config_a)};
     auto test_thread = create_test_thread(end_test, config);
-    ASSERT_TRUE(activate_node(node_name, test_namespace));
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name));
 
     ASSERT_EQ(get_state(node_name)->current_state.id,
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
@@ -184,8 +148,6 @@ TEST(FabricTest, restartOnKillTest)
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
 
     end_test = true;
-    lifecycle_manager_thread.join();
-    dep_manager_thread.join();
     fault_handler_thread.join();
     test_thread.join();
 }
@@ -197,8 +159,7 @@ TEST(FabricTest, startDependency)
     constexpr auto node_name_a = "test_3a";
     constexpr auto node_name_b = "test_3b";
 
-    auto [lifecycle_manager_thread, dep_manager_thread, fault_handler_thread] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
     cmr::fabric::FabricNodeConfig config_dependee{node_name_a, test_namespace,
                                                   std::string(config_a)};
     auto test_thread = create_test_thread(end_test, config_dependee);
@@ -210,7 +171,7 @@ TEST(FabricTest, startDependency)
                                                   std::string(depender_toml.data())};
 
     auto test_thread2 = create_test_thread(end_test, config_depender);
-    ASSERT_TRUE(activate_node(node_name_b, test_namespace));
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_b));
 
     ASSERT_EQ(get_state(node_name_b)->current_state.id,
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
@@ -219,8 +180,6 @@ TEST(FabricTest, startDependency)
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
 
     end_test = true;
-    lifecycle_manager_thread.join();
-    dep_manager_thread.join();
     fault_handler_thread.join();
     test_thread.join();
     test_thread2.join();
@@ -268,11 +227,8 @@ auto create_depender(std::atomic<bool>& end_test, const std::string& node_name,
     return test_thread2;
 }
 
-// This needs to be fixed
-// Currently not supported
-// TODO(@sev47)
 // NOLINTNEXTLINE
-TEST(FabricTest, DISABLED_startDependencyChain)
+TEST(FabricTest, startDependencyChain)
 {
     std::atomic<bool> end_test = false;
     constexpr auto test_namespace = "dependency_chain_test";
@@ -289,8 +245,7 @@ TEST(FabricTest, DISABLED_startDependencyChain)
      *        b
      */
 
-    auto [lifecycle_manager_thread, dep_manager_thread, fault_handler_thread] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
 
     cmr::fabric::FabricNodeConfig config_dependee{node_name_a, test_namespace,
                                                   std::string(config_a)};
@@ -321,7 +276,7 @@ TEST(FabricTest, DISABLED_startDependencyChain)
         node_name_e, test_namespace, std::string(depender_toml.data())};
     auto test_thread_e = create_test_thread(end_test, config_depender_e);
 
-    ASSERT_TRUE(activate_node(node_name_e, test_namespace));
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_e));
 
     ASSERT_EQ(get_state(node_name_b)->current_state.id,
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
@@ -335,8 +290,6 @@ TEST(FabricTest, DISABLED_startDependencyChain)
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
 
     end_test = true;
-    lifecycle_manager_thread.join();
-    dep_manager_thread.join();
     fault_handler_thread.join();
     test_thread_a.join();
     test_thread_b.join();
@@ -352,8 +305,7 @@ TEST(FabricTest, killDependender)
     constexpr auto node_name_a = "test_4a";
     constexpr auto node_name_b = "test_4b";
 
-    auto [lifecycle_manager_thread, dep_manager_thread, fault_handler_thread] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
     cmr::fabric::FabricNodeConfig config_dependee{node_name_a, test_namespace,
                                                   std::string(config_a)};
     auto test_thread = create_test_thread(end_test, config_dependee);
@@ -365,7 +317,7 @@ TEST(FabricTest, killDependender)
                                                   std::string(depender_toml.data())};
 
     auto test_thread2 = create_test_thread(end_test, config_depender);
-    ASSERT_TRUE(activate_node(node_name_b, test_namespace));
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_b));
 
     kill_node(node_name_b);
 
@@ -384,8 +336,6 @@ TEST(FabricTest, killDependender)
               lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
 
     end_test = true;
-    lifecycle_manager_thread.join();
-    dep_manager_thread.join();
     fault_handler_thread.join();
     test_thread.join();
     test_thread2.join();
@@ -401,8 +351,7 @@ TEST(FabricTest, DISABLED_killDependendent)
     constexpr auto node_name_a = "test_5a";
     constexpr auto node_name_b = "test_5b";
 
-    auto [lifecycle_manager_thread, dep_manager_thread, fault_handler_thread] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_thread = create_base_threads(end_test, test_namespace);
     cmr::fabric::FabricNodeConfig config_dependee{node_name_a, test_namespace,
                                                   std::string(config_a)};
     auto test_thread = create_test_thread(end_test, config_dependee);
@@ -414,7 +363,7 @@ TEST(FabricTest, DISABLED_killDependendent)
                                                   std::string(depender_toml.data())};
 
     auto test_thread2 = create_test_thread(end_test, config_depender);
-    ASSERT_TRUE(activate_node(node_name_b, test_namespace));
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_b));
 
     kill_node(node_name_a);
 
@@ -425,8 +374,6 @@ TEST(FabricTest, DISABLED_killDependendent)
               lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
 
     end_test = true;
-    lifecycle_manager_thread.join();
-    dep_manager_thread.join();
     fault_handler_thread.join();
     test_thread.join();
     test_thread2.join();

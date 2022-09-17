@@ -7,39 +7,27 @@
 
 namespace cmr::fabric
 {
+/**
+ * Uses the `LifecycleNode` exposed services to activate `node_name`.
+ *
+ * If `node_name` is already active, this function does nothing and returns true.
+ * This will block the caller thread.
+ */
+bool activate_node(const std::string& node_name);
 
 /**
- * @brief This node provides a service interface for activating and deactivating
- * other nodes.
+ * Uses the `LifecycleNode` exposed services to deactivate `node_name`.
  *
- * The activation service is on `/<namespace>/activate` and takes messages of
- * `cmr_msgs::srv::ActivateNode`. The deactivation service is on
- * `/<namespace>/deactivate` and takes messages of
- * `cmr_msgs::srv::DeactivateNode`.
- *
- *
+ * If `node_name` is already inactive, this function does nothing and returns true.
+ * This will block the caller thread.
  */
-class LifecycleManager : public rclcpp::Node
-{
-  private:
-    /**
-     * A service that gets requests from the dependency manager and fault handler to
-     * activate a node. Does this forwarding the request to ROS's lifecycle node
-     */
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ActivateNode>> m_activate_srv;
-    /**
-     * A service that gets requests from the dependency manager to deactive a node.
-     * Handles this by forwarding a reqeust to ROS's lifecycle node
-     */
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::DeactivateNode>> m_deactivate_srv;
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReconfigureNode>>
-        m_reconfigure_srv;
-    /** A service which gets the current state of a specified node */
-    std::shared_ptr<rclcpp::Service<cmr_msgs::srv::GetNodeState>>
-        m_get_node_state_srv;
+bool deactivate_node(const std::string& node_name);
 
-  public:
-    explicit LifecycleManager(const std::string& node_name = "lifecycle_manager",
-                              const std::string& node_namespace = "fabric");
-};
+/**
+ * Uses the `LifecycleNode` exposed services to cleanup `node_name`.
+ *
+ * If `node_name` is already unconfigured, this function does nothing and returns
+ * true.
+ */
+bool cleanup_node(const std::string& node_name);
 }  // namespace cmr::fabric

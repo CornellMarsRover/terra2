@@ -9,6 +9,21 @@ cmr_std_find_pkgs(rclcpp_lifecycle lifecycle_msgs std_msgs)
 
 # Add additional dependencies here. Make sure you update package.xml if you're
 # depending on other packages. find_package(<dependency> REQUIRED)
+
+cmr_add_lib(
+  cmr_fabric
+  SOURCES
+  src/fabric_node.cpp
+  src/lifecycle_manager.cpp
+  src/dependency_manager.cpp
+  DEPENDS
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  std_msgs
+  cmr_msgs
+  cmr_utils)
+
 cmr_add_test(
   fabric_test
   SOURCES
@@ -25,54 +40,20 @@ cmr_add_test(
   std_msgs
   lifecycle_msgs)
 
-cmr_add_lib(
-  cmr_fabric
-  SOURCES
-  src/fabric_node.cpp
-  DEPENDS
-  rclcpp
-  rclcpp_lifecycle
-  lifecycle_msgs
-  std_msgs
-  cmr_msgs
-  cmr_utils)
-
 cmr_add_node(
   fault_handler
   SOURCES
   src/fault_handler.cpp
   src/fault_handler_node.cpp
-  DEPENDS
-  rclcpp
-  std_msgs
-  cmr_msgs
-  cmr_utils)
-
-cmr_add_node(
-  lifecycle_manager
-  SOURCES
-  src/lifecycle_manager.cpp
-  src/lifecycle_manager_node.cpp
-  DEPENDS
-  rclcpp
-  rclcpp_lifecycle
-  lifecycle_msgs
-  std_msgs
-  cmr_msgs
-  cmr_utils)
-
-cmr_add_node(
-  dependency_manager
-  SOURCES
   src/dependency_manager.cpp
-  src/dependency_manager_node.cpp
+  src/lifecycle_manager.cpp
   DEPENDS
   rclcpp
-  rclcpp_lifecycle
-  lifecycle_msgs
   std_msgs
   cmr_msgs
-  cmr_utils)
+  cmr_utils
+  lifecycle_msgs
+  rclcpp_lifecycle)
 
 # PHOBOS_APPEND
 cmr_install()

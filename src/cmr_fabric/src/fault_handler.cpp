@@ -1,5 +1,7 @@
 #include "cmr_fabric/fault_handler.hpp"
 
+#include "cmr_fabric/lifecycle_manager.hpp"
+
 namespace cmr::fabric
 {
 using namespace std::chrono_literals;
@@ -22,11 +24,7 @@ static auto send_activate_requests(const rclcpp::Node& node,
     for (const auto& node_name : nodes_to_remove) {
         RCLCPP_INFO(node.get_logger(), "Recovering fault for node %s...\n",
                     node_name.c_str());
-        const auto request =
-            std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
-        request->node_name = node_name;
-        if (!cmr::send_request<cmr_msgs::srv::ActivateNode>(
-                node.get_effective_namespace() + "/activate", request)) {
+        if (!activate_node(node_name)) {
             failed_nodes.emplace_back(node_name);
             RCLCPP_WARN(node.get_logger(),
                         "Failed to activate node %s. Will try again\n",

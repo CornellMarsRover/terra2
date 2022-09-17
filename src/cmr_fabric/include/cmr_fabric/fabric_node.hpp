@@ -2,6 +2,8 @@
 
 #include <filesystem>
 
+#include "cmr_fabric/dependency_manager.hpp"
+#include "cmr_fabric/lifecycle_manager.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/external/tomlcpp.hxx"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
@@ -41,6 +43,8 @@ struct FabricNodeConfig {
  */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
+    std::unique_ptr<DependencyHandler> m_dependency_manager;
+
   public:
     explicit FabricNode(
         const std::optional<FabricNodeConfig>& config = std::nullopt);
@@ -48,21 +52,10 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     explicit FabricNode(std::optional<FabricNodeConfig>&& config = std::nullopt)
         : FabricNode(config)
     {
+        m_dependency_manager = std::make_unique<DependencyHandler>(*this);
     }
 
     ~FabricNode() override = default;
-
-    /**
-     * @brief Returns the vector of dependencies defined by this node. There is no
-     * guarantee that everything in this list is a valid dependency (i.e. that they
-     * each exist as a node).
-     *
-     * @return std::vector<std::string> list of dependency names
-     */
-    const std::vector<std::string>& get_dependencies() const
-    {
-        return m_dependencies;
-    }
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_configure(
         const rclcpp_lifecycle::State&) override;
@@ -91,27 +84,6 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      */
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
-    /** The list of dependencies defined by this node */
-    std::vector<std::string> m_dependencies;
-    /** Invairant: must be the same size as m_dependencies */
-    std::vector<bool> m_activated_dependencies;
-
-    /**
-     * Attempts to activate all dependencies of this node.
-     *
-     * Indicates which dependencies were activated by setting their corresponding bit
-     * in m_activated_dependencies
-     *
-     * @return true if all dependencies were activated
-     */
-    bool activate_dependencies();
-
-    /**
-     * @brief Attempts to deactivate all activated dependencies of this node
-     *
-     * @return true if all dependencies were deactivated
-     */
-    bool deactivate_dependencies();
 
     /**
      * @brief Cleans up any state when an error occurs

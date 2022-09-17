@@ -31,6 +31,7 @@ FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config)
                                         .count());
           }))
 {
+    m_dependency_manager = std::make_unique<DependencyHandler>(*this);
     declare_parameter(
         param_config_path,
         monad::bind(config, [](const auto& c) {
@@ -141,8 +142,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 
     const auto dependencies = config->getArray("dependencies");
     if (dependencies) {
-        this->m_dependencies = *dependencies->getStringVector();
-        m_activated_dependencies = std::vector<bool>(m_dependencies.size(), false);
+        const auto deps = dependencies->getStringVector();
+        m_dependency_manager->set_dependencies(deps->begin(), deps->end());
     }
 
     return configure(config)
@@ -150,56 +151,10 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
                : rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
 }
 
-bool FabricNode::activate_dependencies()
-{
-    CMR_ASSERT(m_dependencies.size() == m_activated_dependencies.size());
-    for (size_t i = 0; i < m_dependencies.size(); ++i) {
-        const auto& dep_name = m_dependencies[i];
-        auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
-        request->dependent = get_name();
-        request->target = dep_name;
-        CMR_LOG_D(INFO, "Sending activation to %s/acquire for %s from %s",
-                  m_composition_namespace.c_str(), dep_name.c_str(), get_name());
-        const auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
-            m_composition_namespace + "/acquire", request);
-        if (!response) {
-            CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
-            return false;
-        } else {
-            m_activated_dependencies[i] = true;
-        }
-    }
-    return true;
-}
-
-bool FabricNode::deactivate_dependencies()
-{
-    CMR_ASSERT(m_dependencies.size() == m_activated_dependencies.size());
-    bool success = true;
-    for (size_t i = 0; i < m_dependencies.size(); ++i) {
-        if (!m_activated_dependencies[i]) {
-            continue;
-        }
-        const auto& dep_name = m_dependencies[i];
-        auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();
-        request->dependent = get_name();
-        request->target = dep_name;
-        const auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
-            m_composition_namespace + "/release", request);
-        if (!response) {
-            CMR_LOG(ERROR, "Failed to release dependency %s", dep_name.c_str());
-            success = false;
-        } else {
-            m_activated_dependencies[i] = false;
-        }
-    }
-    return success;
-}
-
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
     const rclcpp_lifecycle::State&)
 {
-    if (!activate_dependencies()) {
+    if (!m_dependency_manager->acquire_all_dependencies()) {
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     return activate() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
@@ -209,7 +164,7 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
     const rclcpp_lifecycle::State&)
 {
-    if (!deactivate_dependencies()) {
+    if (!m_dependency_manager->release_all_dependencies()) {
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     return deactivate() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
@@ -249,7 +204,8 @@ bool FabricNode::cleanup_on_error(const rclcpp_lifecycle::State& current_state)
             return on_cleanup(current_state) == success;
         }
         case State::TRANSITION_STATE_ACTIVATING:
-            return deactivate_dependencies() && on_cleanup(current_state) == success;
+            return m_dependency_manager->release_all_dependencies() &&
+                   on_cleanup(current_state) == success;
         case State::TRANSITION_STATE_DEACTIVATING:
         case State::PRIMARY_STATE_INACTIVE:
             return on_cleanup(current_state) == success;

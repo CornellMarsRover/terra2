@@ -1,15 +1,17 @@
 #pragma once
 
-#include <filesystem>
-
 #include "cmr_fabric/dependency_manager.hpp"
-#include "cmr_fabric/lifecycle_manager.hpp"
+#include "cmr_fabric/lifecycle_helpers.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/external/tomlcpp.hxx"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 namespace cmr::fabric
 {
+
+struct FabricConfigPath {
+    std::string path;
+};
 
 /**
  * @brief Configuration parameters for a FabricNode
@@ -19,7 +21,7 @@ struct FabricNodeConfig {
     std::string node_name;
     std::string composition_namespace;
     /** Either a path to a config file or the data of a config file */
-    std::variant<std::filesystem::path, std::string> toml_config;
+    std::variant<FabricConfigPath, std::string> toml_config;
 };
 
 /**

@@ -14,7 +14,7 @@ cmr_add_lib(
   cmr_fabric
   SOURCES
   src/fabric_node.cpp
-  src/lifecycle_manager.cpp
+  src/lifecycle_helpers.cpp
   src/dependency_manager.cpp
   DEPENDS
   rclcpp
@@ -31,7 +31,7 @@ cmr_add_test(
   src/fabric_node.cpp
   src/fault_handler.cpp
   src/dependency_manager.cpp
-  src/lifecycle_manager.cpp
+  src/lifecycle_helpers.cpp
   DEPENDS
   rclcpp
   rclcpp_lifecycle
@@ -46,7 +46,7 @@ cmr_add_node(
   src/fault_handler.cpp
   src/fault_handler_node.cpp
   src/dependency_manager.cpp
-  src/lifecycle_manager.cpp
+  src/lifecycle_helpers.cpp
   DEPENDS
   rclcpp
   std_msgs

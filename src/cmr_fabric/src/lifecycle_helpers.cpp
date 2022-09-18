@@ -1,9 +1,9 @@
-#include "cmr_fabric/lifecycle_manager.hpp"
+#include "cmr_fabric/lifecycle_helpers.hpp"
 
-#include "cmr_fabric/lifecycle_states.hpp"
 #include "cmr_msgs/msg/state.hpp"
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/deactivate_node.hpp"
+#include "cmr_utils/monad.hpp"
 #include "cmr_utils/services.hpp"
 #include "cmr_utils/string_utils.hpp"
 #include "lifecycle_msgs/srv/change_state.hpp"
@@ -13,37 +13,46 @@
 namespace cmr::fabric
 {
 
-static bool call_change_state_client(const std::string& targetNode,
+static bool call_change_state_client(const std::string& target_node,
                                      uint8_t transition)
 {
     const auto request =
         std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
     request->transition.id = transition;
     const auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
-        cmr::build_string("/", targetNode, "/change_state"), request);
+        cmr::build_string("/", target_node, "/change_state"), request);
     return response && response.value()->success;
 }
 
-static LifecycleState get_lifecycle_state(const std::string& targetNode)
+LifecycleState get_lifecycle_state(const std::string& node_name)
 {
+    using lifecycle_msgs::msg::State;
     const auto request = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
     const auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
-        cmr::build_string("/", targetNode, "/get_state"), request);
-
-    if (!response) {
-        return LifecycleState::Unknown;
-    }
-
-    const auto ros_state_id = response.value()->current_state.id;
-    switch (ros_state_id) {
-        case lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED:
-            return cmr::fabric::LifecycleState::Unconfigured;
-        case lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE:
-            return cmr::fabric::LifecycleState::Inactive;
-        case lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE:
-            return cmr::fabric::LifecycleState::Active;
-        case lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED:
-            return cmr::fabric::LifecycleState::Finalized;
+        cmr::build_string("/", node_name, "/get_state"), request);
+    switch (monad::map(response, [](const auto& resp) {
+                return resp->current_state.id;
+            }).value_or(State::PRIMARY_STATE_UNKNOWN)) {
+        case State::PRIMARY_STATE_UNCONFIGURED:
+            return LifecycleState::Unconfigured;
+        case State::PRIMARY_STATE_INACTIVE:
+            return LifecycleState::Inactive;
+        case State::PRIMARY_STATE_ACTIVE:
+            return LifecycleState::Active;
+        case State::PRIMARY_STATE_FINALIZED:
+            return LifecycleState::Finalized;
+        case State::TRANSITION_STATE_ACTIVATING:
+            return LifecycleState::Activating;
+        case State::TRANSITION_STATE_DEACTIVATING:
+            return LifecycleState::Deactivating;
+        case State::TRANSITION_STATE_CONFIGURING:
+            return LifecycleState::Configuring;
+        case State::TRANSITION_STATE_CLEANINGUP:
+            return LifecycleState::CleaningUp;
+        case State::TRANSITION_STATE_SHUTTINGDOWN:
+            return LifecycleState::ShuttingDown;
+        case State::TRANSITION_STATE_ERRORPROCESSING:
+            return LifecycleState::ErrorProcessing;
         default:
             return cmr::fabric::LifecycleState::Unknown;
     }
@@ -51,12 +60,8 @@ static LifecycleState get_lifecycle_state(const std::string& targetNode)
 
 bool activate_node(const std::string& node_name)
 {
-    const auto state = get_lifecycle_state(node_name);
-    if (state == LifecycleState::Finalized || state == LifecycleState::Unknown) {
-        CMR_LOG(ERROR, "Trying to activate a finalized or transitioning node %s",
-                node_name.c_str());
-        return false;
-    } else if (state == LifecycleState::Active) {
+    auto state = get_lifecycle_state(node_name);
+    if (state == LifecycleState::Active) {
         return true;
     } else if (state == LifecycleState::Unconfigured) {
         // configure first
@@ -66,12 +71,21 @@ bool activate_node(const std::string& node_name)
         if (!success) {
             return false;
         }
+        state = get_lifecycle_state(node_name);
+    }
+
+    if (state != LifecycleState::Inactive) {
+        CMR_LOG(ERROR, "Trying to activate a node that's not inactive %s",
+                node_name.c_str());
+        return false;
     }
     // we can activate now
     CMR_LOG(INFO, "activating node %s", node_name.c_str());
     const auto result = call_change_state_client(
         node_name, lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
-    return result;
+    // if an error occurs during activation, ROS doesn't seem to tell us, so we check
+    // the state again
+    return result && get_lifecycle_state(node_name) == LifecycleState::Active;
 }
 
 bool deactivate_node(const std::string& node_name)

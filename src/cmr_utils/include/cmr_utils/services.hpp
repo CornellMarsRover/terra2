@@ -57,7 +57,7 @@ std::optional<std::shared_ptr<typename SrvT::Response>> send_request(
     }
 
     auto future = client->async_send_request(request);
-    RCLCPP_INFO(node->get_logger(), "Request sent");
+    RCLCPP_INFO(node->get_logger(), "Request sent to %s", service_name.c_str());
     if (rclcpp::spin_until_future_complete(node, future) !=
         rclcpp::FutureReturnCode::SUCCESS) {
         RCLCPP_ERROR(node->get_logger(), "failed request to %s",

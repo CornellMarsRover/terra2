@@ -1,7 +1,6 @@
 #include "cmr_fabric/dependency_manager.hpp"
 
-#include "cmr_fabric/lifecycle_manager.hpp"
-#include "cmr_fabric/lifecycle_states.hpp"
+#include "cmr_fabric/lifecycle_helpers.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
@@ -219,6 +218,9 @@ bool DependencyHandler::release_all_dependencies()
     bool success = true;
     for (auto& [dep_name, dep_acquired] : m_dependencies) {
         if (!dep_acquired) {
+            RCLCPP_INFO(m_node.get().get_logger(),
+                        "Skipping release of %s as it was never acquired",
+                        dep_name.c_str());
             continue;
         }
         auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();

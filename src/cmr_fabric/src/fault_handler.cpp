@@ -1,6 +1,6 @@
 #include "cmr_fabric/fault_handler.hpp"
 
-#include "cmr_fabric/lifecycle_manager.hpp"
+#include "cmr_fabric/lifecycle_helpers.hpp"
 
 namespace cmr::fabric
 {
@@ -34,12 +34,42 @@ static auto send_activate_requests(const rclcpp::Node& node,
     return failed_nodes;
 }
 
+FaultHandler::time_pt_t FaultHandler::base_time_now()
+{
+#ifndef NDEBUG
+    std::unique_lock lock(m_mock_mutex);
+    if (m_mocked_base) {
+        return m_base_time;
+    } else {
+        lock.unlock();
+        return time_now();
+    }
+#else
+    return time_now();
+#endif
+}
+FaultHandler::time_pt_t FaultHandler::check_time_now()
+{
+#ifndef NDEBUG
+    std::unique_lock lock(m_mock_mutex);
+    if (m_mocked_check) {
+        return m_check_time;
+    } else {
+        lock.unlock();
+        return time_now();
+    }
+#else
+    return time_now();
+#endif
+}
+
 void FaultHandler::timer_callback()
 {
     std::vector<std::string> nodes_to_remove;
     std::unique_lock lock(m_nodes_to_restart_mutex);
+    const auto time = check_time_now();
     for (const auto& [node_name, restart_time] : m_nodes_to_restart) {
-        if (time_now() > restart_time) {
+        if (time > restart_time) {
             nodes_to_remove.emplace_back(node_name);
             CMR_LOG(DEBUG, "Restarting node %s at %zd", node_name.c_str(),
                     restart_time.time_since_epoch().count());
@@ -55,9 +85,12 @@ void FaultHandler::timer_callback()
     if (!failed_nodes.empty()) {
         lock.lock();
         for (const auto& node_name : failed_nodes) {
-            m_nodes_to_restart[node_name] = time_now() + 1s;
+            m_nodes_to_restart[node_name] = base_time_now() + 1s;
         }
     }
+#ifndef NDEBUG
+    test_signal_seen_check_time(time);
+#endif
 }
 
 FaultHandler::FaultHandler(const std::string& node_name,
@@ -71,7 +104,7 @@ FaultHandler::FaultHandler(const std::string& node_name,
             std::lock_guard lk(m_nodes_to_restart_mutex);
             m_nodes_to_restart.emplace(
                 request->node_name,
-                time_now() + std::chrono::seconds(request->restart_delay));
+                base_time_now() + std::chrono::seconds(request->restart_delay));
             CMR_LOG(
                 INFO, "Scheduled restart for %s at %zd", request->node_name.c_str(),
                 m_nodes_to_restart[request->node_name].time_since_epoch().count());
@@ -84,4 +117,35 @@ FaultHandler::FaultHandler(const std::string& node_name,
 
     RCLCPP_INFO(get_logger(), "fault handler initialized");
 }
+
+#ifndef NDEBUG
+
+void FaultHandler::test_mock_base_check_time(FaultHandler::time_pt_t time)
+{
+    std::lock_guard lock(m_mock_mutex);
+    m_mocked_base = true;
+    m_mocked_check = true;
+    m_base_time = time;
+    m_check_time = time;
+}
+
+void FaultHandler::test_mock_check_time_and_wait(FaultHandler::time_pt_t time)
+{
+    {
+        std::lock_guard lock(m_mock_mutex);
+        m_mocked_check = true;
+        m_check_time = time;
+    }
+    std::unique_lock lock(m_seen_check_mutex);
+    m_mock_cv.wait(lock, [this, time] { return m_seen_check_time == time; });
+}
+
+void FaultHandler::test_signal_seen_check_time(FaultHandler::time_pt_t time)
+{
+    std::unique_lock lock(m_seen_check_mutex);
+    m_seen_check_time = time;
+    lock.unlock();
+    m_mock_cv.notify_all();
+}
+#endif
 }  // namespace cmr::fabric

@@ -27,6 +27,15 @@ class FaultHandler : public rclcpp::Node
 
     std::mutex m_nodes_to_restart_mutex;
 
+#ifndef NDEBUG
+    time_pt_t m_base_time, m_check_time;
+    bool m_mocked_base = false, m_mocked_check = false;
+    time_pt_t m_seen_check_time;
+    std::mutex m_mock_mutex;
+    std::mutex m_seen_check_mutex;
+    std::condition_variable m_mock_cv;
+#endif
+
     // Destruction occurs in reverse order of construction. Therefore, m_timer should
     // be declared last so that all members used in its callback get destroyed after
     // it does. This prevents a situation where the callback is called while the node
@@ -42,8 +51,43 @@ class FaultHandler : public rclcpp::Node
      */
     void timer_callback();
 
+    time_pt_t base_time_now();
+    time_pt_t check_time_now();
+
+#ifndef NDEBUG
+    void test_signal_seen_check_time(time_pt_t time);
+#endif
+
   public:
     explicit FaultHandler(const std::string& node_name = "fault_handler",
                           const std::string& node_namespace = "fabric");
+
+#ifndef NDEBUG
+    /**
+     * @brief Sets the base and check time.
+     *
+     * The base time is the time at which restart delays will be computed from.
+     * So a restart delay of `2` means that we can restart at time `time + 2s`.
+     *
+     * The check time is time at which restart delays will be checked against.
+     * So a node will restart if its restart_time is `> time`
+     *
+     * Meant to be called in a separate thread from the fault handler
+     *
+     * @param time
+     */
+    void test_mock_base_check_time(time_pt_t time);
+
+    /**
+     * @brief Sets the time at which restart delays will be checked against and waits
+     * until the fault handler sees this time. So a node will restart if its
+     * restart_time is `> time`
+     *
+     * Meant to be called in a separate thread from the fault handler
+     *
+     * @param time
+     */
+    void test_mock_check_time_and_wait(time_pt_t time);
+#endif
 };
 }  // namespace cmr::fabric

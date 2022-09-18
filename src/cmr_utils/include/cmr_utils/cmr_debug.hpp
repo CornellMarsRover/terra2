@@ -18,7 +18,7 @@ inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
 /**
  * @brief Determines if a debugger is attached to the current process.
  *
- * Not very efficient in debug mode, but always returns `false` in release mode.
+ * Always returns `false` in release mode.
  *
  */
 bool is_debugger_attached();
@@ -28,12 +28,17 @@ bool is_debugger_attached();
  * FabricNode.
  *
  * This function will be shadowed if we assert within a FabricNode
+ *
+ * This is deprecated because, if it is used, it is probably a sign that
+ * `CMR_RETRY_ON_ERR` is used incorrectly.
  */
-inline auto error_transition() {}
+[[deprecated]] inline auto error_transition() {}
 
 /**
  * An assert handler is the function that is called when an assert fails
  * or an `CMR_INVALID` is triggered.
+ *
+ * The default assert handler throws `CmrAssertException`
  */
 using assert_handler_t = void (*)();
 
@@ -71,12 +76,9 @@ assert_handler_t get_assert_handler() noexcept;
  * @def CMR_ASSERT
  *
  * Asserts a condition is true.
- * If the condition is false, creates a `FATAL` log and, if debugging is enabled,
- * traps the debugger otherwise invokes `error_transition` and the assert handler.
+ * If the condition is false, creates a `FATAL` log, invokes the assert handler and,
+ * if a debugger is attached, traps the debugger.
  *
- * IMPORTANT: This does not instantly fail the program if the condition is false,
- * you MUST still take into consideration the path of execution if the condition you
- * assert on is false.
  *
  * @param CONDITION condition to assert. In debug mode, if this is false, sets a
  * breakpoint. In release mode it triggers a transition to the error state for

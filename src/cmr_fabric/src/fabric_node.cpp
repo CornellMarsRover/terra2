@@ -32,32 +32,24 @@ FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config)
           }))
 {
     m_dependency_manager = std::make_unique<DependencyHandler>(*this);
-    declare_parameter(
-        param_config_path,
-        monad::bind(config, [](const auto& c) {
-            if (std::holds_alternative<std::filesystem::path>(c.toml_config)) {
-                return std::make_optional(
-                    std::get<std::filesystem::path>(c.toml_config).string());
-            } else {
-                return std::optional<std::string>{};
-            }
-        }).value_or(""));
+    declare_parameter(param_config_path, "");
     declare_parameter(param_composition_namespace,
                       monad::map(config, [](const auto& c) {
                           return c.composition_namespace;
                       }).value_or(""));
-    declare_parameter(
-        param_config_data,
-        monad::bind(config, [](const auto& c) {
-            if (std::holds_alternative<std::string>(c.toml_config)) {
-                return std::make_optional(std::get<std::string>(c.toml_config));
-            } else {
-                return std::optional<std::string>{};
-            }
-        }).value_or(""));
+    declare_parameter(param_config_data, "");
     declare_parameter(param_max_restarts, 2);
     declare_parameter(param_restart_delay, 0);
     declare_parameter(param_num_attempted_restarts, 0);
+
+    if (config && std::holds_alternative<FabricConfigPath>(config->toml_config)) {
+        CMR_LOG(INFO, "Holds path");
+        set_parameter({param_config_path,
+                       std::get<FabricConfigPath>(config->toml_config).path});
+    } else if (config) {
+        set_parameter({param_config_data, std::get<1>(config->toml_config)});
+        CMR_LOG(INFO, "Set config data");
+    }
 }
 
 // Basic guarantee. This is ok because if this fails, entire node is reset anyway

@@ -36,7 +36,7 @@ static auto send_activate_requests(const rclcpp::Node& node,
 
 FaultHandler::time_pt_t FaultHandler::base_time_now()
 {
-#ifndef NDEBUG
+#ifdef BUILD_TESTS
     std::unique_lock lock(m_mock_mutex);
     if (m_mocked_base) {
         return m_base_time;
@@ -50,7 +50,7 @@ FaultHandler::time_pt_t FaultHandler::base_time_now()
 }
 FaultHandler::time_pt_t FaultHandler::check_time_now()
 {
-#ifndef NDEBUG
+#ifdef BUILD_TESTS
     std::unique_lock lock(m_mock_mutex);
     if (m_mocked_check) {
         return m_check_time;
@@ -88,7 +88,7 @@ void FaultHandler::timer_callback()
             m_nodes_to_restart[node_name] = base_time_now() + 1s;
         }
     }
-#ifndef NDEBUG
+#ifdef BUILD_TESTS
     test_signal_seen_check_time(time);
 #endif
 }
@@ -118,7 +118,7 @@ FaultHandler::FaultHandler(const std::string& node_name,
     RCLCPP_INFO(get_logger(), "fault handler initialized");
 }
 
-#ifndef NDEBUG
+#ifdef BUILD_TESTS
 
 void FaultHandler::test_mock_base_check_time(FaultHandler::time_pt_t time)
 {

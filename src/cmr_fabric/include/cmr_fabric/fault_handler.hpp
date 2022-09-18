@@ -27,7 +27,7 @@ class FaultHandler : public rclcpp::Node
 
     std::mutex m_nodes_to_restart_mutex;
 
-#ifndef NDEBUG
+#ifdef BUILD_TESTS
     time_pt_t m_base_time, m_check_time;
     bool m_mocked_base = false, m_mocked_check = false;
     time_pt_t m_seen_check_time;
@@ -54,7 +54,7 @@ class FaultHandler : public rclcpp::Node
     time_pt_t base_time_now();
     time_pt_t check_time_now();
 
-#ifndef NDEBUG
+#ifdef BUILD_TESTS
     void test_signal_seen_check_time(time_pt_t time);
 #endif
 
@@ -62,7 +62,7 @@ class FaultHandler : public rclcpp::Node
     explicit FaultHandler(const std::string& node_name = "fault_handler",
                           const std::string& node_namespace = "fabric");
 
-#ifndef NDEBUG
+#ifdef BUILD_TESTS
     /**
      * @brief Sets the base and check time.
      *

@@ -11,8 +11,8 @@
 #include "gtest/gtest.h"
 #include "lifecycle_msgs/srv/get_state.hpp"
 
-#ifdef NDEBUG
-#error "This test must be compiled in debug mode"
+#ifndef BUILD_TESTS
+#error "This test must be compiled in test mode"
 #endif
 
 using namespace std::chrono_literals;

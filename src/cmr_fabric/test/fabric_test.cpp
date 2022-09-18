@@ -468,7 +468,7 @@ TEST(FabricTest, doubleDependency)
 }
 
 // WIP
-TEST(FabricTest, DISABLED_transitionFailure)
+TEST(FabricTest, transitionFailure)
 {
     MAKE_END_TEST_FLAG();
     constexpr auto test_namespace = "transition_fail_test";
@@ -490,9 +490,19 @@ TEST(FabricTest, DISABLED_transitionFailure)
     auto resp = cmr::send_request<cmr_msgs::srv::ActivateNode>(
         std::string("/") + node_name_b + std::string("/fail_activate"), req);
 
+    const auto base_time = system_now();
+    fh->test_mock_base_check_time(base_time);
     ASSERT_FALSE(cmr::fabric::activate_node(node_name_c));
-    ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Inactive);
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Unconfigured);
+    ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Unconfigured);
+
+    fh->test_mock_check_time_and_wait(base_time + 10s);
+    ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Active);
+    ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
+    ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Active);
+
+    join_all(end_test, test_thread, test_thread2, fault_handler_thread,
+             test_thread3);
 }
 
 int main(int argc, char** argv)

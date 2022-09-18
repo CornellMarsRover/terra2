@@ -25,6 +25,7 @@ static bool transition_to_active(rclcpp_lifecycle::LifecycleNode& node)
         success = node.trigger_transition(
                           lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE)
                       .id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE;
+        ;
     }
     // inactive or finalized
     return success &&
@@ -203,7 +204,7 @@ bool DependencyHandler::acquire_all_dependencies()
                     m_node.get().get_name());
         const auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
             dep_name + "/acquire", request);
-        if (!response) {
+        if (!response || !(*response)->success) {
             RCLCPP_ERROR(m_node.get().get_logger(),
                          "Failed to acquire dependency %s", dep_name.c_str());
             return false;
@@ -227,7 +228,7 @@ bool DependencyHandler::release_all_dependencies()
         request->depender = m_node.get().get_name();
         const auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
             dep_name + "/release", request);
-        if (!response) {
+        if (!response || !(*response)->success) {
             RCLCPP_ERROR(m_node.get().get_logger(),
                          "Failed to release dependency %s", dep_name.c_str());
             success = false;

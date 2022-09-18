@@ -83,9 +83,7 @@ bool activate_node(const std::string& node_name)
     CMR_LOG(INFO, "activating node %s", node_name.c_str());
     const auto result = call_change_state_client(
         node_name, lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
-    // if an error occurs during activation, ROS doesn't seem to tell us, so we check
-    // the state again
-    return result && get_lifecycle_state(node_name) == LifecycleState::Active;
+    return result;
 }
 
 bool deactivate_node(const std::string& node_name)

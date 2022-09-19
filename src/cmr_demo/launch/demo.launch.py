@@ -15,7 +15,12 @@ def generate_launch_description():
                 package="cmr_fabric",
                 executable="fault_handler",
                 namespace=composition_ns,
-                arguments=["--ros-args", "--log-level", "debug"],
+                # arguments=["--ros-args", "--log-level", "debug"],
+            ),
+            Node(
+                package="cmr_fabric",
+                executable="lifecycle_manager",
+                namespace=composition_ns,
             ),
             *fabric_composition("/cmr/terra/src/cmr_demo/config"),
         ]
@@ -40,7 +45,7 @@ def fabric_node(conf_path: str) -> Node:
         parameters=[
             {
                 "config_path": conf_path,
-                "composition_ns": "/" + composition_ns,
+                "composition_ns": composition_ns,
             }
         ],
         # arguments=["--ros-args", "--log-level", "debug"],

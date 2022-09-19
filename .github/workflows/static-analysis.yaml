@@ -19,7 +19,7 @@ jobs:
       - name: Get clang tools
         id: tools
         run: |
-          sudo apt install clang-format clang-tidy -y
+          sudo apt update && sudo apt install clang-format clang-tidy -y
 
       - name: Clean compile commands
         id: clean_db

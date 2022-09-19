@@ -41,7 +41,8 @@ CheckOptions:
     value: "false"
   - { key: readability-identifier-naming.NamespaceCase, value: lower_case }
   - { key: readability-identifier-naming.ClassCase, value: CamelCase }
-  - { key: readability-identifier-naming.ClassMemberPrefix, value: m_ }
+  - { key: readability-identifier-naming.PrivateMemberPrefix, value: m_ }
+  - { key: readability-identifier-naming.ProtectedMemberPrefix, value: m_ }
   - { key: readability-identifier-naming.ClassMethodCase, value: lower_case }
   - { key: readability-identifier-naming.StructCase, value: CamelCase }
   - { key: readability-identifier-naming.FunctionCase, value: lower_case }
@@ -54,8 +55,6 @@ CheckOptions:
     }
   - { key: readability-identifier-nameing.ParameterCase, value: lower_case }
   - key: readability-identifier-naming.TemplateParameterCase
-    value: CamelCase
-  - key: readability-identifier-naming.StaticConstantCase
     value: CamelCase
   - key: readability-identifier-naming.EnumCase
     value: CamelCase

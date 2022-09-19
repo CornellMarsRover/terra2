@@ -18,7 +18,6 @@
     "--compile-commands-dir=${workspaceFolder}/build",
     "--completion-style=detailed",
     "--clang-tidy",
-    "--clang-tidy-checks=-*,modernize*",
     "--header-insertion=never"
   ],
   "C_Cpp.intelliSenseEngine": "Disabled",
@@ -112,16 +111,19 @@
     "**/log": true
   },
   "python.formatting.provider": "black",
-  "clang-tidy.buildPath": "${workspaceFolder}/build",
-  "clang-tidy.blacklist": [
-    "${workspaceFolder}/install/**"
-  ],
-  "clang-tidy.compilerArgs": [
-    "-Isrc/cmr_fabric/include",
-    "-Isrc/cmr_demo/include",
-    "-Isrc/cmr_msgs/include",
-    "-I/cmr/terra/install/cmr_utils/include/cmr_msgs"
-  ],
+  // "clang-tidy.buildPath": "${workspaceFolder}/build",
+  // "clang-tidy.blacklist": [
+  //   "${workspaceFolder}/install/.*"
+  // ],
+  // "clang-tidy.compilerArgs": [
+  //   "-Isrc/cmr_fabric/include",
+  //   "-Isrc/cmr_demo/include",
+  //   "-isystem /cmr/terra/install/cmr_utils/include/cmr_msgs"
+  // ],
+  // I realized that an error in the blacklist specifier made clang-tidy plugin not run
+  // However, when it is running, it is far less sophisticated than 
+  // clang-tidy itself or clang-tidy through clangd, so we will just use clangd.
+  // clang-tidy arguments keps here in case we need it
   "auto-comment-blocks.slashStyleBlocks": [
     "cpp"
   ]

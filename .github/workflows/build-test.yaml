@@ -1,7 +1,6 @@
 name: Build and test
 on:
   push:
-  pull_request:
   workflow_dispatch:
   schedule:
     # 4:30 AM EST every sunday and wednesday
@@ -54,18 +53,3 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install lcov -y
           bash scripts/code_coverage.sh
-
-      - name: Get clang tools
-        id: tools
-        run: |
-          sudo apt install clang-format clang-tidy -y
-
-      - name: Clean compile commands
-        id: clean_db
-        run: |
-          bash scripts/clean_build_db_wd.sh
-
-      - name: Static analysis
-        id: analyze
-        run: |
-          bash scripts/check_wd.sh

@@ -18,7 +18,7 @@ inline auto get_logger() { return rclcpp::get_logger("cmr_log"); }
 /**
  * @brief Determines if a debugger is attached to the current process.
  *
- * Not very efficient in debug mode, but always returns `false` in release mode.
+ * Always returns `false` in release mode.
  *
  */
 bool is_debugger_attached();
@@ -28,12 +28,17 @@ bool is_debugger_attached();
  * FabricNode.
  *
  * This function will be shadowed if we assert within a FabricNode
+ *
+ * This is deprecated because, if it is used, it is probably a sign that
+ * `CMR_RETRY_ON_ERR` is used incorrectly.
  */
-inline auto error_transition() {}
+[[deprecated]] inline auto error_transition() {}
 
 /**
  * An assert handler is the function that is called when an assert fails
  * or an `CMR_INVALID` is triggered.
+ *
+ * The default assert handler throws `CmrAssertException`
  */
 using assert_handler_t = void (*)();
 
@@ -71,12 +76,9 @@ assert_handler_t get_assert_handler() noexcept;
  * @def CMR_ASSERT
  *
  * Asserts a condition is true.
- * If the condition is false, creates a `FATAL` log and, if debugging is enabled,
- * traps the debugger otherwise invokes `error_transition` and the assert handler.
+ * If the condition is false, creates a `FATAL` log, invokes the assert handler and,
+ * if a debugger is attached, traps the debugger.
  *
- * IMPORTANT: This does not instantly fail the program if the condition is false,
- * you MUST still take into consideration the path of execution if the condition you
- * assert on is false.
  *
  * @param CONDITION condition to assert. In debug mode, if this is false, sets a
  * breakpoint. In release mode it triggers a transition to the error state for
@@ -228,7 +230,7 @@ class CmrAssertionException : public CmrException
 }
 
 /**
- * @def CMR_RETRY_ON_ERROR
+ * @def CMR_RETRY_ON_ERR
  *
  * @brief Macro for declaring a callback function for a FabricNode
  *
@@ -292,3 +294,56 @@ auto narrow_cast(T&& t)
     CMR_ASSERT_MSG(static_cast<ValT>(u) == t, "Cannot narrow value");
     return u;
 }
+
+/**
+ * @brief A RAII helper class that simply provides a way to call a function when it
+ * is destroyed
+ *
+ */
+class CmrRAII
+{
+    std::function<void()> m_func;
+
+  public:
+    /**
+     * @brief Construct a new CmrRAII object from a callable object
+     *
+     * @tparam T callable `void(void)` type
+     * @param func
+     */
+    template <typename T>  // NOLINTNEXTLINE
+    CmrRAII(T&& func, decltype(std::declval<T>()())* = 0) : m_func(func)
+    {
+    }
+
+    ~CmrRAII() { m_func(); }
+
+    CmrRAII(const CmrRAII&) = delete;
+    CmrRAII& operator=(const CmrRAII&) = delete;
+
+    CmrRAII(CmrRAII&&) = default;
+    CmrRAII& operator=(CmrRAII&&) = default;
+};
+
+/**
+ * @def ALWAYS
+ *
+ * Macro for easily creating a `CmrRAII` object that calls the code when it is
+ * destroyed
+ *
+ * The paramaters of this macro are the captures of the `CmrRAII`'s lambda which is
+ * called upon destruction. This macro essentially creates a lambda and assigns it to
+ * a uniqurely names `CmrRAII`
+ *
+ * ## Example
+ *
+ * ```C++
+ * ALWAYS(this) { m_error_processing = false; };
+ *
+ * // when the function exits, by any return path, m_error_processing will be set to
+ * // false
+ * ```
+ *
+ */
+// NOLINTNEXTLINE
+#define ALWAYS(...) CmrRAII raii__##__LINE__ = [__VA_ARGS__]()

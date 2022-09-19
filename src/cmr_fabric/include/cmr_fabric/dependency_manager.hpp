@@ -8,93 +8,146 @@
 #include "cmr_msgs/srv/notify_deactivate.hpp"
 #include "cmr_msgs/srv/release_dependency.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 namespace cmr::fabric
 {
+
+/** The reason why a node is deactivated */
+enum class DeactivationReason : uint8_t {
+    /** Node has been deactivated due to an error transition. Dependers should
+       register themselves with the FaultHandler */
+    Error,
+    /** Node has been deactivated  */
+    Manual,
+};
+
 /**
- * The dependency manager provides a service interface for nodes to acquire their
- * dependencies.
+ * @brief The DependencyHandler class is responsible for managing the dependencies.
  *
- * When a node acquires its dependencies, we make sure that all nodes it depends on
- * are already running. When it releases its dependencies, will allow the dependent
- * nodes to deactivate if there are no other nodes that depend on them.
+ * A node that contains a dependency manager becomes part of the dependency DAG. Each
+ * node in the DAG should be on a separate thread or be in a separate process. This
+ * is because `DependencyHandler` requests block the calling thread. I debated with
+ * using asynchronous requests, however synchronous was cleaner, especially because
+ * we want to make sure that a request finished before we move on so that all
+ * dependencies are active before the dependender node is activated. We also want to
+ * make sure we get a response so that we can correctly react if something fails.
+ * The DependencyHandler is a move away from a centralized dependency manager. This
+ * was done to deal with larger dependency graphs. With a centralized manager, we
+ * dependency paths longer than length 1 become challenging because of the
+ * synchronous services used. If a service activates a node, and that activation
+ * triggers the activation of another node (and thus a call to the centralized
+ * dependency manager), then a centralized dependency manager could deadlock as it
+ * waits for itself. This problem could be handled with multithreaded exeuctors or
+ * asynchonous services and a scheduler, however a decentralized approach seemed much
+ * simpler. Furthermore, if asynchronous services are desired, a decentralized
+ * approach would be mucher easier to implement that.
  *
- * The acquire service is created on `/<namespace>/acquire` and takes messages of
- * `cmr_msgs::srv::AcquireDependency`.
- * The release service is created on `/<namespace>/release` and takes messages of
- * `cmr_msgs::srv::ReleaseDependency`.
+ * ## Usage
+ *
+ * The DependencyHandler exposes the following service interface:
+ *
+ * * `/<node>/acquire` - Acquires `<node>` as a dependency for the caller
+ * (`cmr_msgs::srv::AcquireDependency`)
+ *
+ * * `/<node>/release` - Releases `<node>` as a dependency for the caller. If
+ * `<node>` was started by an `acquire` call and no longer has any active nodes
+ * depending on it, `<node>` will deactivate itself.
+ * (`cmr_msgs::srv::ReleaseDependency`)
+ *
+ * * `/<node>/notify_deactivate` - Notifies `<node>` that one of its dependencies has
+ * just deactivated. This is essentially `release` but in the other direction.
+ * (`cmr_msgs::srv::NotifyDeactivate`)
+ *
+ * To use the DependencyHandler, a node should have a `DependencyHandler` has a
+ * member, and initialize it in the node's constructor.
+ *
+ * The DependencyHandler will hold a reference to the node that is passed to it
+ * during construction. Thus, the DependencyHandler should not outlive it.
+ *
+ * Vocabulary Note: I tend to use `depender` to mean the node that depends on the
+ * current node and `dependency` to mean a node the current node
+ * depends on.
+ *
+ *
  */
-class DependencyManager : public rclcpp::Node
+class DependencyHandler
 {
   private:
-    /**
-     * maps names of acquired nodes to the set of names of the nodes that it depends
-     * on
-     */
-    std::unordered_map<std::string, std::unordered_set<std::string>> m_users;
+    std::unordered_map<std::string, bool> m_dependencies;
+    std::unordered_set<std::string> m_dependers;
+    bool m_started_as_dep;
 
-    /**
-     * @brief This is the reverse of `m_users`. It maps names of nodes to the set of
-     * names of nodes that depend on it
-     *
-     */
-    std::unordered_map<std::string, std::unordered_set<std::string>> m_dependers;
+    std::reference_wrapper<rclcpp_lifecycle::LifecycleNode> m_node;
 
-    /** set of nodes that the dependency manager started; nodes in this set will
-     * be disabled when they no longer have any users
-     */
-    std::unordered_set<std::string> m_started_as_deps;
-
-    /**
-     * @brief A service on `/<effective_namespace>/acquire` that allows other nodes
-     * to indicate that they can only start running after their dependencies are
-     * running
-     *
-     */
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::AcquireDependency>>
         m_acquire_dependency_srv;
-
-    /**
-     * @brief A service on `/<effective_namespace>/release` that allows other nodes
-     * to know that they are no longer needed by a particular dependency
-     *
-     */
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::ReleaseDependency>>
         m_release_dependency_srv;
-
-    /**
-     * A service that listens on `/<effective_namespace>/notify_deactivate` that
-     * allows a node that is deactivating which is depndened upon by other nodes to
-     * deactive those other nodes
-     */
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>>
         m_notify_deactivate_srv;
 
+  public:
+    /**
+     * @brief Construct a new Dependency Handler object
+     *
+     * @param node the parent node for this handler. IT MUST NOT OUTLIVE the
+     * DependencyHandler and it must be a `FabricNode`, specifically it needs to have
+     * `composition_ns` and `restart_delay` parameters
+     */
+    explicit DependencyHandler(rclcpp_lifecycle::LifecycleNode& node);
+
+    template <typename It>
+    void set_dependencies(It begin, It end)
+    {
+        m_dependencies.clear();
+        for (; begin != end; ++begin) {
+            m_dependencies.insert(std::make_pair(*begin, false));
+        }
+    }
+
+    /**
+     * @brief Attempts to acquire all dependencies.
+     *
+     * Blocking. If this function return false, some dependencies may have been
+     * enabled, but can be correctly cleaned up with a subsequent call to
+     * `release_all_dependencies`.
+     *
+     * This function will fail once the first dependency fails to be acquired.
+     *
+     * @return true if all dependencies were acquired successfully.
+     */
+    bool acquire_all_dependencies();
+
+    /**
+     * @brief Attempts to release all dependencies.
+     *
+     * Blocking. If this function return false, some dependencies may have been
+     * disabled, which is kept track of internally. Therefore a call to
+     * `activate_all_dependencies` will correctly undo this function.
+     *
+     * This function will continue to try and release all other depedencies after a
+     * dependency fails to be released.
+     *
+     * @return true if all dependencies were deactivated successfully.
+     */
+    bool release_all_dependencies();
+
+    /**
+     * @brief Attempts to notify all dependers that this node is being deactivated
+     *
+     * @return true if all dependers were notified successfully
+     */
+    bool notify_deactivate(DeactivationReason reason, int32_t restart_delay = 0);
+
+  private:
     rclcpp::Service<cmr_msgs::srv::AcquireDependency>::SharedPtr
-    create_acquire_dependency_service();
-
-    const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>&
-    release_dependency_callback(
-        const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& request,
-        const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>& response);
-
-    const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>&
-    notify_deactivate_callback(
-        const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request>& request,
-        const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>& response);
+    create_acquire_dependency_service(rclcpp_lifecycle::LifecycleNode& node);
 
     rclcpp::Service<cmr_msgs::srv::ReleaseDependency>::SharedPtr
-    create_release_dependency_service();
+    create_release_dependency_service(rclcpp_lifecycle::LifecycleNode& node);
 
     rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
-    create_notify_deactivate_service();
-
-    bool activate_dependency(const std::string& target);
-
-    bool deactivate_dependency(const std::string& target);
-
-  public:
-    explicit DependencyManager(const std::string& node_name = "dependency_manager",
-                               const std::string& node_namespace = "fabric");
+    create_notify_deactivate_service(rclcpp_lifecycle::LifecycleNode& node);
 };
 }  // namespace cmr::fabric

@@ -1,6 +1,7 @@
 #pragma once
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
+#include "cmr_utils/clock.hpp"
 #include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -27,10 +28,14 @@ class FaultHandler : public rclcpp::Node
 
     std::mutex m_nodes_to_restart_mutex;
 
-    // Destruction occurs in reverse order of construction. Therefore, m_timer should
-    // be declared last so that all members used in its callback get destroyed after
-    // it does. This prevents a situation where the callback is called while the node
-    // is being destroyed, and some of the members have already been destroyed
+    std::shared_ptr<cmr::Clock<std::chrono::system_clock>> m_base_clock;
+    std::shared_ptr<cmr::Clock<std::chrono::system_clock>> m_check_clock;
+
+    // Destruction occurs in reverse order of construction. Therefore, m_timer
+    // should be declared last so that all members used in its callback get
+    // destroyed after it does. This prevents a situation where the callback is
+    // called while the node is being destroyed, and some of the members have
+    // already been destroyed
     std::shared_ptr<rclcpp::Service<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_service;
     std::shared_ptr<rclcpp::TimerBase> m_timer;
@@ -45,5 +50,27 @@ class FaultHandler : public rclcpp::Node
   public:
     explicit FaultHandler(const std::string& node_name = "fault_handler",
                           const std::string& node_namespace = "fabric");
+
+    /**
+     * @brief Construct a new Fault Handler object, specifying the clocks to use
+     *
+     * @param base_clock The base clock is used to compute the restart times. So
+     * when the fault handler should restart a node in 2s. It will schedule the
+     * restart at 1m_base_clock->now() + 2s`.
+     * @param check_clock The check clock is used to compare the current time with
+     * the restart time. So a node will restart if its restart_time is `>
+     * check_clock->now()`.
+     * @param node_name
+     * @param node_namespace
+     */
+    FaultHandler(std::shared_ptr<cmr::Clock<std::chrono::system_clock>> base_clock,
+                 std::shared_ptr<cmr::Clock<std::chrono::system_clock>> check_clock,
+                 const std::string& node_name = "fault_handler",
+                 const std::string& node_namespace = "fabric")
+        : FaultHandler(node_name, node_namespace)
+    {
+        m_base_clock = base_clock;    // NOLINT(cppcoreguidelines-prefer-*)
+        m_check_clock = check_clock;  // NOLINT(cppcoreguidelines-prefer-*)
+    }
 };
 }  // namespace cmr::fabric

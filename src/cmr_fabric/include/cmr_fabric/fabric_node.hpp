@@ -1,13 +1,17 @@
 #pragma once
 
-#include <filesystem>
-
+#include "cmr_fabric/dependency_manager.hpp"
+#include "cmr_fabric/lifecycle_helpers.hpp"
 #include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/external/tomlcpp.hxx"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 namespace cmr::fabric
 {
+
+struct FabricConfigPath {
+    std::string path;
+};
 
 /**
  * @brief Configuration parameters for a FabricNode
@@ -17,7 +21,7 @@ struct FabricNodeConfig {
     std::string node_name;
     std::string composition_namespace;
     /** Either a path to a config file or the data of a config file */
-    std::variant<std::filesystem::path, std::string> toml_config;
+    std::variant<FabricConfigPath, std::string> toml_config;
 };
 
 /**
@@ -41,6 +45,8 @@ struct FabricNodeConfig {
  */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
+    std::unique_ptr<DependencyHandler> m_dependency_manager;
+
   public:
     explicit FabricNode(
         const std::optional<FabricNodeConfig>& config = std::nullopt);
@@ -51,18 +57,6 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     }
 
     ~FabricNode() override = default;
-
-    /**
-     * @brief Returns the vector of dependencies defined by this node. There is no
-     * guarantee that everything in this list is a valid dependency (i.e. that they
-     * each exist as a node).
-     *
-     * @return std::vector<std::string> list of dependency names
-     */
-    const std::vector<std::string>& get_dependencies() const
-    {
-        return m_dependencies;
-    }
 
     rclcpp_lifecycle::LifecycleNode::CallbackReturn on_configure(
         const rclcpp_lifecycle::State&) override;
@@ -91,27 +85,8 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
      */
     std::shared_ptr<rclcpp::Client<cmr_msgs::srv::RecoverFault>>
         m_recover_fault_client;
-    /** The list of dependencies defined by this node */
-    std::vector<std::string> m_dependencies;
-    /** Invairant: must be the same size as m_dependencies */
-    std::vector<bool> m_activated_dependencies;
 
-    /**
-     * Attempts to activate all dependencies of this node.
-     *
-     * Indicates which dependencies were activated by setting their corresponding bit
-     * in m_activated_dependencies
-     *
-     * @return true if all dependencies were activated
-     */
-    bool activate_dependencies();
-
-    /**
-     * @brief Attempts to deactivate all activated dependencies of this node
-     *
-     * @return true if all dependencies were deactivated
-     */
-    bool deactivate_dependencies();
+    bool m_processing_fault = false;
 
     /**
      * @brief Cleans up any state when an error occurs

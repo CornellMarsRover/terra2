@@ -1,9 +1,10 @@
 #include "cmr_fabric/fault_handler.hpp"
 
+#include "cmr_fabric/lifecycle_helpers.hpp"
+
 namespace cmr::fabric
 {
 using namespace std::chrono_literals;
-constexpr auto time_now = std::chrono::system_clock::now;
 
 /**
  * @brief Sends the activate node request (handled by the lifecycle manager) to all
@@ -22,11 +23,7 @@ static auto send_activate_requests(const rclcpp::Node& node,
     for (const auto& node_name : nodes_to_remove) {
         RCLCPP_INFO(node.get_logger(), "Recovering fault for node %s...\n",
                     node_name.c_str());
-        const auto request =
-            std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
-        request->node_name = node_name;
-        if (!cmr::send_request<cmr_msgs::srv::ActivateNode>(
-                node.get_effective_namespace() + "/activate", request)) {
+        if (!activate_node(node_name)) {
             failed_nodes.emplace_back(node_name);
             RCLCPP_WARN(node.get_logger(),
                         "Failed to activate node %s. Will try again\n",
@@ -40,8 +37,9 @@ void FaultHandler::timer_callback()
 {
     std::vector<std::string> nodes_to_remove;
     std::unique_lock lock(m_nodes_to_restart_mutex);
+    const auto time = m_check_clock->now();
     for (const auto& [node_name, restart_time] : m_nodes_to_restart) {
-        if (time_now() > restart_time) {
+        if (time > restart_time) {
             nodes_to_remove.emplace_back(node_name);
             CMR_LOG(DEBUG, "Restarting node %s at %zd", node_name.c_str(),
                     restart_time.time_since_epoch().count());
@@ -57,9 +55,10 @@ void FaultHandler::timer_callback()
     if (!failed_nodes.empty()) {
         lock.lock();
         for (const auto& node_name : failed_nodes) {
-            m_nodes_to_restart[node_name] = time_now() + 1s;
+            m_nodes_to_restart[node_name] = m_base_clock->now() + 1s;
         }
     }
+    m_check_clock->register_time(time);
 }
 
 FaultHandler::FaultHandler(const std::string& node_name,
@@ -73,7 +72,7 @@ FaultHandler::FaultHandler(const std::string& node_name,
             std::lock_guard lk(m_nodes_to_restart_mutex);
             m_nodes_to_restart.emplace(
                 request->node_name,
-                time_now() + std::chrono::seconds(request->restart_delay));
+                m_base_clock->now() + std::chrono::seconds(request->restart_delay));
             CMR_LOG(
                 INFO, "Scheduled restart for %s at %zd", request->node_name.c_str(),
                 m_nodes_to_restart[request->node_name].time_since_epoch().count());

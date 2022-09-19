@@ -5,6 +5,7 @@
 #include "cmr_fabric/fault_handler.hpp"
 #include "cmr_fabric/lifecycle_helpers.hpp"
 #include "cmr_msgs/srv/activate_node.hpp"
+#include "cmr_utils/debug_clock.hpp"
 #include "cmr_utils/services.hpp"
 #include "cmr_utils/string_utils.hpp"
 #include "fabric_test_node.hpp"
@@ -61,19 +62,24 @@ using cmr::fabric::LifecycleState;
  *
  * @param end_test
  * @param test_namespace
- * @return tuple of fault handler thread and the shared pointer to the fault handler
+ * @return tuple of fault handler thread and the shared pointer to the fault
+ * handler's base and check clock
  */
 static auto create_base_threads(const std::atomic<bool>& end_test,
                                 const char* test_namespace)
 {
-    auto fault_handler =
-        std::make_shared<cmr::fabric::FaultHandler>("fh", test_namespace);
+    auto base_clock = std::make_shared<
+        cmr::ProducerConsumerMockClock<std::chrono::system_clock>>();
+    auto check_clock = std::make_shared<
+        cmr::ProducerConsumerMockClock<std::chrono::system_clock>>();
+    auto fault_handler = std::make_shared<cmr::fabric::FaultHandler>(
+        base_clock, check_clock, "fh", test_namespace);
     std::thread fault_handler_thread([&end_test, fault_handler]() {
         while (!end_test) {
             rclcpp::spin_some(fault_handler);
         }
     });
-    return std::make_tuple(std::move(fault_handler_thread), fault_handler);
+    return std::make_tuple(std::move(fault_handler_thread), base_clock, check_clock);
 }
 
 /**
@@ -216,7 +222,8 @@ TEST(FabricTest, activateTest)
     constexpr auto test_namespace = "activate_test";
     constexpr auto node_name = "test_1a";
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
 
     auto test_thread = create_dependee(end_test, {node_name, test_namespace});
 
@@ -236,7 +243,8 @@ TEST(FabricTest, restartOnKillTest)
     constexpr auto test_namespace = "restart_on_kill_test";
     constexpr auto node_name = "test_2a";
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_test_thread(
         end_test, create_config({node_name, test_namespace}, config_a));
     ASSERT_TRUE(cmr::fabric::activate_node(node_name));
@@ -244,12 +252,13 @@ TEST(FabricTest, restartOnKillTest)
     ASSERT_EQ(get_lifecycle_state(node_name), LifecycleState::Active);
 
     const auto base_time = system_now();
-    fh->test_mock_base_check_time(base_time);
+    base->set_time(base_time);
+    check->set_time(base_time);
     ASSERT_TRUE(kill_node(node_name));
 
     ASSERT_EQ(get_lifecycle_state(node_name), LifecycleState::Unconfigured);
 
-    fh->test_mock_check_time_and_wait(base_time + 5s);
+    check->set_time_and_wait(base_time + 5s);
 
     ASSERT_EQ(get_lifecycle_state(node_name), LifecycleState::Active);
 
@@ -264,7 +273,8 @@ TEST(FabricTest, startDependency)
     constexpr auto node_name_a = "test_3a";
     constexpr auto node_name_b = "test_3b";
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
 
     auto test_thread2 =
@@ -296,7 +306,8 @@ TEST(FabricTest, startDependencyChain)
      *        b
      */
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
 
     auto test_thread_a = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread_b = create_dependee(end_test, {node_name_b, test_namespace});
@@ -327,21 +338,23 @@ TEST(FabricTest, killDependender)
     constexpr auto node_name_a = "test_4a";
     constexpr auto node_name_b = "test_4b";
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
     ASSERT_TRUE(cmr::fabric::activate_node(node_name_b));
 
     const auto base_time = system_now();
-    fh->test_mock_base_check_time(base_time);
+    base->set_time(base_time);
+    check->set_time(base_time);
     ASSERT_TRUE(kill_node(node_name_b));
 
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Unconfigured);
 
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Inactive);
 
-    fh->test_mock_check_time_and_wait(base_time + 5s);
+    check->set_time_and_wait(base_time + 5s);
 
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Active);
 
@@ -358,7 +371,8 @@ TEST(FabricTest, killDependendent)
     constexpr auto node_name_a = "test_5a";
     constexpr auto node_name_b = "test_5b";
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
@@ -381,7 +395,8 @@ TEST(FabricTest, restartDependendent)
     constexpr auto node_name_a = "test_7a";
     constexpr auto node_name_b = "test_7b";
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
@@ -389,9 +404,10 @@ TEST(FabricTest, restartDependendent)
     ASSERT_TRUE(cmr::fabric::activate_node(node_name_b));
 
     const auto base_time = system_now();
-    fh->test_mock_base_check_time(base_time);
+    base->set_time(base_time);
+    check->set_time(base_time);
     ASSERT_TRUE(kill_node(node_name_a));
-    fh->test_mock_check_time_and_wait(base_time + 5s);
+    check->set_time_and_wait(base_time + 5s);
 
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Active);
 
@@ -418,7 +434,8 @@ TEST(FabricTest, killDependencyChain)
      *        b
      */
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
 
     auto test_thread_a = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread_b = create_dependee(end_test, {node_name_b, test_namespace});
@@ -433,7 +450,8 @@ TEST(FabricTest, killDependencyChain)
     ASSERT_TRUE(cmr::fabric::activate_node(node_name_e));
 
     auto base_time = system_now();
-    fh->test_mock_base_check_time(base_time);
+    base->set_time(base_time);
+    check->set_time(base_time);
     ASSERT_TRUE(kill_node(node_name_c));
 
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
@@ -442,7 +460,7 @@ TEST(FabricTest, killDependencyChain)
     ASSERT_EQ(get_lifecycle_state(node_name_e), LifecycleState::Inactive);
     ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Unconfigured);
 
-    fh->test_mock_check_time_and_wait(base_time + 4500ms);
+    check->set_time_and_wait(base_time + 4500ms);
 
     ASSERT_EQ(get_lifecycle_state(node_name_e), LifecycleState::Inactive);
     ASSERT_EQ(get_lifecycle_state(node_name_d), LifecycleState::Active);
@@ -450,7 +468,7 @@ TEST(FabricTest, killDependencyChain)
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Active);
     ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Active);
 
-    fh->test_mock_check_time_and_wait(base_time + 4500ms + 2s);
+    check->set_time_and_wait(base_time + 4500ms + 2s);
 
     ASSERT_EQ(get_lifecycle_state(node_name_e), LifecycleState::Active);
     ASSERT_EQ(get_lifecycle_state(node_name_d), LifecycleState::Active);
@@ -459,7 +477,8 @@ TEST(FabricTest, killDependencyChain)
     ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Active);
 
     base_time = system_now();
-    fh->test_mock_base_check_time(base_time);
+    base->set_time(base_time);
+    check->set_time(base_time);
     ASSERT_TRUE(kill_node(node_name_d));
 
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Inactive);
@@ -488,7 +507,8 @@ TEST(FabricTest, doubleDependency)
         c
     */
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
@@ -520,7 +540,8 @@ TEST(FabricTest, transitionFailure)
 
     // c -> b -> a
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
@@ -533,12 +554,13 @@ TEST(FabricTest, transitionFailure)
         std::string("/") + node_name_b + std::string("/fail_activate"), req);
 
     const auto base_time = system_now();
-    fh->test_mock_base_check_time(base_time);
+    check->set_time(base_time);
+    base->set_time(base_time);
     ASSERT_FALSE(cmr::fabric::activate_node(node_name_c));
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Unconfigured);
     ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Unconfigured);
 
-    fh->test_mock_check_time_and_wait(base_time + 10s);
+    check->set_time_and_wait(base_time + 10s);
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Active);
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
     ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Active);
@@ -554,7 +576,8 @@ TEST(FabricTest, nonFailureDeactivation)
     constexpr auto node_name_a = "test_11a";
     constexpr auto node_name_b = "test_11b";
 
-    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto [fault_handler_thread, base, check] =
+        create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);

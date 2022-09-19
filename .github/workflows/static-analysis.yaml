@@ -16,6 +16,13 @@ jobs:
         id: get-self-packages
         uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
 
+      - name: Build
+        if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
+        uses: autowarefoundation/autoware-github-actions/colcon-build@v1
+        with:
+          rosdistro: humble
+          target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+
       - name: Get clang tools
         id: tools
         run: |

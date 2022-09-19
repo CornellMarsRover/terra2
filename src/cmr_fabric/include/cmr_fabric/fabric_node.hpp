@@ -45,7 +45,7 @@ struct FabricNodeConfig {
  */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
-    std::unique_ptr<DependencyHandler> m_dependency_manager{};
+    std::unique_ptr<DependencyHandler> m_dependency_manager;
 
   public:
     explicit FabricNode(
@@ -54,7 +54,6 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     explicit FabricNode(std::optional<FabricNodeConfig>&& config = std::nullopt)
         : FabricNode(config)
     {
-        m_dependency_manager = std::make_unique<DependencyHandler>(*this);
     }
 
     ~FabricNode() override = default;

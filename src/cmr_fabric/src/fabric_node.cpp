@@ -47,7 +47,8 @@ FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config)
         set_parameter({param_config_path,
                        std::get<FabricConfigPath>(config->toml_config).path});
     } else if (config) {
-        set_parameter({param_config_data, std::get<1>(config->toml_config)});
+        set_parameter(
+            {param_config_data, std::get<std::string>(config->toml_config)});
         CMR_LOG(INFO, "Set config data");
     }
 }
@@ -187,7 +188,7 @@ bool FabricNode::cleanup_on_error(const rclcpp_lifecycle::State& current_state)
 {
     m_processing_fault = true;
     ALWAYS(this) { m_processing_fault = false; };
-    using namespace lifecycle_msgs::msg;  // NOLINT(google-build-using-namespace)
+    using lifecycle_msgs::msg::State;
     constexpr auto success =
         rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
     constexpr auto error = rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;

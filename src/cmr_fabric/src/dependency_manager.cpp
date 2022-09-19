@@ -11,8 +11,7 @@
 namespace cmr::fabric
 {
 
-// NOLINTNEXTLINE
-using namespace lifecycle_msgs::msg;
+using lifecycle_msgs::msg::State;
 
 static bool transition_to_active(rclcpp_lifecycle::LifecycleNode& node)
 {
@@ -27,7 +26,7 @@ static bool transition_to_active(rclcpp_lifecycle::LifecycleNode& node)
                       .id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE;
         ;
     }
-    // inactive or finalized
+    // inactive, finalized, unknown, or transitioning
     return success &&
            node.trigger_transition(
                    lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE)
@@ -41,7 +40,7 @@ static bool transition_to_inactive(rclcpp_lifecycle::LifecycleNode& node)
         current_state == State::PRIMARY_STATE_UNCONFIGURED) {
         return true;
     }
-    // active or finalized
+    // active, finalized, unknown, or transitioning
     return node.trigger_transition(
                    lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE)
                .id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE;

@@ -58,9 +58,7 @@ void FaultHandler::timer_callback()
             m_nodes_to_restart[node_name] = m_base_clock->now() + 1s;
         }
     }
-#ifdef BUILD_TESTS
     m_check_clock->register_time(time);
-#endif
 }
 
 FaultHandler::FaultHandler(const std::string& node_name,

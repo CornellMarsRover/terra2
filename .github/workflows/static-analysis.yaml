@@ -1,0 +1,32 @@
+name: Static Analysis
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  lint:
+    runs-on: self-hosted
+    container: cornellmarsrover:dev
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get self packages
+        id: get-self-packages
+        uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
+
+      - name: Get clang tools
+        id: tools
+        run: |
+          sudo apt install clang-format clang-tidy -y
+
+      - name: Clean compile commands
+        id: clean_db
+        run: |
+          bash scripts/clean_build_db_wd.sh
+
+      - name: Static analysis
+        id: analyze
+        run: |
+          bash scripts/check_wd.sh

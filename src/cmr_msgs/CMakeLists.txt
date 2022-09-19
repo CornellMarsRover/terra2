@@ -12,6 +12,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(
   ${PROJECT_NAME}
   msg/State.msg
+  msg/ArucoMarkers.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv

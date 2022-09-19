@@ -45,7 +45,7 @@ struct FabricNodeConfig {
  */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
-    std::unique_ptr<DependencyHandler> m_dependency_manager;
+    std::unique_ptr<DependencyHandler> m_dependency_manager{};
 
   public:
     explicit FabricNode(

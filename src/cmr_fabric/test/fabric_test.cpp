@@ -61,7 +61,7 @@ using cmr::fabric::LifecycleState;
  *
  * @param end_test
  * @param test_namespace
- * @return auto
+ * @return tuple of fault handler thread and the shared pointer to the fault handler
  */
 static auto create_base_threads(const std::atomic<bool>& end_test,
                                 const char* test_namespace)
@@ -95,6 +95,14 @@ static auto create_test_thread(const std::atomic<bool>& end_test,
     return test_thread;
 }
 
+/**
+ * @brief Creates a FabricNode config by formatting a toml string
+ *
+ * @tparam Formats
+ * @param node_config node name and namespace
+ * @param config the configuration string, with format specifiers such as `%d`
+ * @param formats optional arguments to format into `config`
+ */
 template <typename... Formats>
 static auto create_config(NodeConfig node_config, const char* const config,
                           Formats&&... formats)
@@ -131,6 +139,24 @@ static auto create_dependee(std::atomic<bool>& end_test, NodeConfig config)
     return create_test_thread(end_test, config_struct);
 }
 
+/**
+ * @brief Creates a list of strings by inserting string between quotes, and
+ * separating them with commas
+ *
+ * ## Example
+ *
+ * ```C++
+ * std::stringstream ss;
+ * const auto name = "test";
+ * add_to_stream(ss, 10, "hello", name);
+ * ss.str() == "\"10\",\"hello\",\"test\",";
+ * ```
+ *
+ * @tparam Args
+ * @param stream
+ * @param node_name
+ * @param rest
+ */
 template <typename... Args>
 void add_to_stream(std::stringstream& stream, const std::string& node_name,
                    Args&&... rest)
@@ -141,6 +167,16 @@ void add_to_stream(std::stringstream& stream, const std::string& node_name,
     }
 }
 
+/**
+ * @brief Create a test node that depends on the specified nodes, using a specified
+ * format string
+ *
+ * @tparam Dependees
+ * @param end_test the end test flag
+ * @param config_str the configuration string, with format specifiers
+ * @param node_config node_name and test_namespace
+ * @param dependee_names the names of the dependees
+ */
 template <typename... Dependees>
 auto create_custom_depender(std::atomic<bool>& end_test, const char* config_str,
                             NodeConfig node_config, Dependees&&... dependee_names)
@@ -151,6 +187,10 @@ auto create_custom_depender(std::atomic<bool>& end_test, const char* config_str,
         end_test, create_config(node_config, config_str, ss.str().c_str()));
 }
 
+/**
+ * @brief Like `create_custom_depender`, but with a default configuration string
+ *
+ */
 template <typename... Dependees>
 auto create_depender(std::atomic<bool>& end_test, NodeConfig node_config,
                      Dependees&&... dependee_names)
@@ -159,6 +199,9 @@ auto create_depender(std::atomic<bool>& end_test, NodeConfig node_config,
                                   std::forward<Dependees>(dependee_names)...);
 }
 
+/**
+ * @brief Ends the test by joining all functions after signaling the end test flag
+ */
 template <typename... Threads>
 void join_all(std::atomic<bool>& end_test, Threads&... threads)
 {
@@ -467,7 +510,6 @@ TEST(FabricTest, doubleDependency)
              test_thread3);
 }
 
-// WIP
 TEST(FabricTest, transitionFailure)
 {
     MAKE_END_TEST_FLAG();
@@ -503,6 +545,26 @@ TEST(FabricTest, transitionFailure)
 
     join_all(end_test, test_thread, test_thread2, fault_handler_thread,
              test_thread3);
+}
+
+TEST(FabricTest, nonFailureDeactivation)
+{
+    MAKE_END_TEST_FLAG();
+    constexpr auto test_namespace = "non_fail_deactivate_test";
+    constexpr auto node_name_a = "test_11a";
+    constexpr auto node_name_b = "test_11b";
+
+    auto [fault_handler_thread, fh] = create_base_threads(end_test, test_namespace);
+    auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
+    auto test_thread2 =
+        create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
+
+    ASSERT_TRUE(cmr::fabric::activate_node(node_name_b));
+    ASSERT_TRUE(cmr::fabric::cleanup_node(node_name_a));
+    ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Unconfigured);
+    ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Inactive);
+
+    join_all(end_test, test_thread, test_thread2, fault_handler_thread);
 }
 
 int main(int argc, char** argv)

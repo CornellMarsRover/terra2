@@ -15,7 +15,8 @@ namespace cmr::fabric
 
 /** The reason why a node is deactivated */
 enum class DeactivationReason : uint8_t {
-    /** Node has been deactivated due to an error transition */
+    /** Node has been deactivated due to an error transition. Dependers should
+       register themselves with the FaultHandler */
     Error,
     /** Node has been deactivated  */
     Manual,

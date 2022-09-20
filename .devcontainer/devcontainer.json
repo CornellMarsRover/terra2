@@ -2,7 +2,8 @@
   "name": "Terra",
   "image": "cornellmarsrover/dev:latest",
   "mounts": [
-    "source=${localWorkspaceFolder}/..,target=/cmr,type=bind"
+    "source=${localWorkspaceFolder}/..,target=/cmr,type=bind",
+    "source=${env:HOME}/.ssh,target=/home/cmr/.ssh,type=bind"
   ],
   "workspaceFolder": "/cmr/terra",
   "customizations": {

@@ -7,6 +7,8 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 # Add paths to additional messages, services, and actions here.
 rosidl_generate_interfaces(
@@ -19,6 +21,9 @@ rosidl_generate_interfaces(
   srv/AcquireDependency.srv
   srv/ReleaseDependency.srv
   srv/NotifyDeactivate.srv
-  action/TestTargetPosition.action)
+  action/TestTargetPosition.action
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs)
 
 ament_package()

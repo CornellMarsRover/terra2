@@ -15,10 +15,9 @@ rosidl_generate_interfaces(
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv
-  srv/GetNodeState.srv
-  srv/ReconfigureNode.srv
   srv/AcquireDependency.srv
   srv/ReleaseDependency.srv
-  srv/NotifyDeactivate.srv)
+  srv/NotifyDeactivate.srv
+  action/TestTargetPosition.action)
 
 ament_package()

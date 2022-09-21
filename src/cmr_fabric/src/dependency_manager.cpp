@@ -1,218 +1,255 @@
 #include "cmr_fabric/dependency_manager.hpp"
 
-#include "cmr_fabric/lifecycle_states.hpp"
+#include "cmr_fabric/lifecycle_helpers.hpp"
+#include "cmr_msgs/srv/recover_fault.hpp"
 #include "cmr_utils/cmr_debug.hpp"
 #include "cmr_utils/services.hpp"
+#include "cmr_utils/string_utils.hpp"
 #include "lifecycle_msgs/srv/change_state.hpp"
 #include "lifecycle_msgs/srv/get_state.hpp"
 
 namespace cmr::fabric
 {
-rclcpp::Service<cmr_msgs::srv::AcquireDependency>::SharedPtr
-DependencyManager::create_acquire_dependency_service()
+
+using lifecycle_msgs::msg::State;
+
+static bool transition_to_active(rclcpp_lifecycle::LifecycleNode& node)
 {
-    const auto acquire_dep_callback =
-        [this](
-            const std::shared_ptr<cmr_msgs::srv::AcquireDependency::Request>&
-                request,
-            std::shared_ptr<cmr_msgs::srv::AcquireDependency::Response> response) {
-            const auto [dependent, target] = *request;
-
-            CMR_LOG(INFO, "Acquiring dependency for %s of %s", dependent.c_str(),
-                    target.c_str());
-            if (m_users.find(target) == m_users.end()) {
-                const auto activate_response = activate_dependency(target);
-
-                if (!activate_response) {
-                    // failed to activate
-                    CMR_LOG(ERROR, "Failed to activate dependency %s",
-                            target.c_str());
-                    response->success = false;
-                    return response;
-                }
-
-                CMR_LOG(INFO, "Adding %s to m_started_as_deps and m_users",
-                        target.c_str());
-                m_started_as_deps.insert(target);
-                m_users[target] = std::unordered_set<std::string>();
-            }
-
-            m_users[target].insert(dependent);
-            m_dependers[dependent].insert(target);
-            CMR_LOG(INFO, "Added %s to m_users[%s]", dependent.c_str(),
-                    target.c_str());
-
-            response->success = true;
-            return response;
-        };
-
-    return this->create_service<cmr_msgs::srv::AcquireDependency>(
-        get_effective_namespace() + "/acquire", acquire_dep_callback);
+    bool success = true;
+    const auto current_state = node.get_current_state().id();
+    if (current_state == State::PRIMARY_STATE_ACTIVE) {
+        return true;
+    }
+    if (current_state == State::PRIMARY_STATE_UNCONFIGURED) {
+        success = node.trigger_transition(
+                          lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE)
+                      .id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE;
+        ;
+    }
+    // inactive, finalized, unknown, or transitioning
+    return success &&
+           node.trigger_transition(
+                   lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE)
+                   .id() == lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
 }
 
-const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>&
-DependencyManager::release_dependency_callback(
-    const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& request,
-    const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>& response)
+static bool transition_to_inactive(rclcpp_lifecycle::LifecycleNode& node)
 {
-    const auto [dependent, target] = *request;
-
-    CMR_LOG(DEBUG, "Releasing dependency %s for node %s...", target.c_str(),
-            dependent.c_str());
-
-    if (m_users.find(target) == m_users.end()) {
-        // target node was never acquired; just return success in
-        // this case although this suggests misuse of the dependency
-        // manager
-        CMR_LOG(WARN,
-                "attempting to release node %s, but it was "
-                "never acquired",
-                target.c_str());
-        response->success = true;
-        return response;
+    const auto current_state = node.get_current_state().id();
+    if (current_state == State::PRIMARY_STATE_INACTIVE ||
+        current_state == State::PRIMARY_STATE_UNCONFIGURED) {
+        return true;
     }
-
-    m_users[target].erase(dependent);
-    m_dependers[dependent].erase(target);
-
-    if (m_users[target].empty()) {
-        // no more users of the target node; deactivate it if it was
-        // started as a dependency
-        m_users.erase(target);
-        if (m_started_as_deps.find(target) != m_started_as_deps.end()) {
-            const auto deactivate_response = deactivate_dependency(target);
-            if (!deactivate_response) {
-                // failed to deactivate
-                response->success = false;
-                return response;
-            }
-            m_started_as_deps.erase(target);
-        }
-    }
-    response->success = true;
-    return response;
+    // active, finalized, unknown, or transitioning
+    return node.trigger_transition(
+                   lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE)
+               .id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE;
 }
 
 rclcpp::Service<cmr_msgs::srv::ReleaseDependency>::SharedPtr
-DependencyManager::create_release_dependency_service()
+DependencyHandler::create_release_dependency_service(
+    rclcpp_lifecycle::LifecycleNode& node)
 {
-    const auto release_dep_callback =
-        [this](const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request>& req,
-               const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>&
-                   resp) { return release_dependency_callback(req, resp); };
-
-    return this->create_service<cmr_msgs::srv::ReleaseDependency>(
-        get_effective_namespace() + "/release", release_dep_callback);
+    return node.create_service<cmr_msgs::srv::ReleaseDependency>(
+        cmr::build_string(node.get_name(), "/release"),
+        [this, &node](
+            const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Request> request,
+            const std::shared_ptr<cmr_msgs::srv::ReleaseDependency::Response>
+                response) {
+            const auto depender = request->depender;
+            m_dependers.erase(depender);
+            if (m_dependers.empty() && m_started_as_dep) {
+                response->success = transition_to_inactive(node);
+            } else {
+                response->success = true;
+            }
+        });
 }
 
-/*
- * The following two helpers call the lifecycle management services exposed
- * by dependencies directly. This code looks very similar to how Fabric's
- * lifecycle manager node performs activation and deactivation, which
- * understandably begs the question: why not just use the lifecycle manager's
- * activate and deactivate services? The reason is because the dependency manager
- * is invoked during the lifecycle manager's activate and deactivate callbacks;
- * if we were to call them from within the dependency manager, we would enter
- * into a deadlock because the lifecycle manager's services are busy waiting for
- * the dependency manager, but the dependency manager is busy waiting for the
- * lifecycle manager. So we just have to cut out the middleman here, even if it
- * means some regrettable code duplication.
+rclcpp::Service<cmr_msgs::srv::AcquireDependency>::SharedPtr
+DependencyHandler::create_acquire_dependency_service(
+    rclcpp_lifecycle::LifecycleNode& node)
+{
+    return node.create_service<cmr_msgs::srv::AcquireDependency>(
+        cmr::build_string(node.get_name(), "/acquire"),
+        [&node, this](
+            const std::shared_ptr<cmr_msgs::srv::AcquireDependency::Request> request,
+            std::shared_ptr<cmr_msgs::srv::AcquireDependency::Response> response) {
+            const auto depender = request->depender;
+            if (node.get_current_state().id() == State::PRIMARY_STATE_UNCONFIGURED) {
+                m_started_as_dep = true;
+            }
+            response->success = transition_to_active(node);
+            if (response->success) {
+                m_dependers.insert(depender);
+            }
+        });
+}
+
+/**
+ * @brief Notify all the nodes in `dependers` that `node` is being deactivated
+ *
+ * @param node the node being deactivated
+ * @param dependers the nodes that depend on `node`. All nodes successfully notified
+ * will be removed from this set
+ *
+ * @return true if all nodes were successfully notified
  */
-
-bool DependencyManager::activate_dependency(const std::string& target)
+static bool notify_deactivation_to_dependenders(
+    rclcpp_lifecycle::LifecycleNode& node,
+    std::unordered_set<std::string>& dependers, DeactivationReason reason,
+    int32_t restart_delay)
 {
-    // check if node is configured
-    CMR_LOG(INFO, "Request to activate dependency %s", target.c_str());
-    const auto first_response = cmr::send_request<lifecycle_msgs::srv::GetState>(
-        "/" + target + "/get_state",
-        std::make_shared<lifecycle_msgs::srv::GetState::Request>());
-    if (first_response &&
-        first_response.value()->current_state.id ==
-            lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
-        // configure first
-        CMR_LOG(INFO, "configuring dependency %s", target.c_str());
-        const auto request =
-            std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-        request->transition.id =
-            lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
-        const auto response = cmr::send_request<lifecycle_msgs::srv::ChangeState>(
-            "/" + target + "/change_state", request);
-        if (!response || !response.value()->success) {
-            return false;
+    const auto req = std::make_shared<cmr_msgs::srv::NotifyDeactivate::Request>();
+    req->node_name = node.get_name();
+    req->deactivation_reason = static_cast<uint8_t>(reason);
+    req->restart_delay = restart_delay;
+    bool success = true;
+    std::vector<std::string> notified_nodes;
+    for (const auto& depender : dependers) {
+        RCLCPP_INFO(node.get_logger(), "Notifying %s of deactivation of %s",
+                    depender.c_str(), node.get_name());
+        auto opt = cmr::send_request<cmr_msgs::srv::NotifyDeactivate>(
+            depender + "/notify_deactivate", req);
+        const auto notify_success = opt && opt.value()->success;
+        if (!notify_success) {
+            RCLCPP_ERROR(node.get_logger(),
+                         "Failed to notify %s about deactivation of %s",
+                         depender.c_str(), node.get_name());
+        } else {
+            notified_nodes.push_back(depender);
         }
+        success &= notify_success;
     }
-    // we can activate now
-    CMR_LOG(INFO, "activating dependency %s", target.c_str());
-    const auto activate_request =
-        std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-    activate_request->transition.id =
-        lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-    const auto activate_response =
-        cmr::send_request<lifecycle_msgs::srv::ChangeState>(
-            "/" + target + "/change_state", activate_request);
-    return activate_response && activate_response.value()->success;
+    for (const auto& depender : notified_nodes) {
+        dependers.erase(depender);
+    }
+    RCLCPP_INFO(node.get_logger(), "Notified dependenders success: %d", success);
+    return success;
 }
 
-bool DependencyManager::deactivate_dependency(const std::string& target)
+/**
+ * @brief Determines if we should ask the fault handler to restart outselves
+ *
+ * @param reason the reason why we are being deactivated. If this is an error, we
+ * will restart
+ * @param restart_delay the delay before restarting, taking into account the delay of
+ * our dependencies
+ * @param node
+ *
+ * @return true if we don't need to restart or the scheduling was successful
+ */
+static bool trigger_restart_if_necessary(DeactivationReason reason,
+                                         int32_t restart_delay,
+                                         rclcpp_lifecycle::LifecycleNode& node)
 {
-    // check if node is configured
-    const auto request = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
-    const auto response = cmr::send_request<lifecycle_msgs::srv::GetState>(
-        "/" + target + "/get_state", request);
-    if (response && response.value()->current_state.id ==
-                        lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE) {
-        // This suggests that something is wrong, but since the node is
-        // deactivating anyway, this isn't real cause for alarm enough for an
-        // error log.
-        CMR_LOG(WARN,
-                "Attempted to deactivate dependency %s, but it was already "
-                "inactive.",
-                target.c_str());
-        return true;
+    const auto comp_namespace = node.get_parameter("composition_ns").as_string();
+    if (reason == DeactivationReason::Error) {
+        auto req = std::make_shared<cmr_msgs::srv::RecoverFault::Request>();
+        req->node_name = node.get_name();
+        req->restart_delay = restart_delay;
+        const auto resp = cmr::send_request<cmr_msgs::srv::RecoverFault>(
+            "/" + comp_namespace + "/recover_fault", req);
+        return resp.has_value();
     }
-    // we can deactivate now
-    CMR_LOG(INFO, "deactivating dependency %s", target.c_str());
-    const auto activate_request =
-        std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-    activate_request->transition.id =
-        lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
-    const auto activate_response =
-        cmr::send_request<lifecycle_msgs::srv::ChangeState>(
-            "/" + target + "/change_state", activate_request);
-    return activate_response && activate_response.value()->success;
-}
-
-const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>&
-DependencyManager::notify_deactivate_callback(
-    const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request>&,
-    const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>& response)
-{
-    // TODO(sev47)
-
-    return response;
+    return true;
 }
 
 rclcpp::Service<cmr_msgs::srv::NotifyDeactivate>::SharedPtr
-DependencyManager::create_notify_deactivate_service()
+DependencyHandler::create_notify_deactivate_service(
+    rclcpp_lifecycle::LifecycleNode& node)
 {
-    const auto notify_dep_callback =
-        [this](
-            const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request>& req,
-            const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>& resp) {
-            return notify_deactivate_callback(req, resp);
-        };
-
-    return this->create_service<cmr_msgs::srv::NotifyDeactivate>(
-        get_effective_namespace() + "/notify_deactivate", notify_dep_callback);
+    return node.create_service<cmr_msgs::srv::NotifyDeactivate>(
+        cmr::build_string("/", node.get_name(), "/notify_deactivate"),
+        [this, &node](
+            const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Request> request,
+            const std::shared_ptr<cmr_msgs::srv::NotifyDeactivate::Response>
+                response) {
+            const auto node_name = request->node_name;
+            if (auto it = m_dependencies.find(node_name);
+                it != m_dependencies.end()) {
+                // setthing this to false prevents us trying to release this
+                // dependency
+                it->second = false;
+                const auto node_restart_delay = static_cast<int32_t>(
+                    node.get_parameter("restart_delay").as_int());
+                response->success =
+                    notify_deactivation_to_dependenders(
+                        node, m_dependers,
+                        static_cast<DeactivationReason>(
+                            request->deactivation_reason),
+                        request->restart_delay + node_restart_delay) &&
+                    transition_to_inactive(node) &&
+                    trigger_restart_if_necessary(
+                        static_cast<DeactivationReason>(
+                            request->deactivation_reason),
+                        request->restart_delay + node_restart_delay, node);
+            } else {
+                response->success = false;
+                RCLCPP_WARN(
+                    node.get_logger(),
+                    "Received deactivation notification from a non-dependency");
+            }
+        });
 }
 
-DependencyManager::DependencyManager(const std::string& node_name,
-                                     const std::string& node_namespace)
-    : Node(node_name, node_namespace)
+bool DependencyHandler::acquire_all_dependencies()
 {
-    m_acquire_dependency_srv = create_acquire_dependency_service();
-    m_release_dependency_srv = create_release_dependency_service();
-    m_notify_deactivate_srv = create_notify_deactivate_service();
-    CMR_LOG(INFO, "dependency manager initialized");
+    for (auto& [dep_name, dep_acquired] : m_dependencies) {
+        auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
+        request->depender = m_node.get().get_name();
+        RCLCPP_INFO(m_node.get().get_logger(),
+                    "Sending activation to %s/acquire from %s", dep_name.c_str(),
+                    m_node.get().get_name());
+        const auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
+            dep_name + "/acquire", request);
+        if (!response || !(*response)->success) {
+            RCLCPP_ERROR(m_node.get().get_logger(),
+                         "Failed to acquire dependency %s", dep_name.c_str());
+            return false;
+        } else {
+            dep_acquired = true;
+        }
+    }
+    return true;
+}
+bool DependencyHandler::release_all_dependencies()
+{
+    bool success = true;
+    for (auto& [dep_name, dep_acquired] : m_dependencies) {
+        if (!dep_acquired) {
+            RCLCPP_INFO(m_node.get().get_logger(),
+                        "Skipping release of %s as it was never acquired",
+                        dep_name.c_str());
+            continue;
+        }
+        auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();
+        request->depender = m_node.get().get_name();
+        const auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
+            dep_name + "/release", request);
+        if (!response || !(*response)->success) {
+            RCLCPP_ERROR(m_node.get().get_logger(),
+                         "Failed to release dependency %s", dep_name.c_str());
+            success = false;
+        } else {
+            dep_acquired = false;
+        }
+    }
+    return success;
+}
+
+bool DependencyHandler::notify_deactivate(DeactivationReason reason,
+                                          int32_t restart_delay)
+{
+    return notify_deactivation_to_dependenders(m_node.get(), m_dependers, reason,
+                                               restart_delay);
+}
+
+DependencyHandler::DependencyHandler(rclcpp_lifecycle::LifecycleNode& node)
+    : m_dependencies({}), m_dependers({}), m_started_as_dep(false), m_node(node)
+{
+    m_acquire_dependency_srv = create_acquire_dependency_service(node);
+    m_release_dependency_srv = create_release_dependency_service(node);
+    m_notify_deactivate_srv = create_notify_deactivate_service(node);
 }
 }  // namespace cmr::fabric

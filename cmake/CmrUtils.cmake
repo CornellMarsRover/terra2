@@ -191,6 +191,7 @@ if(BUILD_TESTING)
   add_compile_options(--coverage)
   add_link_options(--coverage)
   find_package(ament_cmake_gtest REQUIRED)
+  add_compile_definitions(BUILD_TESTS)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)

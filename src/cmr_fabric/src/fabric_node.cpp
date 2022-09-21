@@ -31,32 +31,26 @@ FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config)
                                         .count());
           }))
 {
-    declare_parameter(
-        param_config_path,
-        monad::bind(config, [](const auto& c) {
-            if (std::holds_alternative<std::filesystem::path>(c.toml_config)) {
-                return std::make_optional(
-                    std::get<std::filesystem::path>(c.toml_config).string());
-            } else {
-                return std::optional<std::string>{};
-            }
-        }).value_or(""));
+    m_dependency_manager = std::make_unique<DependencyHandler>(*this);
+    declare_parameter(param_config_path, "");
     declare_parameter(param_composition_namespace,
                       monad::map(config, [](const auto& c) {
                           return c.composition_namespace;
                       }).value_or(""));
-    declare_parameter(
-        param_config_data,
-        monad::bind(config, [](const auto& c) {
-            if (std::holds_alternative<std::string>(c.toml_config)) {
-                return std::make_optional(std::get<std::string>(c.toml_config));
-            } else {
-                return std::optional<std::string>{};
-            }
-        }).value_or(""));
+    declare_parameter(param_config_data, "");
     declare_parameter(param_max_restarts, 2);
     declare_parameter(param_restart_delay, 0);
     declare_parameter(param_num_attempted_restarts, 0);
+
+    if (config && std::holds_alternative<FabricConfigPath>(config->toml_config)) {
+        CMR_LOG(INFO, "Holds path");
+        set_parameter({param_config_path,
+                       std::get<FabricConfigPath>(config->toml_config).path});
+    } else if (config) {
+        set_parameter(
+            {param_config_data, std::get<std::string>(config->toml_config)});
+        CMR_LOG(INFO, "Set config data");
+    }
 }
 
 // Basic guarantee. This is ok because if this fails, entire node is reset anyway
@@ -141,8 +135,8 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
 
     const auto dependencies = config->getArray("dependencies");
     if (dependencies) {
-        this->m_dependencies = *dependencies->getStringVector();
-        m_activated_dependencies = std::vector<bool>(m_dependencies.size(), false);
+        const auto deps = dependencies->getStringVector();
+        m_dependency_manager->set_dependencies(deps->begin(), deps->end());
     }
 
     return configure(config)
@@ -150,56 +144,10 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_configure(
                : rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
 }
 
-bool FabricNode::activate_dependencies()
-{
-    CMR_ASSERT(m_dependencies.size() == m_activated_dependencies.size());
-    for (size_t i = 0; i < m_dependencies.size(); ++i) {
-        const auto& dep_name = m_dependencies[i];
-        auto request = std::make_shared<cmr_msgs::srv::AcquireDependency::Request>();
-        request->dependent = get_name();
-        request->target = dep_name;
-        CMR_LOG_D(INFO, "Sending activation to %s/acquire for %s from %s",
-                  m_composition_namespace.c_str(), dep_name.c_str(), get_name());
-        const auto response = cmr::send_request<cmr_msgs::srv::AcquireDependency>(
-            m_composition_namespace + "/acquire", request);
-        if (!response) {
-            CMR_LOG(ERROR, "Failed to acquire dependency %s", dep_name.c_str());
-            return false;
-        } else {
-            m_activated_dependencies[i] = true;
-        }
-    }
-    return true;
-}
-
-bool FabricNode::deactivate_dependencies()
-{
-    CMR_ASSERT(m_dependencies.size() == m_activated_dependencies.size());
-    bool success = true;
-    for (size_t i = 0; i < m_dependencies.size(); ++i) {
-        if (!m_activated_dependencies[i]) {
-            continue;
-        }
-        const auto& dep_name = m_dependencies[i];
-        auto request = std::make_shared<cmr_msgs::srv::ReleaseDependency::Request>();
-        request->dependent = get_name();
-        request->target = dep_name;
-        const auto response = cmr::send_request<cmr_msgs::srv::ReleaseDependency>(
-            m_composition_namespace + "/release", request);
-        if (!response) {
-            CMR_LOG(ERROR, "Failed to release dependency %s", dep_name.c_str());
-            success = false;
-        } else {
-            m_activated_dependencies[i] = false;
-        }
-    }
-    return success;
-}
-
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
     const rclcpp_lifecycle::State&)
 {
-    if (!activate_dependencies()) {
+    if (!m_dependency_manager->acquire_all_dependencies()) {
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     return activate() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
@@ -209,7 +157,11 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_activate(
 rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_deactivate(
     const rclcpp_lifecycle::State&)
 {
-    if (!deactivate_dependencies()) {
+    if (!m_dependency_manager->release_all_dependencies() ||
+        !m_dependency_manager->notify_deactivate(
+            m_processing_fault ? DeactivationReason::Error
+                               : DeactivationReason::Manual,
+            static_cast<int32_t>(get_parameter(param_restart_delay).as_int()))) {
         return rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
     }
     return deactivate() ? rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS
@@ -234,7 +186,9 @@ rclcpp_lifecycle::LifecycleNode::CallbackReturn FabricNode::on_shutdown(
 // Performs the necessary cleanup for `node` during the `ErrorProcessing` state
 bool FabricNode::cleanup_on_error(const rclcpp_lifecycle::State& current_state)
 {
-    using namespace lifecycle_msgs::msg;  // NOLINT(google-build-using-namespace)
+    m_processing_fault = true;
+    ALWAYS(this) { m_processing_fault = false; };
+    using lifecycle_msgs::msg::State;
     constexpr auto success =
         rclcpp_lifecycle::LifecycleNode::CallbackReturn::SUCCESS;
     constexpr auto error = rclcpp_lifecycle::LifecycleNode::CallbackReturn::ERROR;
@@ -249,7 +203,12 @@ bool FabricNode::cleanup_on_error(const rclcpp_lifecycle::State& current_state)
             return on_cleanup(current_state) == success;
         }
         case State::TRANSITION_STATE_ACTIVATING:
-            return deactivate_dependencies() && on_cleanup(current_state) == success;
+            return m_dependency_manager->release_all_dependencies() &&
+                   m_dependency_manager->notify_deactivate(
+                       DeactivationReason::Error,
+                       static_cast<int32_t>(
+                           get_parameter(param_restart_delay).as_int())) &&
+                   on_cleanup(current_state) == success;
         case State::TRANSITION_STATE_DEACTIVATING:
         case State::PRIMARY_STATE_INACTIVE:
             return on_cleanup(current_state) == success;
@@ -320,6 +279,8 @@ bool FabricNode::schedule_restart()
 
 void FabricNode::error_transition()
 {
+    m_processing_fault = true;
+    ALWAYS(this) { m_processing_fault = false; };
     CMR_LOG(INFO, "Transitioning to ErrorProcessing");
     switch (get_current_state().id()) {
         case lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED:

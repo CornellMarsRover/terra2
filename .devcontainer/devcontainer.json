@@ -2,7 +2,8 @@
   "name": "Terra",
   "image": "cornellmarsrover/dev:latest",
   "mounts": [
-    "source=${localWorkspaceFolder}/..,target=/cmr,type=bind"
+    "source=${localWorkspaceFolder}/..,target=/cmr,type=bind",
+    "source=${env:HOME}/.ssh,target=/home/cmr/.ssh,type=bind"
   ],
   "workspaceFolder": "/cmr/terra",
   "customizations": {
@@ -22,7 +23,7 @@
         "DotJoshJohnson.xml",
         "cschlosser.doxdocgen",
         "xaver.clang-format",
-        "notskm.clang-tidy",
+        // "notskm.clang-tidy", just use clang-tidy from clangd
         "matepek.vscode-catch2-test-adapter",
         "Gruntfuggly.todo-tree",
         "kevinkyang.auto-comment-blocks",

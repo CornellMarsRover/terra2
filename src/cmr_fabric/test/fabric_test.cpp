@@ -4,6 +4,7 @@
 #include "cmr_fabric/fabric_node.hpp"
 #include "cmr_fabric/fault_handler.hpp"
 #include "cmr_fabric/lifecycle_helpers.hpp"
+#include "cmr_fabric/test_utils.hpp"
 #include "cmr_msgs/srv/activate_node.hpp"
 #include "cmr_utils/debug_clock.hpp"
 #include "cmr_utils/services.hpp"
@@ -42,11 +43,6 @@ restart_attempts = 2
 restart_delay = 2
 )";
 
-struct NodeConfig {
-    const char* node_name;
-    const char* test_namespace;
-};
-
 // NOLINTNEXTLINE
 #define MAKE_END_TEST_FLAG()            \
     std::atomic<bool> end_test = false; \
@@ -74,57 +70,12 @@ static auto create_base_threads(const std::atomic<bool>& end_test,
         cmr::ProducerConsumerMockClock<std::chrono::system_clock>>();
     auto fault_handler = std::make_shared<cmr::fabric::FaultHandler>(
         base_clock, check_clock, "fh", test_namespace);
-    std::thread fault_handler_thread([&end_test, fault_handler]() {
+    JThread fault_handler_thread([&end_test, fault_handler]() {
         while (!end_test) {
             rclcpp::spin_some(fault_handler);
         }
     });
     return std::make_tuple(std::move(fault_handler_thread), base_clock, check_clock);
-}
-
-/**
- * @brief Create a thread for a FabricTestNode
- *
- * @param end_test
- * @param config
- * @return auto
- */
-static auto create_test_thread(const std::atomic<bool>& end_test,
-                               const cmr::fabric::FabricNodeConfig& config)
-{
-    std::thread test_thread([&end_test, config = std::make_optional(config)]() {
-        auto test_node = std::make_shared<FabricTestNode>(config);
-        while (!end_test) {
-            rclcpp::spin_some(test_node->get_node_base_interface());
-        }
-    });
-    return test_thread;
-}
-
-/**
- * @brief Creates a FabricNode config by formatting a toml string
- *
- * @tparam Formats
- * @param node_config node name and namespace
- * @param config the configuration string, with format specifiers such as `%d`
- * @param formats optional arguments to format into `config`
- */
-template <typename... Formats>
-static auto create_config(NodeConfig node_config, const char* const config,
-                          Formats&&... formats)
-{
-    std::array<char, 1024> config_buffer = {};
-#pragma GCC diagnostic push
-#pragma clang diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-security"
-#pragma clang diagnostic ignored "-Wformat-security"
-    std::snprintf(config_buffer.data(), sizeof(config_buffer), config,
-                  std::forward<Formats>(formats)...);
-#pragma GCC diagnostic pop
-#pragma clang diagnostic pop
-    return cmr::fabric::FabricNodeConfig{node_config.node_name,
-                                         node_config.test_namespace,
-                                         {std::string(config_buffer.data())}};
 }
 
 // Kill a test node via the kill topic
@@ -141,36 +92,8 @@ static auto kill_node(const char* node_name)
 static auto create_dependee(std::atomic<bool>& end_test, NodeConfig config)
 {
     cmr::fabric::FabricNodeConfig config_struct{
-        config.node_name, config.test_namespace, std::string(config_a)};
-    return create_test_thread(end_test, config_struct);
-}
-
-/**
- * @brief Creates a list of strings by inserting string between quotes, and
- * separating them with commas
- *
- * ## Example
- *
- * ```C++
- * std::stringstream ss;
- * const auto name = "test";
- * add_to_stream(ss, 10, "hello", name);
- * ss.str() == "\"10\",\"hello\",\"test\",";
- * ```
- *
- * @tparam Args
- * @param stream
- * @param node_name
- * @param rest
- */
-template <typename... Args>
-void add_to_stream(std::stringstream& stream, const std::string& node_name,
-                   Args&&... rest)
-{
-    stream << '"' << node_name << '"' << ',';
-    if constexpr (sizeof...(rest) > 0) {
-        add_to_stream(stream, std::forward<Args>(rest)...);
-    }
+        config.node_name, config.node_namespace, std::string(config_a)};
+    return create_test_thread<FabricTestNode>(end_test, config_struct);
 }
 
 /**
@@ -188,8 +111,8 @@ auto create_custom_depender(std::atomic<bool>& end_test, const char* config_str,
                             NodeConfig node_config, Dependees&&... dependee_names)
 {
     std::stringstream ss;
-    add_to_stream(ss, std::forward<Dependees>(dependee_names)...);
-    return create_test_thread(
+    add_to_toml_list(ss, std::forward<Dependees>(dependee_names)...);
+    return create_test_thread<FabricTestNode>(
         end_test, create_config(node_config, config_str, ss.str().c_str()));
 }
 
@@ -203,16 +126,6 @@ auto create_depender(std::atomic<bool>& end_test, NodeConfig node_config,
 {
     return create_custom_depender(end_test, config_b, node_config,
                                   std::forward<Dependees>(dependee_names)...);
-}
-
-/**
- * @brief Ends the test by joining all functions after signaling the end test flag
- */
-template <typename... Threads>
-void join_all(std::atomic<bool>& end_test, Threads&... threads)
-{
-    end_test = true;
-    (threads.join(), ...);
 }
 
 // NOLINTNEXTLINE
@@ -233,7 +146,7 @@ TEST(FabricTest, activateTest)
 
     ASSERT_EQ(get_lifecycle_state(node_name), LifecycleState::Active);
 
-    join_all(end_test, test_thread, fault_handler_thread);
+    end_test = true;
 }
 
 // NOLINTNEXTLINE
@@ -245,7 +158,7 @@ TEST(FabricTest, restartOnKillTest)
 
     auto [fault_handler_thread, base, check] =
         create_base_threads(end_test, test_namespace);
-    auto test_thread = create_test_thread(
+    auto test_thread = create_test_thread<FabricTestNode>(
         end_test, create_config({node_name, test_namespace}, config_a));
     ASSERT_TRUE(cmr::fabric::activate_node(node_name));
 
@@ -262,7 +175,7 @@ TEST(FabricTest, restartOnKillTest)
 
     ASSERT_EQ(get_lifecycle_state(node_name), LifecycleState::Active);
 
-    join_all(end_test, test_thread, fault_handler_thread);
+    end_test = true;
 }
 
 // NOLINTNEXTLINE
@@ -285,7 +198,7 @@ TEST(FabricTest, startDependency)
 
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
 
-    join_all(end_test, test_thread, test_thread2, fault_handler_thread);
+    end_test = true;
 }
 
 // NOLINTNEXTLINE
@@ -326,8 +239,7 @@ TEST(FabricTest, startDependencyChain)
     ASSERT_EQ(get_lifecycle_state(node_name_d), LifecycleState::Active);
     ASSERT_EQ(get_lifecycle_state(node_name_e), LifecycleState::Active);
 
-    join_all(end_test, test_thread_a, test_thread_b, test_thread_c, test_thread_d,
-             test_thread_e, fault_handler_thread);
+    end_test = true;
 }
 
 // NOLINTNEXTLINE
@@ -360,7 +272,7 @@ TEST(FabricTest, killDependender)
 
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
 
-    join_all(end_test, test_thread, test_thread2, fault_handler_thread);
+    end_test = true;
 }
 
 // NOLINTNEXTLINE
@@ -384,7 +296,7 @@ TEST(FabricTest, killDependendent)
 
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Unconfigured);
 
-    join_all(end_test, test_thread, test_thread2, fault_handler_thread);
+    end_test = true;
 }
 
 // NOLINTNEXTLINE
@@ -413,7 +325,7 @@ TEST(FabricTest, restartDependendent)
 
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
 
-    join_all(end_test, test_thread, test_thread2, fault_handler_thread);
+    end_test = true;
 }
 
 // NOLINTNEXTLINE
@@ -487,8 +399,7 @@ TEST(FabricTest, killDependencyChain)
     ASSERT_EQ(get_lifecycle_state(node_name_d), LifecycleState::Unconfigured);
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
 
-    join_all(end_test, test_thread_a, test_thread_b, test_thread_c, test_thread_d,
-             test_thread_e, fault_handler_thread);
+    end_test = true;
 }
 
 TEST(FabricTest, doubleDependency)
@@ -526,8 +437,7 @@ TEST(FabricTest, doubleDependency)
     ASSERT_TRUE(cmr::fabric::cleanup_node(node_name_c));
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Inactive);
 
-    join_all(end_test, test_thread, test_thread2, fault_handler_thread,
-             test_thread3);
+    end_test = true;
 }
 
 TEST(FabricTest, transitionFailure)
@@ -565,8 +475,7 @@ TEST(FabricTest, transitionFailure)
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Active);
     ASSERT_EQ(get_lifecycle_state(node_name_c), LifecycleState::Active);
 
-    join_all(end_test, test_thread, test_thread2, fault_handler_thread,
-             test_thread3);
+    end_test = true;
 }
 
 TEST(FabricTest, nonFailureDeactivation)
@@ -587,7 +496,7 @@ TEST(FabricTest, nonFailureDeactivation)
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Unconfigured);
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Inactive);
 
-    join_all(end_test, test_thread, test_thread2, fault_handler_thread);
+    end_test = true;
 }
 
 int main(int argc, char** argv)

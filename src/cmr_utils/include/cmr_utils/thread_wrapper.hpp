@@ -21,6 +21,10 @@ class DeferredCreationPolicy
     {
     }
 
+    /**
+     * Starts the thread if it has not already started. Does nothing if the thread
+     * started
+     */
     void start()
     {
         if (!m_thread.has_value()) {
@@ -28,6 +32,7 @@ class DeferredCreationPolicy
         }
     }
 
+    /** @return true if the thread is running */
     bool is_running() const { return m_thread.has_value(); }
 
   protected:
@@ -85,6 +90,14 @@ class DetatchDestructionPolicy
 /**
  * @brief The ThreadWrapper provides RAII and other features for std::thread
  *
+ * In C++, if a thread is not joined or detached, it will terminate the program when
+ * the thread object is destroyed (ex. when it goes out of scope). This class
+ * provides a way to join, detach, or do something else when the thread is destroyed.
+ * It also allows the thread to be started at a later time, or not at all.
+ *
+ * The underlying design principle for this class is called [Policy Based
+ * Design](https://en.wikipedia.org/wiki/Policy-based_design).
+ *
  * @tparam DestructionPolicy a class which provides a static `destroy` method that
  * acceptes an `std::optional<std::thread>&` that will be called upon destruction
  * @tparam CreationPolicy a class which provides a protected `thread()` method which
@@ -107,6 +120,11 @@ class ThreadWrapper : public CreationPolicy
     ThreadWrapper(ThreadWrapper&&) noexcept = default;
     ThreadWrapper& operator=(ThreadWrapper&&) noexcept = default;
 
+    /**
+     * @brief Joins the thread if it is joinable
+     *
+     * Requires that the thread has been started
+     */
     inline void join()
     {
         CMR_ASSERT(this->thread().has_value());
@@ -115,18 +133,35 @@ class ThreadWrapper : public CreationPolicy
         }
     }
 
+    /**
+     * @brief Gets the thread id
+     *
+     * Requires that the thread has been started
+     */
     inline auto get_id() const
     {
         CMR_ASSERT(this->thread().has_value());
         return this->thread()->get_id();
     }
 
+    /**
+     * @brief Detaches the thread if it is joinable
+     *
+     * Requires that the thread has been started
+     */
     inline void detach()
     {
         CMR_ASSERT(this->thread().has_value());
-        this->thread()->detach();
+        if (this->thread()->joinable()) {
+            this->thread()->detach();
+        }
     }
 
+    /**
+     * @brief Joins the thread if it is joinable
+     *
+     * Requires that the thread has been started
+     */
     inline bool joinable() const
     {
         CMR_ASSERT(this->thread().has_value());

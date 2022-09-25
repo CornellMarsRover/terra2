@@ -1,8 +1,10 @@
 #include "cmr_arm/joystick_forward_kinematics.hpp"
 
-namespace cmr {
+namespace cmr
+{
 
-JoystickForwardKinematics::JoystickForwardKinematics(const std::optional<cmr::fabric::FabricNodeConfig>& config)
+JoystickForwardKinematics::JoystickForwardKinematics(
+    const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
 {
     // declare parameters here
@@ -39,4 +41,4 @@ bool JoystickForwardKinematics::cleanup()
     return true;
 }
 
-} // namespace cmr
+}  // namespace cmr

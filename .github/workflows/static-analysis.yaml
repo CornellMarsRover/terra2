@@ -8,12 +8,12 @@ jobs:
     container: ros:humble
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: "0"
 
       - name: Test diff
-        run: ls && git diff --name-only HEAD^
+        run: ls -a && git diff --name-only HEAD^
 
       - name: Get changed files
         id: changed-files

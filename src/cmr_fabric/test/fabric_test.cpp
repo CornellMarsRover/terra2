@@ -135,8 +135,7 @@ TEST(FabricTest, activateTest)
     constexpr auto test_namespace = "activate_test";
     constexpr auto node_name = "test_1a";
 
-    auto [fault_handler_thread, base, check] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_tuple = create_base_threads(end_test, test_namespace);
 
     auto test_thread = create_dependee(end_test, {node_name, test_namespace});
 
@@ -186,8 +185,7 @@ TEST(FabricTest, startDependency)
     constexpr auto node_name_a = "test_3a";
     constexpr auto node_name_b = "test_3b";
 
-    auto [fault_handler_thread, base, check] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_tuple = create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
 
     auto test_thread2 =
@@ -219,8 +217,7 @@ TEST(FabricTest, startDependencyChain)
      *        b
      */
 
-    auto [fault_handler_thread, base, check] =
-        create_base_threads(end_test, test_namespace);
+    auto fh_tuple = create_base_threads(end_test, test_namespace);
 
     auto test_thread_a = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread_b = create_dependee(end_test, {node_name_b, test_namespace});
@@ -283,8 +280,7 @@ TEST(FabricTest, killDependendent)
     constexpr auto node_name_a = "test_5a";
     constexpr auto node_name_b = "test_5b";
 
-    auto [fault_handler_thread, base, check] =
-        create_base_threads(end_test, test_namespace);
+    auto fh_tuple = create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
@@ -418,8 +414,7 @@ TEST(FabricTest, doubleDependency)
         c
     */
 
-    auto [fault_handler_thread, base, check] =
-        create_base_threads(end_test, test_namespace);
+    auto fault_handler_tuple = create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);
@@ -485,8 +480,7 @@ TEST(FabricTest, nonFailureDeactivation)
     constexpr auto node_name_a = "test_11a";
     constexpr auto node_name_b = "test_11b";
 
-    auto [fault_handler_thread, base, check] =
-        create_base_threads(end_test, test_namespace);
+    auto fh_tuple = create_base_threads(end_test, test_namespace);
     auto test_thread = create_dependee(end_test, {node_name_a, test_namespace});
     auto test_thread2 =
         create_depender(end_test, {node_name_b, test_namespace}, node_name_a);

@@ -36,4 +36,5 @@ jobs:
       - name: Static analysis
         id: analyze
         run: |
+          git diff --name-only HEAD~1
           bash scripts/check_wd.sh

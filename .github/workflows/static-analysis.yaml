@@ -10,7 +10,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 2
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v31
 
       - name: Get self packages
         id: get-self-packages
@@ -36,5 +40,4 @@ jobs:
       - name: Static analysis
         id: analyze
         run: |
-          git diff --name-only HEAD~1
-          bash scripts/check_wd.sh
+          bash scripts/check_wd.sh ${{ steps.changed-files.outputs.all_changed_files }}

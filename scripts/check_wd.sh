@@ -10,7 +10,17 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo "Formatting done"
-changed_files=$(git diff --name-only HEAD~1 | grep -e ".*cpp" -e ".*inl" | grep -v -e "*/external/*")
+if [[ "$@" = "" ]]; then
+    changed_files=$(git diff --name-only HEAD~1 | grep -e ".*cpp" -e ".*inl" | grep -v -e "*/external/*")
+else
+    changed_files="$@"
+fi
+if [[ "$changed_files" = "" ]]; then
+    echo "No files to check"
+    exit 0
+else
+    echo "Checking files: $changed_files"
+fi
 time clang-tidy -p build/compile_commands.json --config-file=.clang-tidy \
   --header-filter="^cmr_.*pp$" $changed_files
 if [ $? -ne 0 ]; then

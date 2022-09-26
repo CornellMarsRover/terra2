@@ -7,10 +7,10 @@ jobs:
     runs-on: self-hosted
     container: ros:humble
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
+        run: git fetch --depth 2
 
       - name: Get changed files
         id: changed-files

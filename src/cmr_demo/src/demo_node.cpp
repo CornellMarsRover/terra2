@@ -24,6 +24,7 @@ bool DemoNode::configure(const std::shared_ptr<toml::Table>& table)
     m_sub = create_subscription<std_msgs::msg::Bool>(
         get_name() + std::string("/kill"), 10,
         [this](const std_msgs::msg::Bool::SharedPtr msg) {
+            // NOLINTNEXTLINE(bugprone-lambda-function-name)
             CMR_RETRY_ON_ERR(RCLCPP_INFO(get_logger(), "Got kill message: %s",
                                          msg->data ? "true" : "false");
                              CMR_ASSERT_MSG(false, "Killed by kill message");)

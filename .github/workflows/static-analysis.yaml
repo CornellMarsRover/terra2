@@ -13,7 +13,7 @@ jobs:
           fetch-depth: "0"
 
       - name: Test diff
-        run: ls -a && git diff --name-only HEAD^
+        run: ls -R .git
 
       - name: Get changed files
         id: changed-files

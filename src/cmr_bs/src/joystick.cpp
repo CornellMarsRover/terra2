@@ -1,6 +1,7 @@
 #include "cmr_bs/joystick.hpp"
 
-namespace cmr {
+namespace cmr
+{
 
 Joystick::Joystick(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
@@ -39,4 +40,4 @@ bool Joystick::cleanup()
     return true;
 }
 
-} // namespace cmr
+}  // namespace cmr

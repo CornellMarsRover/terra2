@@ -1,7 +1,8 @@
 #pragma once
 #include "cmr_fabric/fabric_node.hpp"
 
-namespace cmr {
+namespace cmr
+{
 
 /**
  * `Joystick`
@@ -15,8 +16,8 @@ class Joystick : public cmr::fabric::FabricNode
      * Constructs a `Joystick`, optionally passing in config parameters for
      * testing.
      *
-     * @param config the configuration struct for starting the node or an empty optional
-     * to start the node from a launch file or via ROS
+     * @param config the configuration struct for starting the node or an empty
+     * optional to start the node from a launch file or via ROS
      */
     explicit Joystick(
         const std::optional<cmr::fabric::FabricNodeConfig>& config = std::nullopt);
@@ -31,4 +32,4 @@ class Joystick : public cmr::fabric::FabricNode
     bool cleanup() override;
 };
 
-} // namespace cmr
+}  // namespace cmr

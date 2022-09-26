@@ -1,6 +1,6 @@
 name: Static Analysis
 on:
-  push:
+  pull_request:
   workflow_dispatch:
 jobs:
   lint:
@@ -10,11 +10,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: "0"
-
-      - name: Test diff
-        run: |
-          cat .git/HEAD && ls -R .git
+          fetch-depth: 2
 
       - name: Config git
         run: |

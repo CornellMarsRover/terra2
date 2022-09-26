@@ -11,9 +11,9 @@ if [ $? -ne 0 ]; then
 fi
 echo "Formatting done"
 if [[ "$@" = "" ]]; then
-    changed_files=$(git diff --name-only HEAD~1 | grep -e ".*cpp" -e ".*inl" | grep -v -e "*/external/*")
+    changed_files=$(git diff --name-only HEAD~1 | grep -e ".*cpp" -e ".*inl" | grep -v -e ".*/external/.*")
 else
-    changed_files=$(echo "$@" | grep -e "*.cpp" -e "*.inl" -e "*.hpp" | grep -v -e "*/external/*")
+    changed_files=$(echo "$@" | tr ' ' '\n' | grep -e ".hpp$" -e ".cpp$" -e ".inl$" | grep -v -e ".*/external/.*")
 fi
 if [[ "$changed_files" = "" ]]; then
     echo "No files to check"

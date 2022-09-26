@@ -46,4 +46,4 @@ jobs:
       - name: Static analysis
         id: analyze
         run: |
-          bash scripts/check_wd.sh ${{ steps.changed-files.outputs.all_changed_files }}
+          bash scripts/check_wd.sh "${{ steps.changed-files.outputs.all_changed_files }}"

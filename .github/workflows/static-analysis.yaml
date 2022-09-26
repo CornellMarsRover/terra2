@@ -16,6 +16,15 @@ jobs:
         run: |
           cat .git/HEAD && ls -R .git
 
+      - name: Test git
+        run: |
+          git --version
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          git status
+          git tag
+          git describe
+
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v31

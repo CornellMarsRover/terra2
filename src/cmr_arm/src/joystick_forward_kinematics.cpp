@@ -10,11 +10,12 @@ JoystickForwardKinematics::JoystickForwardKinematics(
     // declare parameters here
 }
 
-bool JoystickForwardKinematics::configure(const std::shared_ptr<toml::Table>&)
+bool JoystickForwardKinematics::configure(const std::shared_ptr<toml::Table>& table)
 {
     // read node config; setup subscriptions, clients, services, etc.; and
     // most of the node setup logic here
-
+    const auto node_settings = table->getTable("node");
+    const auto [ok, test] = node_settings->getString("test");
     // Ex. const auto node_settings = table->getTable("node");
     return true;
 }

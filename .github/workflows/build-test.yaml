@@ -6,7 +6,7 @@ on:
     # 4:30 AM EST every sunday and wednesday
     - cron: "30 8 * * 0,3"
 jobs:
-  build:
+  test:
     runs-on: self-hosted
     container: ros:humble
     steps:
@@ -25,20 +25,6 @@ jobs:
         with:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
-
-  test:
-    needs: build
-    runs-on: self-hosted
-    container: ros:humble
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Get self packages
-        id: get-self-packages
-        uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
 
       - name: Test
         id: test

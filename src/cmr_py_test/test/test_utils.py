@@ -1,4 +1,3 @@
-from itertools import chain
 import rclpy as ros
 from launch_ros.actions import Node as LaunchNode
 from launch import LaunchDescription, LaunchService
@@ -6,17 +5,34 @@ import launch
 import launch.event_handler
 from rclpy.node import Node as RclpyNode
 import os
-import toml
-import threading as thread
 from cmr_msgs.srv import ActivateNode, DeactivateNode
 from lifecycle_msgs.srv import GetState
 from datetime import datetime
 import signal
-import multiprocessing as mp
+import toml
+from ament_index_python.packages import get_package_share_directory
+
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
-def run_launch_file(package: str, launch_file: str):
-    os.system(f"ros2 launch {package} {launch_file}")
+def make_launch_file(package: str, launch_file: str, **kwargs):
+    """
+    Creates a LaunchDescription for a launch file to be run by the NodeLauncher
+    This will essentially launch all the nodes of the launch file
+
+    Args:
+        package (str): The name of the package the launch file is in
+        launch_file (str): The name of the launch file
+        **kwargs: Any extra arguments to pass to the launch file
+    """
+
+    pkg_dir = get_package_share_directory(package)
+
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(pkg_dir, "launch", launch_file)),
+        **kwargs,
+    )
 
 
 def make_fabric_node(
@@ -29,7 +45,7 @@ def make_fabric_node(
     extra_parameters: dict = dict(),
 ) -> LaunchNode:
     """
-    Creates a fabric node with the given parameters
+    Creates a fabric node that can be launched by the NodeLauncher with the given parameters
 
     Args:
         package (str): The package name to find the node executable in.
@@ -70,6 +86,27 @@ def make_fabric_node(
     )
 
 
+def config_fabric_nodes(*node_configs: str) -> list:
+    """
+    Constructs multiple fabric node launch descriptions from toml files or
+    toml strings ONLY
+
+    Args:
+        *node_configs (str): The paths to the toml files or the toml strings
+    Returns:
+        A list of launch descriptions for the nodes
+    See Also:
+        make_fabric_node
+    """
+    nodes = []
+    for node in node_configs:
+        if os.path.isfile(node):
+            nodes.append(make_fabric_node(config_path=node))
+        else:
+            nodes.append(make_fabric_node(config_string=node))
+    return nodes
+
+
 def make_node(
     node_name: str,
     package_name: str,
@@ -79,7 +116,7 @@ def make_node(
     **kwargs,
 ) -> LaunchNode:
     """
-    Creates a node with the given parameters
+    Creates a node that can be launched by the NodeLauncher with the given parameters
 
     Args:
         node_name (str): The name of the node
@@ -111,37 +148,56 @@ class NodeLauncher:
     def __init__(self):
         self.child_pid = 0
 
-    def __enter__(self):
+    def startup(self):
+        """
+        Initializes the test namespace and node list
+
+        Must be called before `launch_nodes`
+        """
+
         self.namespace = f"rover_py_test_{int(datetime.utcnow().timestamp() * 1000)}"
-        # self.executor.add_node(
         self.nodes = [
             LaunchNode(
                 package="cmr_fabric",
                 executable="fault_handler",
                 namespace=self.namespace,
+                on_exit=launch.actions.EmitEvent(event=launch.events.Shutdown()),
             ),
             LaunchNode(
                 package="cmr_fabric",
                 executable="lifecycle_manager",
                 namespace=self.namespace,
+                on_exit=launch.actions.EmitEvent(event=launch.events.Shutdown()),
             ),
         ]
 
+    def __enter__(self):
+        self.startup()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        ros.shutdown()
+    def cleanup(self):
+        """
+        Cleans up the launch service
+
+        Must be called after `launch_nodes`
+        """
+
         if self.child_pid != 0:
-            os.kill(self.child_pid, signal.SIGTERM)
-            print("Shutting down pytest")
+            os.kill(self.child_pid, signal.SIGINT)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.cleanup()
 
     def get_namespace(self):
         return self.namespace
 
-    def launch_nodes(self, *nodes: LaunchNode):
+    def launch_nodes(self, *nodes):
         """
         Launches the given nodes in a new thread under the generated namespace
         This method must only be called ONCE per test
+
+        Args:
+            *nodes: The nodes, launch files, etc. to launch
         """
 
         for node in nodes:
@@ -150,10 +206,9 @@ class NodeLauncher:
         ld = LaunchDescription(self.nodes)
         ld.add_action(
             launch.actions.RegisterEventHandler(
-                launch.event_handlers.OnShutdown(
-                    on_shutdown=[
-                        launch.actions.EmitEvent(event=launch.events.Shutdown())
-                    ],
+                launch.event_handlers.OnProcessExit(
+                    target_action=self.nodes[1],
+                    on_exit=[launch.actions.EmitEvent(event=launch.events.Shutdown())],
                 )
             )
         )
@@ -165,33 +220,47 @@ class NodeLauncher:
 
             def sig_handler(signum, frame):
                 print("Shutting down launch")
-                for child in mp.active_children():
-                    print(f"Shutting down child {child.pid}")
-                    child.terminate()
-                ls.shutdown()
                 print("Called shutdown on launch service")
+                ls.shutdown()
 
-            signal.signal(signal.SIGTERM, sig_handler)
+            signal.signal(signal.SIGINT, sig_handler)
             ls.run()
+            # Run blocks and needs to run on the main thread
+            # so we fork and run it in the child process
             print("Launch finished")
             os._exit(0)
         else:
             self.child_pid = pid
 
 
-def cmr_node_test(test_func):
+def cmr_node_test(nodes: list):
     """
     A decorator that should be used for all CMR node tests
     The decorated test should take a single argument, which is the node launcher to
     start all necessary nodes
+
+    Args:
+        nodes (list): A list of nodes to launch
+
+    Example:
+    ```
+        @cmr_node_test([make_fabric_node(config_string=static_config)])
+        def test_demo_node(namespace: str):
+            assert get_lifecycle_state("py_test_demo") == "unconfigured"
+            activate_fabric_node("py_test_demo", namespace)
+            assert get_lifecycle_state("py_test_demo") == "active"
+    ```
     """
 
-    def wrapper():
-        ros.init()
-        with NodeLauncher() as launcher:
-            test_func(launcher)
+    def decorator(test_func):
+        def wrapper(*args, **kwargs):
+            with NodeLauncher() as launcher:
+                launcher.launch_nodes(*nodes)
+                test_func(*args, namespace=launcher.get_namespace(), **kwargs)
 
-    return wrapper
+        return wrapper
+
+    return decorator
 
 
 def call_service_sync(service_type: type, service_name: str, request, timeout_sec=5.0):
@@ -233,21 +302,27 @@ def call_service_sync(service_type: type, service_name: str, request, timeout_se
         raise Exception(f"Service {service_name} not available")
 
 
-def change_fabric_node_lifecycle(node_name: str, srv_type: type, namespace: str):
+def change_fabric_node_lifecycle(
+    node_name: str, srv_type: type, namespace: str, cleanup: bool = False
+):
     """
     Activates or deactivates a fabric node via the lifecycle manager
 
     Args:
         node_name (str): The name of the node to activate/deactivate
         srv_type (type): The type of service to use. Either ActivateNode or DeactivateNode
+        namespace (str): The namespace of the lifecycle manager
+        cleanup (bool): If true and deactivation, the node will be cleaned up
     Returns:
         the response of the specified service
     """
-    service_name = (
-        f"/{namespace}/lifecycle/activate"
-        if srv_type == ActivateNode
-        else f"/{namespace}/lifecycle/deactivate"
-    )
+    service_name = ""
+    if srv_type == ActivateNode:
+        service_name = f"/{namespace}/lifecycle/activate"
+    elif cleanup:
+        service_name = f"/{namespace}/lifecycle/cleanup"
+    else:
+        service_name = f"/{namespace}/lifecycle/deactivate"
     request = srv_type.Request()
     request.node_name = node_name
     return call_service_sync(srv_type, service_name, request)
@@ -279,6 +354,38 @@ def deactivate_fabric_node(node_name: str, namespace: str):
     return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace)
 
 
+def cleanup_fabric_node(node_name: str, namespace: str):
+    """
+    Cleans up a fabric node via the lifecycle manager
+
+    Args:
+        node_name (str): The name of the node to cleanup
+        namespace (str): The namespace of the node
+    Returns:
+        the response of the CleanupNode service
+    """
+    return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace, True)
+
+
+def reconfigure_fabric_node(node_name: str, namespace: str):
+    """
+    Reconfigures a fabric node via the lifecycle manager by cleaning it up
+    and activating it.
+
+    Reconfiguring a node allows it to reread its toml configuration file
+
+    Args:
+        node_name (str): The name of the node to reconfigure
+        namespace (str): The namespace of the node
+    Returns:
+        the response of the ReconfigureNode service
+    """
+    return (
+        cleanup_fabric_node(node_name, namespace).success
+        and activate_fabric_node(node_name, namespace).success
+    )
+
+
 def get_lifecycle_state(node_name) -> str:
     """
     Gets the current lifecycle state of a node
@@ -286,8 +393,49 @@ def get_lifecycle_state(node_name) -> str:
     Args:
         node_name (str): The name of the node to get the state of
     Returns:
-        the current lifecycle state of the node
+        the current lifecycle state string of the node
     """
     return call_service_sync(
         GetState, f"/{node_name}/get_state", GetState.Request()
     ).current_state.label
+
+
+def setup_module():
+    """
+    Setup module for all tests in this module
+    """
+    ros.init()
+
+
+def teardown_module():
+    """
+    Teardown module for all tests in this module
+    """
+    ros.shutdown()
+
+
+class CMRTestFixture:
+    """
+    A base class for CMR node tests that use the same nodes for all tests
+    This class will start the nodes once for all tests in the class
+    To use this, set the `nodes` class variable to a list of nodes to start
+    """
+
+    nodes = []
+    launcher = NodeLauncher()
+
+    @classmethod
+    def get_namespace(cls):
+        """
+        Gets the namespace of the nodes launcher
+        """
+        return cls.launcher.get_namespace()
+
+    @classmethod
+    def setup_class(cls):
+        cls.launcher.startup()
+        cls.launcher.launch_nodes(*cls.nodes)
+
+    @classmethod
+    def teardown_class(cls):
+        cls.launcher.cleanup()

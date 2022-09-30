@@ -3,27 +3,27 @@ from std_msgs.msg._string import String
 from cmr_msgs.action._test_target_position import TestTargetPosition as TargetPosition
 import threading
 
-# static_config = """
-# package = "cmr_demo"
-# executable = "demo_node"
-# name = "py_test_demo"
-# dependencies = []
+static_config = """
+package = "cmr_demo"
+executable = "demo_node"
+name = "py_test_demo"
+dependencies = []
 
-# [fault_handling]
-# restart_attempts = 2
-# restart_delay = 10
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
 
-# [node]
-# test="Hi"
-# """
+[node]
+test="Hi"
+"""
 
-# # Test functions should be decorated with @cmr_node_test
-# # and should accept the test namespace as an argument
-# @cmr_node_test([make_fabric_node(config_string=static_config)])
-# def test_demo_node(namespace: str):
-#     assert get_lifecycle_state("py_test_demo") == "unconfigured"
-#     activate_fabric_node("py_test_demo", namespace)
-#     assert get_lifecycle_state("py_test_demo") == "active"
+# Test functions should be decorated with @cmr_node_test
+# and should accept the test namespace as an argument
+@cmr_node_test([make_fabric_node(config_string=static_config)])
+def test_demo_node(namespace: str):
+    assert get_lifecycle_state("py_test_demo") == "unconfigured"
+    activate_fabric_node("py_test_demo", namespace)
+    assert get_lifecycle_state("py_test_demo") == "active"
 
 
 # @cmr_node_test([make_node("utils_test_node", "cmr_py_test", "utils_test_node", "test")])

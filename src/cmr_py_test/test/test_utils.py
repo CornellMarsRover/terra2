@@ -1,3 +1,84 @@
+"""
+Node Testing Utility Framework
+
+Launch Elements:
+    What I'm calling launch elements are the things that can be made part of a 
+    launch description such as nodes and launch files. Launch elements are passed
+    to the `nodes` class variable in the `CMRTestFixture` class or as arguments to
+    the `cmr_node_test` decorator. The test framework will then start the specified
+    launch elements before running the test.
+
+    Some ways of creating launch elements:
+    - `make_node`
+    - `make_launch_file`
+    - `make_fabric_node`
+    - `config_fabric_nodes`
+
+Writing Tests:
+    Tests should be written as normal pytest tests. The only difference is that
+    you should decorate your test functions with `@cmr_node_test` and pass in the
+    launch elements you want to start to the decorator. Your test function should
+    also accept a namespace string argument. You may also use 
+    a test fixutre class by subtyping `CMRTestFixture` and setting the 
+    `CMRTestFixutre.nodes` class variable to a list of launch elements.
+
+    See the examples in the documentation of `cmr_node_test` and `CMRTestFixture`
+    for examples.
+
+    Test functions are good for tests that use a unique set of launch elements.
+    If you have multiple tests using the same launch elements, you should use a 
+    test fixutr class. This will be more efficient by avoiding cleaning up and
+    setting up the same launch elements every test.
+
+    The pytest hooks `setup_module` and `teardown_module` are defined here to start
+    and stop ros for the entire test file.
+
+Clients:
+    The test framework provides some functions for working with ROS topics a little easier.
+    All the clients are based on a synchronous model and each start up their own node
+
+    They include:
+    - `publish_to_topic`
+    - `service_call_sync`
+
+Listeners:
+    We provide some classes to help listening to topics, services, etc.
+    They are based on a synchronous model and each start up their own node.
+    The general day-to-day usage would be something like creating a listener, 
+    invoking some action on a node by calling a service or publishing to a topic,
+    and then waiting for the listener to receive the expected message.
+
+    Listeners generally have a `wait_msg()` function that will block until a message
+    or specified amount of messages are received. Some listeners can be passed a 
+    callback function in their constructor in order to control the behavior when
+    a message is received.
+
+    They include:
+    - `TopicSubscriber`
+    - `ServiceListener`
+
+Fabric Helpers:
+    We provide some functions to help with working with fabric nodes. These are
+    generally service calls built on top of `service_call_sync`.
+    Every test will, by default, always start a `fault_handler` and `lifecycle_manager`
+    for fabric nodes. The latter of which is used to handle the lifecycle managerment
+    requests from this test.
+
+    They include:
+    - `activate_fabric_node`
+    - `deactivate_fabric_node`
+    - `reconfigure_fabric_node`
+    - `cleanup_fabric_node`
+    - `get_lifecycle_state`
+
+Misceallenous Helpers:
+    We provide some other functions that can be useful for testing.
+
+    They include:
+    - `is_debugger_attached`
+    - `wait_for_debugger`
+
+"""
 import rclpy as ros
 from launch_ros.actions import Node as LaunchNode
 from launch import LaunchDescription, LaunchService
@@ -483,6 +564,34 @@ class CMRTestFixture:
     To use this, set the `nodes` class variable to a list of nodes to start
 
     All tests will wait for the node processes to start before running
+
+    Example:
+    ```
+        # node_config = "... <toml config> ..."
+        class TestDemoDependencies(CMRTestFixture):
+            CMRTestFixture.nodes = config_fabric_nodes(
+                node_config.format("py_test_demo_1", ""),
+                node_config.format("py_test_demo_2", '"py_test_demo_1"'),
+            )
+
+            def test_demo_activation(self):
+                node_name = "py_test_demo_2"
+                activate_fabric_node(node_name, CMRTestFixture.get_namespace())
+                assert get_lifecycle_state(node_name) == "active"
+                assert get_lifecycle_state("py_test_demo_1") == "active"
+
+            def test_depender_deactivate(self):
+                activate_fabric_node("py_test_demo_2", CMRTestFixture.get_namespace())
+                deactivate_fabric_node("py_test_demo_2", CMRTestFixture.get_namespace())
+                assert get_lifecycle_state("py_test_demo_2") == "inactive"
+                assert get_lifecycle_state("py_test_demo_1") == "inactive"
+
+            def test_dependee_deactivate(self):
+                activate_fabric_node("py_test_demo_2", CMRTestFixture.get_namespace())
+                deactivate_fabric_node("py_test_demo_1", CMRTestFixture.get_namespace())
+                assert get_lifecycle_state("py_test_demo_2") == "inactive"
+                assert get_lifecycle_state("py_test_demo_1") == "inactive"
+    ```
     """
 
     nodes = []
@@ -569,6 +678,21 @@ def publish_to_topic(topic_type: type, topic: str, msg):
 class TopicSubscriber:
     """
     A class for listening to a topic
+    Freeing the topic listener with `del` or using `with` is technically optional,
+    as the garbage collector will do this if you don't.
+
+    Example:
+    ```
+        subber = TopicSubscriber(String, "/test/utils_test_node/test_out")
+        publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
+        assert subber.wait_for_msg().data == "Hi"
+    ```
+        Or using `with`:
+    ```
+        with TopicSubscriber(String, "/test/utils_test_node/test_out") as subber:
+            publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
+            assert subber.wait_for_msg().data == "Hi"
+    ```
     """
 
     def __init__(self, msg_type: type, topic: str):
@@ -623,7 +747,22 @@ class TopicSubscriber:
 
 class ServiceListener:
     """
-    A class for listening to service calls
+    A class for waiting for service calls.
+    Freeing the service listener with `del` or using `with` is technically optional,
+    as the garbage collector will do this if you don't.
+
+    Example:
+    ```
+        def cb(req, resp):
+            resp.success = True
+            resp.message = "Starting"
+            return resp
+
+        print("Waiting for trigger")
+        with ServiceListener(Trigger, f"/{namespace}/wait", cb) as serv:
+            serv.wait_for_msg()
+        print("Trigger received, we can start!")
+    ```
     """
 
     def __init__(self, srv_type: type, service: str, callback):

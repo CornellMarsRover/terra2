@@ -736,7 +736,7 @@ class TopicSubscriber:
         """
         self.results = []
 
-    def wait_for_msg(self, timeout_sec=None, async_nodes=[]):
+    def wait_for_msg(self, timeout_sec=5.0, async_nodes=[]):
         """
         Waits for a message to be received on the topic and returns that message
         Will return immediately if a message has already been received
@@ -812,7 +812,7 @@ class __ServiceActionListener:
     def __enter__(self):
         return self
 
-    def wait_for_msg(self, wait_pred=1, timeout_sec=None, async_nodes=[]):
+    def wait_for_msg(self, wait_pred=1, timeout_sec=5.0, async_nodes=[]):
         """
         Waits for a new message to be received
 
@@ -917,7 +917,7 @@ class ActionListener(__ServiceActionListener):
 
 
 def send_action_goal_sync(
-    action_type: type, action_name: str, goal, feedback_cb=None, timeout_sec=None
+    action_type: type, action_name: str, goal, feedback_cb=None, timeout_sec=5.0
 ):
     """
     Sends a goal to an action server. Wait until the goal is finished and

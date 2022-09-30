@@ -39,7 +39,8 @@ Clients:
 
     They include:
     - `publish_to_topic`
-    - `service_call_sync`
+    - `call_service_sync`
+    - `send_action_goal_sync`
 
 Listeners:
     We provide some classes to help listening to topics, services, etc.
@@ -56,10 +57,11 @@ Listeners:
     They include:
     - `TopicSubscriber`
     - `ServiceListener`
+    - `ActionListener`
 
 Fabric Helpers:
     We provide some functions to help with working with fabric nodes. These are
-    generally service calls built on top of `service_call_sync`.
+    generally service calls built on top of `call_service_sync`.
     Every test will, by default, always start a `fault_handler` and `lifecycle_manager`
     for fabric nodes. The latter of which is used to handle the lifecycle managerment
     requests from this test.
@@ -79,6 +81,7 @@ Misceallenous Helpers:
     - `wait_for_debugger`
 
 """
+from typing import Callable
 import rclpy as ros
 from launch_ros.actions import Node as LaunchNode
 from launch import LaunchDescription, LaunchService
@@ -100,6 +103,7 @@ from std_srvs.srv._trigger import Trigger
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import time
+import rclpy.action as action
 
 
 def make_launch_file(package: str, launch_file: str, **kwargs):
@@ -408,6 +412,9 @@ def call_service_sync(service_type: type, service_name: str, request, timeout_se
     """
     Calls a service synchronously, blocking the calling thread until the service returns
 
+    IMPORTANT: If the service you call waits for an action or calls a service that you are listening to,
+    this will deadlock. To avoid, run this function in a new thread
+
     Args:
         service_type (type): The type of the service
         service_name (str): The name of the service
@@ -554,7 +561,7 @@ def teardown_module():
     """
     Teardown module for all tests in this module
     """
-    ros.shutdown()
+    # ros.shutdown()
 
 
 class CMRTestFixture:
@@ -745,7 +752,93 @@ class TopicSubscriber:
         return self.results.pop(0) if len(self.results) > 0 else None
 
 
-class ServiceListener:
+class __ServiceActionListener:
+    """
+    Internal class for listening to a service or action
+    """
+
+    def __init__(self, srv_type: type, name: str, callback: Callable, service: bool):
+        """
+        Constructs a new ServiceListener that listens for messages of type `srv_type`
+        on the service `service`
+
+        Args:
+            srv_type (type): The type of the service
+            service (str): The name of the service
+            callback (function): The callback to call when a service request is received
+                Accepts the request and response as arguments and should update the response
+                parameter and return the response
+            service (bool): True if this is a service, False if this is an action
+        """
+        type_str = "service" if service else "action"
+        self.node = RclpyNode(
+            f"cmr_py_{type_str}_listener_{int(datetime.utcnow().timestamp() * 1000)}"
+        )
+        self.request_count = 0
+        self.destroyed = False
+        if service:
+            self.sub = self.node.create_service(srv_type, name, self._srv_callback)
+        else:
+            self.sub = action.ActionServer(
+                self.node, srv_type, name, self._act_callback
+            )
+        self.cb = callback
+
+    def _srv_callback(self, request, response):
+        self.request_count += 1
+        return self.cb(request, response)
+
+    def _act_callback(self, goal_handle):
+        self.request_count += 1
+        return self.cb(goal_handle)
+
+    def __del__(self):
+        if not self.destroyed:
+            self.node.destroy_node()
+            self.destroyed = True
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if not self.destroyed:
+            self.node.destroy_node()
+            self.destroyed = True
+
+    def __enter__(self):
+        return self
+
+    def wait_for_msg(self, wait_pred=1, timeout_sec=None, async_nodes=[]):
+        """
+        Waits for a message to be received
+
+        Args:
+            wait_pred (int or callable): The number of requests to wait for or a function
+                that returns True when we can stop waiting
+            timeout_sec (float or None): The number of seconds to wait for a message
+                If None, waits forever
+            async_nodes (list of RclpyNode): A list of nodes to spin while waiting
+        Returns:
+            True if the predicate is true, False if the timeout is reached
+        """
+
+        self.request_count = 0
+
+        def can_stop_waiting():
+            if isinstance(wait_pred, int):
+                return self.request_count >= wait_pred
+            elif callable(wait_pred):
+                return wait_pred()
+
+        start_time = datetime.now()
+        while (not can_stop_waiting()) and (
+            timeout_sec is None
+            or (datetime.now() - start_time).total_seconds() < timeout_sec
+        ):
+            ros.spin_once(self.node)
+            for node in async_nodes:
+                ros.spin_once(node)
+        return can_stop_waiting()
+
+
+class ServiceListener(__ServiceActionListener):
     """
     A class for waiting for service calls.
     Freeing the service listener with `del` or using `with` is technically optional,
@@ -777,59 +870,72 @@ class ServiceListener:
                 Accepts the request and response as arguments and should update the response
                 parameter and return the response
         """
-        self.node = RclpyNode(
-            f"cmr_py_topic_subscriber_{int(datetime.utcnow().timestamp() * 1000)}"
-        )
-        self.request_count = 0
-        self.destroyed = False
-        self.sub = self.node.create_service(srv_type, service, self._callback)
-        self.cb = callback
+        super().__init__(srv_type, service, callback, True)
 
-    def _callback(self, request, response):
-        self.request_count += 1
-        return self.cb(request, response)
 
-    def __del__(self):
-        if not self.destroyed:
-            self.node.destroy_node()
-            self.destroyed = True
+class ActionListener(__ServiceActionListener):
+    """
+    A class for waiting for action goals.
+    Freeing the service listener with `del` or using `with` is technically optional,
+    as the garbage collector will do this if you don't.
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        if not self.destroyed:
-            self.node.destroy_node()
-            self.destroyed = True
+    Example:
+    ```
+        def cb(req, resp):
+            resp.success = True
+            resp.message = "Starting"
+            return resp
 
-    def __enter__(self):
-        return self
+        print("Waiting for trigger")
+        with ServiceListener(Trigger, f"/{namespace}/wait", cb) as serv:
+            serv.wait_for_msg()
+        print("Trigger received, we can start!")
+    ```
+    """
 
-    def wait_for_msg(self, wait_pred=1, timeout_sec=None, async_nodes=[]):
+    def __init__(self, action_type: type, act: str, callback):
         """
-        Waits for a message to be received on the service
+        Constructs a new ActionServer that listens for messages of type `srv_type`
+        on the service `service`
 
         Args:
-            wait_pred (int or callable): The number of requests to wait for or a function
-                that returns True when we can stop waiting
-            timeout_sec (float or None): The number of seconds to wait for a message
-                If None, waits forever
-            async_nodes (list of RclpyNode): A list of nodes to spin while waiting
-        Returns:
-            True if the message was received, False if the timeout is reached
+            action_type (type): The type of the action
+            act (str): The name of the action
+            callback (function): The callback to call when a action goal is received
+                Accepts the goal_handle as an arguments and should return a result to
+                send back. The goal_handle can be used to publish feedback.
+                [See more info here](https://docs.ros.org/en/eloquent/Tutorials/Actions/Writing-a-Py-Action-Server-Client.html)
         """
+        super().__init__(action_type, act, callback, False)
 
-        self.request_count = 0
 
-        def can_stop_waiting():
-            if isinstance(wait_pred, int):
-                return self.request_count >= wait_pred
-            elif callable(wait_pred):
-                return wait_pred()
+def send_action_goal_sync(
+    action_type: type, action_name: str, goal, feedback_cb=None, timeout_sec=None
+):
+    """
+    Sends a goal to an action server. Wait until the goal is finished and
+    we receive a response
 
-        start_time = datetime.now()
-        while (not can_stop_waiting()) and (
-            timeout_sec is None
-            or (datetime.now() - start_time).total_seconds() < timeout_sec
-        ):
-            ros.spin_once(self.node)
-            for node in async_nodes:
-                ros.spin_once(node)
-        return can_stop_waiting()
+    IMPORTANT: If the action server you request waits for an action or
+    calls a service that you are listening to, this will deadlock.
+    To avoid, run this function in a new thread
+
+    Args:
+        action_type (type): The type of the action
+        act (str): The name of the action
+        goal (action_type.Goal): The goal to send
+        feedback_cb (function): A callback to call when feedback is received or `None`
+        timeout_sec (float or None): The number of seconds to wait for a message
+            If None, waits forever
+    Returns:
+        The result of the action or `None` if the timeout is reached or no result was set
+    """
+    node = RclpyNode(
+        f"cmr_py_action_client_{int(datetime.utcnow().timestamp() * 1000)}"
+    )
+    client = action.ActionClient(node, action_type, action_name)
+    future = client.send_goal_async(goal, feedback_cb)
+    node.get_logger().info(f"Sent goal to {action_name}, waiting for result")
+    ros.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
+    node.get_logger().info(f"Got result from {action_name}")
+    return future.result() if future.done() else None

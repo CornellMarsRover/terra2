@@ -1,6 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg._string import String
+import rclpy.action as action
+from cmr_msgs.action._test_target_position import TestTargetPosition
 
 
 class PassthroughNode(Node):
@@ -22,10 +24,30 @@ class PassthroughNode(Node):
         self.get_logger().info(
             f"Publishing on {self.get_namespace()}/{self.get_name()}/test_out"
         )
+        # self.get_logger().info(
+        #     f"Starting action server on {self.get_namespace()}/{self.get_name()}/test_action"
+        # )
+        # self.server = action.ActionServer(
+        #     self,
+        #     TestTargetPosition,
+        #     f"{self.get_namespace()}/{self.get_name()}/test_action",
+        #     self._action_server_callback,
+        # )
+        # self.client = action.ActionClient(
+        #     self,
+        #     TestTargetPosition,
+        #     f"{self.get_namespace()}/{self.get_name()}/test_return",
+        # )
 
     def _topic_callback(self, msg: String):
         self.get_logger().info(f"Received message: '{msg.data}'")
         self.pub.publish(msg)
+
+    def _action_server_callback(self, goal_handle: action.server.ServerGoalHandle):
+        self.get_logger().info("Received goal")
+        self.client.send_goal_async(goal_handle.request)
+        goal_handle.succeed()
+        return TestTargetPosition.Result(success=True)
 
 
 def main():

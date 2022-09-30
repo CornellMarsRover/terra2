@@ -1,8 +1,7 @@
 import rclpy as ros
 from launch_ros.actions import Node as LaunchNode
 from launch import LaunchDescription, LaunchService
-import launch
-import launch.event_handler
+from subprocess import check_output
 from rclpy.node import Node as RclpyNode
 import os
 from cmr_msgs.srv import ActivateNode, DeactivateNode
@@ -14,6 +13,7 @@ from ament_index_python.packages import get_package_share_directory
 
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+import time
 
 
 def make_launch_file(package: str, launch_file: str, **kwargs):
@@ -161,13 +161,11 @@ class NodeLauncher:
                 package="cmr_fabric",
                 executable="fault_handler",
                 namespace=self.namespace,
-                on_exit=launch.actions.EmitEvent(event=launch.events.Shutdown()),
             ),
             LaunchNode(
                 package="cmr_fabric",
                 executable="lifecycle_manager",
                 namespace=self.namespace,
-                on_exit=launch.actions.EmitEvent(event=launch.events.Shutdown()),
             ),
         ]
 
@@ -204,14 +202,14 @@ class NodeLauncher:
             node.namespace = self.namespace
             self.nodes.append(node)
         ld = LaunchDescription(self.nodes)
-        ld.add_action(
-            launch.actions.RegisterEventHandler(
-                launch.event_handlers.OnProcessExit(
-                    target_action=self.nodes[1],
-                    on_exit=[launch.actions.EmitEvent(event=launch.events.Shutdown())],
-                )
-            )
-        )
+        # ld.add_action(
+        #     launch.actions.RegisterEventHandler(
+        #         launch.event_handlers.OnProcessExit(
+        #             target_action=self.nodes[1],
+        #             on_exit=[launch.actions.EmitEvent(event=launch.events.Shutdown())],
+        #         )
+        #     )
+        # )
         ls = LaunchService()
         ls.include_launch_description(ld)
         pid = os.fork()
@@ -221,6 +219,13 @@ class NodeLauncher:
             def sig_handler(signum, frame):
                 print("Shutting down launch")
                 print("Called shutdown on launch service")
+                for node in self.nodes:
+                    node_pid = node.process_details["pid"]
+                    try:
+                        os.kill(node_pid, signal.SIGINT)
+                    except ProcessLookupError:
+                        print(f"WARNING: Process {node_pid} already dead")
+                        pass
                 ls.shutdown()
 
             signal.signal(signal.SIGINT, sig_handler)
@@ -294,11 +299,13 @@ def call_service_sync(service_type: type, service_name: str, request, timeout_se
     if client.service_is_ready():
         future = client.call_async(request)
         ros.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
+        node.destroy_node()
         if future.done():
             return future.result()
         else:
             raise Exception(f"Service {service_name} timed out")
     else:
+        node.destroy_node()
         raise Exception(f"Service {service_name} not available")
 
 
@@ -439,3 +446,103 @@ class CMRTestFixture:
     @classmethod
     def teardown_class(cls):
         cls.launcher.cleanup()
+
+
+def is_debugger_attached(pid) -> bool:
+    """
+    Checks if a debugger is attached to a process
+
+    Args:
+        pid (int): The process id to check
+    Returns:
+        True if a debugger is attached, False otherwise
+    """
+    try:
+        with open(f"/proc/{pid}/status") as file:
+            for line in file:
+                tracer_pid = line.find("TracerPid:")
+                if tracer_pid >= 0:
+                    return line[tracer_pid:].split()[1] != "0"
+    except Exception:
+        return False
+    return False
+
+
+def wait_for_debugger(pid_or_exec_name):
+    """
+    Waits for a debugger to attach to the process
+
+    Args:
+        pid_or_node (int or str): The pid of the process or the executable to wait for
+    """
+    if isinstance(pid_or_exec_name, str):
+        pid = int(check_output(["pidof", "-s", pid_or_exec_name]).strip())
+    else:
+        pid = pid_or_exec_name
+
+    while not is_debugger_attached(pid):
+        print(f"Waiting for debugger to attach to {pid}...")
+        time.sleep(0.5)
+
+
+def publish_to_topic(topic_type: type, topic: str, msg):
+    """
+    Publishes `msg` to `topic` using the `topic_type` type
+
+    Requires `msg` is of type `topic_type`
+    """
+    node = RclpyNode(f"cmr_py_test_client_{int(datetime.utcnow().timestamp() * 1000)}")
+    client = node.create_publisher(topic_type, topic)
+
+    client.publish(msg)
+    node.destroy_node()
+
+
+def listen_topic_once(msg_type: type, topic: str):
+    """
+    Listens for a single message on a topic
+
+    Args:
+        msg_type (type): The type of message to listen for
+        topic (str): The topic to listen on
+    Returns:
+        A function which can be called to wait for the message
+            The returned function will return the message when it is received
+            or `None` if the timeout is reached
+
+            The default timeout is infinite
+    Example:
+    ```
+    msg = listen_topic_once(String, "/test_producer/output")
+    publish_to_topic(String, "/test_producer/input", String(data="test"))
+    assert msg().data == "test"
+    # Where test_producer is a node that publishes the input to the output
+    ```
+    """
+    node = RclpyNode(
+        f"cmr_py_test_subscriber_{int(datetime.utcnow().timestamp() * 1000)}"
+    )
+
+    got_msg = [False]
+    result = []
+
+    def wrapped_callback(msg):
+        nonlocal got_msg
+        nonlocal result
+        got_msg[0] = True
+        result = [msg]
+
+    sub = node.create_subscription(msg_type, topic, wrapped_callback)
+
+    def return_fn(timeout_sec=None):
+        sub
+        start_time = datetime.now()
+        while not got_msg[0] and (
+            timeout_sec is None
+            or (datetime.now() - start_time).total_seconds() < timeout_sec
+        ):
+            ros.spin_once(node)
+        node.destroy_node()
+        return result[0] if got_msg[0] else None
+
+    return return_fn

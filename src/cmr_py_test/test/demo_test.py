@@ -38,7 +38,7 @@ node_config = """
 """
 
 
-# Test fixtures must start with `TEST` and test methods must start with `test_`
+# Test fixtures must start with `Test` and test methods must start with `test_`
 # Use Test fixtures when you want to run different tests with the same nodes
 class TestDemoDependencies(CMRTestFixture):
     CMRTestFixture.nodes = config_fabric_nodes(

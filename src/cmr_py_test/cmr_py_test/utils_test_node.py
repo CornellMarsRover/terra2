@@ -24,20 +24,20 @@ class PassthroughNode(Node):
         self.get_logger().info(
             f"Publishing on {self.get_namespace()}/{self.get_name()}/test_out"
         )
-        # self.get_logger().info(
-        #     f"Starting action server on {self.get_namespace()}/{self.get_name()}/test_action"
-        # )
-        # self.server = action.ActionServer(
-        #     self,
-        #     TestTargetPosition,
-        #     f"{self.get_namespace()}/{self.get_name()}/test_action",
-        #     self._action_server_callback,
-        # )
-        # self.client = action.ActionClient(
-        #     self,
-        #     TestTargetPosition,
-        #     f"{self.get_namespace()}/{self.get_name()}/test_return",
-        # )
+        self.get_logger().info(
+            f"Starting action server on {self.get_namespace()}/{self.get_name()}/test_action"
+        )
+        self.server = action.ActionServer(
+            self,
+            TestTargetPosition,
+            f"{self.get_namespace()}/{self.get_name()}/test_action",
+            self._action_server_callback,
+        )
+        self.client = action.ActionClient(
+            self,
+            TestTargetPosition,
+            f"{self.get_namespace()}/{self.get_name()}/test_return",
+        )
 
     def _topic_callback(self, msg: String):
         self.get_logger().info(f"Received message: '{msg.data}'")

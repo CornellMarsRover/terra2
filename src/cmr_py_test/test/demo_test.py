@@ -33,31 +33,31 @@ def test_utils_node(namespace: str):
     assert subber.wait_for_msg().data == "Hi"
 
     # Test action server
-    # send_goal = TargetPosition.Goal()
-    # send_goal.x = 1.0
-    # send_goal.y = 2.0
-    # send_goal.z = 3.0
-    # success = False
+    send_goal = TargetPosition.Goal()
+    send_goal.x = 1.0
+    send_goal.y = 2.0
+    send_goal.z = 3.0
+    success = False
 
-    # def check_goal_handle(goal_handle: action.server.ServerGoalHandle):
-    #     nonlocal success
-    #     success = goal_handle.request == send_goal
-    #     goal_handle.succeed()
-    #     return success
+    def check_goal_handle(goal_handle: action.server.ServerGoalHandle):
+        nonlocal success
+        success = goal_handle.request == send_goal
+        goal_handle.succeed()
+        return success
 
-    # action_server = ActionListener(
-    #     TargetPosition,
-    #     "/test/utils_test_node/test_return",
-    #     lambda handle: TargetPosition.Result(success=check_goal_handle(handle)),
-    # )
-    # t = threading.Thread(
-    #     target=send_action_goal_sync,
-    #     args=(TargetPosition, "/test/utils_test_node/test_action", send_goal),
-    # )
-    # t.start()
-    # assert action_server.wait_for_msg()
-    # assert success
-    # t.join()
+    action_server = ActionListener(
+        TargetPosition,
+        "/test/utils_test_node/test_return",
+        lambda handle: TargetPosition.Result(success=check_goal_handle(handle)),
+    )
+    t = threading.Thread(
+        target=send_action_goal_sync,
+        args=(TargetPosition, "/test/utils_test_node/test_action", send_goal),
+    )
+    t.start()
+    assert action_server.wait_for_msg()
+    assert success
+    t.join()
 
 
 node_config = """

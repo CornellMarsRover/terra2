@@ -561,7 +561,7 @@ def teardown_module():
     """
     Teardown module for all tests in this module
     """
-    # ros.shutdown()
+    ros.shutdown()
 
 
 class CMRTestFixture:
@@ -730,9 +730,16 @@ class TopicSubscriber:
     def __enter__(self):
         return self
 
+    def clear_msgs(self):
+        """
+        Clears all messages that have been received
+        """
+        self.results = []
+
     def wait_for_msg(self, timeout_sec=None, async_nodes=[]):
         """
         Waits for a message to be received on the topic and returns that message
+        Will return immediately if a message has already been received
 
         Args:
             timeout_sec (float or None): The number of seconds to wait for a message
@@ -807,7 +814,7 @@ class __ServiceActionListener:
 
     def wait_for_msg(self, wait_pred=1, timeout_sec=None, async_nodes=[]):
         """
-        Waits for a message to be received
+        Waits for a new message to be received
 
         Args:
             wait_pred (int or callable): The number of requests to wait for or a function

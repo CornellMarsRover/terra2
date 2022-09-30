@@ -7,6 +7,41 @@
 
 namespace cmr
 {
+
+/**
+ * @brief Helper function for `send_request`
+ * Spins the node until the future is ready
+ *
+ * @tparam FutureT
+ * @param node the node that sent the service request
+ * @param future the future of the async service call
+ * @param service_name the name of the service, for logging purposes
+ * @return an optional containing the response if successful, or empty optional
+ */
+template <typename FutureT>
+static auto wait_for_future(std::shared_ptr<rclcpp::Node> node, FutureT&& future,
+                            const std::string& service_name)
+{
+    using namespace std::chrono_literals;
+    RCLCPP_INFO(node->get_logger(), "Request sent to %s", service_name.c_str());
+    while (rclcpp::ok()) {
+        const auto status = rclcpp::spin_until_future_complete(node, future, 3s);
+        if (status == rclcpp::FutureReturnCode::SUCCESS) {
+            // RCLCPP_INFO(node->get_logger(), "Response received from %s",
+            //             service_name.c_str());
+            return std::make_optional(future.get());
+        } else if (status == rclcpp::FutureReturnCode::INTERRUPTED) {
+            RCLCPP_ERROR(node->get_logger(),
+                         "Interrupted while waiting for service %s. "
+                         "Exiting.",
+                         service_name.c_str());
+            return std::optional<decltype(future.get())>{};
+        } else {
+            RCLCPP_INFO(node->get_logger(), "Service %s timed out, waiting again...",
+                        service_name.c_str());
+        }
+    }
+}
 /**
  * Spins up a service client owned by a temporary node and calls the service with the
  * given request. Returns the response if successful, or empty optional otherwise.
@@ -57,13 +92,6 @@ std::optional<std::shared_ptr<typename SrvT::Response>> send_request(
     }
 
     auto future = client->async_send_request(request);
-    RCLCPP_INFO(node->get_logger(), "Request sent to %s", service_name.c_str());
-    if (rclcpp::spin_until_future_complete(node, future) !=
-        rclcpp::FutureReturnCode::SUCCESS) {
-        RCLCPP_ERROR(node->get_logger(), "failed request to %s",
-                     service_name.c_str());
-        return {};
-    }
-    return future.get();
+    return wait_for_future(node, std::move(future), service_name);
 }
 }  // namespace cmr

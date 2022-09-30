@@ -1,6 +1,10 @@
 import rclpy as ros
 from launch_ros.actions import Node as LaunchNode
 from launch import LaunchDescription, LaunchService
+import sys
+from launch.actions import RegisterEventHandler, ExecuteProcess
+from launch.substitutions import FindExecutable
+from launch.event_handlers import OnProcessStart
 from subprocess import check_output
 from rclpy.node import Node as RclpyNode
 import os
@@ -10,6 +14,7 @@ from datetime import datetime
 import signal
 import toml
 from ament_index_python.packages import get_package_share_directory
+from std_srvs.srv._trigger import Trigger
 
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -111,8 +116,8 @@ def make_node(
     node_name: str,
     package_name: str,
     executable_name: str,
-    namespace: str,
-    parameters: dict,
+    namespace: str = "rover",
+    parameters: dict = {},
     **kwargs,
 ) -> LaunchNode:
     """
@@ -189,6 +194,79 @@ class NodeLauncher:
     def get_namespace(self):
         return self.namespace
 
+    def __add_wait_action(self, ld: LaunchDescription):
+        """
+        Adds an event handler to listen for the last node to start
+        and then write to the service to the parent process to signal the test that it can start
+        """
+        process = ExecuteProcess(
+            cmd=[
+                [
+                    FindExecutable(name="ros2"),
+                    " service call ",
+                    f"/{self.namespace}/launch_wait ",
+                    "std_srvs/srv/Trigger",
+                ],
+            ],
+            shell=True,
+        )
+        ev = RegisterEventHandler(
+            OnProcessStart(
+                target_action=self.nodes[-1],
+                on_start=[process],
+            )
+        )
+        self.nodes.append(process)
+        self.trigger_process = process
+        ld.add_action(ev)
+
+        return ld
+
+    def __wait_for_launch_process(self):
+        """
+        Waits for the child process to make a service call to notify the
+        parent that it is ready
+        """
+
+        def cb(req, resp):
+            resp.success = True
+            resp.message = "Test ready"
+            return resp
+
+        print("Waiting for launch process to start")
+        with ServiceListener(Trigger, f"/{self.namespace}/launch_wait", cb) as serv:
+            serv.wait_for_msg()
+        print("Test start!")
+
+    def __launch_nodes(self, ld: LaunchDescription):
+        print("Launching from child process")
+
+        ld = self.__add_wait_action(ld)
+        ls = LaunchService()
+        ls.include_launch_description(ld)
+
+        def sig_handler(signum, frame):
+            print("Shutting down launch")
+            print("Called shutdown on launch service")
+            for node in self.nodes:
+                node_pid = node.process_details["pid"]
+                try:
+                    os.kill(node_pid, signal.SIGINT)
+                except ProcessLookupError:
+                    if node != self.trigger_process:
+                        print(
+                            f"WARNING: Process {node_pid} already dead. It probably crashed during testing",
+                            file=sys.stderr,
+                        )
+                        # Do not emit warning for the trigger process
+            ls.shutdown()
+
+        signal.signal(signal.SIGINT, sig_handler)
+        ls.run()
+        # Run blocks and needs to run on the main thread
+        # so we fork and run it in the child process
+        print("Launch finished")
+
     def launch_nodes(self, *nodes):
         """
         Launches the given nodes in a new thread under the generated namespace
@@ -202,40 +280,15 @@ class NodeLauncher:
             node.namespace = self.namespace
             self.nodes.append(node)
         ld = LaunchDescription(self.nodes)
-        # ld.add_action(
-        #     launch.actions.RegisterEventHandler(
-        #         launch.event_handlers.OnProcessExit(
-        #             target_action=self.nodes[1],
-        #             on_exit=[launch.actions.EmitEvent(event=launch.events.Shutdown())],
-        #         )
-        #     )
-        # )
-        ls = LaunchService()
-        ls.include_launch_description(ld)
         pid = os.fork()
         if pid == 0:
-            print("Launching from child process")
-
-            def sig_handler(signum, frame):
-                print("Shutting down launch")
-                print("Called shutdown on launch service")
-                for node in self.nodes:
-                    node_pid = node.process_details["pid"]
-                    try:
-                        os.kill(node_pid, signal.SIGINT)
-                    except ProcessLookupError:
-                        print(f"WARNING: Process {node_pid} already dead")
-                        pass
-                ls.shutdown()
-
-            signal.signal(signal.SIGINT, sig_handler)
-            ls.run()
-            # Run blocks and needs to run on the main thread
-            # so we fork and run it in the child process
-            print("Launch finished")
+            self.__launch_nodes(ld)
             os._exit(0)
         else:
             self.child_pid = pid
+            # Forking and launching takes time, so we wait until the last process
+            # has started before returning
+            self.__wait_for_launch_process()
 
 
 def cmr_node_test(nodes: list):
@@ -243,6 +296,8 @@ def cmr_node_test(nodes: list):
     A decorator that should be used for all CMR node tests
     The decorated test should take a single argument, which is the node launcher to
     start all necessary nodes
+
+    The test will wait for the node processes to start before running
 
     Args:
         nodes (list): A list of nodes to launch
@@ -426,6 +481,8 @@ class CMRTestFixture:
     A base class for CMR node tests that use the same nodes for all tests
     This class will start the nodes once for all tests in the class
     To use this, set the `nodes` class variable to a list of nodes to start
+
+    All tests will wait for the node processes to start before running
     """
 
     nodes = []
@@ -474,6 +531,7 @@ def wait_for_debugger(pid_or_exec_name):
 
     Args:
         pid_or_node (int or str): The pid of the process or the executable to wait for
+            If a string is passed, the first process with that executable name will be waited for
     """
     if isinstance(pid_or_exec_name, str):
         pid = int(check_output(["pidof", "-s", pid_or_exec_name]).strip())
@@ -492,57 +550,147 @@ def publish_to_topic(topic_type: type, topic: str, msg):
     Requires `msg` is of type `topic_type`
     """
     node = RclpyNode(f"cmr_py_test_client_{int(datetime.utcnow().timestamp() * 1000)}")
-    client = node.create_publisher(topic_type, topic)
+    client = node.create_publisher(topic_type, topic, 10)
 
     client.publish(msg)
-    node.destroy_node()
+    published = False
+
+    def publish():
+        nonlocal published
+        client.publish(msg)
+        node.destroy_node()
+        published = True
+
+    timer = node.create_timer(0.1, publish)
+    while not published:
+        ros.spin_once(node)
 
 
-def listen_topic_once(msg_type: type, topic: str):
+class TopicSubscriber:
     """
-    Listens for a single message on a topic
-
-    Args:
-        msg_type (type): The type of message to listen for
-        topic (str): The topic to listen on
-    Returns:
-        A function which can be called to wait for the message
-            The returned function will return the message when it is received
-            or `None` if the timeout is reached
-
-            The default timeout is infinite
-    Example:
-    ```
-    msg = listen_topic_once(String, "/test_producer/output")
-    publish_to_topic(String, "/test_producer/input", String(data="test"))
-    assert msg().data == "test"
-    # Where test_producer is a node that publishes the input to the output
-    ```
+    A class for listening to a topic
     """
-    node = RclpyNode(
-        f"cmr_py_test_subscriber_{int(datetime.utcnow().timestamp() * 1000)}"
-    )
 
-    got_msg = [False]
-    result = []
+    def __init__(self, msg_type: type, topic: str):
+        """
+        Constructs a new TopicSubscriber that listens for messages of type `msg_type`
+        on the topic `topic`
+        """
+        self.node = RclpyNode(
+            f"cmr_py_topic_subscriber_{int(datetime.utcnow().timestamp() * 1000)}"
+        )
+        self.results = []
+        self.destroyed = False
+        self.sub = self.node.create_subscription(msg_type, topic, self._callback, 10)
 
-    def wrapped_callback(msg):
-        nonlocal got_msg
-        nonlocal result
-        got_msg[0] = True
-        result = [msg]
+    def _callback(self, msg):
+        self.results.append(msg)
 
-    sub = node.create_subscription(msg_type, topic, wrapped_callback)
+    def __del__(self):
+        if not self.destroyed:
+            self.node.destroy_node()
+            self.destroyed = True
 
-    def return_fn(timeout_sec=None):
-        sub
+    def __exit__(self, exc_type, exc_value, traceback):
+        if not self.destroyed:
+            self.node.destroy_node()
+            self.destroyed = True
+
+    def __enter__(self):
+        return self
+
+    def wait_for_msg(self, timeout_sec=None, async_nodes=[]):
+        """
+        Waits for a message to be received on the topic and returns that message
+
+        Args:
+            timeout_sec (float or None): The number of seconds to wait for a message
+                If None, waits forever
+            async_nodes (list of RclpyNode): A list of nodes to spin while waiting
+        Returns:
+            The message received or None if the timeout is reached
+        """
         start_time = datetime.now()
-        while not got_msg[0] and (
+        while len(self.results) == 0 and (
             timeout_sec is None
             or (datetime.now() - start_time).total_seconds() < timeout_sec
         ):
-            ros.spin_once(node)
-        node.destroy_node()
-        return result[0] if got_msg[0] else None
+            ros.spin_once(self.node)
+            for node in async_nodes:
+                ros.spin_once(node)
+        return self.results.pop(0) if len(self.results) > 0 else None
 
-    return return_fn
+
+class ServiceListener:
+    """
+    A class for listening to service calls
+    """
+
+    def __init__(self, srv_type: type, service: str, callback):
+        """
+        Constructs a new ServiceListener that listens for messages of type `srv_type`
+        on the service `service`
+
+        Args:
+            srv_type (type): The type of the service
+            service (str): The name of the service
+            callback (function): The callback to call when a service request is received
+                Accepts the request and response as arguments and should update the response
+                parameter and return the response
+        """
+        self.node = RclpyNode(
+            f"cmr_py_topic_subscriber_{int(datetime.utcnow().timestamp() * 1000)}"
+        )
+        self.request_count = 0
+        self.destroyed = False
+        self.sub = self.node.create_service(srv_type, service, self._callback)
+        self.cb = callback
+
+    def _callback(self, request, response):
+        self.request_count += 1
+        return self.cb(request, response)
+
+    def __del__(self):
+        if not self.destroyed:
+            self.node.destroy_node()
+            self.destroyed = True
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if not self.destroyed:
+            self.node.destroy_node()
+            self.destroyed = True
+
+    def __enter__(self):
+        return self
+
+    def wait_for_msg(self, wait_pred=1, timeout_sec=None, async_nodes=[]):
+        """
+        Waits for a message to be received on the service
+
+        Args:
+            wait_pred (int or callable): The number of requests to wait for or a function
+                that returns True when we can stop waiting
+            timeout_sec (float or None): The number of seconds to wait for a message
+                If None, waits forever
+            async_nodes (list of RclpyNode): A list of nodes to spin while waiting
+        Returns:
+            True if the message was received, False if the timeout is reached
+        """
+
+        self.request_count = 0
+
+        def can_stop_waiting():
+            if isinstance(wait_pred, int):
+                return self.request_count >= wait_pred
+            elif callable(wait_pred):
+                return wait_pred()
+
+        start_time = datetime.now()
+        while (not can_stop_waiting()) and (
+            timeout_sec is None
+            or (datetime.now() - start_time).total_seconds() < timeout_sec
+        ):
+            ros.spin_once(self.node)
+            for node in async_nodes:
+                ros.spin_once(node)
+        return can_stop_waiting()

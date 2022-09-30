@@ -1,4 +1,7 @@
 from test_utils import *
+from std_msgs.msg._string import String
+import threading
+import rclpy.node
 
 static_config = """
 package = "cmr_demo"
@@ -23,6 +26,13 @@ def test_demo_node(namespace: str):
     assert get_lifecycle_state("py_test_demo") == "active"
 
 
+@cmr_node_test([make_node("utils_test_node", "cmr_py_test", "utils_test_node", "test")])
+def test_utils_node(namespace: str):
+    subber = TopicSubscriber(String, "/test/utils_test_node/test_out")
+    publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
+    assert subber.wait_for_msg().data == "Hi"
+
+
 node_config = """
     package = "cmr_demo"
     executable = "demo_node"
@@ -40,6 +50,8 @@ node_config = """
 
 # Test fixtures must start with `Test` and test methods must start with `test_`
 # Use Test fixtures when you want to run different tests with the same nodes
+# Test fixtures are more efficient than using cmr_node_test multiple times because
+# the setup and cleanup code is nontrivial
 class TestDemoDependencies(CMRTestFixture):
     CMRTestFixture.nodes = config_fabric_nodes(
         node_config.format("py_test_demo_1", ""),

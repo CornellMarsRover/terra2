@@ -19,6 +19,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
+            "utils_test_node = cmr_py_test.utils_test_node:main",
             # PHOBOS_APPEND
         ],
     },

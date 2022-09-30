@@ -1,4 +1,4 @@
-# from test_utils import *
+from test_utils import *
 # from std_msgs.msg._string import String
 # from cmr_msgs.action._test_target_position import TestTargetPosition as TargetPosition
 # import threading

@@ -29,6 +29,7 @@ jobs:
       - name: Pytest
         id: ptest
         run: |
+          pip3 install pytest
           pytest -s --tb=short
 
       - name: Test

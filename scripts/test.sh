@@ -5,7 +5,7 @@
 pushd "$CMR_ROOT/terra" &> /dev/null
 source install/setup.bash
 find . -name "*.gcda" -delete
-colcon test --executor sequential --return-code-on-test-failure
+colcon test --executor sequential
 colcon test-result --verbose
 test_result_code=$?
 if [ $test_result_code != 0 ]; then 

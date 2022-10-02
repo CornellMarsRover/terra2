@@ -326,7 +326,7 @@ class NodeLauncher:
     def __launch_nodes(self, ld: LaunchDescription):
         print("Launching from child process")
 
-        ld = self.__add_wait_action(ld)
+        # ld = self.__add_wait_action(ld)
         ls = LaunchService()
         ls.include_launch_description(ld)
 
@@ -361,19 +361,22 @@ class NodeLauncher:
             *nodes: The nodes, launch files, etc. to launch
         """
 
+        print("Beginning launch sequence")
         for node in nodes:
             node.namespace = self.namespace
             self.nodes.append(node)
         ld = LaunchDescription(self.nodes)
         pid = os.fork()
         if pid == 0:
+            print("Child process about to launch")
             self.__launch_nodes(ld)
             os._exit(0)
         else:
+            print("Forked a child process to launch nodes")
             self.child_pid = pid
             # Forking and launching takes time, so we wait until the last process
             # has started before returning
-            self.__wait_for_launch_process()
+            # self.__wait_for_launch_process()
 
 
 def cmr_node_test(nodes: list):

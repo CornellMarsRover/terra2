@@ -26,11 +26,6 @@ jobs:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
 
-      - name: Pytest
-        id: ptest
-        run: |
-          python3 -m pytest -s --tb=short
-
       - name: Test
         id: test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}

@@ -1,7 +1,7 @@
 """
 Node Testing Utility Framework
 
-Launch Elements:
+### Launch Elements:
     What I'm calling launch elements are the things that can be made part of a 
     launch description such as nodes and launch files. Launch elements are passed
     to the `nodes` class variable in the `CMRTestFixture` class or as arguments to
@@ -9,43 +9,47 @@ Launch Elements:
     launch elements before running the test.
 
     Some ways of creating launch elements:
-    - `make_node`
-    - `make_launch_file`
-    - `make_fabric_node`
-    - `config_fabric_nodes`
+    - `test_utils.make_node`
+    - `test_utils.make_launch_file`
+    - `test_utils.make_fabric_node`
+    - `test_utils.config_fabric_nodes`
 
-Writing Tests:
+### Writing Tests:
     Tests should be written as normal pytest tests. The only difference is that
-    you should decorate your test functions with `@cmr_node_test` and pass in the
+    you should decorate your test functions with `cmr_node_test()` and pass in the
     launch elements you want to start to the decorator. Your test function should
     also accept a namespace string argument. You may also use 
     a test fixutre class by subtyping `CMRTestFixture` and setting the 
     `CMRTestFixutre.nodes` class variable to a list of launch elements.
 
-    See the examples in the documentation of `cmr_node_test` and `CMRTestFixture`
+    See the examples in the documentation of `cmr_node_test()` and `CMRTestFixture`
     for examples.
 
     Test functions are good for tests that use a unique set of launch elements.
     If you have multiple tests using the same launch elements, you should use a 
-    test fixutr class. This will be more efficient by avoiding cleaning up and
+    test fixture class. This will be more efficient by avoiding cleaning up and
     setting up the same launch elements every test.
 
-    The pytest hooks `setup_module` and `teardown_module` are defined here to start
+    The pytest hooks `setup_module()` and `teardown_module()` are defined here to start
     and stop ros for the entire test file.
 
     Don't forget to add the package you are testing as a dependency to this package
     in the package.xml file. This is so that the test framework can find the package
 
-Clients:
+    **IMPORTANT**: Make sure you import `setup_module()` and `teardown_module()` from
+    this module in your test file. These are hooks for Pytest to start ROS.
+    I have just been using `from test_utils import *` at the top of my test files
+
+### Clients:
     The test framework provides some functions for working with ROS topics a little easier.
     All the clients are based on a synchronous model and each start up their own node
 
     They include:
-    - `publish_to_topic`
-    - `call_service_sync`
-    - `send_action_goal_sync`
+    - `test_utils.publish_to_topic`
+    - `test_utils.call_service_sync`
+    - `test_utils.send_action_goal_sync`
 
-Listeners:
+### Listeners:
     We provide some classes to help listening to topics, services, etc.
     They are based on a synchronous model and each start up their own node.
     The general day-to-day usage would be something like creating a listener, 
@@ -62,26 +66,26 @@ Listeners:
     - `ServiceListener`
     - `ActionListener`
 
-Fabric Helpers:
+### Fabric Helpers:
     We provide some functions to help with working with fabric nodes. These are
-    generally service calls built on top of `call_service_sync`.
-    Every test will, by default, always start a `fault_handler` and `lifecycle_manager`
+    generally service calls built on top of `call_service_sync()`.
+    Every test will, by default, always start a `FaultHandler` and `LifecycleManager`
     for fabric nodes. The latter of which is used to handle the lifecycle managerment
     requests from this test.
 
     They include:
-    - `activate_fabric_node`
-    - `deactivate_fabric_node`
-    - `reconfigure_fabric_node`
-    - `cleanup_fabric_node`
-    - `get_lifecycle_state`
+    - `test_utils.activate_fabric_node`
+    - `test_utils.deactivate_fabric_node`
+    - `test_utils.reconfigure_fabric_node`
+    - `test_utils.cleanup_fabric_node`
+    - `test_utils.get_lifecycle_state`
 
-Misceallenous Helpers:
+### Misceallenous Helpers:
     We provide some other functions that can be useful for testing.
 
     They include:
-    - `is_debugger_attached`
-    - `wait_for_debugger`
+    - `test_utils.is_debugger_attached`
+    - `test_utils.wait_for_debugger`
 
 """
 from typing import Callable
@@ -114,10 +118,10 @@ def make_launch_file(package: str, launch_file: str, **kwargs):
     Creates a LaunchDescription for a launch file to be run by the NodeLauncher
     This will essentially launch all the nodes of the launch file
 
-    Args:
-        package (str): The name of the package the launch file is in
-        launch_file (str): The name of the launch file
-        **kwargs: Any extra arguments to pass to the launch file
+    ### Arg:
+        - package (str): The name of the package the launch file is in
+        - launch_file (str): The name of the launch file
+        - **kwargs: Any extra arguments to pass to the launch file
     """
 
     pkg_dir = get_package_share_directory(package)
@@ -140,17 +144,17 @@ def make_fabric_node(
     """
     Creates a fabric node that can be launched by the NodeLauncher with the given parameters
 
-    Args:
-        package (str): The package name to find the node executable in.
+    ### Args:
+        - package (str): The package name to find the node executable in.
             Will be overriden by package name in the toml if one is specified
-        executable (str): The name of the node executable.
+        - executable (str): The name of the node executable.
             Will be overriden by executable name in the toml if one is specified
-        node_name (str): The name of the node.
+        - node_name (str): The name of the node.
             Will be overriden by node name in the toml if one is specified
-        namespace (str): The namespace of the node
-        config_path (str): The path to the toml config file. Can be empty if config_string is used
-        config_string (str): The toml config string. Can be empty if config_path is used
-        extra_parameters (dict): Any extra parameters to add to the node
+        - namespace (str): The namespace of the node
+        - config_path (str): The path to the toml config file. Can be empty if config_string is used
+        - config_string (str): The toml config string. Can be empty if config_path is used
+        - extra_parameters (dict): Any extra parameters to add to the node
 
     """
     config = dict()
@@ -181,15 +185,15 @@ def make_fabric_node(
 
 def config_fabric_nodes(*node_configs: str) -> list:
     """
-    Constructs multiple fabric node launch descriptions from toml files or
+    Constructs multiple fabric node launch elements from toml files or
     toml strings ONLY
 
-    Args:
-        *node_configs (str): The paths to the toml files or the toml strings
-    Returns:
-        A list of launch descriptions for the nodes
-    See Also:
-        make_fabric_node
+    ### Args:
+    - *node_configs (str): The paths to the toml files or the toml strings
+    ### Returns:
+    - A list of launch elements for the nodes
+    ### See Also:
+    - `make_fabric_node()`
     """
     nodes = []
     for node in node_configs:
@@ -211,13 +215,13 @@ def make_node(
     """
     Creates a node that can be launched by the NodeLauncher with the given parameters
 
-    Args:
-        node_name (str): The name of the node
-        package_name (str): The name of the package the node is in
-        executable_name (str): The name of the node executable
-        namespace (str): The namespace to run the node in
-        parameters (dict): The parameters to pass to the node
-        **kwargs: Any extra arguments to pass to the node
+    ### Args:
+        - node_name (str): The name of the node
+        - package_name (str): The name of the package the node is in
+        - executable_name (str): The name of the node executable
+        - namespace (str): The namespace to run the node in
+        - parameters (dict): The parameters to pass to the node
+        - **kwargs: Any extra arguments to pass to the node
 
     """
     return LaunchNode(
@@ -367,7 +371,7 @@ class NodeLauncher:
         set by the node launcher. Therefore, whatever namespace the node uses in
         its constructor will likely be unaltered.
 
-        Args:
+        ### Args:
             *nodes: The nodes, launch files, etc. to launch
         """
 
@@ -398,10 +402,10 @@ def cmr_node_test(nodes: list):
 
     The test will wait for the node processes to start before running
 
-    Args:
+    ### Args:
         nodes (list): A list of nodes to launch
 
-    Example:
+    ### Example:
     ```
         @cmr_node_test([make_fabric_node(config_string=static_config)])
         def test_demo_node(namespace: str):
@@ -429,15 +433,15 @@ def call_service_sync(service_type: type, service_name: str, request, timeout_se
     IMPORTANT: If the service you call waits for an action or calls a service that you are listening to,
     this will deadlock. To avoid, run this function in a new thread
 
-    Args:
-        service_type (type): The type of the service
-        service_name (str): The name of the service
-        request (type): The request to send to the service
-        timeout_sec (float): The timeout in seconds to wait for the service to respond
+    ### Args:
+        - service_type (type): The type of the service
+        - service_name (str): The name of the service
+        - request (type): The request to send to the service
+        - timeout_sec (float): The timeout in seconds to wait for the service to respond
             If `None`, the function will block until its ready
-    Returns:
+    ### Returns:
         the response of the service
-    Raises:
+    ### Raises:
         Exception: If the service does not become available within the timeout
     """
 
@@ -472,12 +476,12 @@ def change_fabric_node_lifecycle(
     """
     Activates or deactivates a fabric node via the lifecycle manager
 
-    Args:
-        node_name (str): The name of the node to activate/deactivate
-        srv_type (type): The type of service to use. Either ActivateNode or DeactivateNode
-        namespace (str): The namespace of the lifecycle manager
-        cleanup (bool): If true and deactivation, the node will be cleaned up
-    Returns:
+    ### Args:
+        - node_name (str): The name of the node to activate/deactivate
+        - srv_type (type): The type of service to use. Either ActivateNode or DeactivateNode
+        - namespace (str): The namespace of the lifecycle manager
+        - cleanup (bool): If true and deactivation, the node will be cleaned up
+    ### Returns:
         the response of the specified service
     """
     service_name = ""
@@ -496,10 +500,10 @@ def activate_fabric_node(node_name: str, namespace: str):
     """
     Activates a fabric node via the lifecycle manager
 
-    Args:
-        node_name (str): The name of the node to activate
-        namespace (str): The namespace of the node
-    Returns:
+    ### Args:
+        - node_name (str): The name of the node to activate
+        - namespace (str): The namespace of the node
+    ### Returns:
         True if the node was activated, False otherwise
     """
     return change_fabric_node_lifecycle(node_name, ActivateNode, namespace).success
@@ -509,11 +513,11 @@ def deactivate_fabric_node(node_name: str, namespace: str):
     """
     Deactivates a fabric node via the lifecycle manager
 
-    Args:
-        node_name (str): The name of the node to deactivate
-        namespace (str): The namespace of the node
-    Returns:
-        True if the node was deactivated, False otherwise
+    ### Args:
+        - node_name (str): The name of the node to deactivate
+        - namespace (str): The namespace of the node
+    ### Returns:
+        `True` if the node was deactivated, `False` otherwise
     """
     return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace).success
 
@@ -522,11 +526,11 @@ def cleanup_fabric_node(node_name: str, namespace: str):
     """
     Cleans up a fabric node via the lifecycle manager
 
-    Args:
-        node_name (str): The name of the node to cleanup
-        namespace (str): The namespace of the node
-    Returns:
-        True if the node was cleaned up, False otherwise
+    ### Args:
+        - node_name (str): The name of the node to cleanup
+        - namespace (str): The namespace of the node
+    ### Returns:
+        `True` if the node was cleaned up, `False` otherwise
     """
     return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace, True).success
 
@@ -538,11 +542,11 @@ def reconfigure_fabric_node(node_name: str, namespace: str):
 
     Reconfiguring a node allows it to reread its toml configuration file
 
-    Args:
-        node_name (str): The name of the node to reconfigure
-        namespace (str): The namespace of the node
-    Returns:
-        True if the node was reconfigured (cleaned up and activated), False otherwise
+    ### Args:
+        - node_name (str): The name of the node to reconfigure
+        - namespace (str): The namespace of the node
+    ### Returns:
+        `True` if the node was reconfigured (cleaned up and activated), `False` otherwise
     """
     return (
         cleanup_fabric_node(node_name, namespace).success
@@ -554,9 +558,9 @@ def get_lifecycle_state(node_name) -> str:
     """
     Gets the current lifecycle state of a node
 
-    Args:
+    ### Args:
         node_name (str): The name of the node to get the state of
-    Returns:
+    ### Returns:
         the current lifecycle state string of the node
     """
     return call_service_sync(
@@ -584,10 +588,10 @@ class CMRTestFixture:
     This class will start the nodes once for all tests in the class
     To use this, set the `nodes` class variable to a list of nodes to start
 
-    Essentially, this wraps `@cmr_node_test` around a group of tests and works
-    exactly the same way. See `cmr_node_test` for more details.
+    Essentially, this wraps `cmr_node_test()` around a group of tests and works
+    exactly the same way. See `cmr_node_test()` for more details.
 
-    Example:
+    ### Example:
     ```
         # node_config = "... <toml config> ..."
         class TestDemoDependencies(CMRTestFixture):
@@ -640,10 +644,10 @@ def is_debugger_attached(pid) -> bool:
     """
     Checks if a debugger is attached to a process
 
-    Args:
+    ### Args:
         pid (int): The process id to check
-    Returns:
-        True if a debugger is attached, False otherwise
+    ### Returns:
+        `True` if a debugger is attached, `False` otherwise
     """
     try:
         with open(f"/proc/{pid}/status") as file:
@@ -660,7 +664,7 @@ def wait_for_debugger(pid_or_exec_name):
     """
     Waits for a debugger to attach to the process
 
-    Args:
+    ### Args:
         pid_or_node (int or str): The pid of the process or the executable to wait for
             If a string is passed, the first process with that executable name will be waited for
     """
@@ -703,7 +707,7 @@ class TopicSubscriber:
     Freeing the topic listener with `del` or using `with` is technically optional,
     as the garbage collector will do this if you don't.
 
-    Example:
+    ### Example:
     ```
         subber = TopicSubscriber(String, "/test/utils_test_node/test_out")
         publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
@@ -757,11 +761,12 @@ class TopicSubscriber:
         Waits for a message to be received on the topic and returns that message
         Will return immediately if a message has already been received
 
-        Args:
-            timeout_sec (float or None): The number of seconds to wait for a message
-                If None, waits forever
-            async_nodes (list of RclpyNode): A list of nodes to spin while waiting
-        Returns:
+        ### Args:
+            - timeout_sec (float or None): The number of seconds to wait for a message
+                If `None`, waits forever
+            - async_nodes (list of RclpyNode): A list of nodes to spin while waiting
+                Can be empty
+        ### Returns:
             The message received or None if the timeout is reached
         """
         start_time = datetime.now()
@@ -785,13 +790,13 @@ class __ServiceActionListener:
         Constructs a new ServiceListener that listens for messages of type `srv_type`
         on the service `service`
 
-        Args:
-            srv_type (type): The type of the service
-            service (str): The name of the service
-            callback (function): The callback to call when a service request is received
+        ### Args:
+            - srv_type (type): The type of the service
+            - service (str): The name of the service
+            - callback (function): The callback to call when a service request is received
                 Accepts the request and response as arguments and should update the response
                 parameter and return the response
-            service (bool): True if this is a service, False if this is an action
+            - service (bool): True if this is a service, False if this is an action
         """
         type_str = "service" if service else "action"
         self.node = RclpyNode(
@@ -832,14 +837,14 @@ class __ServiceActionListener:
         """
         Waits for a new message to be received
 
-        Args:
-            wait_pred (int or callable): The number of requests to wait for or a function
+        ### Args:
+            - wait_pred (int or callable): The number of requests to wait for or a function
                 that returns True when we can stop waiting
-            timeout_sec (float or None): The number of seconds to wait for a message
+            - timeout_sec (float or None): The number of seconds to wait for a message
                 If None, waits forever
-            async_nodes (list of RclpyNode): A list of nodes to spin while waiting
-        Returns:
-            True if the predicate is true, False if the timeout is reached
+            - async_nodes (list of RclpyNode): A list of nodes to spin while waiting
+        ### Returns:
+            `True` if the predicate is true, `False` if the timeout is reached
         """
 
         self.request_count = 0
@@ -867,7 +872,7 @@ class ServiceListener(__ServiceActionListener):
     Freeing the service listener with `del` or using `with` is technically optional,
     as the garbage collector will do this if you don't.
 
-    Example:
+    ### Example:
     ```
         def cb(req, resp):
             resp.success = True
@@ -886,10 +891,10 @@ class ServiceListener(__ServiceActionListener):
         Constructs a new ServiceListener that listens for messages of type `srv_type`
         on the service `service`
 
-        Args:
-            srv_type (type): The type of the service
-            service (str): The name of the service
-            callback (function): The callback to call when a service request is received
+        ### Args:
+            - srv_type (type): The type of the service
+            - service (str): The name of the service
+            - callback (function): The callback to call when a service request is received
                 Accepts the request and response as arguments and should update the response
                 parameter and return the response
         """
@@ -902,7 +907,7 @@ class ActionListener(__ServiceActionListener):
     Freeing the action listener with `del` or using `with` is technically optional,
     as the garbage collector will do this if you don't.
 
-    Example:
+    ### Example:
     ```
         success = False
         expected_goal = TargetPosition.Goal()
@@ -930,10 +935,10 @@ class ActionListener(__ServiceActionListener):
         Constructs a new ActionServer that listens for messages of type `srv_type`
         on the service `service`
 
-        Args:
-            action_type (type): The type of the action
-            act (str): The name of the action
-            callback (function): The callback to call when a action goal is received
+        ### Args:
+            - action_type (type): The type of the action
+            - act (str): The name of the action
+            - callback (function): The callback to call when a action goal is received
                 Accepts the goal_handle as an arguments and should return a result to
                 send back. The goal_handle can be used to publish feedback.
                 [See more info here](https://docs.ros.org/en/eloquent/Tutorials/Actions/Writing-a-Py-Action-Server-Client.html)
@@ -948,18 +953,18 @@ def send_action_goal_sync(
     Sends a goal to an action server. Wait until the goal is finished and
     we receive a response
 
-    IMPORTANT: If the action server you request waits for an action or
+    **IMPORTANT**: If the action server you request waits for an action or
     calls a service that you are listening to, this will deadlock.
     To avoid, run this function in a new thread
 
-    Args:
-        action_type (type): The type of the action
-        act (str): The name of the action
-        goal (action_type.Goal): The goal to send
-        feedback_cb (function): A callback to call when feedback is received or `None`
-        timeout_sec (float or None): The number of seconds to wait for a message
+    ### Args:
+        - action_type (type): The type of the action
+        - act (str): The name of the action
+        - goal (action_type.Goal): The goal to send
+        - feedback_cb (function): A callback to call when feedback is received or `None`
+        - timeout_sec (float or None): The number of seconds to wait for a message
             If None, waits forever
-    Returns:
+    ### Returns:
         The result of the action or `None` if the timeout is reached or no result was set
     """
     node = RclpyNode(

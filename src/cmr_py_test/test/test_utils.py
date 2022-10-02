@@ -33,6 +33,9 @@ Writing Tests:
     The pytest hooks `setup_module` and `teardown_module` are defined here to start
     and stop ros for the entire test file.
 
+    Don't forget to add the package you are testing as a dependency to this package
+    in the package.xml file. This is so that the test framework can find the package
+
 Clients:
     The test framework provides some functions for working with ROS topics a little easier.
     All the clients are based on a synchronous model and each start up their own node
@@ -318,13 +321,10 @@ class NodeLauncher:
             resp.message = "Test ready"
             return resp
 
-        print("Waiting for launch process to start")
         with ServiceListener(Trigger, f"/{self.namespace}/launch_wait", cb) as serv:
             serv.wait_for_msg()
-        print("Test start!")
 
     def __launch_nodes(self, ld: LaunchDescription):
-        print("Launching from child process")
 
         ld = self.__add_wait_action(ld)
         ls = LaunchService()
@@ -332,7 +332,6 @@ class NodeLauncher:
 
         def sig_handler(signum, frame):
             print("Shutting down launch")
-            print("Called shutdown on launch service")
             for node in self.nodes:
                 node_pid = node.process_details["pid"]
                 try:
@@ -361,18 +360,15 @@ class NodeLauncher:
             *nodes: The nodes, launch files, etc. to launch
         """
 
-        print("Beginning launch sequence")
         for node in nodes:
             node.namespace = self.namespace
             self.nodes.append(node)
         ld = LaunchDescription(self.nodes)
         pid = os.fork()
         if pid == 0:
-            print("Child process about to launch")
             self.__launch_nodes(ld)
             os._exit(0)
         else:
-            print("Forked a child process to launch nodes")
             self.child_pid = pid
             # Forking and launching takes time, so we wait until the last process
             # has started before returning
@@ -489,9 +485,9 @@ def activate_fabric_node(node_name: str, namespace: str):
         node_name (str): The name of the node to activate
         namespace (str): The namespace of the node
     Returns:
-        the response of the ActivateNode service
+        True if the node was activated, False otherwise
     """
-    return change_fabric_node_lifecycle(node_name, ActivateNode, namespace)
+    return change_fabric_node_lifecycle(node_name, ActivateNode, namespace).success
 
 
 def deactivate_fabric_node(node_name: str, namespace: str):
@@ -502,9 +498,9 @@ def deactivate_fabric_node(node_name: str, namespace: str):
         node_name (str): The name of the node to deactivate
         namespace (str): The namespace of the node
     Returns:
-        the response of the DeactivateNode service
+        True if the node was deactivated, False otherwise
     """
-    return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace)
+    return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace).success
 
 
 def cleanup_fabric_node(node_name: str, namespace: str):
@@ -515,9 +511,9 @@ def cleanup_fabric_node(node_name: str, namespace: str):
         node_name (str): The name of the node to cleanup
         namespace (str): The namespace of the node
     Returns:
-        the response of the CleanupNode service
+        True if the node was cleaned up, False otherwise
     """
-    return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace, True)
+    return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace, True).success
 
 
 def reconfigure_fabric_node(node_name: str, namespace: str):
@@ -531,7 +527,7 @@ def reconfigure_fabric_node(node_name: str, namespace: str):
         node_name (str): The name of the node to reconfigure
         namespace (str): The namespace of the node
     Returns:
-        the response of the ReconfigureNode service
+        True if the node was reconfigured (cleaned up and activated), False otherwise
     """
     return (
         cleanup_fabric_node(node_name, namespace).success

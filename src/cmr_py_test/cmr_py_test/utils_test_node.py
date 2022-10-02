@@ -6,6 +6,16 @@ from cmr_msgs.action._test_target_position import TestTargetPosition
 
 
 class PassthroughNode(Node):
+    """
+    This node simply provides a topic and action server for testing purposes.
+
+    It echos back every message on the topic /<ns>/<name>/test_in on
+    the topic /<ns>/<name>/test_out.
+
+    It echos back every target position goal received on the action server at
+    /<ns>/<name>/test_action and responds on the action server
+    /<ns>/<name>/test_return.
+    """
     def __init__(self):
         super().__init__("utils_test_node")
         self.get_logger().info("The utils_test_node node.")

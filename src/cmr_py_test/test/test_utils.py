@@ -325,6 +325,13 @@ class NodeLauncher:
             serv.wait_for_msg()
 
     def __launch_nodes(self, ld: LaunchDescription):
+        """
+        Launches the nodes in the launch description.
+        Once all nodes are launched, a trigger service call is made to
+        `/<namespace>/launch_wait`
+
+        This blocks the calling thread until all the nodes terminate
+        """
 
         ld = self.__add_wait_action(ld)
         ls = LaunchService()
@@ -356,6 +363,10 @@ class NodeLauncher:
         Launches the given nodes in a new thread under the generated namespace
         This method must only be called ONCE per test
 
+        Note that the node constructor will likely be run before the namespace is
+        set by the node launcher. Therefore, whatever namespace the node uses in
+        its constructor will likely be unaltered.
+
         Args:
             *nodes: The nodes, launch files, etc. to launch
         """
@@ -378,8 +389,12 @@ class NodeLauncher:
 def cmr_node_test(nodes: list):
     """
     A decorator that should be used for all CMR node tests
-    The decorated test should take a single argument, which is the node launcher to
-    start all necessary nodes
+    The decorated test should take at least a single argument, which is the namespace
+    the node launcher will use to launch all nodes.
+
+    Note that the node constructor of launched nodes will likely be run before the namespace is
+    set by the node launcher. Therefore, whatever namespace the node uses by default in
+    its constructor will likely be unaltered.
 
     The test will wait for the node processes to start before running
 
@@ -569,7 +584,8 @@ class CMRTestFixture:
     This class will start the nodes once for all tests in the class
     To use this, set the `nodes` class variable to a list of nodes to start
 
-    All tests will wait for the node processes to start before running
+    Essentially, this wraps `@cmr_node_test` around a group of tests and works
+    exactly the same way. See `cmr_node_test` for more details.
 
     Example:
     ```
@@ -692,6 +708,7 @@ class TopicSubscriber:
         subber = TopicSubscriber(String, "/test/utils_test_node/test_out")
         publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
         assert subber.wait_for_msg().data == "Hi"
+        del subber
     ```
         Or using `with`:
     ```
@@ -882,20 +899,29 @@ class ServiceListener(__ServiceActionListener):
 class ActionListener(__ServiceActionListener):
     """
     A class for waiting for action goals.
-    Freeing the service listener with `del` or using `with` is technically optional,
+    Freeing the action listener with `del` or using `with` is technically optional,
     as the garbage collector will do this if you don't.
 
     Example:
     ```
-        def cb(req, resp):
-            resp.success = True
-            resp.message = "Starting"
-            return resp
+        success = False
+        expected_goal = TargetPosition.Goal()
+        expected_goal.x = 1.0
+        expected_goal.y = 2.0
+        expected_goal.z = 3.0
+        def check_goal_handle(goal_handle: action.server.ServerGoalHandle):
+            nonlocal success
+            success = goal_handle.request == expected_goal
+            goal_handle.succeed()
+            return success
 
-        print("Waiting for trigger")
-        with ServiceListener(Trigger, f"/{namespace}/wait", cb) as serv:
-            serv.wait_for_msg()
-        print("Trigger received, we can start!")
+        action_server = ActionListener(
+            TargetPosition,
+            "/test/utils_test_node/test_return",
+            lambda handle: TargetPosition.Result(success=check_goal_handle(handle)),
+        )
+        assert action_server.wait_for_msg()
+        assert success
     ```
     """
 

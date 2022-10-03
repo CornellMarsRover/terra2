@@ -15,6 +15,7 @@ rosidl_generate_interfaces(
   ${PROJECT_NAME}
   msg/State.msg
   msg/ArucoMarkers.msg
+  msg/JoystickReading.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv

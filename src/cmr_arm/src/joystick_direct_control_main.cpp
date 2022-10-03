@@ -1,11 +1,11 @@
-#include "cmr_arm/joystick_forward_kinematics.hpp"
+#include "cmr_arm/joystick_direct_control.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 int main(int argc, char* argv[])
 {
     rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<cmr::JoystickForwardKinematics>();
+    auto node = std::make_shared<cmr::JoystickDirectControl>();
     rclcpp::spin(node->get_node_base_interface());
     rclcpp::shutdown();
     return 0;

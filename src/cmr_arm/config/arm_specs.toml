@@ -1,5 +1,5 @@
 package = "cmr_arm"
-executable = "joystick_forward_kinematics"
+executable = "joystick_direct_control"
 name = "arm_specs"
 dependencies = []
 
@@ -8,4 +8,28 @@ restart_attempts = 2
 restart_delay = 10
 
 [node]
-test="Hi"
+test = "Hi"
+arm_segment1_length = 0.3556
+arm_segment2_length = 0.3556
+arm_segment3_length = 0.127
+initial_joint_state = [0.0, 0.2207, -0.5956, 2.2147, -0.2256, -0.6401, 0.6033]
+
+# parameters taken from Superproject, unsure if still useful
+planning_time_limit = 10.0
+max_iterations = 200
+max_iterations_after_collision_free = 5
+smoothness_cost_weight = 0.1
+obstacle_cost_weight = 1.0
+learning_rate = 0.01
+smoothness_cost_velocity = 0.0
+smoothness_cost_acceleration = 1.0
+smoothness_cost_jerk = 0.0
+ridge_factor = 0.01
+use_pseudo_inverse = false
+pseudo_inverse_ridge_factor = 1e-4
+joint_update_limit = 0.1
+collision_clearance = 0.2
+collision_threshold = 0.07
+use_stochastic_descent = true
+enable_failure_recovery = true
+max_recovery_attempts = 5

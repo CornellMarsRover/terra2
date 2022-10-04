@@ -61,10 +61,15 @@ void FaultHandler::timer_callback()
     m_check_clock->register_time(time);
 }
 
-FaultHandler::FaultHandler(const std::string& node_name,
-                           const std::string& node_namespace)
+FaultHandler::FaultHandler(
+    // NOLINTNEXTLINE(bugprone-*)
+    std::shared_ptr<cmr::Clock<std::chrono::system_clock>> base_clock,
+    std::shared_ptr<cmr::Clock<std::chrono::system_clock>> check_clock,
+    const std::string& node_name, const std::string& node_namespace)
     : rclcpp::Node(node_name, node_namespace)
 {
+    m_check_clock = std::move(check_clock);  // NOLINT(cppcoreguidelines-*)
+    m_base_clock = std::move(base_clock);    // NOLINT(cppcoreguidelines-*)
     const auto recover_fault_callback =
         [this](const std::shared_ptr<cmr_msgs::srv::RecoverFault::Request>& request,
                const std::shared_ptr<cmr_msgs::srv::RecoverFault::Response>&) {

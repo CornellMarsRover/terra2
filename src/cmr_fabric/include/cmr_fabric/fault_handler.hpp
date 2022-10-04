@@ -49,7 +49,12 @@ class FaultHandler : public rclcpp::Node
 
   public:
     explicit FaultHandler(const std::string& node_name = "fault_handler",
-                          const std::string& node_namespace = "fabric");
+                          const std::string& node_namespace = "fabric")
+        : FaultHandler(std::make_shared<cmr::RealClock<std::chrono::system_clock>>(),
+                       std::make_shared<cmr::RealClock<std::chrono::system_clock>>(),
+                       node_name, node_namespace)
+    {
+    }
 
     /**
      * @brief Construct a new Fault Handler object, specifying the clocks to use
@@ -66,11 +71,6 @@ class FaultHandler : public rclcpp::Node
     FaultHandler(std::shared_ptr<cmr::Clock<std::chrono::system_clock>> base_clock,
                  std::shared_ptr<cmr::Clock<std::chrono::system_clock>> check_clock,
                  const std::string& node_name = "fault_handler",
-                 const std::string& node_namespace = "fabric")
-        : FaultHandler(node_name, node_namespace)
-    {
-        m_base_clock = base_clock;    // NOLINT(cppcoreguidelines-prefer-*)
-        m_check_clock = check_clock;  // NOLINT(cppcoreguidelines-prefer-*)
-    }
+                 const std::string& node_namespace = "fabric");
 };
 }  // namespace cmr::fabric

@@ -7,6 +7,45 @@
 
 namespace cmr
 {
+
+/**
+ * @brief Helper function for `send_request`
+ * Spins the node until the future is ready
+ *
+ * @tparam FutureT
+ * @param node the node that sent the service request
+ * @param future the future of the async service call
+ * @param service_name the name of the service, for logging purposes
+ * @return an optional containing the response if successful, or empty optional
+ */
+template <typename FutureT>
+static auto wait_for_future(std::shared_ptr<rclcpp::Node> node, FutureT&& future,
+                            const std::string& service_name,
+                            std::chrono::seconds timeout = std::chrono::seconds(5))
+{
+    using namespace std::chrono_literals;
+    RCLCPP_INFO(node->get_logger(), "Request sent to %s", service_name.c_str());
+    const auto start = std::chrono::system_clock::now();
+    while (rclcpp::ok() && std::chrono::system_clock::now() - start < timeout) {
+        const auto status = rclcpp::spin_until_future_complete(node, future, 1s);
+        if (status == rclcpp::FutureReturnCode::SUCCESS) {
+            // RCLCPP_INFO(node->get_logger(), "Response received from %s",
+            //             service_name.c_str());
+            return std::make_optional(future.get());
+        } else if (status == rclcpp::FutureReturnCode::INTERRUPTED) {
+            RCLCPP_ERROR(node->get_logger(),
+                         "Interrupted while waiting for service %s. "
+                         "Exiting.",
+                         service_name.c_str());
+            return std::optional<decltype(future.get())>{};
+        } else {
+            RCLCPP_INFO(node->get_logger(), "Service %s timed out, waiting again...",
+                        service_name.c_str());
+        }
+    }
+    RCLCPP_INFO(node->get_logger(), "Service %s timed out.", service_name.c_str());
+    return std::optional<decltype(future.get())>{};
+}
 /**
  * Spins up a service client owned by a temporary node and calls the service with the
  * given request. Returns the response if successful, or empty optional otherwise.
@@ -36,7 +75,8 @@ namespace cmr
 template <typename SrvT>
 std::optional<std::shared_ptr<typename SrvT::Response>> send_request(
     const std::string& service_name,
-    const std::shared_ptr<typename SrvT::Request> request)
+    const std::shared_ptr<typename SrvT::Request> request,
+    std::chrono::seconds timeout = std::chrono::seconds(5))
 {
     // we need to make a new node for each client we create, so let's make one with a
     // unique name by using the current time.
@@ -46,24 +86,25 @@ std::optional<std::shared_ptr<typename SrvT::Response>> send_request(
     auto client = node->create_client<SrvT>(service_name);
 
     using namespace std::chrono_literals;
-    while (!client->wait_for_service(3s)) {
+    const auto start = std::chrono::system_clock::now();
+    bool wait_success = false;
+    while (!(wait_success = client->wait_for_service(1s)) &&
+           std::chrono::system_clock::now() - start < timeout) {
         if (!rclcpp::ok()) {
             RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
                          "Interrupted while waiting for the service. Exiting.");
             return {};
         }
-        RCLCPP_INFO(node->get_logger(), "service %s not available, waiting again...",
+        RCLCPP_INFO(node->get_logger(), "Service %s not available, waiting again...",
                     service_name.c_str());
     }
-
-    auto future = client->async_send_request(request);
-    RCLCPP_INFO(node->get_logger(), "Request sent to %s", service_name.c_str());
-    if (rclcpp::spin_until_future_complete(node, future) !=
-        rclcpp::FutureReturnCode::SUCCESS) {
-        RCLCPP_ERROR(node->get_logger(), "failed request to %s",
+    if (wait_success) {
+        auto future = client->async_send_request(request);
+        return wait_for_future(node, std::move(future), service_name);
+    } else {
+        RCLCPP_ERROR(node->get_logger(), "Service %s timed out.",
                      service_name.c_str());
         return {};
     }
-    return future.get();
 }
 }  // namespace cmr

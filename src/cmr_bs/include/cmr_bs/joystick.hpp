@@ -1,5 +1,6 @@
 #pragma once
 #include "cmr_fabric/fabric_node.hpp"
+#include <wall_timer.h>
 
 namespace cmr
 {
@@ -11,6 +12,9 @@ namespace cmr
  */
 class Joystick : public cmr::fabric::FabricNode
 {
+  //Initiates basic ROS2 Wall Timer for callback function with joystick output
+  ros::WallTimer = walltimer_;
+
   public:
     /**
      * Constructs a `Joystick`, optionally passing in config parameters for

@@ -96,13 +96,22 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_deactivate(
 hardware_interface::return_type DrivesSystemHardware::read(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)
 {
+    // TODO(fad35): hook this up once firmware message schema is decided
     return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type DrivesSystemHardware::write(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)
 {
+    // TODO(fad35): hook this up once firmware message schema is decided
     return hardware_interface::return_type::OK;
 }
 
 }  // namespace cmr::control
+
+// This exposes this hardware interface so that it can be discovered by the
+// ROS2 Control hardware resource manager
+#include "pluginlib/class_list_macros.hpp"
+// NOLINTNEXTLINE
+PLUGINLIB_EXPORT_CLASS(cmr::control::DrivesSystemHardware,
+                       hardware_interface::SystemInterface)

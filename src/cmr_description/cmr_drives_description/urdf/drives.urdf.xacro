@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="drives">
+
+    <xacro:arg name="use_gazebo" default="false" />
+
+    <xacro:arg name="use_fake_hardware" default="true" />
+    <xacro:arg name="fake_sensor_commands" default="false" />
+
+    <xacro:include filename="$(find cmr_drives_description)/urdf/drives_description.urdf.xacro" />
+    <xacro:include filename="$(find cmr_drives_description)/gazebo/drives.materials.xacro" />
+    <xacro:include filename="$(find cmr_drives_description)/ros2_control/drives.ros2_control.xacro" />
+
+    <xacro:drives />
+
+</robot>

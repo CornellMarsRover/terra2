@@ -1,7 +1,6 @@
 #pragma once
-#include <cmr_msgs/msg/detail/joystick_reading__struct.hpp>
-
 #include "cmr_fabric/fabric_node.hpp"
+#include "cmr_msgs/msg/joystick_reading.hpp"
 namespace cmr
 {
 
@@ -35,7 +34,7 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
 
     bool cleanup() override;
 
-    void update_arm_position();
+    bool update_arm_position();
 };
 
 }  // namespace cmr

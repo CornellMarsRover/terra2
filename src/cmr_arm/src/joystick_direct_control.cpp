@@ -1,7 +1,5 @@
 #include "cmr_arm/joystick_direct_control.hpp"
 
-#include <cmr_msgs/msg/detail/joystick_reading__struct.hpp>
-
 namespace cmr
 {
 
@@ -12,7 +10,7 @@ JoystickDirectControl::JoystickDirectControl(
     // declare parameters here
 }
 
-void JoystickDirectControl::update_arm_position() { return; }
+bool JoystickDirectControl::update_arm_position() { return true; }
 
 bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
 {

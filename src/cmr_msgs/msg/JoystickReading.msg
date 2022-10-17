@@ -1,4 +1,3 @@
-string name
-float64[] axes
-int32[] buttons
-int32[] hats
+int32 control
+int32 axis
+float64 magnitude

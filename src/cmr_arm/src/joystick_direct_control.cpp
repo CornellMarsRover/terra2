@@ -10,7 +10,40 @@ JoystickDirectControl::JoystickDirectControl(
     // declare parameters here
 }
 
-bool JoystickDirectControl::update_arm_position() { return true; }
+bool JoystickDirectControl::update_arm_position(
+    const cmr_msgs::msg::JoystickReading msg)
+{
+    // control integer corresponds to specific buttons or joysticks on thrustmaster.
+    // i.e. main joystick corresponds to control = 0.
+    int control = msg.control;
+    // generalized axis value for controls with multiple axes. main joystick
+    // horizontal = 0, vertical = 1.
+    int axis = msg.axis;
+    // magnitude is important for continuous controls such as the joystick. values
+    // range 0-100 float. buttons will have discrete values of 1.0, -1.0, 0.0 for
+    // pressing/unpressing.
+    double magnitude = msg.magnitude;
+
+    // logic to send effort values to certain motors based on control value
+    if (control == 0) {  // main joystick movement detected
+        m_arm_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
+            "joystick/effort", 100);
+        if (axis == 0) {  // horizontal movement on joystick detected
+            auto message = cmr_msgs::msg::ArmJointEffort();
+            message.motor = 1;
+            message.effort = magnitude;
+            m_arm_effort_pub->publish(message);
+        }
+        if (axis == 1) {  // vertical movement on joystick detected
+            auto message = cmr_msgs::msg::ArmJointEffort();
+            message.motor = 2;
+            message.effort = magnitude;
+            m_arm_effort_pub->publish(message);
+        }
+    }
+
+    return true;
+}
 
 bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
 {
@@ -23,10 +56,12 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
     //     node_settings->getDouble("arm_segment2_length");
     // const auto [ok_arm3, arm_segment3_length] =
     //     node_settings->getDouble("arm_segment3_length");
+    // const auto [_, buffer_size] = node_settings->getInt("buffer_size");
     // Ex.const auto node_settings = table->getTable("node");
-    m_joystick_sub = nullptr;
-    // m_joystick_sub = create_subscription<typename MessageT>(
-    //    "joystick_reading", 10, update_arm_position());
+    m_joystick_sub = this->create_subscription<cmr_msgs::msg::JoystickReading>(
+        "topic", 100,
+        std::bind(&JoystickDirectControl::update_arm_position, this,
+                  std::placeholders::_1));
     return true;
 }
 

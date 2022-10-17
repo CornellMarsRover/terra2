@@ -1,18 +1,15 @@
 #pragma once
 #include "cmr_fabric/fabric_node.hpp"
+#include "cmr_msgs/msg/arm_joint_effort.hpp"
 #include "cmr_msgs/msg/joystick_reading.hpp"
 namespace cmr
 {
-
-/**
- * `JoystickDirectControl`
- *
- * TODO
- */
 class JoystickDirectControl : public cmr::fabric::FabricNode
 {
     std::shared_ptr<rclcpp::Subscription<cmr_msgs::msg::JoystickReading>>
         m_joystick_sub;
+    std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
+        m_arm_effort_pub;
 
   public:
     /**
@@ -34,7 +31,7 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
 
     bool cleanup() override;
 
-    bool update_arm_position();
+    bool update_arm_position(const cmr_msgs::msg::JoystickReading msg);
 };
 
 }  // namespace cmr

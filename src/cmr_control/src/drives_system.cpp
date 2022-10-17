@@ -3,7 +3,7 @@
 #include "cmr_utils/cmr_debug.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 
-namespace cmr::control
+namespace cmr_control
 {
 
 // NOLINTNEXTLINE
@@ -15,6 +15,13 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_init(
         hardware_interface::CallbackReturn::SUCCESS) {
         return hardware_interface::CallbackReturn::ERROR;
     }
+
+    m_hw_commands.resize(info_.joints.size(),
+                         std::numeric_limits<double>::quiet_NaN());
+    m_hw_velocities.resize(info_.joints.size(),
+                           std::numeric_limits<double>::quiet_NaN());
+    m_hw_positions.resize(info_.joints.size(),
+                          std::numeric_limits<double>::quiet_NaN());
 
     // Enforce requirements on the system's state and command interfaces.
     // We expect each joint to have one velocity command interface and one
@@ -35,17 +42,25 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_init(
             return hardware_interface::CallbackReturn::ERROR;
         }
 
-        if (joint.state_interfaces.size() != 1) {
-            CMR_LOG(FATAL, "Joint '%s' has %zu state interfaces found. 1 expected.",
-                    joint.name.c_str(), joint.command_interfaces.size());
+        if (joint.state_interfaces.size() != 2) {
+            CMR_LOG(FATAL, "Joint '%s' has %zu state interfaces found. 2 expected.",
+                    joint.name.c_str(), joint.state_interfaces.size());
             return hardware_interface::CallbackReturn::ERROR;
         }
 
-        if (joint.state_interfaces[0].name != hardware_interface::HW_IF_VELOCITY) {
+        if (joint.state_interfaces[0].name != hardware_interface::HW_IF_POSITION) {
+            CMR_LOG(FATAL,
+                    "Joint '%s' has %s state interface, but position interface was "
+                    "expected.",
+                    joint.name.c_str(), joint.state_interfaces[0].name.c_str());
+            return hardware_interface::CallbackReturn::ERROR;
+        }
+
+        if (joint.state_interfaces[1].name != hardware_interface::HW_IF_VELOCITY) {
             CMR_LOG(FATAL,
                     "Joint '%s' has %s state interface, but velocity interface was "
                     "expected.",
-                    joint.name.c_str(), joint.state_interfaces[0].name.c_str());
+                    joint.name.c_str(), joint.state_interfaces[1].name.c_str());
             return hardware_interface::CallbackReturn::ERROR;
         }
     }
@@ -59,8 +74,11 @@ DrivesSystemHardware::export_state_interfaces()
     std::vector<hardware_interface::StateInterface> state_interfaces;
     for (auto i = 0u; i < info_.joints.size(); i++) {
         state_interfaces.emplace_back(hardware_interface::StateInterface(
+            info_.joints[i].name, hardware_interface::HW_IF_POSITION,
+            &m_hw_positions[i]));
+        state_interfaces.emplace_back(hardware_interface::StateInterface(
             info_.joints[i].name, hardware_interface::HW_IF_VELOCITY,
-            &m_hw_states[i]));
+            &m_hw_velocities[i]));
     }
     return state_interfaces;
 }
@@ -83,7 +101,8 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_activate(
 {
     // set initial values
     std::fill(m_hw_commands.begin(), m_hw_commands.end(), 0.0);
-    std::fill(m_hw_states.begin(), m_hw_states.end(), 0.0);
+    std::fill(m_hw_velocities.begin(), m_hw_velocities.end(), 0.0);
+    std::fill(m_hw_positions.begin(), m_hw_positions.end(), 0.0);
     return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -107,11 +126,11 @@ hardware_interface::return_type DrivesSystemHardware::write(
     return hardware_interface::return_type::OK;
 }
 
-}  // namespace cmr::control
+}  // namespace cmr_control
 
 // This exposes this hardware interface so that it can be discovered by the
 // ROS2 Control hardware resource manager
 #include "pluginlib/class_list_macros.hpp"
 // NOLINTNEXTLINE
-PLUGINLIB_EXPORT_CLASS(cmr::control::DrivesSystemHardware,
+PLUGINLIB_EXPORT_CLASS(cmr_control::DrivesSystemHardware,
                        hardware_interface::SystemInterface)

@@ -13,7 +13,7 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
-namespace cmr::control
+namespace cmr_control
 {
 
 class DrivesSystemHardware : public hardware_interface::SystemInterface
@@ -46,7 +46,9 @@ class DrivesSystemHardware : public hardware_interface::SystemInterface
     // outgoing velocities of each joint
     std::vector<double> m_hw_commands;
     // incoming measured velocities of each joint
-    std::vector<double> m_hw_states;
+    std::vector<double> m_hw_velocities;
+    // incoming measured velocities of each joint
+    std::vector<double> m_hw_positions;
 };
 
-}  // namespace cmr::control
+}  // namespace cmr_control

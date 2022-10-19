@@ -4,7 +4,7 @@ project(cmr_arm_description)
 find_package(ament_cmake REQUIRED)
 
 install(
-    DIRECTORY config gazebo launch ros2_control urdf
+    DIRECTORY config gazebo launch ros2_control urdf meshes
     DESTINATION share/${PROJECT_NAME}
 )
 

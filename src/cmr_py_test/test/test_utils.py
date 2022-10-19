@@ -111,6 +111,7 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import time
 import rclpy.action as action
+import rclpy.executors as executors
 
 
 def make_launch_file(package: str, launch_file: str, **kwargs):
@@ -973,6 +974,9 @@ def send_action_goal_sync(
     client = action.ActionClient(node, action_type, action_name)
     future = client.send_goal_async(goal, feedback_cb)
     node.get_logger().info(f"Sent goal to {action_name}, waiting for result")
-    ros.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
+    # ros.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
+    exec = executors.SingleThreadedExecutor()
+    exec.add_node(node)
+    exec.spin_until_future_complete(future, timeout_sec=timeout_sec)
     node.get_logger().info(f"Got result from {action_name}")
     return future.result() if future.done() else None

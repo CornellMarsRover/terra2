@@ -12,8 +12,16 @@ namespace cmr
  */
 class Joystick : public cmr::fabric::FabricNode
 {
+<<<<<<< HEAD
   //Initiates basic ROS2 Wall Timer for callback function with joystick output
   ros::WallTimer = walltimer_;
+=======
+    std::string m_device_name;
+
+    int m_js;
+
+    std::shared_ptr<rclcpp::WallTimer<std::function<void()>>> m_buffer_timer;
+>>>>>>> 9e1310a (Finishes basic implementation of joystick node without messages. (For testing))
 
   public:
     /**
@@ -27,6 +35,8 @@ class Joystick : public cmr::fabric::FabricNode
         const std::optional<cmr::fabric::FabricNodeConfig>& config = std::nullopt);
 
   private:
+    void joystick_callback() const;
+
     bool configure(const std::shared_ptr<toml::Table>& table) override;
 
     bool activate() override;

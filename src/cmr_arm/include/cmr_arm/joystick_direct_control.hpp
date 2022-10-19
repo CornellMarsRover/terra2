@@ -9,7 +9,17 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
     std::shared_ptr<rclcpp::Subscription<cmr_msgs::msg::JoystickReading>>
         m_joystick_sub;
     std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
-        m_arm_effort_pub;
+        m_base_rotate_effort_pub;
+    std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
+        m_shoulder_effort_pub;
+    std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
+        m_elbow_effort_pub;
+    std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
+        m_second_rotate_effort_pub;
+    std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
+        m_third_tilt_effort_pub;
+    std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
+        m_third_rotate_effort_pub;
 
   public:
     /**

@@ -25,23 +25,37 @@ bool JoystickDirectControl::update_arm_position(
     double magnitude = msg.magnitude;
 
     // logic to send effort values to certain motors based on control value
-    if (control == 0) {  // main joystick movement detected
-        m_arm_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
-            "joystick/effort", 100);
+    if (control == 0) {   // main joystick movement detected
         if (axis == 0) {  // horizontal movement on joystick detected
             auto message = cmr_msgs::msg::ArmJointEffort();
-            message.motor = 1;
             message.effort = magnitude;
-            m_arm_effort_pub->publish(message);
+            m_base_rotate_effort_pub->publish(message);
         }
         if (axis == 1) {  // vertical movement on joystick detected
             auto message = cmr_msgs::msg::ArmJointEffort();
-            message.motor = 2;
             message.effort = magnitude;
-            m_arm_effort_pub->publish(message);
+            m_shoulder_effort_pub->publish(message);
         }
+    } else if (control == 2) {
+        if (axis == 0) {  // horizontal movement on joystick detected
+            auto message = cmr_msgs::msg::ArmJointEffort();
+            message.effort = magnitude;
+            m_third_tilt_effort_pub->publish(message);
+        }
+        if (axis == 1) {  // vertical movement on joystick detected
+            auto message = cmr_msgs::msg::ArmJointEffort();
+            message.effort = magnitude;
+            m_third_rotate_effort_pub->publish(message);
+        }
+    } else if (control == 3) {
+        auto message = cmr_msgs::msg::ArmJointEffort();
+        message.effort = magnitude;
+        m_elbow_effort_pub->publish(message);
+    } else if (control == 4) {
+        auto message = cmr_msgs::msg::ArmJointEffort();
+        message.effort = magnitude;
+        m_second_rotate_effort_pub->publish(message);
     }
-
     return true;
 }
 
@@ -62,6 +76,20 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
         "topic", 100,
         std::bind(&JoystickDirectControl::update_arm_position, this,
                   std::placeholders::_1));
+    m_base_rotate_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
+        "base_rotate/effort", 100);
+    m_shoulder_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
+        "shoulder/effort", 100);
+    m_elbow_effort_pub =
+        this->create_publisher<cmr_msgs::msg::ArmJointEffort>("elbow/effort", 100);
+    m_second_rotate_effort_pub =
+        this->create_publisher<cmr_msgs::msg::ArmJointEffort>("second_rotate/effort",
+                                                              100);
+    m_third_tilt_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
+        "third_tilt/effort", 100);
+    m_third_rotate_effort_pub =
+        this->create_publisher<cmr_msgs::msg::ArmJointEffort>("third_rotate/effort",
+                                                              100);
     return true;
 }
 

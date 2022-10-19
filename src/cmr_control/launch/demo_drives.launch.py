@@ -6,36 +6,37 @@ from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+
 def generate_launch_description():
-    robot_description_content = Command([
-        PathJoinSubstitution([FindExecutable(name="xacro")]),
-        " ",
-        PathJoinSubstitution([
-            FindPackageShare("cmr_drives_description"),
-            "urdf",
-            "drives.urdf.xacro"
-        ])
-    ])
+    robot_description_content = Command(
+        [
+            PathJoinSubstitution([FindExecutable(name="xacro")]),
+            " ",
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("cmr_drives_description"),
+                    "urdf",
+                    "drives.urdf.xacro",
+                ]
+            ),
+        ]
+    )
 
     robot_description = {"robot_description": robot_description_content}
 
-    robot_controllers = PathJoinSubstitution([
-        FindPackageShare("cmr_control"),
-        "config",
-        "drives_controllers.yaml"
-    ])
+    robot_controllers = PathJoinSubstitution(
+        [FindPackageShare("cmr_control"), "config", "drives_controllers.yaml"]
+    )
 
-    rviz_config_file = PathJoinSubstitution([
-        FindPackageShare("cmr_drives_description"),
-        "config",
-        "drives.rviz"
-    ])
+    rviz_config_file = PathJoinSubstitution(
+        [FindPackageShare("cmr_drives_description"), "config", "drives.rviz"]
+    )
 
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
         parameters=[robot_description, robot_controllers],
-        output="both"
+        output="both",
     )
 
     robot_state_pub_node = Node(
@@ -44,7 +45,7 @@ def generate_launch_description():
         output="both",
         parameters=[robot_description],
         remappings=[
-            ("/base_controller/cmd_vel_unstamped", "/cmd_vel"),
+            ("/drives_controller/cmd_vel_unstamped", "/cmd_vel"),
         ],
     )
     rviz_node = Node(
@@ -58,13 +59,17 @@ def generate_launch_description():
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        arguments=[
+            "joint_state_broadcaster",
+            "--controller-manager",
+            "/controller_manager",
+        ],
     )
 
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["base_controller", "-c", "/controller_manager"],
+        arguments=["drives_controller", "-c", "/controller_manager"],
     )
 
     # Delay rviz start after `joint_state_broadcaster`
@@ -76,10 +81,12 @@ def generate_launch_description():
     )
 
     # Delay start of robot_controller after `joint_state_broadcaster`
-    delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=joint_state_broadcaster_spawner,
-            on_exit=[robot_controller_spawner],
+    delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = (
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[robot_controller_spawner],
+            )
         )
     )
 

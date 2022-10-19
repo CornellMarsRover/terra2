@@ -6,11 +6,11 @@ controller_manager:
       # Doc -> https://github.com/ros-controls/ros2_controllers/blob/master/joint_state_broadcaster/doc/userdoc.rst
       type: joint_state_broadcaster/JointStateBroadcaster
 
-    base_controller:
+    drives_controller:
       # Doc -> https://github.com/ros-controls/ros2_controllers/blob/master/diff_drive_controller/doc/userdoc.rst
       type: diff_drive_controller/DiffDriveController
 
-base_controller:
+drives_controller:
   ros__parameters:
     # Names should match the joint names from the URDF
     left_wheel_names: ["left_front_joint", "left_mid_joint", "left_back_joint"]

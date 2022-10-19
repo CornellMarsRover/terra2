@@ -1,6 +1,6 @@
 #pragma once
+
 #include "cmr_fabric/fabric_node.hpp"
-#include <wall_timer.h>
 
 namespace cmr
 {
@@ -12,16 +12,11 @@ namespace cmr
  */
 class Joystick : public cmr::fabric::FabricNode
 {
-<<<<<<< HEAD
-  //Initiates basic ROS2 Wall Timer for callback function with joystick output
-  ros::WallTimer = walltimer_;
-=======
     std::string m_device_name;
 
     int m_js;
 
     std::shared_ptr<rclcpp::WallTimer<std::function<void()>>> m_buffer_timer;
->>>>>>> 9e1310a (Finishes basic implementation of joystick node without messages. (For testing))
 
   public:
     /**

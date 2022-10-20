@@ -458,9 +458,11 @@ def call_service_sync(service_type: type, service_name: str, request, timeout_se
         )
         connection_tries += 1
 
+    exec = executors.SingleThreadedExecutor()
+    exec.add_node(node)
     if client.service_is_ready():
         future = client.call_async(request)
-        ros.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
+        exec.spin_until_future_complete(future, timeout_sec=timeout_sec)
         node.destroy_node()
         if future.done():
             return future.result()
@@ -760,7 +762,9 @@ class TopicSubscriber:
     def wait_for_msg(self, timeout_sec=5.0, async_nodes=[]):
         """
         Waits for a message to be received on the topic and returns that message
-        Will return immediately if a message has already been received
+        Will return immediately if a message has already been received.
+
+        This should not be called at the same time as another `wait_for_msg`
 
         ### Args:
             - timeout_sec (float or None): The number of seconds to wait for a message
@@ -836,7 +840,8 @@ class __ServiceActionListener:
 
     def wait_for_msg(self, wait_pred=1, timeout_sec=5.0, async_nodes=[]):
         """
-        Waits for a new message to be received
+        Waits for a new message to be received.
+        This should not be called at the same time as another `wait_for_msg`
 
         ### Args:
             - wait_pred (int or callable): The number of requests to wait for or a function
@@ -974,7 +979,6 @@ def send_action_goal_sync(
     client = action.ActionClient(node, action_type, action_name)
     future = client.send_goal_async(goal, feedback_cb)
     node.get_logger().info(f"Sent goal to {action_name}, waiting for result")
-    # ros.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
     exec = executors.SingleThreadedExecutor()
     exec.add_node(node)
     exec.spin_until_future_complete(future, timeout_sec=timeout_sec)

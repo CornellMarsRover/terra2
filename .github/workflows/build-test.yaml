@@ -3,8 +3,8 @@ on:
   push:
   workflow_dispatch:
   schedule:
-    # 4:30 AM EST every sunday, wednesday, friday, and saturday
-    - cron: "30 8 * * 0,3,5,6"
+    # 4:30 AM EST every day
+    - cron: "30 8 * * *"
 jobs:
   test:
     runs-on: self-hosted

@@ -20,6 +20,7 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
         m_third_tilt_effort_pub;
     std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::ArmJointEffort>>
         m_third_rotate_effort_pub;
+    std::shared_ptr<double> m_sensitivity;
 
   public:
     /**

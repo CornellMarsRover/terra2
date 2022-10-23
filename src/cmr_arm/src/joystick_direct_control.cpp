@@ -23,37 +23,42 @@ bool JoystickDirectControl::update_arm_position(
     // range 0-100 float. buttons will have discrete values of 1.0, -1.0, 0.0 for
     // pressing/unpressing.
     double magnitude = msg.magnitude;
+    // sensitivity is updated whenever slider is moved. affects magnitude of
+    // motor effort via a multiplier.
+    double sens = *m_sensitivity;
 
     // logic to send effort values to certain motors based on control value
     if (control == 0) {   // main joystick movement detected
         if (axis == 0) {  // horizontal movement on joystick detected
             auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude;
+            message.effort = magnitude * sens;
             m_base_rotate_effort_pub->publish(message);
         }
         if (axis == 1) {  // vertical movement on joystick detected
             auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude;
+            message.effort = magnitude * sens;
             m_shoulder_effort_pub->publish(message);
         }
+    } else if (control == 1) {  // sensitivity slider has changed
+        *m_sensitivity = magnitude * 0.01;
     } else if (control == 2) {
         if (axis == 0) {  // horizontal movement on joystick detected
             auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude;
+            message.effort = magnitude * sens;
             m_third_tilt_effort_pub->publish(message);
         }
         if (axis == 1) {  // vertical movement on joystick detected
             auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude;
+            message.effort = magnitude * sens;
             m_third_rotate_effort_pub->publish(message);
         }
     } else if (control == 3) {
         auto message = cmr_msgs::msg::ArmJointEffort();
-        message.effort = magnitude;
+        message.effort = magnitude * sens;
         m_elbow_effort_pub->publish(message);
     } else if (control == 4) {
         auto message = cmr_msgs::msg::ArmJointEffort();
-        message.effort = magnitude;
+        message.effort = magnitude * sens;
         m_second_rotate_effort_pub->publish(message);
     }
     return true;
@@ -64,14 +69,12 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
     // read node config; setup subscriptions, clients, services, etc.; and
     // most of the node setup logic here
     const auto node_settings = table->getTable("node");
+
     // const auto [ok_arm1, arm_segment1_length] =
     //     node_settings->getDouble("arm_segment1_length");
-    // const auto [ok_arm2, arm_segment2_length] =
-    //     node_settings->getDouble("arm_segment2_length");
-    // const auto [ok_arm3, arm_segment3_length] =
-    //     node_settings->getDouble("arm_segment3_length");
     // const auto [_, buffer_size] = node_settings->getInt("buffer_size");
     // Ex.const auto node_settings = table->getTable("node");
+
     m_joystick_sub = this->create_subscription<cmr_msgs::msg::JoystickReading>(
         "topic", 100,
         std::bind(&JoystickDirectControl::update_arm_position, this,
@@ -90,6 +93,7 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
     m_third_rotate_effort_pub =
         this->create_publisher<cmr_msgs::msg::ArmJointEffort>("third_rotate/effort",
                                                               100);
+    *m_sensitivity = 0.5;
     return true;
 }
 
@@ -111,7 +115,14 @@ bool JoystickDirectControl::deactivate()
 bool JoystickDirectControl::cleanup()
 {
     // undo the effects of configure here
-
+    m_joystick_sub.reset();
+    m_base_rotate_effort_pub.reset();
+    m_shoulder_effort_pub.reset();
+    m_elbow_effort_pub.reset();
+    m_second_rotate_effort_pub.reset();
+    m_third_tilt_effort_pub.reset();
+    m_third_rotate_effort_pub.reset();
+    m_sensitivity.reset();
     return true;
 }
 

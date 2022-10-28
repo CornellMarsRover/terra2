@@ -16,6 +16,10 @@
 namespace cmr_control
 {
 
+/**
+ * @brief MockArmSystemHardware is a mock hardware interface for a robot arm.
+ * This hardware interface converts effort commands to velocity and position.
+ */
 class MockArmSystemHardware : public hardware_interface::SystemInterface
 {
   public:
@@ -30,6 +34,10 @@ class MockArmSystemHardware : public hardware_interface::SystemInterface
     std::vector<hardware_interface::CommandInterface> export_command_interfaces()
         override;
 
+    hardware_interface::return_type prepare_command_mode_switch(
+        const std::vector<std::string>& start_interfaces,
+        const std::vector<std::string>& stop_interfaces) override;
+
     hardware_interface::CallbackReturn on_activate(
         const rclcpp_lifecycle::State& previous_state) override;
 
@@ -43,6 +51,8 @@ class MockArmSystemHardware : public hardware_interface::SystemInterface
                                           const rclcpp::Duration& period) override;
 
   private:
+    // current control modes of each joint
+    std::vector<std::string> m_hw_control_modes;
     // outgoing positions of each joint
     std::vector<double> m_hw_position_commands;
     // outgoing efforts of each joint

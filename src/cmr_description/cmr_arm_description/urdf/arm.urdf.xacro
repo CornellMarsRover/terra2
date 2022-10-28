@@ -3,13 +3,12 @@
 
     <xacro:arg name="use_gazebo" default="false" />
 
-    <xacro:arg name="use_fake_hardware" default="true" />
-    <xacro:arg name="fake_sensor_commands" default="false" />
+    <xacro:arg name="mock" default="true" />
 
     <xacro:include filename="$(find cmr_arm_description)/urdf/arm_description.urdf.xacro" />
     <xacro:include filename="$(find cmr_arm_description)/ros2_control/arm.ros2_control.xacro" />
 
     <xacro:arm />
-    <xacro:arm_ros2_control name="arm"/>
+    <xacro:arm_ros2_control name="arm" mock="$(arg mock)"/>
 
 </robot>

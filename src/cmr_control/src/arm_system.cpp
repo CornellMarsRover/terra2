@@ -24,6 +24,7 @@ hardware_interface::CallbackReturn ArmSystemHardware::on_init(
                            std::numeric_limits<double>::quiet_NaN());
     m_hw_positions.resize(info_.joints.size(),
                           std::numeric_limits<double>::quiet_NaN());
+    m_hw_control_modes.resize(info_.joints.size(), hardware_interface::HW_IF_EFFORT);
 
     // Enforce requirements on the system's state and command interfaces.
     // We expect each joint to have one velocity command interface and one
@@ -107,6 +108,62 @@ ArmSystemHardware::export_command_interfaces()
     }
 
     return command_interfaces;
+}
+
+// NOLINTNEXTLINE(readability-function-size)
+hardware_interface::return_type ArmSystemHardware::prepare_command_mode_switch(
+    const std::vector<std::string>& start_interfaces,
+    const std::vector<std::string>& /*stop_interfaces*/)
+{
+    // Prepare for new command modes
+    std::vector<std::string> new_modes;
+    for (auto i = 0u; i < start_interfaces.size(); i++) {
+        auto interface = start_interfaces[i];
+        auto joint = info_.joints[i];
+        if (interface == joint.name + "/" + hardware_interface::HW_IF_POSITION) {
+            new_modes.emplace_back(hardware_interface::HW_IF_POSITION);
+        } else if (interface ==
+                   joint.name + "/" + hardware_interface::HW_IF_EFFORT) {
+            new_modes.emplace_back(hardware_interface::HW_IF_EFFORT);
+        } else {
+            CMR_LOG(ERROR, "Unsupported interface '%s' requested.",
+                    interface.c_str());
+            return hardware_interface::return_type::ERROR;
+        }
+    }
+
+    // Ensure all joints are given the same mode at the same time
+    if (new_modes.size() != info_.joints.size()) {
+        CMR_LOG(ERROR, "All joints must receive new command mode at the same time.");
+        return hardware_interface::return_type::ERROR;
+    }
+    if (std::adjacent_find(new_modes.begin(), new_modes.end(),
+                           std::not_equal_to<>()) != new_modes.end()) {
+        CMR_LOG(ERROR, "All joints must be given the same command mode.");
+        return hardware_interface::return_type::ERROR;
+    }
+
+    // Stop motion on all joints in the current mode
+    for (auto i = 0u; i < info_.joints.size(); i++) {
+        if (m_hw_control_modes[i] == hardware_interface::HW_IF_POSITION) {
+            m_hw_position_commands[i] = m_hw_positions[i];
+        } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_EFFORT) {
+            m_hw_effort_commands[i] = 0.0;
+        }
+        m_hw_control_modes[i] = "undefined";
+    }
+
+    // Set new command modes
+    for (auto i = 0u; i < info_.joints.size(); i++) {
+        if (m_hw_control_modes[i] != "undefined") {
+            CMR_LOG(ERROR, "Joint '%s' is in use by another interface.",
+                    info_.joints[i].name.c_str());
+            return hardware_interface::return_type::ERROR;
+        }
+        m_hw_control_modes[i] = new_modes[i];
+    }
+
+    return hardware_interface::return_type::OK;
 }
 
 hardware_interface::CallbackReturn ArmSystemHardware::on_activate(

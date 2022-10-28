@@ -1,9 +1,14 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="arm_ros2_control" params="name">
+    <xacro:macro name="arm_ros2_control" params="name mock">
         <ros2_control name="${name}" type="system">
             <hardware>
-                <plugin>cmr_control/MockArmSystemHardware</plugin>
+                <xacro:if value="${mock}">
+                    <plugin>cmr_control/MockArmSystemHardware</plugin>
+                </xacro:if>
+                <xacro:unless value="${mock}">
+                    <plugin>cmr_control/ArmSystemHardware</plugin>
+                </xacro:unless>
             </hardware>
             <joint name="base_rotate">
                 <command_interface name="position"/>

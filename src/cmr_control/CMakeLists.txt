@@ -24,6 +24,7 @@ add_library(
     SHARED
     src/drives_system.cpp
     src/arm_system.cpp
+    src/mock_arm_system.cpp
 )
 target_include_directories(
     ${PROJECT_NAME}

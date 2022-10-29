@@ -27,38 +27,28 @@ bool JoystickDirectControl::update_arm_position(
     // motor effort via a multiplier.
     double sens = *m_sensitivity;
 
+    auto message = cmr_msgs::msg::ArmJointEffort();
+    message.effort = magnitude * sens;
     // logic to send effort values to certain motors based on control value
     if (control == 0) {   // main joystick movement detected
         if (axis == 0) {  // horizontal movement on joystick detected
-            auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude * sens;
             m_base_rotate_effort_pub->publish(message);
         }
         if (axis == 1) {  // vertical movement on joystick detected
-            auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude * sens;
             m_shoulder_effort_pub->publish(message);
         }
     } else if (control == 1) {  // sensitivity slider has changed
         *m_sensitivity = magnitude * 0.01;
     } else if (control == 2) {
         if (axis == 0) {  // horizontal movement on joystick detected
-            auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude * sens;
             m_third_tilt_effort_pub->publish(message);
         }
         if (axis == 1) {  // vertical movement on joystick detected
-            auto message = cmr_msgs::msg::ArmJointEffort();
-            message.effort = magnitude * sens;
             m_third_rotate_effort_pub->publish(message);
         }
     } else if (control == 3) {
-        auto message = cmr_msgs::msg::ArmJointEffort();
-        message.effort = magnitude * sens;
         m_elbow_effort_pub->publish(message);
     } else if (control == 4) {
-        auto message = cmr_msgs::msg::ArmJointEffort();
-        message.effort = magnitude * sens;
         m_second_rotate_effort_pub->publish(message);
     }
     return true;
@@ -115,14 +105,14 @@ bool JoystickDirectControl::deactivate()
 bool JoystickDirectControl::cleanup()
 {
     // undo the effects of configure here
-    m_joystick_sub.reset();
-    m_base_rotate_effort_pub.reset();
-    m_shoulder_effort_pub.reset();
-    m_elbow_effort_pub.reset();
-    m_second_rotate_effort_pub.reset();
-    m_third_tilt_effort_pub.reset();
-    m_third_rotate_effort_pub.reset();
-    m_sensitivity.reset();
+    // m_joystick_sub.reset();
+    // m_base_rotate_effort_pub.reset();
+    // m_shoulder_effort_pub.reset();
+    // m_elbow_effort_pub.reset();
+    // m_second_rotate_effort_pub.reset();
+    // m_third_tilt_effort_pub.reset();
+    // m_third_rotate_effort_pub.reset();
+    // m_sensitivity.reset();
     return true;
 }
 

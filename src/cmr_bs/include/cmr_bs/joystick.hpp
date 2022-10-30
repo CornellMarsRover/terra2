@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cmr_fabric/fabric_node.hpp"
+#include "cmr_utils/thread_wrapper.hpp"
 
 namespace cmr
 {
@@ -18,6 +19,10 @@ class Joystick : public cmr::fabric::FabricNode
 
     std::shared_ptr<rclcpp::WallTimer<std::function<void()>>> m_buffer_timer;
 
+    std::unique_ptr<JThread> m_js_thread;
+
+    std::atomic_bool m_loop_flag = false;
+
   public:
     /**
      * Constructs a `Joystick`, optionally passing in config parameters for
@@ -31,6 +36,8 @@ class Joystick : public cmr::fabric::FabricNode
 
   private:
     void joystick_callback() const;
+
+    void joystick_loop();
 
     bool configure(const std::shared_ptr<toml::Table>& table) override;
 

@@ -122,6 +122,14 @@ void Joystick::joystick_callback() const
     fflush(stdout);
 }
 
+void Joystick::joystick_loop()
+{
+    while (m_loop_flag) {
+        joystick_callback();
+    }
+    m_js = close(m_js);
+}
+
 bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
 {
     // read node config; setup subscriptions, clients, services, etc.; and
@@ -144,9 +152,12 @@ bool Joystick::activate()
         perror("Could not open joystick");
         return false;
     }
+    m_loop_flag = true;
 
-    m_buffer_timer =
-        create_wall_timer(50ms, std::function([this]() { joystick_callback(); }));
+    m_js_thread = std::make_unique<JThread>(([this]() { joystick_loop(); }));
+
+    // m_buffer_timer =
+    //     create_wall_timer(50ms, std::function([this]() { joystick_callback(); }));
 
     return true;
 }
@@ -154,8 +165,9 @@ bool Joystick::activate()
 bool Joystick::deactivate()
 {
     // undo the effects of activate here
-    m_js = close(m_js);
+
     m_buffer_timer->cancel();
+    m_loop_flag = false;
     return true;
 }
 

@@ -20,16 +20,17 @@ Joystick::Joystick(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     // declare parameters here
 }
 
-int read_event(int fd, struct js_event* event)
+std::optional<js_event> read_event(int fd)
 {
-    const auto bytes = read(fd, event, sizeof(*event));
+    js_event event{};
+    const auto bytes = read(fd, &event, sizeof(event));
 
-    if (bytes == sizeof(*event)) {
-        return 0;
+    if (bytes == sizeof(event)) {
+        return event;
     }
 
     /* Error, could not read full event. */
-    return -1;
+    return {};
 }
 
 /**
@@ -37,7 +38,7 @@ int read_event(int fd, struct js_event* event)
  */
 size_t get_axis_count(int fd)
 {
-    __u8 axes;
+    uint8_t axes{};
 
     if (ioctl(fd, JSIOCGAXES, &axes) == -1) {
         return 0;
@@ -51,20 +52,13 @@ size_t get_axis_count(int fd)
  */
 size_t get_button_count(int fd)
 {
-    __u8 buttons;
+    uint8_t buttons{};
     if (ioctl(fd, JSIOCGBUTTONS, &buttons) == -1) {
         return 0;
     }
 
     return buttons;
 }
-
-/**
- * Current state of an axis.
- */
-struct AxisState {
-    short x, y;
-};
 
 /**
  * Keeps track of the current axis state.
@@ -75,44 +69,43 @@ struct AxisState {
  *
  * Returns the axis that the event indicated.
  */
-size_t get_axis_state(struct js_event* event, std::array<AxisState, 3>& axis_state)
+size_t get_axis_state(const js_event& event,
+                      std::array<Joystick::AxisState, 3>& axis_state)
 {
-    const size_t axis = event->number / 2;
+    const size_t axis = event.number / 2;
 
     if (axis < 3) {
-        if (event->number % 2 == 0) {
-            axis_state[axis].x = event->value;
+        if (event.number % 2 == 0) {
+            axis_state.at(axis).x = event.value;
         } else {
-            axis_state[axis].y = event->value;
+            axis_state.at(axis).y = event.value;
         }
     }
 
     return axis;
 }
 
-void Joystick::joystick_callback() const
+void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
 {
-    js_event event;
-    std::array<AxisState, 3> axis_state;
-    size_t axis;
-    if (read_event(m_js, &event) == 0) {
+    // std::array<AxisState, 3> axis_state = {};
+    if (const auto event = read_event(m_js); event) {
         /* This loop will exit if the controller is unplugged. */
-
-        switch (event.type) {
+        // event.value().type;
+        switch (event->type) {
             case JS_EVENT_BUTTON:
-                CMR_LOG(INFO, "Button %u %s\n", event.number,
-                        event.value != 0 ? "pressed" : "released");
+                CMR_LOG(INFO, "Button %u %s\n", event->number,
+                        event->value != 0 ? "pressed" : "released");
                 break;
-            case JS_EVENT_AXIS:
-
-                axis = get_axis_state(&event, axis_state);
-                if (axis < 3 && (abs(axis_state[axis].x) > 10000 ||
-                                 abs(axis_state[axis].y) > 10000)) {
+            case JS_EVENT_AXIS: {
+                size_t axis = get_axis_state(*event, axis_state);
+                if (axis < 3 && (abs(axis_state.at(axis).x) > 10000 ||
+                                 abs(axis_state.at(axis).y) > 10000)) {
                     CMR_LOG(INFO, "Axis %zu at (%6d, %6d)\n", axis,
-                            (int)(axis_state[axis].x / 327.67),
-                            (int)(axis_state[axis].y / 327.67));
+                            (int)(axis_state.at(axis).x / 327.67),
+                            (int)(axis_state.at(axis).y / 327.67));
                 }
                 break;
+            }
             default:
                 /* Ignore init events. */
                 break;
@@ -124,8 +117,9 @@ void Joystick::joystick_callback() const
 
 void Joystick::joystick_loop()
 {
+    std::array<AxisState, 3> axis_state{};
     while (m_loop_flag) {
-        joystick_callback();
+        joystick_callback(axis_state);
     }
     m_js = close(m_js);
 }
@@ -152,12 +146,12 @@ bool Joystick::activate()
         perror("Could not open joystick");
         return false;
     }
-    m_loop_flag = true;
+    // m_loop_flag = true;
 
-    m_js_thread = std::make_unique<JThread>(([this]() { joystick_loop(); }));
+    // m_js_thread = std::make_unique<JThread>(([this]() { joystick_loop(); }));
 
-    // m_buffer_timer =
-    //     create_wall_timer(50ms, std::function([this]() { joystick_callback(); }));
+    m_buffer_timer = create_wall_timer(
+        50ms, std::function([this]() { joystick_callback(m_axis_state); }));
 
     return true;
 }
@@ -165,9 +159,9 @@ bool Joystick::activate()
 bool Joystick::deactivate()
 {
     // undo the effects of activate here
-
+    m_js = close(m_js);
     m_buffer_timer->cancel();
-    m_loop_flag = false;
+    // m_loop_flag = false;
     return true;
 }
 

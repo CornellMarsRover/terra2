@@ -34,8 +34,17 @@ class Joystick : public cmr::fabric::FabricNode
     explicit Joystick(
         const std::optional<cmr::fabric::FabricNodeConfig>& config = std::nullopt);
 
+    /**
+     * Current state of an axis.
+     */
+    struct AxisState {
+        short x, y;
+    };
+
   private:
-    void joystick_callback() const;
+    std::array<AxisState, 3> m_axis_state{};
+
+    void joystick_callback(std::array<AxisState, 3>& axis_state) const;
 
     void joystick_loop();
 

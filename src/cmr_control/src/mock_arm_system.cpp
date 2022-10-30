@@ -11,7 +11,7 @@ const float position_factor = 0.01;
 namespace cmr_control
 {
 
-// NOLINTNEXTLINE
+// NOLINTNEXTLINE(readability-function-size)
 hardware_interface::CallbackReturn MockArmSystemHardware::on_init(
     const hardware_interface::HardwareInfo& info)
 {

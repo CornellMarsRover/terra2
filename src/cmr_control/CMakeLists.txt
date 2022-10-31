@@ -23,6 +23,7 @@ add_library(
     ${PROJECT_NAME}
     SHARED
     src/drives_system.cpp
+    src/base_arm_system.cpp
     src/arm_system.cpp
     src/mock_arm_system.cpp
 )

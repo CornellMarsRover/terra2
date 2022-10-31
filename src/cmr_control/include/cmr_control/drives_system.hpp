@@ -10,7 +10,6 @@
 #include "rclcpp/duration.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/time.hpp"
-#include "rclcpp_lifecycle/state.hpp"
 
 namespace cmr_control
 {

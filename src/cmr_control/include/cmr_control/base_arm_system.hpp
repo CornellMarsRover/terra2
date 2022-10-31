@@ -54,12 +54,34 @@ class BaseArmSystemHardware : public hardware_interface::SystemInterface
 
   private:
     /**
-     * Returns true if the interfaces we're configured with make sense for this
-     * hardware. Checks that we have the expected number and types of command and
+     * @brief Returns true if the interfaces we're configured with make sense for
+     * this hardware.
+     *
+     * Checks that we have the expected number and types of command and
      * state interfaces declared in the ROS2 Control portion of this hardware's URDF
      * file.
      */
     bool validate_interfaces();
+
+    /**
+     * @brief Returns true if all control modes are changed at the same time and
+     * are all given the same control mode.
+     *
+     * @param new_modes The new control modes to set.
+     */
+    bool validate_switch(const std::vector<std::string>& new_modes);
+
+    /**
+     * @brief Halts all motion in the current control mode and sets the current
+     * control mode of all joints to "undefined".
+     *
+     * This is called when the hardware interface is told to switch control modes
+     * between position and effort control. If any of the joints are not in the
+     * "undefined" mode, this indicates that another hardware resource is using
+     * this particular joint and therefore it is not safe to switch control mode
+     * at this time.
+     */
+    void halt_all_motion();
 };
 
 }  // namespace cmr_control

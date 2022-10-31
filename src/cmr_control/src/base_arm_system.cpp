@@ -82,6 +82,49 @@ hardware_interface::CallbackReturn BaseArmSystemHardware::on_deactivate(
     return hardware_interface::CallbackReturn::SUCCESS;
 };
 
+hardware_interface::return_type BaseArmSystemHardware::prepare_command_mode_switch(
+    const std::vector<std::string>& start_interfaces,
+    const std::vector<std::string>& /*stop_interfaces*/)
+{
+    // Prepare for new command modes
+    std::vector<std::string> new_modes;
+    for (auto i = 0u; i < start_interfaces.size(); i++) {
+        auto interface = start_interfaces[i];
+        auto joint = info_.joints[i];
+        if (interface == joint.name + "/" + hardware_interface::HW_IF_POSITION) {
+            new_modes.emplace_back(hardware_interface::HW_IF_POSITION);
+        } else if (interface ==
+                   joint.name + "/" + hardware_interface::HW_IF_EFFORT) {
+            new_modes.emplace_back(hardware_interface::HW_IF_EFFORT);
+        } else {
+            CMR_LOG(ERROR, "Unsupported interface '%s' requested.",
+                    interface.c_str());
+            return hardware_interface::return_type::ERROR;
+        }
+    }
+
+    if (!validate_switch(new_modes)) {
+        CMR_LOG(
+            ERROR,
+            "All joints must receive the same new command mode at the same time.");
+        return hardware_interface::return_type::ERROR;
+    }
+
+    halt_all_motion();
+
+    // Set new command modes
+    for (auto i = 0u; i < info_.joints.size(); i++) {
+        if (m_hw_control_modes[i] != "undefined") {
+            CMR_LOG(ERROR, "Joint '%s' is in use by another interface.",
+                    info_.joints[i].name.c_str());
+            return hardware_interface::return_type::ERROR;
+        }
+        m_hw_control_modes[i] = new_modes[i];
+    }
+
+    return hardware_interface::return_type::OK;
+}
+
 // NOLINTNEXTLINE(readability-function-size)
 bool BaseArmSystemHardware::validate_interfaces()
 {
@@ -136,5 +179,26 @@ bool BaseArmSystemHardware::validate_interfaces()
     }
     return true;
 };
+
+bool BaseArmSystemHardware::validate_switch(
+    const std::vector<std::string>& new_modes)
+{
+    return new_modes.size() == info_.joints.size() &&
+           std::adjacent_find(new_modes.begin(), new_modes.end(),
+                              std::not_equal_to<>()) == new_modes.end();
+}
+
+void BaseArmSystemHardware::halt_all_motion()
+{
+    // Stop motion on all joints in the current mode
+    for (auto i = 0u; i < info_.joints.size(); i++) {
+        if (m_hw_control_modes[i] == hardware_interface::HW_IF_POSITION) {
+            m_hw_position_commands[i] = m_hw_positions[i];
+        } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_EFFORT) {
+            m_hw_effort_commands[i] = 0.0;
+        }
+        m_hw_control_modes[i] = "undefined";
+    }
+}
 
 }  // namespace cmr_control

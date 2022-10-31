@@ -61,7 +61,7 @@ class BaseArmSystemHardware : public hardware_interface::SystemInterface
      * state interfaces declared in the ROS2 Control portion of this hardware's URDF
      * file.
      */
-    bool validate_interfaces();
+    bool validate_interfaces() const;
 
     /**
      * @brief Returns true if all control modes are changed at the same time and
@@ -69,7 +69,7 @@ class BaseArmSystemHardware : public hardware_interface::SystemInterface
      *
      * @param new_modes The new control modes to set.
      */
-    bool validate_switch(const std::vector<std::string>& new_modes);
+    bool validate_switch(const std::vector<std::string>& new_modes) const;
 
     /**
      * @brief Halts all motion in the current control mode and sets the current

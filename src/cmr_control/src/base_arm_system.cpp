@@ -82,6 +82,11 @@ hardware_interface::CallbackReturn BaseArmSystemHardware::on_deactivate(
     return hardware_interface::CallbackReturn::SUCCESS;
 };
 
+// TODO consider revisiting the below function after testing to simplify the logic
+// and avoid the extra loop iterations. Right now this directly mimics the ROS2
+// Control demo code, but it might be performing more work than necessary to ensure
+// all the joints are in the same control mode.
+
 hardware_interface::return_type BaseArmSystemHardware::prepare_command_mode_switch(
     const std::vector<std::string>& start_interfaces,
     const std::vector<std::string>& /*stop_interfaces*/)
@@ -126,7 +131,7 @@ hardware_interface::return_type BaseArmSystemHardware::prepare_command_mode_swit
 }
 
 // NOLINTNEXTLINE(readability-function-size)
-bool BaseArmSystemHardware::validate_interfaces()
+bool BaseArmSystemHardware::validate_interfaces() const
 {
     // Enforce requirements on the system's state and command interfaces.
     // We expect each joint to have one velocity command interface and one
@@ -181,7 +186,7 @@ bool BaseArmSystemHardware::validate_interfaces()
 };
 
 bool BaseArmSystemHardware::validate_switch(
-    const std::vector<std::string>& new_modes)
+    const std::vector<std::string>& new_modes) const
 {
     return new_modes.size() == info_.joints.size() &&
            std::adjacent_find(new_modes.begin(), new_modes.end(),

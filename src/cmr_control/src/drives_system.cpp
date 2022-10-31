@@ -87,7 +87,7 @@ hardware_interface::return_type DrivesSystemHardware::write(
 }
 
 // NOLINTNEXTLINE(readability-function-size)
-bool DrivesSystemHardware::validate_interfaces()
+bool DrivesSystemHardware::validate_interfaces() const
 {
     // Enforce requirements on the system's state and command interfaces.
     // We expect each joint to have one velocity command interface and one

@@ -26,7 +26,7 @@ namespace cmr_control
 class DrivesSystemHardware : public hardware_interface::SystemInterface
 {
   public:
-    RCLCPP_SHARED_PTR_DEFINITIONS(DrivesSystemHardware);
+    RCLCPP_SHARED_PTR_DEFINITIONS(DrivesSystemHardware)
 
     hardware_interface::CallbackReturn on_init(
         const hardware_interface::HardwareInfo& info) override;
@@ -65,7 +65,7 @@ class DrivesSystemHardware : public hardware_interface::SystemInterface
      * state interfaces declared in the ROS2 Control portion of this hardware's URDF
      * file.
      */
-    bool validate_interfaces();
+    bool validate_interfaces() const;
 };
 
 }  // namespace cmr_control

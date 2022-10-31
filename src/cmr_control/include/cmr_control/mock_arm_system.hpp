@@ -15,7 +15,7 @@ namespace cmr_control
 class MockArmSystemHardware : public cmr_control::BaseArmSystemHardware
 {
   public:
-    RCLCPP_SHARED_PTR_DEFINITIONS(MockArmSystemHardware);
+    RCLCPP_SHARED_PTR_DEFINITIONS(MockArmSystemHardware)
 
     hardware_interface::return_type read(const rclcpp::Time& time,
                                          const rclcpp::Duration& period) override;

@@ -35,6 +35,9 @@ cmr_add_lib(
     rclcpp_lifecycle
     cmr_utils)
 
+# Export hardware pligins
+pluginlib_export_plugin_description_file(hardware_interface hardware.xml)
+
 # Export old-style CMake variables
 cmr_export()
 

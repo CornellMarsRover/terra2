@@ -12,7 +12,7 @@ namespace cmr_control
 class ArmSystemHardware : public cmr_control::BaseArmSystemHardware
 {
   public:
-    RCLCPP_SHARED_PTR_DEFINITIONS(ArmSystemHardware);
+    RCLCPP_SHARED_PTR_DEFINITIONS(ArmSystemHardware)
 
     hardware_interface::return_type read(const rclcpp::Time& time,
                                          const rclcpp::Duration& period) override;

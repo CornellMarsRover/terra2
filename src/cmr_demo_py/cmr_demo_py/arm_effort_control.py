@@ -5,6 +5,10 @@ from std_msgs.msg import Float64MultiArray
 
 
 class ArmEffortControl(Node):
+    """A temporary test node that just publishes a constant effort of 10.0 to
+    the arm joints at a rate of 2Hz. This should be removed once joystick control
+    is implemented."""
+
     def __init__(self):
         super().__init__("arm_effort_control")
         self.publisher_ = self.create_publisher(

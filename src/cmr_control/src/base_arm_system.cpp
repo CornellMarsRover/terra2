@@ -89,7 +89,7 @@ hardware_interface::return_type BaseArmSystemHardware::prepare_command_mode_swit
     // Prepare for new command modes
     std::vector<std::string> new_modes;
     for (auto i = 0u; i < start_interfaces.size(); i++) {
-        auto interface = start_interfaces[i];
+        const auto& interface = start_interfaces[i];
         auto joint = info_.joints[i];
         if (interface == joint.name + "/" + hardware_interface::HW_IF_POSITION) {
             new_modes.emplace_back(hardware_interface::HW_IF_POSITION);

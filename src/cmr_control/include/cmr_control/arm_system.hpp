@@ -5,9 +5,9 @@ namespace cmr_control
 {
 
 /**
- * @brief ArmSystemHardware is a hardware interface for the arm, meant to be
- * used when using forward kinematics.
- *
+ * @brief ArmSystemHardware is a hardware interface for the arm that provides
+ * effort and position control to each of the arm's joints. It also reads the
+ * current position and velocity of each arm joint from the encoders.
  */
 class ArmSystemHardware : public cmr_control::BaseArmSystemHardware
 {

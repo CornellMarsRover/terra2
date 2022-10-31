@@ -14,6 +14,15 @@
 namespace cmr_control
 {
 
+/**
+ * @brief Hardware interface for the drives system of the rover, which consists
+ * of a number of wheel motors and their encoders.
+ *
+ * This hardware interface supports commanding the velocity of each wheel, and
+ * reading the current velocity and position of each wheel reported from the
+ * wheel encoders. This hardware interface is mainly used by the
+ * diff_drive_controller to provide velocity control of the rover.
+ */
 class DrivesSystemHardware : public hardware_interface::SystemInterface
 {
   public:
@@ -45,8 +54,18 @@ class DrivesSystemHardware : public hardware_interface::SystemInterface
     std::vector<double> m_hw_commands;
     // incoming measured velocities of each joint
     std::vector<double> m_hw_velocities;
-    // incoming measured velocities of each joint
+    // incoming measured positions of each joint
     std::vector<double> m_hw_positions;
+
+    /**
+     * @brief Returns true if the interfaces we're configured with make sense for
+     * this hardware.
+     *
+     * Checks that we have the expected number and types of command and
+     * state interfaces declared in the ROS2 Control portion of this hardware's URDF
+     * file.
+     */
+    bool validate_interfaces();
 };
 
 }  // namespace cmr_control

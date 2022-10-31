@@ -5,8 +5,12 @@ namespace cmr_control
 {
 
 /**
- * @brief MockArmSystemHardware is a mock hardware interface for a robot arm.
- * This hardware interface converts effort commands to velocity and position.
+ * @brief MockArmSystemHardware is a hardware interface for the arm that mocks
+ * effort and position control to each of the arm's joints.
+ *
+ * No actual hardware commands are sent, but the arm's position and velocity are
+ * updated based on the commanded effort and position times a constant factor
+ * that's defined in the implementation.
  */
 class MockArmSystemHardware : public cmr_control::BaseArmSystemHardware
 {

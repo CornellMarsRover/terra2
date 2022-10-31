@@ -28,7 +28,7 @@ hardware_interface::return_type MockArmSystemHardware::write(
             // update position
             m_hw_positions[i] = m_hw_position_commands[i];
         } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_EFFORT) {
-            auto effort = m_hw_effort_commands[i];
+            const auto& effort = m_hw_effort_commands[i];
             if (effort > 0) {
                 auto computed_vel = effort * velocity_factor;
 

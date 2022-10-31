@@ -6,7 +6,6 @@
 namespace cmr_control
 {
 
-// NOLINTNEXTLINE
 hardware_interface::CallbackReturn DrivesSystemHardware::on_init(
     const hardware_interface::HardwareInfo& info)
 {
@@ -16,6 +15,8 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_init(
         return hardware_interface::CallbackReturn::ERROR;
     }
 
+    // Initialize members to a default value for each joint.
+    // We use NaN to indicate that data has not yet been set.
     m_hw_commands.resize(info_.joints.size(),
                          std::numeric_limits<double>::quiet_NaN());
     m_hw_velocities.resize(info_.joints.size(),
@@ -23,49 +24,8 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_init(
     m_hw_positions.resize(info_.joints.size(),
                           std::numeric_limits<double>::quiet_NaN());
 
-    // Enforce requirements on the system's state and command interfaces.
-    // We expect each joint to have one velocity command interface and one
-    // velocity state interface.
-    for (const hardware_interface::ComponentInfo& joint : info_.joints) {
-        if (joint.command_interfaces.size() != 1) {
-            CMR_LOG(FATAL,
-                    "Joint '%s' has %zu command interfaces found. 1 expected.",
-                    joint.name.c_str(), joint.command_interfaces.size());
-            return hardware_interface::CallbackReturn::ERROR;
-        }
-
-        if (joint.command_interfaces[0].name != hardware_interface::HW_IF_VELOCITY) {
-            CMR_LOG(
-                FATAL,
-                "Joint '%s' has %s interface, but velocity interface was expected.",
-                joint.name.c_str(), joint.command_interfaces[0].name.c_str());
-            return hardware_interface::CallbackReturn::ERROR;
-        }
-
-        if (joint.state_interfaces.size() != 2) {
-            CMR_LOG(FATAL, "Joint '%s' has %zu state interfaces found. 2 expected.",
-                    joint.name.c_str(), joint.state_interfaces.size());
-            return hardware_interface::CallbackReturn::ERROR;
-        }
-
-        if (joint.state_interfaces[0].name != hardware_interface::HW_IF_POSITION) {
-            CMR_LOG(FATAL,
-                    "Joint '%s' has %s state interface, but position interface was "
-                    "expected.",
-                    joint.name.c_str(), joint.state_interfaces[0].name.c_str());
-            return hardware_interface::CallbackReturn::ERROR;
-        }
-
-        if (joint.state_interfaces[1].name != hardware_interface::HW_IF_VELOCITY) {
-            CMR_LOG(FATAL,
-                    "Joint '%s' has %s state interface, but velocity interface was "
-                    "expected.",
-                    joint.name.c_str(), joint.state_interfaces[1].name.c_str());
-            return hardware_interface::CallbackReturn::ERROR;
-        }
-    }
-
-    return hardware_interface::CallbackReturn::SUCCESS;
+    return validate_interfaces() ? hardware_interface::CallbackReturn::SUCCESS
+                                 : hardware_interface::CallbackReturn::ERROR;
 }
 
 std::vector<hardware_interface::StateInterface>
@@ -124,6 +84,53 @@ hardware_interface::return_type DrivesSystemHardware::write(
 {
     // TODO(fad35): hook this up once firmware message schema is decided
     return hardware_interface::return_type::OK;
+}
+
+// NOLINTNEXTLINE(readability-function-size)
+bool DrivesSystemHardware::validate_interfaces()
+{
+    // Enforce requirements on the system's state and command interfaces.
+    // We expect each joint to have one velocity command interface and one
+    // velocity state interface.
+    for (const hardware_interface::ComponentInfo& joint : info_.joints) {
+        if (joint.command_interfaces.size() != 1) {
+            CMR_LOG(FATAL,
+                    "Joint '%s' has %zu command interfaces found. 1 expected.",
+                    joint.name.c_str(), joint.command_interfaces.size());
+            return false;
+        }
+
+        if (joint.command_interfaces[0].name != hardware_interface::HW_IF_VELOCITY) {
+            CMR_LOG(
+                FATAL,
+                "Joint '%s' has %s interface, but velocity interface was expected.",
+                joint.name.c_str(), joint.command_interfaces[0].name.c_str());
+            return false;
+        }
+
+        if (joint.state_interfaces.size() != 2) {
+            CMR_LOG(FATAL, "Joint '%s' has %zu state interfaces found. 2 expected.",
+                    joint.name.c_str(), joint.state_interfaces.size());
+            return false;
+        }
+
+        if (joint.state_interfaces[0].name != hardware_interface::HW_IF_POSITION) {
+            CMR_LOG(FATAL,
+                    "Joint '%s' has %s state interface, but position interface was "
+                    "expected.",
+                    joint.name.c_str(), joint.state_interfaces[0].name.c_str());
+            return false;
+        }
+
+        if (joint.state_interfaces[1].name != hardware_interface::HW_IF_VELOCITY) {
+            CMR_LOG(FATAL,
+                    "Joint '%s' has %s state interface, but velocity interface was "
+                    "expected.",
+                    joint.name.c_str(), joint.state_interfaces[1].name.c_str());
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace cmr_control

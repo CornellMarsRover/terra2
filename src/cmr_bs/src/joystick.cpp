@@ -10,7 +10,10 @@
 #include <cmr_utils/cmr_debug.hpp>
 #include <memory>
 
+#include "cmr_msgs/msg/joystick_reading.hpp"
+
 using namespace std::chrono_literals;
+using cmr_msgs::msg::JoystickReading;
 namespace cmr
 {
 
@@ -85,20 +88,29 @@ size_t get_axis_state(const js_event& event,
     return axis;
 }
 
+// Used to read values from the joystick and send inputs in the form of messages
 void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
 {
-    // std::array<AxisState, 3> axis_state = {};
+    auto message = cmr_msgs::msg::JoystickReading;
     if (const auto event = read_event(m_js); event) {
         /* This loop will exit if the controller is unplugged. */
-        // event.value().type;
         switch (event->type) {
             case JS_EVENT_BUTTON:
-
+                message.control_id = event->number + 3;
+                message.axis_id = 0;
+                message.magnitude = event->value != 0 ? 1 : 0;
                 CMR_LOG(INFO, "Button %u %s\n", event->number + 3,
                         event->value != 0 ? "pressed" : "released");
+                m_joystick_pub->publish(message);
                 break;
             case JS_EVENT_AXIS: {
                 size_t axis = get_axis_state(*event, axis_state);
+                message.control_id = axis;
+                message.axis_id = 0;
+                message.magnitude = (int)(axis_state.at(axis).x / 327.67);
+                m_joystick_pub->publish(message);
+                message.axis_id = 1;
+                message.magnitude = (int)(axis_state.at(axis).y / 327.67);
                 if (axis < 3) {
                     CMR_LOG(INFO, "Axis %zu at (%6d, %6d)\n", axis,
                             (int)(axis_state.at(axis).x / 327.67),

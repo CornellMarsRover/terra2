@@ -14,13 +14,11 @@ cmr_install()
 
 # Add tests with:
 # cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test dependencies>)
-cmr_add_node(joystick_forward_kinematics
+cmr_add_node(joystick_direct_control
   SOURCES
-  src/joystick_forward_kinematics.cpp
-  src/joystick_forward_kinematics_main.cpp
+  src/joystick_direct_control.cpp
+  src/joystick_direct_control_main.cpp
   DEPENDS
-  cmr_fabric
-  rclcpp_lifecycle
   rclcpp
   std_msgs
   cmr_msgs

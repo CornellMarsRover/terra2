@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="arm_ros2_control" params="name mock">
+        <ros2_control name="${name}" type="system">
+            <hardware>
+                <xacro:if value="${mock}">
+                    <plugin>cmr_control/MockArmSystemHardware</plugin>
+                </xacro:if>
+                <xacro:unless value="${mock}">
+                    <plugin>cmr_control/ArmSystemHardware</plugin>
+                </xacro:unless>
+            </hardware>
+            <joint name="base_rotate">
+                <command_interface name="position"/>
+                <command_interface name="effort"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="shoulder">
+                <command_interface name="position"/>
+                <command_interface name="effort"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="elbow">
+                <command_interface name="position"/>
+                <command_interface name="effort"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="second_rotate">
+                <command_interface name="position"/>
+                <command_interface name="effort"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="third_tilt">
+                <command_interface name="position"/>
+                <command_interface name="effort"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="third_rotate">
+                <command_interface name="position"/>
+                <command_interface name="effort"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name="end_effector">
+                <command_interface name="position"/>
+                <command_interface name="effort"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+        </ros2_control>
+    </xacro:macro>
+</robot>

@@ -10,10 +10,10 @@ namespace cmr
  * efforts). A subscriber is set up to listen for messages, and a callback function
  * sends messages via one of many publishers to individual joint motors.
  *
- * The subscriber topic listens for messages of type JoystickReading.msg, which
- * contains an int control_id, int axis_id, and float64 magnitude. The control and
- * id numbers affect which motor is being controlled, and the magnitude affects how
- * much.
+ * The subscriber topic listens for messages of type JoystickReading.msg on topic
+ * "/js_input", which contains an int control_id, int axis_id, and float64 magnitude.
+ * The control and id numbers affect which motor is being controlled, and the
+ * magnitude affects how much.
  *
  * The publisher topics are set individually to target specific motors. They're named
  * according to the names in the arm URDF. The message type these send out consist of

@@ -50,7 +50,6 @@ void JoystickDirectControl::update_arm_position(const JoystickReading& msg)
     } else if (control == JoystickReading::FOURTH_BUTTON_ID) {
         m_second_rotate_effort_pub->publish(message);
     }
-    return;
 }
 
 bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
@@ -61,31 +60,33 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
 
     const auto [ok_buffer_size, buffer_size] = node_settings->getInt("buffer_size");
     const auto [ok_sensi_scaler, sensi_scaler] =
-        node_settings->getInt("sensitivity_scaler");
-    if (!ok_buffer_size || !ok_sensi_scaler) {
+        node_settings->getDouble("sensitivity_scaler");
+    const auto [ok_start_sens, start_sens] =
+        node_settings->getDouble("starting_sensitivity");
+    if (!ok_buffer_size || !ok_sensi_scaler || !ok_start_sens) {
         return false;
     }
-    m_sens_scaler = static_cast<double>(sensi_scaler);
+    m_sens_scaler = sensi_scaler;
     auto buf_size = static_cast<uint64_t>(buffer_size);
     m_joystick_sub = this->create_subscription<cmr_msgs::msg::JoystickReading>(
-        "/js_input", buf_size, [this](const JoystickReading& joy_msg) {
+        "js_input", buf_size, [this](const JoystickReading& joy_msg) {
             return update_arm_position(joy_msg);
         });
     m_base_rotate_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
-        "/base_rotate/effort", buf_size);
+        "base_rotate/effort", buf_size);
     m_shoulder_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
-        "/shoulder/effort", buf_size);
+        "shoulder/effort", buf_size);
     m_elbow_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
-        "/elbow/effort", buf_size);
+        "elbow/effort", buf_size);
     m_second_rotate_effort_pub =
-        this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
-            "/second_rotate/effort", buf_size);
-    m_third_tilt_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
-        "/third_tilt/effort", buf_size);
-    m_third_rotate_effort_pub =
-        this->create_publisher<cmr_msgs::msg::ArmJointEffort>("/third_rotate/effort",
+        this->create_publisher<cmr_msgs::msg::ArmJointEffort>("second_rotate/effort",
                                                               buf_size);
-    m_sensitivity = 50 * m_sens_scaler;
+    m_third_tilt_effort_pub = this->create_publisher<cmr_msgs::msg::ArmJointEffort>(
+        "third_tilt/effort", buf_size);
+    m_third_rotate_effort_pub =
+        this->create_publisher<cmr_msgs::msg::ArmJointEffort>("third_rotate/effort",
+                                                              buf_size);
+    m_sensitivity = start_sens;
     return true;
 }
 

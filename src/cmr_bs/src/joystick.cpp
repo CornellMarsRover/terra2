@@ -93,13 +93,13 @@ void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
         // event.value().type;
         switch (event->type) {
             case JS_EVENT_BUTTON:
-                CMR_LOG(INFO, "Button %u %s\n", event->number,
+
+                CMR_LOG(INFO, "Button %u %s\n", event->number + 3,
                         event->value != 0 ? "pressed" : "released");
                 break;
             case JS_EVENT_AXIS: {
                 size_t axis = get_axis_state(*event, axis_state);
-                if (axis < 3 && (abs(axis_state.at(axis).x) > 10000 ||
-                                 abs(axis_state.at(axis).y) > 10000)) {
+                if (axis < 3) {
                     CMR_LOG(INFO, "Axis %zu at (%6d, %6d)\n", axis,
                             (int)(axis_state.at(axis).x / 327.67),
                             (int)(axis_state.at(axis).y / 327.67));
@@ -128,6 +128,9 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
 {
     // read node config; setup subscriptions, clients, services, etc.; and
     // most of the node setup logic here
+    auto buffer_size = static_cast<uint64_t>(100);
+    m_joystick_pub = this->create_publisher<cmr_msgs::msg::JoystickReading>(
+        "js_input", buffer_size);
 
     const auto node_settings = table->getTable("node");
     const auto [ok, device] = node_settings->getString("device");
@@ -141,6 +144,8 @@ bool Joystick::activate()
 {
     // do any last-minute things before activation here
     // it should be quick
+    m_joystick_pub->on_activate();
+
     m_js = open(m_device_name.c_str(), O_RDONLY);
     if (m_js == -1) {
         perror("Could not open joystick");
@@ -151,7 +156,7 @@ bool Joystick::activate()
     // m_js_thread = std::make_unique<JThread>(([this]() { joystick_loop(); }));
 
     m_buffer_timer = create_wall_timer(
-        50ms, std::function([this]() { joystick_callback(m_axis_state); }));
+        5ms, std::function([this]() { joystick_callback(m_axis_state); }));
 
     return true;
 }
@@ -159,6 +164,8 @@ bool Joystick::activate()
 bool Joystick::deactivate()
 {
     // undo the effects of activate here
+
+    m_joystick_pub->on_deactivate();
     m_js = close(m_js);
     m_buffer_timer->cancel();
     // m_loop_flag = false;

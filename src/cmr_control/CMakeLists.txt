@@ -1,79 +1,41 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_control)
-
-# Default to C++14
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 14)
-endif()
-
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-Wall -Wextra)
-endif()
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/../../cmake")
+include(CmrUtils)
 
 # find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(hardware_interface REQUIRED)
-find_package(pluginlib REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(rclcpp_lifecycle REQUIRED)
-find_package(cmr_utils REQUIRED)
+cmr_std_find_pkgs(rclcpp_lifecycle hardware_interface pluginlib)
 
-# # COMPILE
-add_library(
+# Add additional dependencies as arguments here. Make sure you update package.xml if you're depending
+# on other packages.
+
+# Pass "LAUNCH" as an argument if you need a launch directory
+cmr_install(LAUNCH)
+
+# Additionally install the config directory
+install(
+    DIRECTORY config
+    DESTINATION share/${PROJECT_NAME}
+)
+
+# Add tests with:
+# cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test dependencies>)
+cmr_add_lib(
     ${PROJECT_NAME}
     SHARED
+    SOURCES
     src/drives_system.cpp
     src/base_arm_system.cpp
     src/arm_system.cpp
     src/mock_arm_system.cpp
-)
-target_include_directories(
-    ${PROJECT_NAME}
-    PRIVATE
-    include
-)
-ament_target_dependencies(
-    ${PROJECT_NAME}
+    DEPENDS
     hardware_interface
     pluginlib
     rclcpp
     rclcpp_lifecycle
-    cmr_utils
-)
+    cmr_utils)
 
-# Export hardware pligins
-pluginlib_export_plugin_description_file(hardware_interface hardware.xml)
+# Export old-style CMake variables
+cmr_export()
 
-# INSTALL
-install(
-    TARGETS ${PROJECT_NAME}
-    DESTINATION lib
-)
-install(
-    DIRECTORY include/
-    DESTINATION include
-)
-install(
-    DIRECTORY config launch
-    DESTINATION share/${PROJECT_NAME}
-)
-
-if(BUILD_TESTING)
-    find_package(ament_cmake_gtest REQUIRED)
-endif()
-
-# # EXPORTS
-ament_export_include_directories(
-    include
-)
-ament_export_libraries(
-    ${PROJECT_NAME}
-)
-ament_export_dependencies(
-    hardware_interface
-    pluginlib
-    rclcpp
-    rclcpp_lifecycle
-    cmr_utils
-)
 ament_package()

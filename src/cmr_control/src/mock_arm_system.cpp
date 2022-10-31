@@ -4,8 +4,8 @@
 
 // these are arbitrarily chosen values that are used to simulate the arm's
 // motion when using forward kinematics.
-const float velocity_factor = 10;
-const float position_factor = 0.01;
+const double velocity_factor = 10;
+const double position_factor = 0.01;
 
 namespace cmr_control
 {

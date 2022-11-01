@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # constants for control ids
 int32 MAIN_JOYSTICK_ID = 0
 int32 SECOND_JOYSTICK_ID = 2
@@ -12,8 +11,4 @@ int32 VERTICAL_AXIS_ID = 1
 
 int32 control_id
 int32 axis_id
-=======
-int32 control
-int32 axis
->>>>>>> 05edd0d (Merged some files from arm for publishing messages)
 float64 magnitude

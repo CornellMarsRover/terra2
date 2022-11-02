@@ -111,6 +111,7 @@ void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
                 m_joystick_pub->publish(message);
                 message.axis_id = 1;
                 message.magnitude_id = (int)(axis_state.at(axis).y / 327.67);
+                m_joystick_pub->publish(message);
                 if (axis < 3) {
                     CMR_LOG(INFO, "Axis %zu at (%6d, %6d)\n", axis,
                             (int)(axis_state.at(axis).x / 327.67),

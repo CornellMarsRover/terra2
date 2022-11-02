@@ -2,6 +2,7 @@
 #include "cmr_fabric/fabric_node.hpp"
 #include "cmr_msgs/msg/arm_joint_effort.hpp"
 #include "cmr_msgs/msg/joystick_reading.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 namespace cmr
 {
 /**
@@ -29,23 +30,8 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
     std::shared_ptr<rclcpp::Subscription<cmr_msgs::msg::JoystickReading>>
         m_joystick_sub;
     std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::ArmJointEffort>>
-        m_base_rotate_effort_pub;
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::ArmJointEffort>>
-        m_shoulder_effort_pub;
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::ArmJointEffort>>
-        m_elbow_effort_pub;
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::ArmJointEffort>>
-        m_second_rotate_effort_pub;
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::ArmJointEffort>>
-        m_third_tilt_effort_pub;
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::ArmJointEffort>>
-        m_third_rotate_effort_pub;
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>>
+        m_arm_control_pub;
     double m_sensitivity;
     double m_sens_scaler;
     bool m_is_activated;

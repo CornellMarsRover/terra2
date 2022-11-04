@@ -135,24 +135,24 @@ macro(CMR_EXPORT)
   endif()
 endmacro()
 
-# Installs the include directory for the module.
+# Installs the include directory for the module and any additional directories
+# that are in the project workspace directory (Ex. under `src/cmr_arm` for arm)
 #
 # ## Args:
 #
-# * <LAUNCH> - optional flag, if passed will also install the launch directory
+# * <dir...> - space separated list of directories to install. Can be empty
 #
 # ## Examples:
 #
 # * `cmr_install()`
-# * `cmr_install(LAUNCH)`
+# * `cmr_install(launch)`
+# * `cmr_install(launch config)`
 function(cmr_install)
-  cmake_parse_arguments(CMR_INSTALL "LAUNCH" "" "" ${ARGN})
-
   install(DIRECTORY include/ DESTINATION include)
 
-  if(${CMR_INSTALL_LAUNCH})
-    install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
-  endif()
+  foreach(dir ${ARGN})
+    install(DIRECTORY "${dir}/" DESTINATION "share/${PROJECT_NAME}/${dir}")
+  endforeach()
 endfunction()
 
 # Calls `find_package` for each argument, passing the REQUIRED option

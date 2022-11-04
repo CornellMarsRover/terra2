@@ -9,7 +9,7 @@ cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle)
 
 # Add additional dependencies here. Make sure you update package.xml if you're
 # depending on other packages.
-cmr_install(LAUNCH)
+cmr_install(launch)
 
 cmr_add_node(
   demo_node

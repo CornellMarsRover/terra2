@@ -48,7 +48,7 @@ def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: 
 # TODO(sev47): The test fixture class doesn't work here?
 
 @cmr_node_test([
-    make_launch_file("cmr_control", "demo_arm.launch.py"),
+    make_launch_file("cmr_control", "forward_k_arm.launch.py"),
     make_fabric_node("cmr_arm", config_path="joystick_direct_control.toml"),
 ])
 def test_basic_direct_control(namespace: str):

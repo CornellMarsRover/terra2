@@ -6,6 +6,13 @@
 namespace cmr
 {
 /**
+ * @brief An ArmSegment is a segment of the arm that can be controlled by mutiple
+ * joints for multiple degrees of freedom
+ *
+ */
+enum class ArmSegment : uint8_t { Base = 0, Elbow, Wrist };
+
+/**
  * @brief The JoystickDirectControl node is the node called to activate arm control
  * via direct joystick control (joystick hardware directly controls joint motor
  * efforts). A subscriber is set up to listen for messages, and a callback function
@@ -23,18 +30,25 @@ namespace cmr
 class JoystickDirectControl : public cmr::fabric::FabricNode
 {
   private:
-    /**
-     * Publishers and subcribers declared here. One subscriber listens for messages
-     * from the joystick hardware, and one publisher for each individual joint motor.
-     */
+    /** listens for messages from the joystick hardware */
     std::shared_ptr<rclcpp::Subscription<cmr_msgs::msg::JoystickReading>>
         m_joystick_sub;
+    /** publishes messages to the ros2 control hardware interface */
     std::shared_ptr<
         rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>>
         m_arm_control_pub;
     double m_sensitivity;
     double m_sens_scaler;
     bool m_is_activated;
+    /** The current arm segment being controlled */
+    ArmSegment m_active_segment;
+    /** Timer to toggle motors off */
+    std::shared_ptr<rclcpp::WallTimer<std::function<void()>>> m_timer;
+    /** The last time we wrote to the hadware interface */
+    rclcpp::Time m_last_msg_time;
+    /** If we wrote to the hardware interface after the last time we toggled controls
+     * off */
+    bool m_dirty;
 
   public:
     /**
@@ -63,6 +77,12 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
      * corresponds to a certain effort amount to a certain motor's axis.)
      */
     void update_arm_position(const cmr_msgs::msg::JoystickReading& msg);
+
+    /**
+     * @brief Callback called periodically to turn off the motors if the joystick
+     * hasn't been used in a while.
+     */
+    void toggle_off_callback();
 };
 
 }  // namespace cmr

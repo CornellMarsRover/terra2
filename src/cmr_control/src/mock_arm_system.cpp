@@ -29,12 +29,12 @@ hardware_interface::return_type MockArmSystemHardware::write(
             m_hw_positions[i] = m_hw_position_commands[i];
         } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_EFFORT) {
             const auto& effort = m_hw_effort_commands[i];
-            if (effort > 0) {
-                auto computed_vel = effort * velocity_factor;
+            const auto computed_vel = effort * velocity_factor;
 
-                // update velocity
-                m_hw_velocities[i] = computed_vel;
+            // update velocity
+            m_hw_velocities[i] = computed_vel;
 
+            if (abs(computed_vel) > std::numeric_limits<double>::epsilon()) {
                 // update position
                 m_hw_positions[i] += computed_vel * position_factor;
             }

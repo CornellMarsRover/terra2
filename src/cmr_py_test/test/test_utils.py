@@ -93,7 +93,7 @@ import rclpy as ros
 from launch_ros.actions import Node as LaunchNode
 from launch import LaunchDescription, LaunchService
 import sys
-from launch.actions import RegisterEventHandler, ExecuteProcess
+from launch.actions import RegisterEventHandler, ExecuteProcess, Shutdown
 from launch.substitutions import FindExecutable
 from launch.event_handlers import OnProcessStart
 from subprocess import check_output
@@ -106,13 +106,13 @@ import signal
 import toml
 from ament_index_python.packages import get_package_share_directory
 from std_srvs.srv._trigger import Trigger
+import re
 
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import time
 import rclpy.action as action
 import rclpy.executors as executors
-import asyncio
 
 
 def make_launch_file(package: str, launch_file: str, **kwargs):
@@ -333,6 +333,20 @@ class NodeLauncher:
 
         with ServiceListener(Trigger, f"/{self.namespace}/launch_wait", cb) as serv:
             serv.wait_for_msg()
+    
+    def __kill_launch_file(self, ld: IncludeLaunchDescription):
+        """
+        Reads the launch file and kills all launched nodes
+        A node is identified by the string "executable=" in the launch file
+        """
+        with open(ld.launch_description_source.location) as f:
+            launch_code = f.read()
+            for match in re.finditer(r"executable\s*=\s*\"(\w+)\"", launch_code):
+                os.system(f"pkill -f {match.group(1)}")
+        # Going to be honest, not sure why this needs to be killed twice
+        os.system("pkill dbus-launch")
+        os.system("pkill dbus-launch")
+
 
     def __launch_nodes(self, ld: LaunchDescription):
         """
@@ -351,19 +365,19 @@ class NodeLauncher:
             print("Shutting down launch")
             for node in self.nodes:
                 node_pid = 0
-                try:
+                if type(node) == LaunchNode:
                     node_pid = node.process_details["pid"]
-                except:
-                    continue
-                try:
-                    os.kill(node_pid, signal.SIGINT)
-                except ProcessLookupError:
-                    if node != self.trigger_process:
-                        print(
-                            f"WARNING: Process {node_pid} already dead. It probably crashed during testing",
-                            file=sys.stderr,
-                        )
-                        # Do not emit warning for the trigger process
+                    try:
+                        os.kill(node_pid, signal.SIGINT)
+                    except ProcessLookupError:
+                        if node != self.trigger_process:
+                            print(
+                                f"WARNING: Process {node_pid} already dead. It probably crashed during testing",
+                                file=sys.stderr,
+                            )
+                            # Do not emit warning for the trigger process
+                elif type(node) == IncludeLaunchDescription:
+                    self.__kill_launch_file(node)
             #event_loop = asyncio.get_event_loop()
             #event_loop.run_until_complete(ls.shutdown())
             ls.shutdown()
@@ -706,7 +720,6 @@ def publish_to_topic(topic_type: type, topic: str, msg):
 
     def publish():
         nonlocal published
-        client.publish(msg)
         node.destroy_node()
         published = True
 

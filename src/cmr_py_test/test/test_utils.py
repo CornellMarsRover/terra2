@@ -127,9 +127,13 @@ def make_launch_file(package: str, launch_file: str, **kwargs):
     """
 
     pkg_dir = get_package_share_directory(package)
+    launch_file_path = os.path.join(pkg_dir, "launch", launch_file)
+    
+    if not os.path.isfile(launch_file_path):
+        raise FileNotFoundError(f"Launch file {launch_file_path} does not exist")
 
     return IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(pkg_dir, "launch", launch_file)),
+        PythonLaunchDescriptionSource(launch_file_path),
         **kwargs,
     )
 

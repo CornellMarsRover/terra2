@@ -48,36 +48,36 @@ def gen_forward_kinematics_launch_list() -> list:
         ],
     )
 
-    joint_state_broadcaster_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            "--controller-manager",
-            "/controller_manager",
-        ],
-    )
+    # joint_state_broadcaster_spawner = Node(
+    #     package="controller_manager",
+    #     executable="spawner",
+    #     arguments=[
+    #         "joint_state_broadcaster",
+    #         "--controller-manager",
+    #         "/controller_manager",
+    #     ],
+    # )
 
-    robot_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["arm_controller", "-c", "/controller_manager"],
-    )
+    # robot_controller_spawner = Node(
+    #     package="controller_manager",
+    #     executable="spawner",
+    #     arguments=["arm_controller", "-c", "/controller_manager"],
+    # )
 
-    # Delay start of robot_controller after `joint_state_broadcaster`
-    delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = (
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=joint_state_broadcaster_spawner,
-                on_exit=[robot_controller_spawner],
-            )
-        )
-    )
+    # # Delay start of robot_controller after `joint_state_broadcaster`
+    # delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = (
+    #     RegisterEventHandler(
+    #         event_handler=OnProcessExit(
+    #             target_action=joint_state_broadcaster_spawner,
+    #             on_exit=[robot_controller_spawner],
+    #         )
+    #     )
+    # )
 
     nodes = [
         control_node,
         robot_state_pub_node,
-        joint_state_broadcaster_spawner,
-        delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        # joint_state_broadcaster_spawner,
+        # delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
     ]
     return nodes

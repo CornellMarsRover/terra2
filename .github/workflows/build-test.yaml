@@ -26,6 +26,10 @@ jobs:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
 
+      - name: Install Dependencies
+        run: |
+          sudo apt-get install ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro
+
       - name: Test
         id: test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}

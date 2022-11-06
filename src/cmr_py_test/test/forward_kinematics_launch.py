@@ -8,6 +8,7 @@ from launch_ros.substitutions import FindPackageShare
 
 from toml import load
 from os import listdir, path
+from ament_index_python.packages import get_package_share_directory
 
 
 def gen_forward_kinematics_launch_list() -> list:
@@ -80,7 +81,8 @@ def gen_forward_kinematics_launch_list() -> list:
     #     joint_state_broadcaster_spawner,
     #     delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
     # ]
-    nodes = fabric_composition("/cmr/terra/src/cmr_demo/config")
+    demo_path = get_package_share_directory("cmr_demo")
+    nodes = fabric_composition(path.join(demo_path, "config"))
 
     return nodes
 

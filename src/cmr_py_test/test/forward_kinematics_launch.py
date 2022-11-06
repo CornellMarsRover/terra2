@@ -76,7 +76,8 @@ def gen_forward_kinematics_launch_list() -> list:
     # )
 
     nodes = [
-        control_node,
+        robot_description_content
+        # control_node,
         # robot_state_pub_node,
         # joint_state_broadcaster_spawner,
         # delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,

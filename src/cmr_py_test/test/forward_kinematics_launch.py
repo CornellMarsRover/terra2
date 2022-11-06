@@ -9,6 +9,7 @@ from launch_ros.substitutions import FindPackageShare
 from toml import load
 from os import listdir, path
 from ament_index_python.packages import get_package_share_directory
+import subprocess
 
 
 def gen_forward_kinematics_launch_list() -> list:
@@ -25,8 +26,10 @@ def gen_forward_kinematics_launch_list() -> list:
             ),
         ]
     )
+    urdf_content = subprocess.check_output(["xacro", 
+                    path.join(get_package_share_directory("cmr_arm_description"), "urdf", "arm.urdf.xacro")]).decode("utf-8")
 
-    robot_description = {"robot_description": robot_description_content}
+    robot_description = {"robot_description": urdf_content}
 
     robot_controllers = PathJoinSubstitution(
         [FindPackageShare("cmr_control"), "config", "arm_controllers.yaml"]

@@ -2,6 +2,7 @@ from test_utils import *
 from cmr_msgs.msg import JoystickReading
 from sensor_msgs.msg import JointState
 import time
+from forward_kinematics_launch import gen_forward_kinematics_launch_list
 
 # NOTE: Due to timing, this test can be a tad flaky. It should pass most of the time
 # TODO(sev47): Look into this
@@ -45,8 +46,7 @@ def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: 
     assert abs(msg.velocity[idx]) <= sys.float_info.epsilon
     return last_pos
 
-@cmr_node_test([
-    make_launch_file("cmr_demo", "demo.launch.py"),
+@cmr_node_test(gen_forward_kinematics_launch_list() + [
     make_fabric_node("cmr_arm", config_path="joystick_direct_control.toml"),
 ])
 def test_launch(namespace: str):

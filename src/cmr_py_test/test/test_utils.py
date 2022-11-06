@@ -369,7 +369,7 @@ class NodeLauncher:
             print("Shutting down launch")
             for node in self.nodes:
                 node_pid = 0
-                if type(node) == LaunchNode:
+                if isinstance(node, LaunchNode):
                     node_pid = node.process_details["pid"]
                     try:
                         os.kill(node_pid, signal.SIGINT)

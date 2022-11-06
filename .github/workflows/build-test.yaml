@@ -27,8 +27,10 @@ jobs:
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
 
       - name: Install Dependencies
-        run: |
-          sudo apt-get install ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro -y
+        run: >
+          sudo apt-get install -y ros-humble-ros2-control ros-humble-ros2-controllers
+           ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher
+           ros-humble-joint-state-broadcaster
 
       - name: Test
         id: test

@@ -45,8 +45,7 @@ def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: 
     assert abs(msg.velocity[idx]) <= sys.float_info.epsilon
     return last_pos
 
-@cmr_node_test([make_launch_file("cmr_control", "forward_k_arm.launch.py"), 
-                make_fabric_node("cmr_arm", config_path="joystick_direct_control.toml")])
+@cmr_node_test([make_fabric_node("cmr_arm", config_path="joystick_direct_control.toml")])
 def test_launch(namespace: str):
     pass
 

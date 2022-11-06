@@ -12,32 +12,32 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def gen_forward_kinematics_launch_list() -> list:
-    # robot_description_content = Command(
-    #     [
-    #         PathJoinSubstitution([FindExecutable(name="xacro")]),
-    #         " ",
-    #         PathJoinSubstitution(
-    #             [
-    #                 FindPackageShare("cmr_arm_description"),
-    #                 "urdf",
-    #                 "arm.urdf.xacro",
-    #             ]
-    #         ),
-    #     ]
-    # )
+    robot_description_content = Command(
+        [
+            PathJoinSubstitution([FindExecutable(name="xacro")]),
+            " ",
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("cmr_arm_description"),
+                    "urdf",
+                    "arm.urdf.xacro",
+                ]
+            ),
+        ]
+    )
 
-    # robot_description = {"robot_description": robot_description_content}
+    robot_description = {"robot_description": robot_description_content}
 
-    # robot_controllers = PathJoinSubstitution(
-    #     [FindPackageShare("cmr_control"), "config", "arm_controllers.yaml"]
-    # )
+    robot_controllers = PathJoinSubstitution(
+        [FindPackageShare("cmr_control"), "config", "arm_controllers.yaml"]
+    )
 
-    # control_node = Node(
-    #     package="controller_manager",
-    #     executable="ros2_control_node",
-    #     parameters=[robot_description, robot_controllers],
-    #     output="both",
-    # )
+    control_node = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        parameters=[robot_description, robot_controllers],
+        output="both",
+    )
 
     # robot_state_pub_node = Node(
     #     package="robot_state_publisher",
@@ -75,36 +75,10 @@ def gen_forward_kinematics_launch_list() -> list:
     #     )
     # )
 
-    # nodes = [
-    #     control_node,
-    #     robot_state_pub_node,
-    #     joint_state_broadcaster_spawner,
-    #     delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-    # ]
-    demo_path = get_package_share_directory("cmr_demo")
-    nodes = fabric_composition(path.join(demo_path, "config"))
-
+    nodes = [
+        control_node,
+        # robot_state_pub_node,
+        # joint_state_broadcaster_spawner,
+        # delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+    ]
     return nodes
-
-def fabric_composition(conf_dir: str) -> list:
-    return [fabric_node(path.join(conf_dir, x)) for x in listdir(conf_dir)]
-
-
-def fabric_node(conf_path: str) -> Node:
-    result = load(conf_path)
-    pkg = result["package"]
-    executable = result["executable"]
-    name = result["name"]
-
-    return Node(
-        package=pkg,
-        executable=executable,
-        name=name,
-        exec_name=name,
-        parameters=[
-            {
-                "config_path": conf_path,
-                "composition_ns": "rover",
-            }
-        ],
-    )

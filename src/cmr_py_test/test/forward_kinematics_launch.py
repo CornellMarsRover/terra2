@@ -26,10 +26,10 @@ def gen_forward_kinematics_launch_list() -> list:
             ),
         ]
     )
-    urdf_content = subprocess.check_output(["xacro", 
-                    path.join(get_package_share_directory("cmr_arm_description"), "urdf", "arm.urdf.xacro")]).decode("utf-8")
+    # urdf_content = subprocess.check_output(["xacro", 
+    #                 path.join(get_package_share_directory("cmr_arm_description"), "urdf", "arm.urdf.xacro")]).decode("utf-8")
 
-    robot_description = {"robot_description": urdf_content}
+    robot_description = {"robot_description": robot_description_content}
 
     robot_controllers = PathJoinSubstitution(
         [FindPackageShare("cmr_control"), "config", "arm_controllers.yaml"]
@@ -79,8 +79,7 @@ def gen_forward_kinematics_launch_list() -> list:
     # )
 
     nodes = [
-        robot_description_content
-        # control_node,
+        control_node,
         # robot_state_pub_node,
         # joint_state_broadcaster_spawner,
         # delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,

@@ -46,6 +46,10 @@ std::vector<geometry_msgs::msg::PoseStamped> convert_waypoints_to_pose(
         pose.pose.position.x = it->latitude;
         pose.pose.position.y = it->longitude;
         pose.pose.position.z = it->altitude;
+        pose.pose.orientation.x = 0;
+        pose.pose.orientation.y = 0;
+        pose.pose.orientation.z = 0;
+        pose.pose.orientation.w = 1;
         poses.push_back(pose);
         // pose.pose.orientation
     }

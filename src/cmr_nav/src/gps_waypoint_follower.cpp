@@ -18,9 +18,10 @@ GPSWayPointFollowerClient::GPSWayPointFollowerClient()
     // number of poses that robot will go throug, specified in yaml file
     this->declare_parameter("waypoints", std::vector<std::string>({"0"}));
     m_subscription = this->create_subscription<GPSWaypoints>(
-        "topic", 10,
+        "gps_waypoints", 10,
         std::bind(&GPSWayPointFollowerClient::gps_waypoints_callback, this,
                   std::placeholders::_1));
+
     RCLCPP_INFO(this->get_logger(),
                 "Loaded %i GPS waypoints from YAML, gonna pass them to "
                 "FollowGPSWaypoints...",
@@ -35,6 +36,23 @@ GPSWayPointFollowerClient::~GPSWayPointFollowerClient()
                 "Destroyed an Instance of GPSWayPointFollowerClient");
 }
 
+std::vector<geometry_msgs::msg::PoseStamped> convert_waypoints_to_pose(
+    GPSWayPointFollowerClient::GPSWaypoints gps_poses)
+{
+    std::vector<geometry_msgs::msg::PoseStamped> poses;
+    for (auto it = gps_poses.begin(); it < gps_poses.end(); it++) {
+        geometry_msgs::msg::PoseStamped pose;
+        pose.header = it->header;
+        pose.pose.position.x = it->latitude;
+        pose.pose.position.y = it->longitude;
+        pose.pose.position.z = it->altitude;
+        poses.push_back(pose);
+        // pose.pose.orientation
+    }
+    return poses;
+}
+
+// NOLINTNEXTLINE(readability-function-size)
 void GPSWayPointFollowerClient::start_waypoint_following()
 {
     using namespace std::placeholders;
@@ -58,7 +76,7 @@ void GPSWayPointFollowerClient::start_waypoint_following()
     }
     m_gps_waypoint_follower_goal = ClientT::Goal();
     // Send the goal poses
-    m_gps_waypoint_follower_goal.poses = m_gps_poses;
+    m_gps_waypoint_follower_goal.poses = convert_waypoints_to_pose(m_gps_poses);
 
     RCLCPP_INFO(this->get_logger(), "Sending a path of %zu gps_poses:",
                 m_gps_waypoint_follower_goal.poses.size());
@@ -85,7 +103,7 @@ void GPSWayPointFollowerClient::start_waypoint_following()
 void GPSWayPointFollowerClient::gps_waypoints_callback(
     std::shared_ptr<GPSWaypoints> msg)
 {
-    m_gps_poses = msg->data();
+    m_gps_poses = *msg;
 }
 
 void GPSWayPointFollowerClient::goal_response_callback(

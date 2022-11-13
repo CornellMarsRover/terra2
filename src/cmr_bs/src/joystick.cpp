@@ -18,7 +18,7 @@ namespace cmr
 {
 
 Joystick::Joystick(const std::optional<cmr::fabric::FabricNodeConfig>& config)
-    : cmr::fabric::FabricNode::FabricNode(config)
+    : cmr::fabric::FabricNode::FabricNode(config), m_js(-1)
 {
     // declare parameters here
 }
@@ -98,24 +98,24 @@ void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
             case JS_EVENT_BUTTON:
                 message.control_id = event->number + 3;
                 message.axis_id = 0;
-                message.magnitude_id = event->value != 0 ? 1 : 0;
+                message.magnitude = event->value != 0 ? 1 : 0;
                 CMR_LOG(INFO, "Button %u %s\n", event->number + 3,
                         event->value != 0 ? "pressed" : "released");
                 m_joystick_pub->publish(message);
                 break;
             case JS_EVENT_AXIS: {
                 size_t axis = get_axis_state(*event, axis_state);
-                message.control_id = (int)axis;
+                message.control_id = static_cast<int>(axis);
                 message.axis_id = 0;
-                message.magnitude_id = (int)(axis_state.at(axis).x / 327.67);
+                message.magnitude = static_cast<int>(axis_state.at(axis).x / 327.67);
                 m_joystick_pub->publish(message);
                 message.axis_id = 1;
-                message.magnitude_id = (int)(axis_state.at(axis).y / 327.67);
+                message.magnitude = static_cast<int>(axis_state.at(axis).y / 327.67);
                 m_joystick_pub->publish(message);
                 if (axis < 3) {
                     CMR_LOG(INFO, "Axis %zu at (%6d, %6d)\n", axis,
-                            (int)(axis_state.at(axis).x / 327.67),
-                            (int)(axis_state.at(axis).y / 327.67));
+                            static_cast<int>(axis_state.at(axis).x / 327.67),
+                            static_cast<int>(axis_state.at(axis).y / 327.67));
                 }
                 break;
             }
@@ -149,6 +149,8 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
     const auto [ok, device] = node_settings->getString("device");
     if (ok) {
         m_device_name = device;
+    } else {
+        CMR_LOG(ERROR, "Could not find device name in config file");
     }
     return ok;
 }
@@ -161,7 +163,7 @@ bool Joystick::activate()
 
     m_js = open(m_device_name.c_str(), O_RDONLY);
     if (m_js == -1) {
-        perror("Could not open joystick");
+        CMR_LOG(ERROR, "Could not open joystick %s", m_device_name.c_str());
         return false;
     }
     // m_loop_flag = true;

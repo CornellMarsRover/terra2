@@ -300,9 +300,13 @@ auto narrow_cast(T&& t)
  * is destroyed
  *
  */
+template <typename Func>
 class CmrRAII
 {
-    std::function<void()> m_func;
+    Func m_func;
+
+    static_assert(std::is_same_v<decltype(std::declval<Func>()()), void>,
+                  "Func for RAII wrapper must be callable");
 
   public:
     /**
@@ -311,18 +315,19 @@ class CmrRAII
      * @tparam T callable `void(void)` type
      * @param func
      */
-    template <typename T>  // NOLINTNEXTLINE
-    CmrRAII(T&& func, decltype(std::declval<T>()())* = 0) : m_func(func)
-    {
-    }
+    // NOLINTNEXTLINE(google-explicit-constructor)
+    CmrRAII(Func&& func) : m_func(std::move(func)) {}
+
+    // NOLINTNEXTLINE(google-explicit-constructor)
+    CmrRAII(const Func& func) : m_func(func) {}
 
     ~CmrRAII() { m_func(); }
 
     CmrRAII(const CmrRAII&) = delete;
     CmrRAII& operator=(const CmrRAII&) = delete;
 
-    CmrRAII(CmrRAII&&) = default;
-    CmrRAII& operator=(CmrRAII&&) = default;
+    CmrRAII(CmrRAII&&) noexcept = default;
+    CmrRAII& operator=(CmrRAII&&) noexcept = default;
 };
 
 /**
@@ -346,4 +351,8 @@ class CmrRAII
  *
  */
 // NOLINTNEXTLINE
-#define ALWAYS(...) CmrRAII raii__##__LINE__ = [__VA_ARGS__]()
+#define CONCAT(a, b) a##b
+// NOLINTNEXTLINE
+#define CONCAT2(a, b) CONCAT(a, b)
+// NOLINTNEXTLINE
+#define ALWAYS(...) CmrRAII CONCAT2(raii__, __LINE__) = [__VA_ARGS__]()

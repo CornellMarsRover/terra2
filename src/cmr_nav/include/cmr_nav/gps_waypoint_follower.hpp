@@ -5,6 +5,7 @@
 #include "nav2_lifecycle_manager/lifecycle_manager_client.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 // #include "nav2_msgs/action/follow_gps_waypoints.hpp"
+#include "cmr_fabric/fabric_node.hpp"
 #include "nav2_msgs/action/follow_waypoints.hpp"
 #include "nav2_waypoint_follower/waypoint_follower.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -22,7 +23,7 @@ enum class ActionStatus { UNKNOWN, PROCESSING, FAILED, SUCCEEDED };
  * @brief A ros node that drives robot through gievn way points from YAML file
  *
  */
-class GPSWayPointFollowerClient : public rclcpp::Node
+class GPSWayPointFollowerClient : public cmr::fabric::FabricNode
 {
   public:
     using GPSWaypoints = std::vector<sensor_msgs::msg::NavSatFix>;
@@ -35,7 +36,8 @@ class GPSWayPointFollowerClient : public rclcpp::Node
      * @brief Construct a new WayPoint Folllower object
      *
      */
-    GPSWayPointFollowerClient();
+    GPSWayPointFollowerClient(
+        const std::optional<cmr::fabric::FabricNodeConfig>& config = std::nullopt);
 
     /**
      * @brief Destroy the Way Point Folllower object
@@ -43,12 +45,20 @@ class GPSWayPointFollowerClient : public rclcpp::Node
      */
     ~GPSWayPointFollowerClient();
 
-    /**
-     * @brief send robot through each of the pose in poses vector
-     *
-     * @param poses
-     */
-    void start_waypoint_following();
+    bool configure(const std::shared_ptr<toml::Table>& table) override;
+
+    bool activate() override;
+
+    bool deactivate() override;
+
+    bool cleanup() override;
+
+    // /**
+    //  * @brief send robot through each of the pose in poses vector
+    //  *
+    //  * @param poses
+    //  */
+    // void start_waypoint_following();
 
     /**
      * @brief
@@ -75,8 +85,9 @@ class GPSWayPointFollowerClient : public rclcpp::Node
 
     void result_callback(const GPSWaypointFollowerGoalHandle::WrappedResult& result);
 
-  protected:
+  private:
     bool m_goal_done;
+    bool m_active;
     rclcpp::TimerBase::SharedPtr m_timer;
     // client to connect waypoint follower service(FollowWaypoints)
     rclcpp_action::Client<ClientT>::SharedPtr m_gps_waypoint_follower_action_client;

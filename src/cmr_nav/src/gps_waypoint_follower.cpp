@@ -3,32 +3,33 @@
 #include <string>
 #include <vector>
 
+using namespace std::placeholders;
+
 namespace cmr
 {
-GPSWayPointFollowerClient::GPSWayPointFollowerClient()
-    : Node("GPSWaypointFollowerClient"), m_goal_done(false)
+GPSWayPointFollowerClient::GPSWayPointFollowerClient(
+    const std::optional<cmr::fabric::FabricNodeConfig>& config)
+    : cmr::fabric::FabricNode::FabricNode(config)
+{
+}
+
+bool GPSWayPointFollowerClient::configure(const std::shared_ptr<toml::Table>&)
 {
     m_gps_waypoint_follower_action_client = rclcpp_action::create_client<ClientT>(
         this->get_node_base_interface(), this->get_node_graph_interface(),
         this->get_node_logging_interface(), this->get_node_waitables_interface(),
         "follow_gps_waypoints");
-    this->m_timer = this->create_wall_timer(
-        std::chrono::milliseconds(500),
-        std::bind(&GPSWayPointFollowerClient::start_waypoint_following, this));
+    // m_timer = this->create_wall_timer(
+    //     std::chrono::milliseconds(500),
+    //     std::bind(&GPSWayPointFollowerClient::start_waypoint_following, this));
     // number of poses that robot will go throug, specified in yaml file
-    this->declare_parameter("waypoints", std::vector<std::string>({"0"}));
+    // Read from table
     m_subscription = this->create_subscription<GPSWaypoints>(
         "gps_waypoints", 10,
         std::bind(&GPSWayPointFollowerClient::gps_waypoints_callback, this,
                   std::placeholders::_1));
-
-    RCLCPP_INFO(this->get_logger(),
-                "Loaded %i GPS waypoints from YAML, gonna pass them to "
-                "FollowGPSWaypoints...",
-                static_cast<int>(m_gps_poses.size()));
-    RCLCPP_INFO(this->get_logger(),
-                "Created an Instance of GPSWayPointFollowerClient");
-}
+    return true;
+};
 
 GPSWayPointFollowerClient::~GPSWayPointFollowerClient()
 {
@@ -56,15 +57,14 @@ std::vector<geometry_msgs::msg::PoseStamped> convert_waypoints_to_pose(
     return poses;
 }
 
-// NOLINTNEXTLINE(readability-function-size)
-void GPSWayPointFollowerClient::start_waypoint_following()
+bool GPSWayPointFollowerClient::activate()
 {
-    using namespace std::placeholders;
-    this->m_timer->cancel();
+    // this->m_timer->cancel();
     this->m_goal_done = false;
 
     if (!this->m_gps_waypoint_follower_action_client) {
         RCLCPP_ERROR(this->get_logger(), "Action client not initialized");
+        return false;
     }
 
     auto is_action_server_ready =
@@ -76,14 +76,31 @@ void GPSWayPointFollowerClient::start_waypoint_following()
             "FollowGPSWaypoints action server is not available."
             " Make sure an instance of GPSWaypointFollower is up and running");
         this->m_goal_done = true;
+        return false;
+    }
+    m_active = true;
+    return true;
+}
+
+bool GPSWayPointFollowerClient::deactivate() {
+    m_active = false;
+    return true;
+}
+
+void GPSWayPointFollowerClient::gps_waypoints_callback(
+    std::shared_ptr<GPSWaypoints> msg)
+{
+    if (!m_active) {
         return;
     }
+    m_gps_poses = *msg;
     m_gps_waypoint_follower_goal = ClientT::Goal();
     // Send the goal poses
     m_gps_waypoint_follower_goal.poses = convert_waypoints_to_pose(m_gps_poses);
 
     RCLCPP_INFO(this->get_logger(), "Sending a path of %zu gps_poses:",
                 m_gps_waypoint_follower_goal.poses.size());
+
     for (auto pose_stamped : m_gps_waypoint_follower_goal.poses) {
         auto position = pose_stamped.pose.position;
         RCLCPP_DEBUG(this->get_logger(), "\t(%lf, %lf)", position.x, position.y);
@@ -102,12 +119,6 @@ void GPSWayPointFollowerClient::start_waypoint_following()
 
     auto future_goal_handle = m_gps_waypoint_follower_action_client->async_send_goal(
         m_gps_waypoint_follower_goal, goal_options);
-}
-
-void GPSWayPointFollowerClient::gps_waypoints_callback(
-    std::shared_ptr<GPSWaypoints> msg)
-{
-    m_gps_poses = *msg;
 }
 
 void GPSWayPointFollowerClient::goal_response_callback(

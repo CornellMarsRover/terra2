@@ -5,7 +5,7 @@ import time
 from forward_kinematics_launch import gen_forward_kinematics_launch_list
 
 # NOTE: Due to timing, this test can be a tad flaky. It should pass most of the time
-# TODO(sev47): Look into this
+# TODO(sev47): Look into this.
 
 BASE_ROTATE_IDX = 0
 SHOULDER_IDX = 1

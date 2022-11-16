@@ -13,8 +13,6 @@
 #include <filesystem>
 #include <rclcpp/rclcpp.hpp>
 
-using namespace cmr::fabric;
-
 /**
  * @brief Create threads for each of the dependency manager, fault handler, and
  * lifecycle manager
@@ -62,6 +60,7 @@ TEST(JoystickTest, basicTest)
     ASSERT_EQ(mkfifo(pipe_name, 0666), 0);
     // always unlink the pipe when we're done
     ALWAYS() { unlink(pipe_name); };
+
     auto fault_handler_tuple = create_base_threads(end_test, test_namespace);
 
     // insert the pipe_name into the toml config string
@@ -73,35 +72,37 @@ TEST(JoystickTest, basicTest)
                                          toml_buffer.data()};
     auto test_thread = create_test_thread<cmr::Joystick>(end_test, config);
 
-    // activate the node
-    ASSERT_TRUE(cmr::fabric::activate_node(node_name));
-    auto node = std::make_shared<rclcpp::Node>("subscriber_node");
+    std::atomic<bool> activated = false;
+    JThread activate_thread(
+        [&activated]() { activated = cmr::fabric::activate_node(node_name); });
 
-    // write the message
-    js_event event{};
-    event.value = 1000;
-    event.type = JS_EVENT_AXIS;
-    event.number = 2;
-
-    // open the pipe for writing only
+    // open the pipe for writing only, this will block until a reader opens it
     const auto fd = open(pipe_name, O_WRONLY);
     ALWAYS(fd) { close(fd); };  // close the file descriptor when we're done
 
-    // write the joystick event message
-    ASSERT_EQ(write(fd, &event, sizeof(event)), static_cast<int>(sizeof(event)));
+    // // activate the node
+    auto node = std::make_shared<rclcpp::Node>("subscriber_node");
+
     bool call = false;
 
     // create the topic subscriber
     // the subscriber will contain the assert logic  to check the messages
     // it receives
     auto sub = node->create_subscription<cmr_msgs::msg::JoystickReading>(
-        test_namespace + std::string("/js_input"), 10,
-        [&call](cmr_msgs::msg::JoystickReading::SharedPtr ptr) {
+        "js_input", 10, [&call](cmr_msgs::msg::JoystickReading::SharedPtr ptr) {
             // assert that the message is correct
             ASSERT_EQ(ptr->control_id, 1);
             ASSERT_GT(ptr->magnitude, 0);
             call = true;
         });
+
+    // write the message
+    js_event event{};
+    event.value = 1000;
+    event.type = JS_EVENT_AXIS;
+    event.number = 2;
+    // write the joystick event message
+    ASSERT_EQ(write(fd, &event, sizeof(event)), static_cast<int>(sizeof(event)));
 
     // wait for the message to be received
     const auto start = std::chrono::steady_clock::now();

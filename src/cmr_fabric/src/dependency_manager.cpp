@@ -251,5 +251,8 @@ DependencyHandler::DependencyHandler(rclcpp_lifecycle::LifecycleNode& node)
     m_acquire_dependency_srv = create_acquire_dependency_service(node);
     m_release_dependency_srv = create_release_dependency_service(node);
     m_notify_deactivate_srv = create_notify_deactivate_service(node);
+    CMR_ASSERT(m_acquire_dependency_srv);
+    CMR_ASSERT(m_release_dependency_srv);
+    CMR_ASSERT(m_notify_deactivate_srv);
 }
 }  // namespace cmr::fabric

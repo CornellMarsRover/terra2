@@ -20,10 +20,6 @@ class Joystick : public cmr::fabric::FabricNode
 
     std::shared_ptr<rclcpp::WallTimer<std::function<void()>>> m_buffer_timer;
 
-    std::unique_ptr<JThread> m_js_thread;
-
-    std::atomic_bool m_loop_flag = false;
-
   public:
     /**
      * Constructs a `Joystick`, optionally passing in config parameters for
@@ -50,8 +46,6 @@ class Joystick : public cmr::fabric::FabricNode
         m_joystick_pub;
 
     void joystick_callback(std::array<AxisState, 3>& axis_state) const;
-
-    void joystick_loop();
 
     bool configure(const std::shared_ptr<toml::Table>& table) override;
 

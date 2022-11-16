@@ -3,7 +3,6 @@
 // For joystick callback function
 #include <fcntl.h>
 #include <linux/joystick.h>
-#include <stdio.h>
 #include <unistd.h>
 
 #include <array>
@@ -20,7 +19,6 @@ namespace cmr
 Joystick::Joystick(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config), m_js(-1)
 {
-    // declare parameters here
 }
 
 std::optional<js_event> read_event(int fd)
@@ -93,7 +91,6 @@ void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
 {
     auto message = cmr_msgs::msg::JoystickReading();
     if (const auto event = read_event(m_js); event) {
-        /* This loop will exit if the controller is unplugged. */
         switch (event->type) {
             case JS_EVENT_BUTTON:
                 message.control_id = event->number + 3;
@@ -124,24 +121,13 @@ void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
                 break;
         }
     }
-
-    fflush(stdout);
-}
-
-void Joystick::joystick_loop()
-{
-    std::array<AxisState, 3> axis_state{};
-    while (m_loop_flag) {
-        joystick_callback(axis_state);
-    }
-    m_js = close(m_js);
 }
 
 bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
 {
     // read node config; setup subscriptions, clients, services, etc.; and
     // most of the node setup logic here
-    auto buffer_size = static_cast<uint64_t>(100);
+    const auto buffer_size = static_cast<uint64_t>(10);
     m_joystick_pub = this->create_publisher<cmr_msgs::msg::JoystickReading>(
         "js_input", buffer_size);
 
@@ -157,22 +143,21 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
 
 bool Joystick::activate()
 {
-    // do any last-minute things before activation here
-    // it should be quick
-    m_joystick_pub->on_activate();
-
+    CMR_LOG(INFO, "About to open file %s", m_device_name.c_str());
     m_js = open(m_device_name.c_str(), O_RDONLY);
     if (m_js == -1) {
         CMR_LOG(ERROR, "Could not open joystick %s", m_device_name.c_str());
         return false;
     }
-    // m_loop_flag = true;
 
-    // m_js_thread = std::make_unique<JThread>(([this]() { joystick_loop(); }));
+    // do any last-minute things before activation here
+    // it should be quick
+    m_joystick_pub->on_activate();
 
     m_buffer_timer = create_wall_timer(
         5ms, std::function([this]() { joystick_callback(m_axis_state); }));
 
+    CMR_LOG(INFO, "Joystick activated");
     return true;
 }
 
@@ -183,7 +168,6 @@ bool Joystick::deactivate()
     m_joystick_pub->on_deactivate();
     m_js = close(m_js);
     m_buffer_timer->cancel();
-    // m_loop_flag = false;
     return true;
 }
 

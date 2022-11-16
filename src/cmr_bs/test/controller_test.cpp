@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <linux/joystick.h>
 #include <sys/stat.h>
@@ -46,6 +47,21 @@ restart_delay = 2
 device="%s"
 )";
 
+class JsInputMockSubscriber
+{
+  public:
+    /**
+     * @brief Construct callback for a js_input subscriber
+     * @param control_id
+     * @param axis_id
+     * @param magnitude
+     */
+    MOCK_METHOD(void, callback, (int, int, double));
+};
+
+// NOLINTNEXTLINE(google-build-using-namespace)
+using namespace testing;
+
 // NOLINTNEXTLINE(readability-function-size)
 TEST(JoystickTest, basicTest)
 {
@@ -83,18 +99,20 @@ TEST(JoystickTest, basicTest)
     // // activate the node
     auto node = std::make_shared<rclcpp::Node>("subscriber_node");
 
-    bool call = false;
-
+    auto calls = 0;
+    JsInputMockSubscriber mock;
     // create the topic subscriber
     // the subscriber will contain the assert logic  to check the messages
     // it receives
     auto sub = node->create_subscription<cmr_msgs::msg::JoystickReading>(
-        "js_input", 10, [&call](cmr_msgs::msg::JoystickReading::SharedPtr ptr) {
-            // assert that the message is correct
-            ASSERT_EQ(ptr->control_id, 1);
-            ASSERT_GT(ptr->magnitude, 0);
-            call = true;
+        "js_input", 10,
+        [&mock, &calls](cmr_msgs::msg::JoystickReading::SharedPtr ptr) {
+            mock.callback(ptr->control_id, ptr->axis_id, ptr->magnitude);
+            ++calls;
         });
+
+    EXPECT_CALL(mock, callback(Eq(1), _, Ge(1))).Times(1);
+    EXPECT_CALL(mock, callback(Eq(1), _, DoubleEq(0))).Times(1);
 
     // write the message
     js_event event{};
@@ -106,7 +124,7 @@ TEST(JoystickTest, basicTest)
 
     // wait for the message to be received
     const auto start = std::chrono::steady_clock::now();
-    while (!call) {
+    while (calls < 2) {
         rclcpp::spin_some(node);
         if (std::chrono::steady_clock::now() - start > std::chrono::seconds(10)) {
             FAIL() << "Timed out waiting for message";
@@ -114,7 +132,7 @@ TEST(JoystickTest, basicTest)
     }
 
     // check that the subscriber callback was called
-    ASSERT_TRUE(call);
+    ASSERT_EQ(calls, 2);
     end_test = true;
 }
 

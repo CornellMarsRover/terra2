@@ -73,7 +73,8 @@ TEST(JoystickTest, basicTest)
     if (std::filesystem::exists(pipe_name)) {
         unlink(pipe_name);
     }
-    ASSERT_EQ(mkfifo(pipe_name, 0666), 0);
+    int ret = mkfifo(pipe_name, 0666);
+    ASSERT_EQ(ret, 0) << "Failed to create pipe " << ret << " : " << errno;
     // always unlink the pipe when we're done
     ALWAYS() { unlink(pipe_name); };
 

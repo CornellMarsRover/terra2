@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: self-hosted
-    container: 
+    container:
       image: cornellmarsrover/dev:latest
       options: --user root
     steps:
@@ -45,4 +45,4 @@ jobs:
         id: ccoverage
         run: |
           sudo apt-get update && sudo apt-get install lcov -y
-          bash scripts/code_coverage.sh
+          bash scripts/llvm_code_coverage.sh

@@ -35,7 +35,7 @@ static auto create_base_threads(const std::atomic<bool>& end_test,
     });
     return std::make_tuple(std::move(fault_handler_thread));
 }
-constexpr auto pipe_name = "/cmr/cmr_test_pipe";
+constexpr auto pipe_name = "/tmp/cmr_test_pipe";
 constexpr auto test_toml = R"(
 dependencies = []
 

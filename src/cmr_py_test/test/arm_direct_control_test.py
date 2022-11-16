@@ -2,7 +2,6 @@ from test_utils import *
 from cmr_msgs.msg import JoystickReading
 from sensor_msgs.msg import JointState
 import time
-from forward_kinematics_launch import gen_forward_kinematics_launch_list
 
 # NOTE: Due to timing, this test can be a tad flaky. It should pass most of the time
 # TODO(sev47): Look into this.

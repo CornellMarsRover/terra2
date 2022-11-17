@@ -174,22 +174,22 @@ TEST(JoystickTest, basicTest)
             event.value = 1000;
             event.type = JS_EVENT_AXIS;
             event.number = 2;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = 1000;
             event.type = JS_EVENT_AXIS;
             event.number = 3;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = 1000;
             event.type = JS_EVENT_AXIS;
             event.number = 0;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = 3000;
             event.type = JS_EVENT_AXIS;
             event.number = 1;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             return 8;
         });
@@ -219,22 +219,22 @@ TEST(JoystickTest, negativeTest)
             event.value = -1000;
             event.type = JS_EVENT_AXIS;
             event.number = 2;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = -1000;
             event.type = JS_EVENT_AXIS;
             event.number = 3;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = -9000;
             event.type = JS_EVENT_AXIS;
             event.number = 4;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = -9000;
             event.type = JS_EVENT_AXIS;
             event.number = 5;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             return 8;
         });
@@ -259,22 +259,22 @@ TEST(JoystickTest, buttonTest)
             event.value = 1;
             event.type = JS_EVENT_BUTTON;
             event.number = 2;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = 0;
             event.type = JS_EVENT_BUTTON;
             event.number = 2;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = 25;
             event.type = JS_EVENT_BUTTON;
             event.number = 25;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             event.value = 0;
             event.type = JS_EVENT_BUTTON;
             event.number = 25;
-            write(fd, &event, sizeof(event));
+            (void)write(fd, &event, sizeof(event));
 
             return 4;
         });

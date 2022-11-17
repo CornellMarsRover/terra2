@@ -14,7 +14,7 @@
 #include "cmr_utils/string_utils.hpp"
 
 using namespace std::chrono_literals;
-using cmr_msgs::msg::JoystickReading;
+constexpr auto invalid_fd = -1;
 namespace cmr
 {
 
@@ -34,33 +34,6 @@ std::optional<js_event> read_event(int fd)
 
     /* Error, could not read full event. */
     return {};
-}
-
-/**
- * Returns the number of axes on the controller or 0 if an error occurs.
- */
-size_t get_axis_count(int fd)
-{
-    uint8_t axes{};
-
-    if (ioctl(fd, JSIOCGAXES, &axes) == -1) {
-        return 0;
-    }
-
-    return axes;
-}
-
-/**
- * Returns the number of buttons on the controller or 0 if an error occurs.
- */
-size_t get_button_count(int fd)
-{
-    uint8_t buttons{};
-    if (ioctl(fd, JSIOCGBUTTONS, &buttons) == -1) {
-        return 0;
-    }
-
-    return buttons;
 }
 
 /**
@@ -161,13 +134,11 @@ bool Joystick::activate()
 {
     CMR_LOG(INFO, "About to open file %s", m_device_name.c_str());
     m_js = open(m_device_name.c_str(), O_RDONLY);
-    if (m_js == -1) {
+    if (m_js == invalid_fd) {
         CMR_LOG(ERROR, "Could not open joystick %s", m_device_name.c_str());
         return false;
     }
 
-    // do any last-minute things before activation here
-    // it should be quick
     m_joystick_pub->on_activate();
 
     m_buffer_timer = create_wall_timer(
@@ -179,19 +150,19 @@ bool Joystick::activate()
 
 bool Joystick::deactivate()
 {
-    // undo the effects of activate here
-
     m_joystick_pub->on_deactivate();
-    m_js = close(m_js);
     m_buffer_timer->cancel();
+    const auto err = close(m_js);
+    if (err != 0) {
+        CMR_LOG(ERROR,
+                "Could not close joystick %s with errno %d. "
+                "Continuing with deactivation as normal",
+                m_device_name.c_str(), errno);
+    }
+    m_js = invalid_fd;
     return true;
 }
 
-bool Joystick::cleanup()
-{
-    // undo the effects of configure here
-
-    return true;
-}
+bool Joystick::cleanup() { return true; }
 
 }  // namespace cmr

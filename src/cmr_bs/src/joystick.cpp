@@ -10,6 +10,8 @@
 #include <memory>
 
 #include "cmr_msgs/msg/joystick_reading.hpp"
+#include "cmr_utils/cmr_debug.hpp"
+#include "cmr_utils/string_utils.hpp"
 
 using namespace std::chrono_literals;
 using cmr_msgs::msg::JoystickReading;
@@ -75,6 +77,16 @@ size_t get_axis_state(const js_event& event,
 {
     const size_t axis = event.number / 2;
 
+    // Each axis has an X and Y component. So for axis 0, the X component is 0
+    // and the Y component is 1.
+    // therefore, if the event number is even, it is the X component, and if it
+    // is odd, it is the Y component.
+
+    // So the axis numbers are 0 to 5
+    // Control 0, X = 0, Y = 1
+    // Control 1, X = 2, Y = 3
+    // Control 2, X = 4, Y = 5
+
     if (axis < 3) {
         if (event.number % 2 == 0) {
             axis_state.at(axis).x = event.value;
@@ -93,6 +105,7 @@ void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
     if (const auto event = read_event(m_js); event) {
         switch (event->type) {
             case JS_EVENT_BUTTON:
+                // Add 3 so buttons have different control ids than axes
                 message.control_id = event->number + 3;
                 message.axis_id = 0;
                 message.magnitude = event->value != 0 ? 1 : 0;
@@ -116,8 +129,11 @@ void Joystick::joystick_callback(std::array<AxisState, 3>& axis_state) const
                 }
                 break;
             }
-            default:
+            case JS_EVENT_INIT:
                 /* Ignore init events. */
+                break;
+            default:
+                CMR_ASSERT_MSG(false, "Unknown event type: %d", event->type);
                 break;
         }
     }

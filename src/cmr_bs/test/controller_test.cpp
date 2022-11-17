@@ -150,11 +150,24 @@ auto test_wrapper(const char* test_namespace, const char* node_name,
     end_test = true;
 }
 
+/**
+ * @brief Writes a joystick message to the fd
+ *
+ * @param fd
+ * @param event
+ * @return true if entire event was written
+ */
+auto write_event(int fd, const js_event& event)
+{
+    return write(fd, &event, sizeof(event)) == static_cast<int>(sizeof(event));
+}
+
 // NOLINTNEXTLINE(readability-function-size)
 TEST(JoystickTest, basicTest)
 {
     constexpr auto test_namespace = "ctrl_test";
     constexpr auto node_name = "test_control1";
+    bool fail_send = false;
     test_wrapper(
         test_namespace, node_name,
         [](auto& mock, auto& /*sequence*/) {
@@ -168,31 +181,32 @@ TEST(JoystickTest, basicTest)
             EXPECT_CALL(mock, callback(Eq(0), Eq(0), Ge(1)));
             EXPECT_CALL(mock, callback(Eq(0), Eq(1), Gt(4)));
         },
-        [](int fd) -> int {
+        [&fail_send](int fd) -> int {
             // write the message
             js_event event{};
             event.value = 1000;
             event.type = JS_EVENT_AXIS;
             event.number = 2;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = 1000;
             event.type = JS_EVENT_AXIS;
             event.number = 3;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = 1000;
             event.type = JS_EVENT_AXIS;
             event.number = 0;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = 3000;
             event.type = JS_EVENT_AXIS;
             event.number = 1;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             return 8;
         });
+    ASSERT_FALSE(fail_send);
 }
 
 // NOLINTNEXTLINE(readability-function-size)
@@ -200,6 +214,7 @@ TEST(JoystickTest, negativeTest)
 {
     constexpr auto test_namespace = "ctrl_test";
     constexpr auto node_name = "test_control2";
+    bool fail_send = false;
     test_wrapper(
         test_namespace, node_name,
         [](auto& mock, auto& /*sequence*/) {
@@ -213,31 +228,32 @@ TEST(JoystickTest, negativeTest)
             EXPECT_CALL(mock, callback(Eq(2), Eq(0), Le(-3)));
             EXPECT_CALL(mock, callback(Eq(2), Eq(1), Lt(-4)));
         },
-        [](int fd) -> int {
+        [&fail_send](int fd) -> int {
             // write the message
             js_event event{};
             event.value = -1000;
             event.type = JS_EVENT_AXIS;
             event.number = 2;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = -1000;
             event.type = JS_EVENT_AXIS;
             event.number = 3;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = -9000;
             event.type = JS_EVENT_AXIS;
             event.number = 4;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = -9000;
             event.type = JS_EVENT_AXIS;
             event.number = 5;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             return 8;
         });
+    ASSERT_FALSE(fail_send);
 }
 
 // NOLINTNEXTLINE(readability-function-size)
@@ -245,6 +261,7 @@ TEST(JoystickTest, buttonTest)
 {
     constexpr auto test_namespace = "ctrl_test";
     constexpr auto node_name = "test_control2";
+    bool fail_send = false;
     test_wrapper(
         test_namespace, node_name,
         [](auto& mock, auto& /*sequence*/) {
@@ -253,31 +270,32 @@ TEST(JoystickTest, buttonTest)
             EXPECT_CALL(mock, callback(Eq(28), Eq(0), DoubleEq(1)));
             EXPECT_CALL(mock, callback(Eq(28), Eq(0), DoubleEq(0)));
         },
-        [](int fd) -> int {
+        [&fail_send](int fd) -> int {
             // write the message
             js_event event{};
             event.value = 1;
             event.type = JS_EVENT_BUTTON;
             event.number = 2;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = 0;
             event.type = JS_EVENT_BUTTON;
             event.number = 2;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = 25;
             event.type = JS_EVENT_BUTTON;
             event.number = 25;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             event.value = 0;
             event.type = JS_EVENT_BUTTON;
             event.number = 25;
-            (void)write(fd, &event, sizeof(event));
+            fail_send |= !write_event(fd, event);
 
             return 4;
         });
+    ASSERT_FALSE(fail_send);
 }
 
 int main(int argc, char** argv)

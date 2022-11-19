@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_fabric)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
-  "${PROJECT_SOURCE_DIR}/../../cmake")
+                      "${PROJECT_SOURCE_DIR}/../../cmake")
 include(CmrUtils)
 
 # find dependencies
@@ -15,6 +15,7 @@ cmr_add_lib(
   src/fabric_node.cpp
   src/lifecycle_helpers.cpp
   src/dependency_manager.cpp
+  src/fault_handler.cpp
   DEPENDS
   rclcpp
   rclcpp_lifecycle

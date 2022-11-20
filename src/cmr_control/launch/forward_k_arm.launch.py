@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def generate_launch_description(rviz = True):
+def generate_launch_description():
     robot_description_content = Command(
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
@@ -28,10 +28,6 @@ def generate_launch_description(rviz = True):
         [FindPackageShare("cmr_control"), "config", "arm_controllers.yaml"]
     )
 
-    rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("cmr_arm_description"), "config", "arm.rviz"]
-    )
-
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
@@ -48,14 +44,6 @@ def generate_launch_description(rviz = True):
             ("/arm_controller/cmd_vel_unstamped", "/cmd_vel"),
         ],
     )
-    if rviz:
-        rviz_node = Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2",
-            output="log",
-            arguments=["-d", rviz_config_file],
-        )
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -73,15 +61,6 @@ def generate_launch_description(rviz = True):
         arguments=["arm_controller", "-c", "/controller_manager"],
     )
 
-    if rviz:
-        # Delay rviz start after `joint_state_broadcaster`
-        delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=joint_state_broadcaster_spawner,
-                on_exit=[rviz_node],
-            )
-        )
-
     # Delay start of robot_controller after `joint_state_broadcaster`
     delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = (
         RegisterEventHandler(
@@ -98,8 +77,5 @@ def generate_launch_description(rviz = True):
         joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
     ]
-
-    if rviz:
-        nodes.append(delay_rviz_after_joint_state_broadcaster_spawner)
 
     return LaunchDescription(nodes)

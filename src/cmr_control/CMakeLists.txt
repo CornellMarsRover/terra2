@@ -1,39 +1,32 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_control)
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/../../cmake")
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
+                      "${PROJECT_SOURCE_DIR}/../../cmake")
 include(CmrUtils)
 
-# find dependencies
+# Add additional dependencies as arguments here. Make sure you update
+# package.xml if you're depending on other packages. find dependencies
 cmr_std_find_pkgs(rclcpp_lifecycle hardware_interface pluginlib)
 
-# Add additional dependencies as arguments here. Make sure you update package.xml if you're depending
-# on other packages.
+# Add other directories to install here
+cmr_install(launch config)
 
-# Pass "LAUNCH" as an argument if you need a launch directory
-cmr_install(LAUNCH)
-
-# Additionally install the config directory
-install(
-    DIRECTORY config
-    DESTINATION share/${PROJECT_NAME}
-)
-
-# Add tests with:
-# cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test dependencies>)
+# Add tests with: cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test
+# dependencies>)
 cmr_add_lib(
-    ${PROJECT_NAME}
-    SHARED
-    SOURCES
-    src/drives_system.cpp
-    src/base_arm_system.cpp
-    src/arm_system.cpp
-    src/mock_arm_system.cpp
-    DEPENDS
-    hardware_interface
-    pluginlib
-    rclcpp
-    rclcpp_lifecycle
-    cmr_utils)
+  ${PROJECT_NAME}
+  SHARED
+  SOURCES
+  src/drives_system.cpp
+  src/base_arm_system.cpp
+  src/arm_system.cpp
+  src/mock_arm_system.cpp
+  DEPENDS
+  hardware_interface
+  pluginlib
+  rclcpp
+  rclcpp_lifecycle
+  cmr_utils)
 
 # Export hardware pligins
 pluginlib_export_plugin_description_file(hardware_interface hardware.xml)

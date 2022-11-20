@@ -93,7 +93,7 @@ import rclpy as ros
 from launch_ros.actions import Node as LaunchNode
 from launch import LaunchDescription, LaunchService
 import sys
-from launch.actions import RegisterEventHandler, ExecuteProcess
+from launch.actions import RegisterEventHandler, ExecuteProcess, Shutdown
 from launch.substitutions import FindExecutable
 from launch.event_handlers import OnProcessStart
 from subprocess import check_output
@@ -106,6 +106,7 @@ import signal
 import toml
 from ament_index_python.packages import get_package_share_directory
 from std_srvs.srv._trigger import Trigger
+import re
 
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -126,9 +127,13 @@ def make_launch_file(package: str, launch_file: str, **kwargs):
     """
 
     pkg_dir = get_package_share_directory(package)
+    launch_file_path = os.path.join(pkg_dir, "launch", launch_file)
+    
+    if not os.path.isfile(launch_file_path):
+        raise FileNotFoundError(f"Launch file {launch_file_path} does not exist")
 
     return IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(pkg_dir, "launch", launch_file)),
+        PythonLaunchDescriptionSource(launch_file_path),
         **kwargs,
     )
 
@@ -154,12 +159,16 @@ def make_fabric_node(
             Will be overriden by node name in the toml if one is specified
         - namespace (str): The namespace of the node
         - config_path (str): The path to the toml config file. Can be empty if config_string is used
+            If config_path does not contain a `'/'` and the package name is specified, the path will
+            be relative to the cofig directory in the package directory
         - config_string (str): The toml config string. Can be empty if config_path is used
         - extra_parameters (dict): Any extra parameters to add to the node
 
     """
     config = dict()
     if config_string == "":
+        if config_path.find('/') == -1 and package != "":
+            config_path = os.path.join(get_package_share_directory(package), "config", config_path)
         config = toml.load(config_path)
     else:
         config = toml.loads(config_string)
@@ -328,6 +337,20 @@ class NodeLauncher:
 
         with ServiceListener(Trigger, f"/{self.namespace}/launch_wait", cb) as serv:
             serv.wait_for_msg()
+    
+    def __kill_launch_file(self, ld: IncludeLaunchDescription):
+        """
+        Reads the launch file and kills all launched nodes
+        A node is identified by the string "executable=" in the launch file
+        """
+        with open(ld.launch_description_source.location) as f:
+            launch_code = f.read()
+            for match in re.finditer(r"executable\s*=\s*\"(\w+)\"", launch_code):
+                os.system(f"pkill -f {match.group(1)}")
+        # Going to be honest, not sure why this needs to be killed twice
+        os.system("pkill dbus-launch")
+        os.system("pkill dbus-launch")
+
 
     def __launch_nodes(self, ld: LaunchDescription):
         """
@@ -345,16 +368,22 @@ class NodeLauncher:
         def sig_handler(signum, frame):
             print("Shutting down launch")
             for node in self.nodes:
-                node_pid = node.process_details["pid"]
-                try:
-                    os.kill(node_pid, signal.SIGINT)
-                except ProcessLookupError:
-                    if node != self.trigger_process:
-                        print(
-                            f"WARNING: Process {node_pid} already dead. It probably crashed during testing",
-                            file=sys.stderr,
-                        )
-                        # Do not emit warning for the trigger process
+                node_pid = 0
+                if isinstance(node, LaunchNode):
+                    node_pid = node.process_details["pid"]
+                    try:
+                        os.kill(node_pid, signal.SIGINT)
+                    except ProcessLookupError:
+                        if node != self.trigger_process:
+                            print(
+                                f"WARNING: Process {node_pid} already dead. It probably crashed during testing",
+                                file=sys.stderr,
+                            )
+                            # Do not emit warning for the trigger process
+                elif type(node) == IncludeLaunchDescription:
+                    self.__kill_launch_file(node)
+            #event_loop = asyncio.get_event_loop()
+            #event_loop.run_until_complete(ls.shutdown())
             ls.shutdown()
 
         signal.signal(signal.SIGINT, sig_handler)
@@ -499,7 +528,7 @@ def change_fabric_node_lifecycle(
     return call_service_sync(srv_type, service_name, request)
 
 
-def activate_fabric_node(node_name: str, namespace: str):
+def activate_fabric_node(node_name: str, namespace: str) -> bool:
     """
     Activates a fabric node via the lifecycle manager
 
@@ -512,7 +541,7 @@ def activate_fabric_node(node_name: str, namespace: str):
     return change_fabric_node_lifecycle(node_name, ActivateNode, namespace).success
 
 
-def deactivate_fabric_node(node_name: str, namespace: str):
+def deactivate_fabric_node(node_name: str, namespace: str) -> bool:
     """
     Deactivates a fabric node via the lifecycle manager
 
@@ -525,7 +554,7 @@ def deactivate_fabric_node(node_name: str, namespace: str):
     return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace).success
 
 
-def cleanup_fabric_node(node_name: str, namespace: str):
+def cleanup_fabric_node(node_name: str, namespace: str) -> bool:
     """
     Cleans up a fabric node via the lifecycle manager
 
@@ -538,7 +567,7 @@ def cleanup_fabric_node(node_name: str, namespace: str):
     return change_fabric_node_lifecycle(node_name, DeactivateNode, namespace, True).success
 
 
-def reconfigure_fabric_node(node_name: str, namespace: str):
+def reconfigure_fabric_node(node_name: str, namespace: str) -> bool:
     """
     Reconfigures a fabric node via the lifecycle manager by cleaning it up
     and activating it.
@@ -695,7 +724,6 @@ def publish_to_topic(topic_type: type, topic: str, msg):
 
     def publish():
         nonlocal published
-        client.publish(msg)
         node.destroy_node()
         published = True
 

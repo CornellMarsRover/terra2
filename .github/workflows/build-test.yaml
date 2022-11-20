@@ -8,7 +8,18 @@ on:
 jobs:
   test:
     runs-on: self-hosted
-    container: ros:humble
+    # Ideally, we want to keep build and tests relatively short, but if
+    # tests legitimately take longer than this it can be increased
+    # (although it may be in our best interest to try and optimize tests if this
+    # is the case)
+    # If there are some really long tests that cannot be optimized, maybe disable
+    # them in this workflow and add them to a special test workflow for PRs or
+    # merges into main only
+    # As of the time I'm adding this, 15 is already a pretty generous upper-bound
+    timeout-minutes: 15
+    container:
+      image: cornellmarsrover/dev:latest
+      options: --user root
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
@@ -26,16 +37,21 @@ jobs:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
 
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher ros-humble-joint-state-broadcaster ros-humble-rviz2
+
       - name: Test
         id: test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
-        uses: autowarefoundation/autoware-github-actions/colcon-test@v1
+        uses: cornellmarsrover/ros2-test-action@v1 #autowarefoundation/autoware-github-actions/colcon-test@v1
         with:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
+          pytest-args: "-s"
 
       - name: Code coverage
         id: ccoverage
         run: |
           sudo apt-get update && sudo apt-get install lcov -y
-          bash scripts/code_coverage.sh
+          bash scripts/ci_code_coverage.sh

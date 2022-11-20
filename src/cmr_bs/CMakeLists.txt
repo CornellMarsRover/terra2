@@ -10,8 +10,8 @@ cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle)
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages.
 
-# Pass "LAUNCH" as an argument if you need a launch directory
-cmr_install(LAUNCH)
+# Pass "launch" as an argument if you need a launch directory
+cmr_install(launch)
 
 # Add tests with: cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test
 # dependencies>)

@@ -1,7 +1,10 @@
 from typing import List
 from os import listdir, path
 from toml import load
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import FrontendLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -11,6 +14,16 @@ composition_ns = "rover"
 def generate_launch_description():
     return LaunchDescription(
         [
+            # Launch rosbridge for frontend access via socket on port 9090
+            IncludeLaunchDescription(
+                FrontendLaunchDescriptionSource(
+                    path.join(
+                        get_package_share_directory("rosbridge_server"),
+                        "launch",
+                        "rosbridge_websocket_launch.xml",
+                    )
+                )
+            ),
             Node(
                 package="cmr_fabric",
                 executable="fault_handler",

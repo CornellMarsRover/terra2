@@ -5,7 +5,9 @@ on:
 jobs:
   lint:
     runs-on: self-hosted
-    container: ros:humble
+    container: 
+      image: cornellmarsrover/dev:latest
+      options: --user root
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3

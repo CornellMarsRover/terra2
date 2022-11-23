@@ -12,6 +12,7 @@
 #include "fabric_test_node.hpp"
 #include "gtest/gtest.h"
 #include "lifecycle_msgs/srv/get_state.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 
 #ifndef BUILD_TESTS
 #error "This test must be compiled in test mode"
@@ -43,6 +44,7 @@ restart_attempts = 2
 restart_delay = 2
 )";
 
+/** Creates a flag to signal when the test is finished */
 // NOLINTNEXTLINE
 #define MAKE_END_TEST_FLAG()            \
     std::atomic<bool> end_test = false; \
@@ -128,6 +130,9 @@ auto create_depender(std::atomic<bool>& end_test, NodeConfig node_config,
                                   std::forward<Dependees>(dependee_names)...);
 }
 
+/**
+ * @brief Tests that a simple dependency chain can be started from the "root" node
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, activateTest)
 {
@@ -148,6 +153,9 @@ TEST(FabricTest, activateTest)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a node restarts on an error
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, restartOnKillTest)
 {
@@ -177,6 +185,9 @@ TEST(FabricTest, restartOnKillTest)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a dependee node is started when its depnder is started
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, startDependency)
 {
@@ -199,6 +210,10 @@ TEST(FabricTest, startDependency)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a complex dependency chain is started correctly when the "root"
+ * node is activated
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, startDependencyChain)
 {
@@ -239,6 +254,10 @@ TEST(FabricTest, startDependencyChain)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a node started via a dependency chain is killed when all the
+ * nodes that depend on it die
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, killDependender)
 {
@@ -272,6 +291,9 @@ TEST(FabricTest, killDependender)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a node deactivates when one of its dependencies errors
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, killDependendent)
 {
@@ -295,6 +317,9 @@ TEST(FabricTest, killDependendent)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a node restarts when one of its dependencies errors
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, restartDependendent)
 {
@@ -324,6 +349,9 @@ TEST(FabricTest, restartDependendent)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a complex dependency graph is deactivated correctly on error
+ */
 // NOLINTNEXTLINE
 TEST(FabricTest, killDependencyChain)
 {
@@ -397,7 +425,10 @@ TEST(FabricTest, killDependencyChain)
 
     end_test = true;
 }
-
+/**
+ * @brief Tests activations and deactivations for two nodes which depend on the same
+ * third node
+ */
 TEST(FabricTest, doubleDependency)
 {
     MAKE_END_TEST_FLAG();
@@ -435,6 +466,10 @@ TEST(FabricTest, doubleDependency)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a node is not activated when one of its dependencies fails to
+ * activate
+ */
 TEST(FabricTest, transitionFailure)
 {
     MAKE_END_TEST_FLAG();
@@ -473,6 +508,10 @@ TEST(FabricTest, transitionFailure)
     end_test = true;
 }
 
+/**
+ * @brief Tests that a regular deactivation triggers dependending nodes to also
+ * deactivate
+ */
 TEST(FabricTest, nonFailureDeactivation)
 {
     MAKE_END_TEST_FLAG();
@@ -489,6 +528,272 @@ TEST(FabricTest, nonFailureDeactivation)
     ASSERT_TRUE(cmr::fabric::cleanup_node(node_name_a));
     ASSERT_EQ(get_lifecycle_state(node_name_a), LifecycleState::Unconfigured);
     ASSERT_EQ(get_lifecycle_state(node_name_b), LifecycleState::Inactive);
+
+    end_test = true;
+}
+
+/**
+ * @brief Tests lifeycle subscriptions.
+ *
+ * Creates a FabricTestNode and checks that the subscription only executes
+ * callbacks when the node in in the active state
+ *
+ */
+TEST(FabricCommTest, lifecycleSubTest)
+{
+    MAKE_END_TEST_FLAG();
+    cmr::fabric::FabricNodeConfig config{};
+    config.node_name = "test_12a";
+    config.composition_namespace = "lifecycle_sub_test";
+    config.toml_config = config_a;
+    const auto test_node = create_test_thread<FabricTestNode>(end_test, config);
+    const auto test_sub_node = std::make_shared<rclcpp::Node>("test_12b_sub");
+
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Unconfigured);
+
+    std::vector<bool> msgs_received;
+    const auto test_pub = test_sub_node->create_publisher<std_msgs::msg::Bool>(
+        config.node_name + "/test_sub", 10);
+    const auto test_sub = test_sub_node->create_subscription<std_msgs::msg::Bool>(
+        config.node_name + "/test_pub", 10,
+        [&](const std_msgs::msg::Bool::SharedPtr msg) {
+            msgs_received.push_back(msg->data);
+        });
+
+    std_msgs::msg::Bool msg{};
+    msg.data = false;
+    test_pub->publish(msg);
+
+    ASSERT_TRUE(cmr::fabric::activate_node(config.node_name));
+
+    msg.data = true;
+    test_pub->publish(msg);
+
+    const auto start_time = system_now();
+    while (msgs_received.empty() && system_now() - start_time < 5s) {
+        rclcpp::spin_some(test_sub_node);
+    }
+
+    ASSERT_EQ(msgs_received.size(), 1u);
+    ASSERT_TRUE(msgs_received[0]);
+
+    end_test = true;
+}
+
+/**
+ * @brief Tests lifeycle services.
+ *
+ * Creates a FabricTestNode and checks that the service listerner only executes
+ * callbacks when the node in in the active state
+ *
+ */
+// NOLINTNEXTLINE
+TEST(FabricCommsTest, lifecycleServiceTest)
+{
+    MAKE_END_TEST_FLAG();
+    cmr::fabric::FabricNodeConfig config{};
+    config.node_name = "test_13a";
+    config.composition_namespace = "lifecycle_service_test";
+    config.toml_config = config_a;
+    const auto test_node = create_test_thread<FabricTestNode>(end_test, config);
+
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Unconfigured);
+
+    std::vector<std::string> msgs_received;
+    std::atomic<bool> msgs_empty = true;
+    std::mutex msgs_mu;
+    const auto test_sub_thread = JThread([&]() {
+        const auto test_sub_node = std::make_shared<rclcpp::Node>("test_13b_sub");
+
+        const auto test_sub =
+            test_sub_node->create_service<cmr_msgs::srv::ActivateNode>(
+                config.node_name + "/test_client",
+                [&](const cmr_msgs::srv::ActivateNode::Request::SharedPtr request,
+                    cmr_msgs::srv::ActivateNode::Response::SharedPtr response) {
+                    {
+                        std::lock_guard<std::mutex> lock(msgs_mu);
+                        msgs_received.push_back(request->node_name);
+                    }
+                    response->success = true;
+                    msgs_empty = false;
+                    return response;
+                });
+        while (!end_test) {
+            rclcpp::spin_some(test_sub_node);
+        }
+    });
+
+    auto req = std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
+    req->node_name = "test_13a";
+    ASSERT_FALSE(cmr::send_request<cmr_msgs::srv::ActivateNode>(
+                     config.node_name + "/test_service", req, 1s)
+                     .has_value());
+
+    ASSERT_TRUE(cmr::fabric::activate_node(config.node_name));
+
+    req->node_name = "test_13b";
+    ASSERT_TRUE(cmr::send_request<cmr_msgs::srv::ActivateNode>(
+                    config.node_name + "/test_service", req, 1s)
+                    .has_value());
+
+    ASSERT_FALSE(msgs_empty);
+
+    {
+        std::lock_guard lock(msgs_mu);
+        ASSERT_EQ(msgs_received.size(), 1u);
+        ASSERT_EQ(msgs_received[0], "test_13b");
+    }
+
+    end_test = true;
+}
+
+/**
+ * @brief Tests lifecycle service errors.
+ *
+ * Creates a FabricTestNode and checks the node correctly restarts when an exception
+ * is thrown in one of its callbacks.
+ */
+TEST(FabricCommsTest, callbackErrorTest)
+{
+    MAKE_END_TEST_FLAG();
+    cmr::fabric::FabricNodeConfig config{};
+    config.node_name = "test_14a";
+    config.composition_namespace = "lifecycle_error_test";
+    config.toml_config = config_a;
+    const auto test_node = create_test_thread<FabricTestNode>(end_test, config);
+    const auto [thread, base, check] =
+        create_base_threads(end_test, config.composition_namespace.c_str());
+
+    auto start_time = system_now();
+    base->set_time(start_time);
+    check->set_time(start_time);
+
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Unconfigured);
+    ASSERT_TRUE(cmr::fabric::activate_node(config.node_name));
+    const auto req = std::make_shared<cmr_msgs::srv::ActivateNode::Request>();
+    req->node_name = "bad_node_name";
+    const auto resp = cmr::send_request<cmr_msgs::srv::ActivateNode>(
+        config.node_name + "/test_service", req, 1s);
+    ASSERT_TRUE(resp.has_value());
+    ASSERT_FALSE((*resp)->success);
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Unconfigured);
+
+    check->set_time_and_wait(start_time + 10s);
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Active);
+
+    end_test = true;
+}
+
+/**
+ * @brief Tests lifeycle timers.
+ *
+ * Creates a FabricTestNode and checks that the timer only executes
+ * callbacks when the node in in the active state
+ *
+ */
+TEST(FabricCommsTest, timerTest)
+{
+    std_msgs::msg::Bool b;
+    MAKE_END_TEST_FLAG();
+    cmr::fabric::FabricNodeConfig config{};
+    config.node_name = "test_15a";
+    config.composition_namespace = "lifecycle_timer_test";
+    config.toml_config = config_a;
+    const auto test_node = create_test_thread<FabricTestNode>(end_test, config);
+    const auto test_threads =
+        create_base_threads(end_test, config.composition_namespace.c_str());
+
+    std::vector<std::chrono::time_point<std::chrono::system_clock>> msgs_received;
+    const auto test_sub_node = std::make_shared<rclcpp::Node>("test_15b_sub");
+    const auto test_sub = test_sub_node->create_subscription<std_msgs::msg::Bool>(
+        config.node_name + "/test_timer_pub", 10,
+        [&](const std_msgs::msg::Bool::SharedPtr) {
+            msgs_received.push_back(system_now());
+        });
+
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Unconfigured);
+    rclcpp::spin_some(test_sub_node);
+    std::this_thread::sleep_for(300ms);
+    rclcpp::spin_some(test_sub_node);
+    const auto activate_time = system_now();
+    ASSERT_TRUE(msgs_received.empty());
+
+    ASSERT_TRUE(cmr::fabric::activate_node(config.node_name));
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Active);
+
+    const auto start_time = system_now();
+    while (msgs_received.empty() && system_now() - start_time < 5s) {
+        rclcpp::spin_some(test_sub_node);
+    }
+
+    ASSERT_FALSE(msgs_received.empty());
+    for (auto& time : msgs_received) {
+        ASSERT_TRUE(time > activate_time);
+    }
+
+    end_test = true;
+}
+
+/**
+ * @brief Tests lifeycle actions.
+ *
+ * Creates a FabricTestNode and checks that the action server only executes
+ * callbacks when the node in in the active state
+ *
+ */
+// NOLINTNEXTLINE
+TEST(FabricCommsTest, actionTest)
+{
+    std_msgs::msg::Bool b;
+    MAKE_END_TEST_FLAG();
+    cmr::fabric::FabricNodeConfig config{};
+    config.node_name = "test_16a";
+    config.composition_namespace = "lifecycle_action_test";
+    config.toml_config = config_a;
+    const auto test_node = create_test_thread<FabricTestNode>(end_test, config);
+    const auto test_threads =
+        create_base_threads(end_test, config.composition_namespace.c_str());
+
+    unsigned msgs_received = 0u;
+    const auto test_sub_node = std::make_shared<rclcpp::Node>("test_15b_sub");
+    const auto test_sub = test_sub_node->create_subscription<std_msgs::msg::Bool>(
+        config.node_name + "/test_pub", 10,
+        [&msgs_received](const std_msgs::msg::Bool::SharedPtr) { msgs_received++; });
+
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Unconfigured);
+    auto client = rclcpp_action::create_client<cmr_msgs::action::TestTargetPosition>(
+        test_sub_node, config.node_name + "/test_action");
+    cmr_msgs::action::TestTargetPosition::Goal goal{};
+    auto fu = client->async_send_goal(goal);
+
+    auto time_now = system_now();
+    while (system_now() - time_now < 1s) {
+        rclcpp::spin_some(test_sub_node);
+    }
+
+    ASSERT_EQ(fu.wait_for(0ms), std::future_status::timeout);
+    ASSERT_EQ(msgs_received, 0u);
+    ASSERT_TRUE(cmr::fabric::activate_node(config.node_name));
+    ASSERT_EQ(get_lifecycle_state(config.node_name), LifecycleState::Active);
+
+    fu = client->async_send_goal(goal);
+    const auto start_time = system_now();
+    while (system_now() - start_time < 2s) {
+        rclcpp::spin_some(test_sub_node);
+    }
+
+    ASSERT_EQ(msgs_received, 1u);
+    ASSERT_EQ(fu.wait_for(0ms), std::future_status::ready);
+
+    ASSERT_TRUE(cmr::fabric::deactivate_node(config.node_name));
+    fu = client->async_send_goal(goal);
+
+    time_now = system_now();
+    while (system_now() - time_now < 1s) {
+        rclcpp::spin_some(test_sub_node);
+    }
+
+    ASSERT_EQ(fu.wait_for(0ms), std::future_status::timeout);
 
     end_test = true;
 }

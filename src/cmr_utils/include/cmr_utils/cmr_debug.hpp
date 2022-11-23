@@ -217,6 +217,17 @@ class CmrAssertionException : public CmrException
 {
 };
 
+/** An exception that is thrown to test error catching in tests */
+class CmrTestException : public CmrAssertionException
+{
+    std::string m_msg;
+
+  public:
+    explicit CmrTestException(std::string msg) : m_msg(std::move(msg)) {}
+
+    const char* what() const noexcept override { return m_msg.c_str(); }
+};
+
 [[noreturn]] inline void cmr_invalid(const char* file, unsigned line,
                                      const char* msg)
 {
@@ -356,3 +367,21 @@ class CmrRAII
 #define CONCAT2(a, b) CONCAT(a, b)
 // NOLINTNEXTLINE
 #define ALWAYS(...) CmrRAII CONCAT2(raii__, __LINE__) = [__VA_ARGS__]()
+
+#ifdef NDEBUG
+/**
+ * @brief The "catch-all" exception type to catch.
+ *
+ * In release mode, we will catch everything, but in debug mode, we will only
+ * catch CmrTestException to make debugging easier.
+ */
+using cmr_catch_t = std::exception;
+#else
+/**
+ * @brief The "catch-all" exception type to catch.
+ *
+ * In release mode, we will catch everything, but in debug mode, we will only
+ * catch CmrTestException to make debugging easier.
+ */
+using cmr_catch_t = CmrTestException;
+#endif

@@ -5,7 +5,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
 include(CmrUtils)
 
 # find dependencies
-cmr_std_find_pkgs(rclcpp_lifecycle lifecycle_msgs std_msgs)
+cmr_std_find_pkgs(rclcpp_lifecycle lifecycle_msgs std_msgs rclcpp_action)
 
 # Add additional dependencies here. Make sure you update package.xml if you're
 # depending on other packages. find_package(<dependency> REQUIRED)
@@ -38,7 +38,8 @@ cmr_add_test(
   cmr_msgs
   cmr_utils
   std_msgs
-  lifecycle_msgs)
+  lifecycle_msgs
+  rclcpp_action)
 
 cmr_add_node(
   fault_handler

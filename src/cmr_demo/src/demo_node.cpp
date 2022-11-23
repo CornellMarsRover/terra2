@@ -6,6 +6,7 @@
 
 #include "cmr_fabric/fabric_node.hpp"
 #include "cmr_utils/cmr_debug.hpp"
+#include "cmr_utils/external/tomlcpp.hxx"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 

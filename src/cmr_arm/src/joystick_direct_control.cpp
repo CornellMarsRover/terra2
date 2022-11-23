@@ -1,6 +1,7 @@
 #include "cmr_arm/joystick_direct_control.hpp"
 
 #include "cmr_utils/cmr_debug.hpp"
+#include "cmr_utils/external/tomlcpp.hxx"
 using cmr_msgs::msg::JoystickReading;
 namespace cmr
 {

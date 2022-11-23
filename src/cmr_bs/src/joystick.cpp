@@ -11,6 +11,7 @@
 
 #include "cmr_msgs/msg/joystick_reading.hpp"
 #include "cmr_utils/cmr_debug.hpp"
+#include "cmr_utils/external/tomlcpp.hxx"
 #include "cmr_utils/string_utils.hpp"
 
 using namespace std::chrono_literals;

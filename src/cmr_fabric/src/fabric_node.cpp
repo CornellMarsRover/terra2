@@ -2,9 +2,11 @@
 
 #include <chrono>
 
+#include "cmr_fabric/dependency_manager.hpp"
 #include "cmr_msgs/srv/acquire_dependency.hpp"
 #include "cmr_msgs/srv/release_dependency.hpp"
 #include "cmr_utils/cmr_debug.hpp"
+#include "cmr_utils/external/tomlcpp.hxx"
 #include "cmr_utils/monad.hpp"
 #include "cmr_utils/services.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
@@ -52,6 +54,8 @@ FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config)
         CMR_LOG(INFO, "Set config data");
     }
 }
+
+FabricNode::~FabricNode() = default;
 
 // Basic guarantee. This is ok because if this fails, entire node is reset anyway
 bool set_config_params(FabricNode& node, const toml::Result& toml)

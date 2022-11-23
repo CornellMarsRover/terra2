@@ -802,6 +802,7 @@ class TopicSubscriber:
         ### Returns:
             The message received or None if the timeout is reached
         """
+        ros.spin_once(self.node)
         start_time = datetime.now()
         while len(self.results) == 0 and (
             timeout_sec is None

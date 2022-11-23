@@ -2,6 +2,7 @@ from test_utils import *
 from cmr_msgs.msg import JoystickReading
 from sensor_msgs.msg import JointState
 import time
+import math
 
 # NOTE: Due to timing, this test can be a tad flaky. It should pass most of the time
 # TODO(sev47): Look into this.
@@ -31,19 +32,25 @@ def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: 
     joy_msg.axis_id = axis_id
     joy_msg.control_id = control_id
     joy_msg.magnitude = magnitude
-    publish_to_topic(JoystickReading, "/js_input", joy_msg)
-    time.sleep(0.5)
     sub = TopicSubscriber(JointState, "/joint_states")
+    publish_to_topic(JoystickReading, "/js_input", joy_msg)
     msg = sub.wait_for_msg()
-    print(f"Got reply {msg}")
-    assert pred(msg.position[idx], msg.velocity[idx])
-    last_pos = msg.position[idx]
-    assert all(abs(x) <= sys.float_info.epsilon or i == idx
+    check_others_zero = lambda msg: all(abs(x) <= sys.float_info.epsilon or i == idx
                 for x, i in zip(msg.velocity, range(len(msg.velocity))))
-    time.sleep(0.5)
-    msg = sub.wait_for_msg()
-    assert abs(msg.velocity[idx]) <= sys.float_info.epsilon
-    return last_pos
+    start_time = time.time()
+    while ((not (pred(msg.position[idx], msg.velocity[idx]) and check_others_zero(msg))) 
+            and time.time() - start_time < 3.0):
+        msg = sub.wait_for_msg()
+    assert pred(msg.position[idx], msg.velocity[idx]) and check_others_zero(msg)
+    print(f"Got msgs {msg}")
+
+
+    start_time = time.time()
+    last_msg = sub.wait_for_msg()
+    while time.time() - start_time < 2.5 and abs(last_msg.velocity[idx]) > sys.float_info.epsilon:
+        last_msg = sub.wait_for_msg()
+    assert abs(last_msg.velocity[idx]) <= sys.float_info.epsilon
+    return last_msg.position[idx]
 
 
 # TODO(sev47): The test fixture class doesn't work here?
@@ -179,6 +186,6 @@ def test_basic_direct_control(namespace: str):
     # Test ignore
     send_joystick_reading(JoystickReading.MAIN_JOYSTICK_ID,
                           JoystickReading.X_AXIS_ID, 0.04, SHOULDER_IDX,
-                          lambda pos, vel: pos == last_pos and vel >= 0.0)
+                          lambda pos, vel: math.isclose(pos, last_pos) and vel >= 0.0)
     
     

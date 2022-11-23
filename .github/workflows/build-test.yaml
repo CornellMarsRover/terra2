@@ -41,14 +41,20 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher ros-humble-joint-state-broadcaster ros-humble-rviz2
 
-      - name: Test
+      - name: Unit Tests
         id: test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
-        uses: cornellmarsrover/ros2-test-action@v1 #autowarefoundation/autoware-github-actions/colcon-test@v1
+        uses: cornellmarsrover/ros2-test-action@v1
         with:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
-          pytest-args: "-s"
+          pytest-args: " -k SKIP_ALL_TESTS"
+
+      - name: Integration Tests
+        id: integration
+        run: |
+          . install/setup.sh
+          python3 -m pytest -v
 
       - name: Code coverage
         id: ccoverage

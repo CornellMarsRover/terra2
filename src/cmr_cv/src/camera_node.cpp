@@ -3,6 +3,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include "cmr_utils/cmr_debug.hpp"
+#include "cmr_utils/external/tomlcpp.hxx"
 
 using namespace std::chrono_literals;
 namespace cmr

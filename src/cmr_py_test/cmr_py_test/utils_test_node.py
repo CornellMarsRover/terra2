@@ -49,6 +49,8 @@ class PassthroughNode(Node):
             f"{self.get_namespace()}/{self.get_name()}/test_return",
         )
 
+        self.get_logger().info("Utils test node finished setup")
+
     def _topic_callback(self, msg: String):
         self.get_logger().info(f"Received message: '{msg.data}'")
         self.pub.publish(msg)

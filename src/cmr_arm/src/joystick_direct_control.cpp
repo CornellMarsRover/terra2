@@ -20,8 +20,7 @@ JoystickDirectControl::JoystickDirectControl(
       m_sensitivity(0),
       m_sens_scaler(0),
       m_is_activated(false),
-      m_active_segment(ArmSegment::Base),
-      m_dirty(false)
+      m_active_segment(ArmSegment::Base)
 {
 }
 
@@ -93,8 +92,6 @@ void JoystickDirectControl::update_arm_position(const JoystickReading& msg)
             get_arm_control_msg(msg, m_sensitivity, m_active_segment);
 
         m_arm_control_pub->publish(message);
-        m_last_msg_time = this->now();
-        m_dirty = true;
         CMR_LOG(DEBUG, "JoystickDirectControl::update_arm_position: published");
     }
 }
@@ -129,9 +126,6 @@ bool JoystickDirectControl::activate()
 {
     m_arm_control_pub->on_activate();
     m_is_activated = true;
-    m_timer = this->create_wall_timer(
-        std::chrono::milliseconds(50),
-        std::function([this]() { return toggle_off_callback(); }));
     return true;
 }
 
@@ -139,7 +133,6 @@ bool JoystickDirectControl::deactivate()
 {
     m_arm_control_pub->on_deactivate();
     m_is_activated = false;
-    m_timer.reset();
     return true;
 }
 
@@ -150,14 +143,4 @@ bool JoystickDirectControl::cleanup()
     return true;
 }
 
-void JoystickDirectControl::toggle_off_callback()
-{
-    auto message = std_msgs::msg::Float64MultiArray();
-    if (m_dirty && (this->now() - m_last_msg_time).seconds() > 0.1) {
-        message.data.resize(7, 0.0);
-        m_arm_control_pub->publish(message);
-        m_dirty = false;
-        CMR_LOG(DEBUG, "Sent zero message");
-    }
-}
 }  // namespace cmr

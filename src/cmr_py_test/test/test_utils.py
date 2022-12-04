@@ -96,7 +96,7 @@ import sys
 from launch.actions import RegisterEventHandler, ExecuteProcess, Shutdown
 from launch.substitutions import FindExecutable
 from launch.event_handlers import OnProcessStart
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from rclpy.node import Node as RclpyNode
 import os
 from cmr_msgs.srv import ActivateNode, DeactivateNode
@@ -289,6 +289,8 @@ class NodeLauncher:
 
         if self.child_pid != 0:
             os.kill(self.child_pid, signal.SIGINT)
+            os.waitpid(self.child_pid, 0)
+            self.child_pid = 0
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.cleanup()
@@ -335,8 +337,9 @@ class NodeLauncher:
             resp.message = "Test ready"
             return resp
 
+        print("Waiting for launch process to start")
         with ServiceListener(Trigger, f"/{self.namespace}/launch_wait", cb) as serv:
-            serv.wait_for_msg()
+            serv.wait_for_msg(timeout_sec=10.0)
     
     def __kill_launch_file(self, ld: IncludeLaunchDescription):
         """
@@ -346,10 +349,9 @@ class NodeLauncher:
         with open(ld.launch_description_source.location) as f:
             launch_code = f.read()
             for match in re.finditer(r"executable\s*=\s*\"(\w+)\"", launch_code):
-                os.system(f"pkill -f {match.group(1)}")
+                os.system(f"pkill -SIGKILL -f {match.group(1)}")
         # Going to be honest, not sure why this needs to be killed twice
-        os.system("pkill dbus-launch")
-        os.system("pkill dbus-launch")
+        os.system("pkill -SIGKILL dbus-launch")
 
 
     def __launch_nodes(self, ld: LaunchDescription):
@@ -372,7 +374,7 @@ class NodeLauncher:
                 if isinstance(node, LaunchNode):
                     node_pid = node.process_details["pid"]
                     try:
-                        os.kill(node_pid, signal.SIGINT)
+                        os.kill(node_pid, signal.SIGKILL)
                     except ProcessLookupError:
                         if node != self.trigger_process:
                             print(
@@ -387,6 +389,7 @@ class NodeLauncher:
             ls.shutdown()
 
         signal.signal(signal.SIGINT, sig_handler)
+        print("Launch begin")
         ls.run()
         # Run blocks and needs to run on the main thread
         # so we fork and run it in the child process
@@ -410,6 +413,10 @@ class NodeLauncher:
             self.nodes.append(node)
         ld = LaunchDescription(self.nodes)
         pid = os.fork()
+        if pid < 0:
+            print("Fork failed")
+            raise Exception("Fork failed")
+            
         if pid == 0:
             self.__launch_nodes(ld)
             os._exit(0)
@@ -447,9 +454,14 @@ def cmr_node_test(nodes: list):
 
     def decorator(test_func):
         def wrapper(*args, **kwargs):
+            print("Test start")
             with NodeLauncher() as launcher:
+                print("Launching nodes for test start")
                 launcher.launch_nodes(*nodes)
+                time.sleep(1.5)
                 test_func(*args, namespace=launcher.get_namespace(), **kwargs)
+                time.sleep(1.5)
+            print("Test done")
 
         return wrapper
 
@@ -724,12 +736,13 @@ def publish_to_topic(topic_type: type, topic: str, msg):
 
     def publish():
         nonlocal published
-        node.destroy_node()
         published = True
 
     timer = node.create_timer(0.1, publish)
     while not published:
-        ros.spin_once(node)
+        ros.spin_once(node, timeout_sec=1.0)
+
+    node.destroy_node()
 
 
 class TopicSubscriber:
@@ -802,15 +815,15 @@ class TopicSubscriber:
         ### Returns:
             The message received or None if the timeout is reached
         """
-        ros.spin_once(self.node)
+        ros.spin_once(self.node, timeout_sec=1.0)
         start_time = datetime.now()
         while len(self.results) == 0 and (
             timeout_sec is None
             or (datetime.now() - start_time).total_seconds() < timeout_sec
         ):
-            ros.spin_once(self.node)
+            ros.spin_once(self.node, timeout_sec=1.0)
             for node in async_nodes:
-                ros.spin_once(node)
+                ros.spin_once(node, timeout_sec=1.0)
         return self.results.pop(0) if len(self.results) > 0 else None
 
 
@@ -848,11 +861,13 @@ class __ServiceActionListener:
 
     def _srv_callback(self, request, response):
         self.request_count += 1
-        return self.cb(request, response)
+        if self.cb is not None:
+            return self.cb(request, response)
 
     def _act_callback(self, goal_handle):
         self.request_count += 1
-        return self.cb(goal_handle)
+        if self.cb is not None:
+            return self.cb(goal_handle)
 
     def __del__(self):
         if not self.destroyed:
@@ -895,9 +910,9 @@ class __ServiceActionListener:
             timeout_sec is None
             or (datetime.now() - start_time).total_seconds() < timeout_sec
         ):
-            ros.spin_once(self.node)
+            ros.spin_once(self.node, timeout_sec=1.0)
             for node in async_nodes:
-                ros.spin_once(node)
+                ros.spin_once(node, timeout_sec=1.0)
         return can_stop_waiting()
 
 
@@ -1012,4 +1027,25 @@ def send_action_goal_sync(
     exec.add_node(node)
     exec.spin_until_future_complete(future, timeout_sec=timeout_sec)
     node.get_logger().info(f"Got result from {action_name}")
+    node.destroy_node()
     return future.result() if future.done() else None
+
+def wait_for_processes(*process_names):
+    """
+    Waits for the processes to be running
+
+    ### Args:
+        - *process_names (str): The names of the processes to wait for
+    """
+    success = False
+    while not success:
+        success = True
+        for name in process_names:
+            try:
+                check_output(["pidof", name])
+            except CalledProcessError:
+                success = False
+                time.sleep(0.5)
+                break
+        time.sleep(0.5)
+

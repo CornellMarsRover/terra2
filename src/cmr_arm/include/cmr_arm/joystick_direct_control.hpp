@@ -42,13 +42,6 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
     bool m_is_activated;
     /** The current arm segment being controlled */
     ArmSegment m_active_segment;
-    /** Timer to toggle motors off */
-    std::shared_ptr<rclcpp::WallTimer<std::function<void()>>> m_timer;
-    /** The last time we wrote to the hadware interface */
-    rclcpp::Time m_last_msg_time;
-    /** If we wrote to the hardware interface after the last time we toggled controls
-     * off */
-    bool m_dirty;
 
   public:
     /**
@@ -77,12 +70,6 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
      * corresponds to a certain effort amount to a certain motor's axis.)
      */
     void update_arm_position(const cmr_msgs::msg::JoystickReading& msg);
-
-    /**
-     * @brief Callback called periodically to turn off the motors if the joystick
-     * hasn't been used in a while.
-     */
-    void toggle_off_callback();
 };
 
 }  // namespace cmr

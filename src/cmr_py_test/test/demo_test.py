@@ -21,6 +21,7 @@ test="Hi"
 # and should accept the test namespace as an argument
 @cmr_node_test([make_fabric_node(config_string=static_config)])
 def test_demo_node(namespace: str):
+    print("Utils test begin test_demo_node")
     assert get_lifecycle_state("py_test_demo") == "unconfigured"
     activate_fabric_node("py_test_demo", namespace)
     assert get_lifecycle_state("py_test_demo") == "active"
@@ -28,9 +29,17 @@ def test_demo_node(namespace: str):
 
 @cmr_node_test([make_node("utils_test_node", "cmr_py_test", "utils_test_node", "test")])
 def test_utils_node(namespace: str):
+    time.sleep(1)
+    print("Utils test begin test_utils_node")
     subber = TopicSubscriber(String, "/test/utils_test_node/test_out")
-    publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
-    assert subber.wait_for_msg().data == "Hi"
+    attempts = 0
+    success = False
+    while attempts < 2 and not success:
+        publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
+        success = subber.wait_for_msg().data == "Hi"
+        attempts += 1
+    assert success
+    del subber
 
     # Test action server
     send_goal = TargetPosition.Goal()
@@ -57,6 +66,7 @@ def test_utils_node(namespace: str):
     t.start()
     assert action_server.wait_for_msg()
     assert success
+    del action_server
     t.join()
 
 
@@ -86,18 +96,21 @@ class TestDemoDependencies(CMRTestFixture):
     )
 
     def test_demo_activation(self):
+        print("Utils test begin test_demo_activation")
         node_name = "py_test_demo_2"
         activate_fabric_node(node_name, CMRTestFixture.get_namespace())
         assert get_lifecycle_state(node_name) == "active"
         assert get_lifecycle_state("py_test_demo_1") == "active"
 
     def test_depender_deactivate(self):
+        print("Utils test begin test_depender_deactivate")
         activate_fabric_node("py_test_demo_2", CMRTestFixture.get_namespace())
         deactivate_fabric_node("py_test_demo_2", CMRTestFixture.get_namespace())
         assert get_lifecycle_state("py_test_demo_2") == "inactive"
         assert get_lifecycle_state("py_test_demo_1") == "inactive"
 
     def test_dependee_deactivate(self):
+        print("Utils test begin test_dependee_deactivate")
         activate_fabric_node("py_test_demo_2", CMRTestFixture.get_namespace())
         deactivate_fabric_node("py_test_demo_1", CMRTestFixture.get_namespace())
         assert get_lifecycle_state("py_test_demo_2") == "inactive"

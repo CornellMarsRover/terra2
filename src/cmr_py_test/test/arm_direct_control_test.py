@@ -23,7 +23,7 @@ def send_unchecked_joystick_reading(control_id: int, axis_id: int, magnitude: fl
     publish_to_topic(JoystickReading, "/js_input", joy_msg)
     time.sleep(0.3)
 
-def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: int, pred) -> float:
+def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: int, pred, timeout_sec=10.0) -> float:
     """
     Sends a joystick reading and checks that the joint state has changed
     Returns the new joint position
@@ -38,16 +38,19 @@ def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: 
     check_others_zero = lambda msg: all(abs(x) <= sys.float_info.epsilon or i == idx
                 for x, i in zip(msg.velocity, range(len(msg.velocity))))
     start_time = time.time()
-    while ((not (pred(msg.position[idx], msg.velocity[idx]) and check_others_zero(msg))) 
-            and time.time() - start_time < 3.0):
+    while ((not (msg is not None and pred(msg.position[idx], msg.velocity[idx]) 
+                and check_others_zero(msg))) 
+            and time.time() - start_time < timeout_sec):
         msg = sub.wait_for_msg()
     assert pred(msg.position[idx], msg.velocity[idx]) and check_others_zero(msg)
     print(f"Got msgs {msg}")
 
-
+    joy_msg.magnitude = 0.0
+    publish_to_topic(JoystickReading, "/js_input", joy_msg)
+    
     start_time = time.time()
     last_msg = sub.wait_for_msg()
-    while time.time() - start_time < 2.5 and abs(last_msg.velocity[idx]) > sys.float_info.epsilon:
+    while time.time() - start_time < 8.0 and abs(last_msg.velocity[idx]) > sys.float_info.epsilon:
         last_msg = sub.wait_for_msg()
     assert abs(last_msg.velocity[idx]) <= sys.float_info.epsilon
     return last_msg.position[idx]
@@ -62,8 +65,13 @@ def send_joystick_reading(control_id: int, axis_id: int, magnitude: float, idx: 
 def test_basic_direct_control(namespace: str):
     assert activate_fabric_node("joystick_direct_control", namespace)
 
-    time.sleep(4) # Give time for all nodes to start
-    # TODO(sev47): Add waiting support for launch files
+    # wait_for_processes("robot_state_publisher", "ros2_control_node")
+
+    print("Basic control test start")
+    time.sleep(10.0) 
+    # Wait for all nodes to start and their initialization code to run
+
+    # TODO(sev47): Add waiting support for when a process is 'ready', not just started
 
     last_pos = send_joystick_reading(JoystickReading.MAIN_JOYSTICK_ID, 
                         JoystickReading.Y_AXIS_ID, 0.04, SHOULDER_IDX, 
@@ -186,6 +194,6 @@ def test_basic_direct_control(namespace: str):
     # Test ignore
     send_joystick_reading(JoystickReading.MAIN_JOYSTICK_ID,
                           JoystickReading.X_AXIS_ID, 0.04, SHOULDER_IDX,
-                          lambda pos, vel: math.isclose(pos, last_pos) and vel >= 0.0)
+                          lambda pos, vel: math.isclose(pos, last_pos, abs_tol=0.01) and vel >= 0.0)
     
     

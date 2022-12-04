@@ -34,9 +34,15 @@ def test_utils_node(namespace: str):
     subber = TopicSubscriber(String, "/test/utils_test_node/test_out")
     attempts = 0
     success = False
-    while attempts < 2 and not success:
+    while attempts < 3 and not success:
+        if attempts > 0:
+            print("Retrying test_utils_node publish and subscribe")
         publish_to_topic(String, "/test/utils_test_node/test_in", String(data="Hi"))
-        success = subber.wait_for_msg().data == "Hi"
+        response = subber.wait_for_msg()
+        if response is not None:
+            success = response.data == "Hi"
+        else:
+            success = False
         attempts += 1
     assert success
     del subber

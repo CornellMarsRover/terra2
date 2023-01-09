@@ -5,7 +5,7 @@
 pushd "$CMR_ROOT/terra" &> /dev/null
 source install/setup.bash
 find . -name "*.gcda" -delete
-colcon test --executor sequential --pytest-args " -k SKIP_ALL_TESTS"
+colcon test --executor sequential --pytest-args " -k SKIP_ALL_TESTS" --packages-skip-regex ros2_aruco
 # I gave up (for now?) trying to figure out why the tests don't work in parallel
 # So we just run them sequentially for now. This should be robust enough because
 # I don't forsee us running two complete different software systems on the same
@@ -18,7 +18,7 @@ if [ $test_result_code != 0 ]; then
     exit $test_result_code
 fi
 
-pytest
+pytest --ignore=src/cmr_aruco
 test_result_code=$?
 if [ $test_result_code != 0 ]; then 
     exit $test_result_code

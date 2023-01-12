@@ -39,17 +39,17 @@ cmr_add_node(autonomy_control_node
   nav2_waypoint_follower
   nav2_lifecycle_manager)
 
-cmr_add_node(bt_navigate
-  SOURCES
-  src/bt_navigate.cpp
-  src/bt_navigate_main.cpp
-  DEPENDS
-  rclcpp
-  std_msgs
-  cmr_msgs
-  cmr_utils
-  cmr_fabric
-  rclcpp_lifecycle)
+# cmr_add_node(bt_navigate
+#   SOURCES
+#   src/bt_navigate.cpp
+#   src/bt_navigate_main.cpp
+#   DEPENDS
+#   rclcpp
+#   std_msgs
+#   cmr_msgs
+#   cmr_utils
+#   cmr_fabric
+#   rclcpp_lifecycle)
 
 # add_compile_options(--compile-no-warning-as-error)
 cmr_add_lib(ar_tag_navigate SHARED
@@ -70,7 +70,7 @@ cmr_add_lib(ar_tag_navigate SHARED
   nav2_core
   pluginlib)
 
-pluginlib_export_plugin_description_file(nav2_core navigator_plugin.xml)
+pluginlib_export_plugin_description_file(nav2_core navigator_plugins.xml)
 
 
 # PHOBOS_APPEND

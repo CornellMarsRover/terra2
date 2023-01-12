@@ -39,7 +39,7 @@ bool ARTagNavigator::configure(
     return true;
 }
 
-std::string NavigateToPoseNavigator::getDefaultBTFilepath(
+std::string ARTagNavigator::getDefaultBTFilepath(
     rclcpp_lifecycle::LifecycleNode::WeakPtr parent_node)
 {
     std::string default_bt_xml_filename;
@@ -57,14 +57,14 @@ std::string NavigateToPoseNavigator::getDefaultBTFilepath(
     return default_bt_xml_filename;
 }
 
-bool NavigateToPoseNavigator::cleanup()
+bool ARTagNavigator::cleanup()
 {
     goal_sub_.reset();
     self_client_.reset();
     return true;
 }
 
-bool NavigateToPoseNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal)
+bool ARTagNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal)
 {
     auto bt_xml_filename = goal->behavior_tree;
 
@@ -79,13 +79,13 @@ bool NavigateToPoseNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal)
     return true;
 }
 
-void NavigateToPoseNavigator::goalCompleted(
+void ARTagNavigator::goalCompleted(
     typename ActionT::Result::SharedPtr /*result*/,
     const nav2_behavior_tree::BtStatus /*final_bt_status*/)
 {
 }
 
-void NavigateToPoseNavigator::onLoop()
+void ARTagNavigator::onLoop()
 {
     // action server feedback (pose, duration of task,
     // number of recoveries, and distance remaining to goal)
@@ -154,7 +154,7 @@ void NavigateToPoseNavigator::onLoop()
     bt_action_server_->publishFeedback(feedback_msg);
 }
 
-void NavigateToPoseNavigator::onPreempt(ActionT::Goal::ConstSharedPtr goal)
+void ARTagNavigator::onPreempt(ActionT::Goal::ConstSharedPtr goal)
 {
     RCLCPP_INFO(logger_, "Received goal preemption request");
 
@@ -183,7 +183,7 @@ void NavigateToPoseNavigator::onPreempt(ActionT::Goal::ConstSharedPtr goal)
     }
 }
 
-void NavigateToPoseNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPtr goal)
+void ARTagNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPtr goal)
 {
     RCLCPP_INFO(logger_, "Begin navigating from current location to (%.2f, %.2f)",
                 goal->pose.pose.position.x, goal->pose.pose.position.y);
@@ -198,7 +198,7 @@ void NavigateToPoseNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPtr g
                                                      goal->pose);
 }
 
-void NavigateToPoseNavigator::onGoalPoseReceived(
+void ARTagNavigator::onGoalPoseReceived(
     const geometry_msgs::msg::PoseStamped::SharedPtr pose)
 {
     ActionT::Goal goal;

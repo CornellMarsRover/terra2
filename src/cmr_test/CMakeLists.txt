@@ -11,7 +11,7 @@ cmr_std_find_pkgs(tf2 tf2_ros geometry_msgs nav_msgs rclcpp_action)
 # package.xml if you're depending on other packages.
 
 # Pass "LAUNCH" as an argument if you need a launch directory
-cmr_install(launch)
+cmr_install(launch config)
 
 # Add tests with: cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test
 # dependencies>)

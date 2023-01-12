@@ -67,26 +67,26 @@
                 <max_vel>1.0</max_vel>
                 <min_depth>0.00</min_depth> -->
                 <surface>
-                  <friction>
-                    <ode>
-                      <mu>1.5</mu>
-                      <mu2>1.5</mu2>
-                      <slip1>0</slip1>
-                      <slip2>0</slip2>
-                    </ode>
-                  </friction>
-                   <contact>
-                    <ode>
-                      <soft_cfm>0</soft_cfm>
-                      <soft_erp>0.2</soft_erp>
-                      <kp>1e+13</kp>
-                      <kd>1</kd>
-                      <max_vel>1</max_vel>
-                      <min_depth>0.01</min_depth>
-                    </ode>
-                  </contact> 
+                    <friction>
+                        <ode>
+                            <mu>1.5</mu>
+                            <mu2>1.5</mu2>
+                            <slip1>0</slip1>
+                            <slip2>0</slip2>
+                        </ode>
+                    </friction>
+                    <contact>
+                        <ode>
+                            <soft_cfm>0</soft_cfm>
+                            <soft_erp>0.2</soft_erp>
+                            <kp>1e+13</kp>
+                            <kd>1</kd>
+                            <max_vel>1</max_vel>
+                            <min_depth>0.01</min_depth>
+                        </ode>
+                    </contact>
                 </surface>
-              </gazebo>
+            </gazebo>
         </xacro:macro>
 
         <!-- Base Link -->
@@ -118,12 +118,7 @@
             <inertial>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <mass value="${lidar_mass}"/>
-                <inertia ixx="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" 
-                         ixy="0" 
-                         ixz="0" 
-                         iyy="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" 
-                         iyz="0" 
-                         izz="${0.5 * lidar_mass * lidar_radius * lidar_radius}" />
+                <inertia ixx="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" ixy="0" ixz="0" iyy="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" iyz="0" izz="${0.5 * lidar_mass * lidar_radius * lidar_radius}" />
             </inertial>
 
             <collision>
@@ -185,12 +180,7 @@
             <inertial>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <mass value="${camera_mass}"/>
-                <inertia ixx="${camera_mass / 12.0 * (cam_height * cam_height + cam_length * cam_length)}" 
-                         ixy="0" 
-                         ixz="0" 
-                         iyy="${camera_mass / 12.0 * (cam_height * cam_height + cam_width * cam_width)}" 
-                         iyz="0" 
-                         izz="${camera_mass / 12.0 * (cam_width * cam_width + cam_length * cam_length)}" />
+                <inertia ixx="${camera_mass / 12.0 * (cam_height * cam_height + cam_length * cam_length)}" ixy="0" ixz="0" iyy="${camera_mass / 12.0 * (cam_height * cam_height + cam_width * cam_width)}" iyz="0" izz="${camera_mass / 12.0 * (cam_width * cam_width + cam_length * cam_length)}" />
             </inertial>
         </link>
 
@@ -209,27 +199,8 @@
         <xacro:wheel name="right_mid" x="0" y="${base_length/2 + wheel_len}" />
         <xacro:wheel name="right_back" x="-${base_width/2}" y="${base_length/2 + wheel_len}" />
     </xacro:macro>
-    <link name="imu_link">
-        <visual>
-            <geometry>
-                <box size="0.1 0.1 0.1"/>
-            </geometry>
-        </visual>
 
-        <collision>
-            <geometry>
-                <box size="0.1 0.1 0.1"/>
-            </geometry>
-        </collision>
 
-        <!-- <xacro:box_inertia m="0.1" w="0.1" d="0.1" h="0.1"/> -->
-    </link>
-
-    <joint name="imu_joint" type="fixed">
-        <parent link="base_link"/>
-        <child link="imu_link"/>
-        <origin xyz="0 0 0.01"/>
-    </joint>
 
     <gazebo reference="imu_link">
         <gravity>true</gravity>
@@ -311,20 +282,27 @@
     <gazebo>
         <plugin name='diff_drive' filename='libgazebo_ros_diff_drive.so'>
             <ros>
-                <namespace>/demo</namespace>
+                <namespace>/</namespace>
             </ros>
 
             <!-- wheels -->
-            <left_joint>drivewhl_l_joint</left_joint>
-            <right_joint>drivewhl_r_joint</right_joint>
+            <num_wheel_pairs>3</num_wheel_pairs>
+
+            <left_joint>left_front_joint</left_joint>
+            <left_joint>left_mid_joint</left_joint>
+            <left_joint>left_back_joint</left_joint>
+
+            <right_joint>right_front_joint</right_joint>
+            <right_joint>right_mid_joint</right_joint>
+            <right_joint>right_back_joint</right_joint>
 
             <!-- kinematics -->
-            <wheel_separation>0.4</wheel_separation>
+            <wheel_separation>0.5</wheel_separation>
             <wheel_diameter>0.2</wheel_diameter>
 
             <!-- limits -->
-            <max_wheel_torque>20</max_wheel_torque>
-            <max_wheel_acceleration>1.0</max_wheel_acceleration>
+            <max_wheel_torque>500</max_wheel_torque>
+            <max_wheel_acceleration>10.0</max_wheel_acceleration>
 
             <!-- output -->
             <update_rate>30</update_rate>
@@ -334,6 +312,7 @@
             <odom_topic>/rover/odom</odom_topic>
             <topic>/cmd_vel</topic>
 
+            <source_frame>map</source_frame>
             <odometry_frame>odom</odometry_frame>
             <robot_base_frame>base_link</robot_base_frame>
         </plugin>

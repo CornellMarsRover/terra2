@@ -9,6 +9,8 @@ from launch.substitutions import (
     PathJoinSubstitution,
 )
 from launch.conditions import UnlessCondition
+from launch.actions import RegisterEventHandler, TimerAction
+from launch.event_handlers import OnProcessStart
 
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -21,6 +23,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     pkg_share = FindPackageShare(package='cmr_drives_description').find('cmr_drives_description')
+    pkg_gazebo_ros = FindPackageShare(package='gazebo_ros').find('gazebo_ros')   
     bringup_dir = get_package_share_directory('nav2_bringup')
     slam_dir = get_package_share_directory('slam_toolbox')
     default_rviz_config_path = os.path.join(pkg_share, 'config/drives_view.rviz')
@@ -35,6 +38,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration("use_respawn")
     world = LaunchConfiguration("world")
     slam_params_file = LaunchConfiguration("slam_params_file")
+    log_level = LaunchConfiguration("log_level")
 
     declare_desc_pkg_cmd = DeclareLaunchArgument(
             "description_package",
@@ -58,6 +62,8 @@ def generate_launch_description():
     declare_slam_params_cmd = DeclareLaunchArgument(name='slam_params_file',
                                             default_value=os.path.join(pkg_share, 'config', 'mapper_params_online_async.yaml'),
                                             description='Full path to the ROS2 parameters file to use for all launched nodes')
+    declare_log_level_cmd = DeclareLaunchArgument(name='log_level', default_value='info',
+                                            description='Log level for all launched nodes')
 
     # Generate URDF file via Xacro
     robot_description_content = Command(
@@ -116,6 +122,13 @@ def generate_launch_description():
     
     start_gazebo = ExecuteProcess(cmd=['gazebo', '--verbose', '-s', 
                 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so', world], output='screen')
+    # start_gazebo_server = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')),
+    #     launch_arguments={'world': world}.items())
+ 
+    # # Start Gazebo client    
+    # start_gazebo_client = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')))
 
     # nav_bringup = IncludeLaunchDescription(
     #     PythonLaunchDescriptionSource(
@@ -137,9 +150,12 @@ def generate_launch_description():
         launch_arguments={'use_sim_time': sim_time,
                           'params_file': params_file,
                           'use_respawn': use_respawn,
-                          'use_composition': 'True',
+                          #'use_composition': 'True',
+                          'log_level': log_level,
                          }.items()
     )
+
+    start_rviz_after_delay = TimerAction(period=10.0, actions=[rviz_node])
 
     return LaunchDescription([
         declare_desc_pkg_cmd,
@@ -150,11 +166,14 @@ def generate_launch_description():
         declare_use_respawn_cmd,
         declare_world_cmd,
         declare_slam_params_cmd,
+        declare_log_level_cmd,
         start_gazebo,
+        # start_gazebo_server,
+        # start_gazebo_client,
         joint_state_publisher_node,
         robot_state_publisher_node,
         spawn_entity,
         start_slam_toolbox,
-        rviz_node,
-        nav_bringup
+        nav_bringup,
+        start_rviz_after_delay,
     ])

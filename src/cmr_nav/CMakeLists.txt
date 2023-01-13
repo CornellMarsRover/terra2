@@ -14,7 +14,7 @@ cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle geometry_msgs rclcpp_action sensor
 # on other packages.
 
 # Pass "LAUNCH" as an argument if you need a launch directory
-cmr_install(LAUNCH)
+# cmr_install(LAUNCH)
 
 # Add tests with:
 # cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test dependencies>)
@@ -72,6 +72,16 @@ cmr_add_lib(ar_tag_navigate SHARED
 
 pluginlib_export_plugin_description_file(nav2_core navigator_plugins.xml)
 
+cmr_add_lib(cmr_print_node SHARED
+  SOURCES
+  src/print_node.cpp
+  DEPENDS
+  rclcpp
+  nav2_behavior_tree
+  nav2_msgs
+  behaviortree_cpp_v3
+  pluginlib
+  )
 
 # PHOBOS_APPEND
 cmr_export()

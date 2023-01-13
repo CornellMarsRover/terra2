@@ -2,23 +2,26 @@
 <root main_tree_to_execute="BehaviorTree">
     <!-- ////////// -->
     <BehaviorTree ID="BehaviorTree">
-        <Control ID="RecoveryNode" number_of_retries="10">
-            <WhileDoElse>
-                <Action ID="Spin" server_name="spin" server_timeout="" spin_dist="3.14" time_allowance=""/>
-                <Decorator ID="RateController" hz="1">
-                    <AlwaysFailure/>
-                </Decorator>
-            </WhileDoElse>
-            <Control ID="PipelineSequence">
-                <Decorator ID="GoalUpdater" input_goal="{goal}" output_goal="{updated_goal}">
+        <Control ID="PipelineSequence">
+            <Action ID="Print" message="Hello World"/>
+            <Control ID="RecoveryNode" number_of_retries="10">
+                <WhileDoElse>
+                    <Action ID="Spin" server_name="spin" server_timeout="" spin_dist="3.14" time_allowance=""/>
+                    <Decorator ID="RateController" hz="1">
+                        <AlwaysFailure/>
+                    </Decorator>
+                </WhileDoElse>
+                <Control ID="PipelineSequence">
+                    <Decorator ID="GoalUpdater" input_goal="{goal}" output_goal="{updated_goal}">
+                        <Control ID="RecoveryNode" number_of_retries="10">
+                            <Action ID="ComputePathToPose" goal="{updated_goal}" path="{path}" planner_id="GridBased" server_timeout="" service_name="" start=""/>
+                            <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_cost"/>
+                        </Control>
+                    </Decorator>
                     <Control ID="RecoveryNode" number_of_retries="10">
-                        <Action ID="ComputePathToPose" goal="{updated_goal}" path="{path}" planner_id="GridBased" server_timeout="" service_name="ComputePathToPose" start=""/>
-                        <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_cost"/>
+                        <Action ID="FollowPath" controller_id="FollowPath" goal_checker_id="GoalChecker" path="{path}" server_timeout="" service_name="FollowPath"/>
+                        <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_costmap"/>
                     </Control>
-                </Decorator>
-                <Control ID="RecoveryNode" number_of_retries="10">
-                    <Action ID="FollowPath" controller_id="FollowPath" goal_checker_id="GoalChecker" path="{path}" server_timeout="" service_name="FollowPath"/>
-                    <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_costmap"/>
                 </Control>
             </Control>
         </Control>
@@ -175,6 +178,9 @@
             <input_port name="default_planner">Default planner of the planner selector</input_port>
             <output_port name="selected_planner">Name of the selected planner received from the topic subcription</output_port>
             <input_port name="topic_name">Name of the topic to receive planner selection commands</input_port>
+        </Action>
+        <Action ID="Print">
+            <input_port name="message">Message to Print</input_port>
         </Action>
         <Decorator ID="RateController">
             <input_port name="hz">Rate</input_port>

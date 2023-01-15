@@ -10,7 +10,7 @@ from launch.substitutions import (
 )
 from launch.conditions import UnlessCondition
 from launch.actions import RegisterEventHandler, TimerAction
-from launch.event_handlers import OnProcessStart
+from launch.event_handlers import OnProcessStart, OnExecutionComplete
 
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -27,8 +27,10 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory('nav2_bringup')
     slam_dir = get_package_share_directory('slam_toolbox')
     default_rviz_config_path = os.path.join(pkg_share, 'config/drives_view.rviz')
-    default_world_path= os.path.join(pkg_share, 'world/my_world.sdf')
+    default_world_path= os.path.join(pkg_share, 'world/smalltown.world')
     slam_launch_file = os.path.join(slam_dir, 'launch', 'online_async_launch.py')
+    default_localization_config = os.path.join(pkg_share, 'config', 'ekf.yaml')
+    map_yaml_file = os.path.join(pkg_share, 'world', 'smalltown_world.yaml')
     # Initialize arguments
     description_package = LaunchConfiguration("description_package")
     description_file = LaunchConfiguration("description_file")
@@ -39,6 +41,7 @@ def generate_launch_description():
     world = LaunchConfiguration("world")
     slam_params_file = LaunchConfiguration("slam_params_file")
     log_level = LaunchConfiguration("log_level")
+    localization_config = LaunchConfiguration("localization_config")
 
     declare_desc_pkg_cmd = DeclareLaunchArgument(
             "description_package",
@@ -64,6 +67,9 @@ def generate_launch_description():
                                             description='Full path to the ROS2 parameters file to use for all launched nodes')
     declare_log_level_cmd = DeclareLaunchArgument(name='log_level', default_value='info',
                                             description='Log level for all launched nodes')
+    declare_localization_config_cmd = DeclareLaunchArgument(name='localization_config',
+                                            default_value=default_localization_config,
+                                            description='Full path to the localization config file to use for all launched nodes')
 
     # Generate URDF file via Xacro
     robot_description_content = Command(
@@ -101,18 +107,15 @@ def generate_launch_description():
     spawn_entity = Node(
         package='gazebo_ros', 
         executable='spawn_entity.py',
-        arguments=['-entity', 'cmr_drives', '-topic', 'robot_description'],
+        arguments=['-entity', 'cmr_drives', '-topic', 'robot_description', 
+                    '-x', '1.0', 
+                    '-y', '0', 
+                    '-z', '0.5', 
+                    '-R', '0', 
+                    '-P', '0', 
+                    '-Y', '0'],
         output='screen'
     )
-    # start_sync_slam_toolbox_node = Node(
-    #     parameters=[
-    #       os.path.join(pkg_share, 'config/mapper_params_online_sync.yaml'),
-    #       {'use_sim_time': sim_time}
-    #     ],
-    #     package='slam_toolbox',
-    #     executable='sync_slam_toolbox_node',
-    #     name='slam_toolbox',
-    #     output='screen')
 
     start_slam_toolbox = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch_file),
@@ -130,32 +133,42 @@ def generate_launch_description():
     # start_gazebo_client = IncludeLaunchDescription(
     #     PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')))
 
+    nav_bringup = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(bringup_dir, 'launch', 'bringup_launch.py')),
+        launch_arguments = {'namespace': '',
+                            'use_namespace': 'False',
+                            'slam': 'True',
+                            'map': map_yaml_file,
+                            'use_sim_time': sim_time,
+                            'params_file': params_file,
+                            'use_respawn': use_respawn,
+                            #'autostart': autostart
+                            }.items()
+    )
     # nav_bringup = IncludeLaunchDescription(
     #     PythonLaunchDescriptionSource(
-    #         os.path.join(get_package_share_directory('nav2_bringup'), 'launch', 'bringup_launch.py')),
-    #     launch_arguments={#'namespace': namespace,
-    #                       #'use_namespace': use_namespace,
-    #                       'map': "",
-    #                       'use_sim_time': sim_time,
+    #         os.path.join(get_package_share_directory('nav2_bringup'), 'launch', 'navigation_launch.py')),
+    #     launch_arguments={'use_sim_time': sim_time,
     #                       'params_file': params_file,
-    #                       'slam': 'True',
-    #                       #'autostart': autostart,
-    #                       'use_composition': 'True',
-    #                       'use_respawn': use_respawn
-    #                       }.items()
+    #                       'use_respawn': use_respawn,
+    #                       #'use_composition': 'True',
+    #                       'log_level': log_level,
+    #                      }.items()
     # )
-    nav_bringup = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('nav2_bringup'), 'launch', 'navigation_launch.py')),
-        launch_arguments={'use_sim_time': sim_time,
-                          'params_file': params_file,
-                          'use_respawn': use_respawn,
-                          #'use_composition': 'True',
-                          'log_level': log_level,
-                         }.items()
-    )
 
-    start_rviz_after_delay = TimerAction(period=10.0, actions=[rviz_node])
+    start_robot_localization = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_filter_node',
+        output='screen',
+        parameters=[localization_config, 
+        {'use_sim_time': sim_time}])
+
+    start_nav_and_rviz_after_delay = RegisterEventHandler(OnProcessStart(
+        target_action=start_gazebo,
+        on_start=[TimerAction(period=8.0, actions=[rviz_node]), 
+                  TimerAction(period=8.0, actions=[nav_bringup])]
+    ))
 
     return LaunchDescription([
         declare_desc_pkg_cmd,
@@ -167,13 +180,14 @@ def generate_launch_description():
         declare_world_cmd,
         declare_slam_params_cmd,
         declare_log_level_cmd,
+        declare_localization_config_cmd,
         start_gazebo,
         # start_gazebo_server,
         # start_gazebo_client,
         joint_state_publisher_node,
         robot_state_publisher_node,
         spawn_entity,
-        start_slam_toolbox,
-        nav_bringup,
-        start_rviz_after_delay,
+        # start_slam_toolbox,
+        start_robot_localization,
+        start_nav_and_rviz_after_delay,
     ])

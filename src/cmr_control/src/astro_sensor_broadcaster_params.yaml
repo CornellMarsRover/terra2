@@ -1,0 +1,19 @@
+astro_sensor_broadcaster:
+  sensor_name:
+    {
+      type: string,
+      default_value: "test_sensor",
+      description: "Name of the sensor used as prefix for interfaces if there are no individual interface names defined.",
+    }
+  frame_id:
+    {
+      type: string,
+      default_value: "",
+      description: "Name of the frame for the sensor readings.",
+    }
+  interface_names:
+    {
+      type: string_array,
+      default_value: ["reading"],
+      description: "Name of the interfaces to read from the sensor.",
+    }

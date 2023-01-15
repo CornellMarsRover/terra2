@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="astro_sensor" params="name prefix">
+
+    <ros2_control name="${name}" type="sensor">
+      <hardware>
+          <plugin>cmr_control/AstroSensorHardware</plugin>
+          <!-- <param name="example_hardware_param">0.0</param> -->
+      </hardware>
+
+      <sensor name="${prefix}astro_sensor">
+        <state_interface name="c02"/>
+        <state_interface name="nitrogen"/>
+        <state_interface name="potassium"/>
+        <param name="frame_id">base_link</param>
+      </sensor>
+    </ros2_control>
+  </xacro:macro>
+
+</robot>

@@ -1,0 +1,15 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 10 #Hz
+
+    astro_controller:
+      type: cmr_control/AstroSensorBroadcaster
+
+astro_controller:
+  ros__parameters:
+    sensor_name: test_astro_sensor
+    frame_id: base_link
+    interface_names:
+      - c02
+      - nitrogen
+      - potassium

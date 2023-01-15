@@ -6,30 +6,52 @@ include(CmrUtils)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages. find dependencies
-cmr_std_find_pkgs(rclcpp_lifecycle hardware_interface pluginlib)
+cmr_std_find_pkgs(rclcpp_lifecycle hardware_interface pluginlib
+                  generate_parameter_library controller_interface)
 
 # Add other directories to install here
 cmr_install(launch config)
+
+generate_parameter_library(astro_sensor_broadcaster_params
+                           src/astro_sensor_broadcaster_params.yaml)
 
 # Add tests with: cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test
 # dependencies>)
 cmr_add_lib(
   ${PROJECT_NAME}
   SHARED
+  NO_INSTALL
   SOURCES
   src/drives_system.cpp
   src/base_arm_system.cpp
   src/arm_system.cpp
   src/mock_arm_system.cpp
+  src/astro_sensor_broadcaster.cpp
+  src/astro_sensor.cpp
   DEPENDS
   hardware_interface
   pluginlib
   rclcpp
   rclcpp_lifecycle
-  cmr_utils)
+  cmr_utils
+  cmr_msgs
+  controller_interface)
+
+target_link_libraries(${PROJECT_NAME} astro_sensor_broadcaster_params)
+install(
+  TARGETS ${PROJECT_NAME} astro_sensor_broadcaster_params
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+
+list(APPEND CMR_LIBS astro_sensor_broadcaster_params)
 
 # Export hardware pligins
 pluginlib_export_plugin_description_file(hardware_interface hardware.xml)
+
+# Export controller plugins
+pluginlib_export_plugin_description_file(controller_interface controllers.xml)
 
 # Export old-style CMake variables
 cmr_export()

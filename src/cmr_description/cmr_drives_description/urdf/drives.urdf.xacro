@@ -9,8 +9,10 @@
     <xacro:include filename="$(find cmr_drives_description)/urdf/drives_description.urdf.xacro" />
     <xacro:include filename="$(find cmr_drives_description)/gazebo/drives.materials.xacro" />
     <xacro:include filename="$(find cmr_drives_description)/ros2_control/drives.ros2_control.xacro" />
+    <xacro:include filename="$(find cmr_drives_description)/ros2_control/sensor.ros2_control.xacro" />
 
     <xacro:drives />
     <xacro:drives_ros2_control name="drives"/>
+    <xacro:astro_sensor name="test_astro_sensor" prefix="test_"/>
 
 </robot>

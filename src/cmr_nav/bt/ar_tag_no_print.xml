@@ -2,26 +2,23 @@
 <root main_tree_to_execute="BehaviorTree">
     <!-- ////////// -->
     <BehaviorTree ID="BehaviorTree">
-        <Control ID="PipelineSequence">
-            <Action ID="Print" message="Hello World"/>
-            <Control ID="RecoveryNode" number_of_retries="10">
-                <WhileDoElse>
-                    <Action ID="Spin" server_name="spin" server_timeout="" spin_dist="3.14" time_allowance=""/>
-                    <Decorator ID="RateController" hz="1">
-                        <AlwaysFailure/>
-                    </Decorator>
-                </WhileDoElse>
-                <Control ID="PipelineSequence">
-                    <Decorator ID="GoalUpdater" input_goal="{goal}" output_goal="{updated_goal}">
-                        <Control ID="RecoveryNode" number_of_retries="10">
-                            <Action ID="ComputePathToPose" goal="{updated_goal}" path="{path}" planner_id="GridBased" server_timeout="" server_name="" start=""/>
-                            <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_cost"/>
-                        </Control>
-                    </Decorator>
+        <Control ID="RecoveryNode" number_of_retries="10">
+            <WhileDoElse>
+                <Action ID="Spin" server_name="spin" server_timeout="" spin_dist="3.14" time_allowance=""/>
+                <Decorator ID="RateController" hz="1">
+                    <AlwaysFailure/>
+                </Decorator>
+            </WhileDoElse>
+            <Control ID="PipelineSequence">
+                <Decorator ID="GoalUpdater" input_goal="{goal}" output_goal="{updated_goal}">
                     <Control ID="RecoveryNode" number_of_retries="10">
-                        <Action ID="FollowPath" controller_id="FollowPath" goal_checker_id="GoalChecker" path="{path}" server_timeout="" server_name="FollowPath"/>
-                        <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_costmap"/>
+                        <Action ID="ComputePathToPose" goal="{updated_goal}" path="{path}" planner_id="GridBased" server_name="" server_timeout="" start=""/>
+                        <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_cost"/>
                     </Control>
+                </Decorator>
+                <Control ID="RecoveryNode" number_of_retries="10">
+                    <Action ID="FollowPath" controller_id="FollowPath" goal_checker_id="GoalChecker" path="{path}" server_name="FollowPath" server_timeout=""/>
+                    <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_costmap"/>
                 </Control>
             </Control>
         </Control>
@@ -91,8 +88,8 @@
             <input_port name="goal">Destination to plan to</input_port>
             <output_port name="path">Path created by ComputePathToPose node</output_port>
             <input_port name="planner_id">Mapped name to the planner plugin type to use</input_port>
-            <input_port name="server_timeout">Server timeout</input_port>
             <input_port name="server_name">Service name</input_port>
+            <input_port name="server_timeout">Server timeout</input_port>
             <input_port name="start">Start pose of the path if overriding current robot pose</input_port>
         </Action>
         <Action ID="ControllerSelector">
@@ -121,8 +118,8 @@
             <input_port default="FollowPath" name="controller_id"/>
             <input_port default="GoalChecker" name="goal_checker_id">Goal checker</input_port>
             <input_port name="path">Path to follow</input_port>
-            <input_port name="server_timeout">Server timeout</input_port>
             <input_port name="server_name">Service name</input_port>
+            <input_port name="server_timeout">Server timeout</input_port>
         </Action>
         <Condition ID="GlobalUpdatedGoal"/>
         <Action ID="GoalCheckerSelector">

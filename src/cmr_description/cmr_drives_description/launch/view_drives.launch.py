@@ -188,6 +188,6 @@ def generate_launch_description():
         robot_state_publisher_node,
         spawn_entity,
         # start_slam_toolbox,
-        start_robot_localization,
+        # start_robot_localization,
         start_nav_and_rviz_after_delay,
     ])

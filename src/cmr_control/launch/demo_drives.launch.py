@@ -1,13 +1,21 @@
 from launch import LaunchDescription
-from launch.actions import RegisterEventHandler
+from launch.actions import RegisterEventHandler, DeclareLaunchArgument
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution, LaunchConfiguration
+from launch.conditions.if_condition import IfCondition
 
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+
 def generate_launch_description():
+    declare_rviz_config = DeclareLaunchArgument(name = 'use_rviz', 
+                    default_value='True', 
+                    description='Whether to launch RViz')
+    use_rviz = LaunchConfiguration('use_rviz')
+
+
     robot_description_content = Command(
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
@@ -98,7 +106,8 @@ def generate_launch_description():
         event_handler=OnProcessExit(
             target_action=joint_state_broadcaster_spawner,
             on_exit=[rviz_node],
-        )
+        ),
+        condition=IfCondition(use_rviz),
     )
 
     # Delay start of robot_controller after `joint_state_broadcaster`
@@ -122,6 +131,7 @@ def generate_launch_description():
     )
 
     nodes = [
+        declare_rviz_config,
         control_node,
         robot_state_pub_node,
         joint_state_broadcaster_spawner,

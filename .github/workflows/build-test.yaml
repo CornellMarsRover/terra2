@@ -54,8 +54,7 @@ jobs:
       - name: Integration Tests
         id: integration
         run: |
-          . install/setup.sh
-          python3 -m pytest --ignore=src/cmr_aruco -v -s -k "not arm_direct_control_test.py"
+          bash scripts/test_wd.sh
 
       - name: Code coverage
         id: ccoverage

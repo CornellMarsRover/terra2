@@ -314,15 +314,18 @@ class NodeLauncher:
             ],
             shell=True,
         )
-        ev = RegisterEventHandler(
-            OnProcessStart(
-                target_action=self.nodes[-1],
-                on_start=[process],
+        if isinstance(self.nodes[-1], LaunchNode):
+            ev = RegisterEventHandler(
+                OnProcessStart(
+                    target_action=self.nodes[-1],
+                    on_start=[process],
+                )
             )
-        )
+            ld.add_action(ev)
+        else:
+            ld.add_action(process)
         self.nodes.append(process)
         self.trigger_process = process
-        ld.add_action(ev)
 
         return ld
 
@@ -677,6 +680,9 @@ class CMRTestFixture:
     @classmethod
     def setup_class(cls):
         cls.launcher.startup()
+        print("Launching test fixture nodes")
+        assert isinstance(cls.nodes, list)
+        assert len(cls.nodes) > 0
         cls.launcher.launch_nodes(*cls.nodes)
 
     @classmethod

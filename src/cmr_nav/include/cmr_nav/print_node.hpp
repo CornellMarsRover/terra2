@@ -3,8 +3,7 @@
 #include <string>
 
 #include "behaviortree_cpp_v3/action_node.h"
-#include "nav2_behavior_tree/bt_action_node.hpp"
-#include "nav2_msgs/action/wait.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 namespace cmr
 {

@@ -27,7 +27,7 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory('nav2_bringup')
     slam_dir = get_package_share_directory('slam_toolbox')
     default_rviz_config_path = os.path.join(pkg_share, 'config/drives_view.rviz')
-    default_world_path= os.path.join(pkg_share, 'world/smalltown.world')
+    default_world_path= os.path.join(pkg_share, 'world/my_world.sdf')
     slam_launch_file = os.path.join(slam_dir, 'launch', 'online_async_launch.py')
     default_localization_config = os.path.join(pkg_share, 'config', 'ekf.yaml')
     map_yaml_file = os.path.join(pkg_share, 'world', 'smalltown_world.yaml')
@@ -102,7 +102,7 @@ def generate_launch_description():
         name='rviz2',
         output='screen',
         arguments=['-d', rviz_config],
-        parameters=[{'use_sim_time': sim_time}]
+        parameters=[{'use_sim_time': sim_time, '__log_level': 'FATAL'}]
     )
     spawn_entity = Node(
         package='gazebo_ros', 
@@ -142,6 +142,7 @@ def generate_launch_description():
                             'use_sim_time': sim_time,
                             'params_file': params_file,
                             'use_respawn': use_respawn,
+                            'use_composition': 'False'
                             #'autostart': autostart
                             }.items()
     )
@@ -169,7 +170,8 @@ def generate_launch_description():
         on_start=[TimerAction(period=8.0, actions=[rviz_node]), 
                   TimerAction(period=8.0, actions=[nav_bringup])]
     ))
-
+    
+    start_rviz_after_delay = TimerAction(period=10.0, actions=[rviz_node])
     return LaunchDescription([
         declare_desc_pkg_cmd,
         declare_desc_file_cmd,
@@ -181,6 +183,8 @@ def generate_launch_description():
         declare_slam_params_cmd,
         declare_log_level_cmd,
         declare_localization_config_cmd,
+        nav_bringup,
+        start_rviz_after_delay,
         start_gazebo,
         # start_gazebo_server,
         # start_gazebo_client,
@@ -189,5 +193,5 @@ def generate_launch_description():
         spawn_entity,
         # start_slam_toolbox,
         # start_robot_localization,
-        start_nav_and_rviz_after_delay,
+     #   start_nav_and_rviz_after_delay,
     ])

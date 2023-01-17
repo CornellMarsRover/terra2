@@ -4,7 +4,7 @@
     <BehaviorTree ID="BehaviorTree">
         <Control ID="RecoveryNode" number_of_retries="10">
             <WhileDoElse>
-                <Action ID="Spin" server_name="spin" server_timeout="" spin_dist="3.14" time_allowance=""/>
+                <Action ID="Spin" server_name="spin" spin_dist="3.14"/>
                 <Decorator ID="RateController" hz="1">
                     <AlwaysFailure/>
                 </Decorator>
@@ -12,13 +12,13 @@
             <Control ID="PipelineSequence">
                 <Decorator ID="GoalUpdater" input_goal="{goal}" output_goal="{updated_goal}">
                     <Control ID="RecoveryNode" number_of_retries="10">
-                        <Action ID="ComputePathToPose" goal="{updated_goal}" path="{path}" planner_id="GridBased" server_name="" server_timeout="" start=""/>
-                        <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_cost"/>
+                        <Action ID="ComputePathToPose" goal="{updated_goal}" path="{path}" planner_id="GridBased"/>
+                        <Action ID="ClearEntireCostmap" service_name="local_costmap/clear_entirely_local_cost"/>
                     </Control>
                 </Decorator>
                 <Control ID="RecoveryNode" number_of_retries="10">
-                    <Action ID="FollowPath" controller_id="FollowPath" goal_checker_id="GoalChecker" path="{path}" server_name="FollowPath" server_timeout=""/>
-                    <Action ID="ClearEntireCostmap" server_timeout="" service_name="local_costmap/clear_entirely_local_costmap"/>
+                    <Action ID="FollowPath" controller_id="FollowPath" goal_checker_id="GoalChecker" path="{path}" server_name="FollowPath"/>
+                    <Action ID="ClearEntireCostmap" service_name="local_costmap/clear_entirely_local_costmap"/>
                 </Control>
             </Control>
         </Control>

@@ -1,0 +1,19 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: cmr_arm_description
+    relative_path: urdf/arm.urdf.xacro
+  srdf:
+    relative_path: config/arm.srdf
+  package_settings:
+    author_name: CMR Software
+    author_email: team@cornellmarsrover.org
+    generated_timestamp: 1673978175
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro

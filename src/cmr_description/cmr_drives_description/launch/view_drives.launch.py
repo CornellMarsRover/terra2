@@ -108,7 +108,7 @@ def generate_launch_description():
         package='gazebo_ros', 
         executable='spawn_entity.py',
         arguments=['-entity', 'cmr_drives', '-topic', 'robot_description', 
-                    '-x', '1.0', 
+                    '-x', '0', 
                     '-y', '0', 
                     '-z', '0', 
                     '-R', '0', 

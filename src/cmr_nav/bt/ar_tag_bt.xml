@@ -10,24 +10,40 @@
                         <AlwaysFailure/>
                     </Decorator>
                     <Sequence>
-                        <Spin server_name="spin" spin_dist="1.05" />
                         <Action ID="Print" message="Spinning!"/>
+                        <Spin server_name="spin" spin_dist="1.05" />
                     </Sequence>
                 </RecoveryNode>
-                <Action ID="Print" message="This is a test"/>
-                <!-- <Sequence name="NavigateWithReplanning">
-                    <Action ID="Print" message="Navigating"/>
-                    <RateController hz="1.0">
-                        <RecoveryNode number_of_retries="1" name="ComputePathToPose">
-                            <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
-                            <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+                <!-- <Action ID="Print" message="This is a test"/> -->
+                <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+                    <PipelineSequence name="NavigateWithReplanning">
+                        <RateController hz="1.0">
+                            <Action ID="Print" message="Navigating"/>
+                        </RateController>
+                        <RateController hz="1.0">
+                            <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+                                <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+                                <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+                            </RecoveryNode>
+                        </RateController>
+                        <RecoveryNode number_of_retries="1" name="FollowPath">
+                            <FollowPath path="{path}" controller_id="FollowPath"/>
+                            <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
                         </RecoveryNode>
-                    </RateController>
-                    <RecoveryNode number_of_retries="1" name="FollowPath">
-                        <FollowPath path="{path}" controller_id="FollowPath"/>
-                        <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
-                    </RecoveryNode>
-                </Sequence> -->
+                    </PipelineSequence>
+                    <ReactiveFallback name="RecoveryFallback">
+                        <GoalUpdated/>
+                        <RoundRobin name="RecoveryActions">
+                            <Sequence name="ClearingActions">
+                                <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+                                <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+                            </Sequence>
+                            <Spin spin_dist="1.57"/>
+                            <Wait wait_duration="5"/>
+                            <BackUp backup_dist="0.30" backup_speed="0.05"/>
+                        </RoundRobin>
+                    </ReactiveFallback>
+                </RecoveryNode>
             </RecoveryNode>
         </Sequence>
     </BehaviorTree>

@@ -110,7 +110,7 @@ def generate_launch_description():
         arguments=['-entity', 'cmr_drives', '-topic', 'robot_description', 
                     '-x', '1.0', 
                     '-y', '0', 
-                    '-z', '0.5', 
+                    '-z', '0', 
                     '-R', '0', 
                     '-P', '0', 
                     '-Y', '0'],

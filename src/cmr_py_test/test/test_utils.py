@@ -343,18 +343,47 @@ class NodeLauncher:
         print("Waiting for launch process to start")
         with ServiceListener(Trigger, f"/{self.namespace}/launch_wait", cb) as serv:
             serv.wait_for_msg(timeout_sec=10.0)
+
+    def __get_entity_pid(entity):
+        """
+        Gets the pid of `entity` if it is an active LaunchNode or ExecuteProcess
+        otherwise returns None
+        """
+        try:
+            if isinstance(entity, LaunchNode):
+                return entity.process_details["pid"]
+            elif isinstance(entity, ExecuteProcess):
+                return entity.child_pid
+        except:
+            # If the process has already died, we can't get the pid
+            pass
+        return None
     
-    def __kill_launch_file(self, ld: IncludeLaunchDescription):
+    def __kill_launch_entity(self, entity):
         """
-        Reads the launch file and kills all launched nodes
-        A node is identified by the string "executable=" in the launch file
+        Kills `entity` and all of its sub entities
         """
-        with open(ld.launch_description_source.location) as f:
-            launch_code = f.read()
-            for match in re.finditer(r"executable\s*=\s*\"(\w+)\"", launch_code):
-                os.system(f"pkill -SIGKILL -f {match.group(1)}")
-        # Going to be honest, not sure why this needs to be killed twice
-        os.system("pkill -SIGKILL dbus-launch")
+        node_pid = NodeLauncher.__get_entity_pid(entity)
+        if node_pid is not None:
+            try:
+                os.kill(node_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                if entity != self.trigger_process:
+                    print(
+                        f"WARNING: Process {node_pid} already dead. It may have crashed during testing "
+                         "but this may also be expected behavior.",
+                        file=sys.stderr,
+                    )
+                    # Do not emit warning for the trigger process
+
+
+        if hasattr(entity, "get_sub_entities"):
+            for sub_entity in entity.get_sub_entities():
+                self.__kill_launch_entity(sub_entity)
+        
+        if hasattr(entity, 'entities'):
+            for sub_entity in entity.entities:
+                self.__kill_launch_entity(sub_entity)
 
 
     def __launch_nodes(self, ld: LaunchDescription):
@@ -373,20 +402,9 @@ class NodeLauncher:
         def sig_handler(signum, frame):
             print("Shutting down launch")
             for node in self.nodes:
-                node_pid = 0
-                if isinstance(node, LaunchNode):
-                    node_pid = node.process_details["pid"]
-                    try:
-                        os.kill(node_pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        if node != self.trigger_process:
-                            print(
-                                f"WARNING: Process {node_pid} already dead. It probably crashed during testing",
-                                file=sys.stderr,
-                            )
-                            # Do not emit warning for the trigger process
-                elif type(node) == IncludeLaunchDescription:
-                    self.__kill_launch_file(node)
+                self.__kill_launch_entity(node)
+
+            os.system("pkill -SIGKILL dbus")
             #event_loop = asyncio.get_event_loop()
             #event_loop.run_until_complete(ls.shutdown())
             ls.shutdown()
@@ -469,6 +487,18 @@ def cmr_node_test(nodes: list):
         return wrapper
 
     return decorator
+
+def cmr_on_exit(cleanup_func):
+    def decorator(test_func):
+        def wrapper(*args, **kwargs):
+            test_func(*args, **kwargs)
+            cleanup_func()
+
+        return wrapper
+
+    return decorator
+
+    
 
 
 def call_service_sync(service_type: type, service_name: str, request, timeout_sec=5.0):

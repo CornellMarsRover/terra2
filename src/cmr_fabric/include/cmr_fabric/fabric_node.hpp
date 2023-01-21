@@ -74,8 +74,8 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     bool m_processing_fault = false;
 
   public:
-    explicit FabricNode(
-        const std::optional<FabricNodeConfig>& config = std::nullopt);
+    explicit FabricNode(const std::optional<FabricNodeConfig>& config = std::nullopt,
+                        const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
     explicit FabricNode(std::optional<FabricNodeConfig>&& config = std::nullopt)
         : FabricNode(config)

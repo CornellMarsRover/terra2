@@ -22,6 +22,10 @@ class Table;
 namespace cmr::fabric
 {
 
+// Forward declare the ActionServerPolicy class
+template <typename ActionT>
+class ActionServerPolicy;
+
 /** A struct that provides semantic typing when an argument is a path */
 struct FabricConfigPath {
     std::string path;
@@ -85,7 +89,8 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     // friend function to allow it to access the error handling method while still
     // not adding excess dependencies on rclcpp_action
     template <typename ActionT>
-    friend std::unique_ptr<class GenericLifecycle> create_lifecycle_action_server(
+    friend std::unique_ptr<LifecycleServer<ActionServerPolicy<ActionT>>>
+    create_lifecycle_action_server(
         FabricNode& node, const std::string& action_name,
         const typename rclcpp_action::Server<ActionT>::GoalCallback& goal_callback,
         const typename rclcpp_action::Server<ActionT>::CancelCallback&
@@ -233,7 +238,7 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     {
         typename LifecycleSubscription<MessageT>::config_t config(topic, qos,
                                                                   options);
-        return LifecycleSubscription<MessageT>(
+        return std::make_unique<LifecycleSubscription<MessageT>>(
             *this, [this]() { return this->error_transition(); }, config,
             std::forward<FuncT>(callback));
     }
@@ -275,9 +280,9 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     {
         rcl_client_options_t client_options = rcl_client_get_default_options();
         client_options.qos = qos_profile;
-        return LifecycleClient<ServiceT>(get_node_base_interface().get(),
-                                         get_node_graph_interface(), service_name,
-                                         client_options);
+        return std::make_unique<LifecycleClient<ServiceT>>(
+            get_node_base_interface().get(), get_node_graph_interface(),
+            service_name, client_options);
     }
 
     /**
@@ -303,7 +308,7 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
         const rclcpp::CallbackGroup::SharedPtr group = nullptr)
     {
         ServiceConfig config(service_name, qos_profile, group);
-        return LifecycleService<ServiceT>(
+        return std::make_unique<LifecycleService<ServiceT>>(
             *this, [this]() { return this->error_transition(); }, config,
             std::forward<FuncT>(callback));
     }
@@ -325,9 +330,9 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
                                 CallbackT&& callback)
     {
         typename WallTimerServerPolicy<RepT, PeriodT>::Config config = {period};
-        return std::unique_ptr<GenericLifecycle>(new LifecycleTimer<RepT, PeriodT>(
+        return std::make_unique<LifecycleTimer<RepT, PeriodT>>(
             *this, [this]() { return this->error_transition(); }, config,
-            std::forward<CallbackT>(callback)));
+            std::forward<CallbackT>(callback));
     }
 };
 

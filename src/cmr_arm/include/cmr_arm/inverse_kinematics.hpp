@@ -19,8 +19,7 @@ namespace cmr
 class InverseKinematics : public cmr::fabric::FabricNode
 {
   private:
-    std::unique_ptr<fabric::LifecycleSubscription<geometry_msgs::msg::Pose>>
-        m_arm_pose_sub;
+    fabric::LifecycleSubscription<geometry_msgs::msg::Pose>::ptr_t m_arm_pose_sub;
     std::unique_ptr<moveit::planning_interface::MoveGroupInterface>
         m_move_group_interface;
     std::shared_ptr<rclcpp::Node> m_node;

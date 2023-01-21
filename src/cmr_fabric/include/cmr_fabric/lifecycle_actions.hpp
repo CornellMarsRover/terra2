@@ -94,7 +94,7 @@ using LifecycleActionServer = LifecycleServer<ActionServerPolicy<ActionT>>;
  */
 template <typename ActionT>
 // NOLINTNEXTLINE(readability-function-size)
-std::unique_ptr<GenericLifecycle> create_lifecycle_action_server(
+std::unique_ptr<LifecycleActionServer<ActionT>> create_lifecycle_action_server(
     FabricNode& node, const std::string& action_name,
     const typename rclcpp_action::Server<ActionT>::GoalCallback& goal_callback,
     const typename rclcpp_action::Server<ActionT>::CancelCallback& cancel_callback,
@@ -102,9 +102,9 @@ std::unique_ptr<GenericLifecycle> create_lifecycle_action_server(
         accepted_callback)
 {
     ActionConfig config{action_name};
-    return std::unique_ptr<GenericLifecycle>(new LifecycleActionServer<ActionT>(
+    return std::make_unique<LifecycleActionServer<ActionT>>(
         node, [&node]() { node.error_transition(); }, config, goal_callback,
-        cancel_callback, accepted_callback));
+        cancel_callback, accepted_callback);
 }
 
 }  // namespace cmr::fabric

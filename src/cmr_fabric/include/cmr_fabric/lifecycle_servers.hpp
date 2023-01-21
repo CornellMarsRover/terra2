@@ -208,15 +208,21 @@ struct WallTimerServerPolicy {
 /**
  * @brief Interface for any LifecycleServer.
  *
- * Provides activation, deactivation, and polling of activation status
+ * A lifecycle server is a server which registeres a callback with ROS
+ * that is called when a certain event occurs during the spinning of the node.
+ * It provides activation, deactivation, and polling of activation status.
+ * When the lifecycle server is deactivated, it will not invoke any user callbacks.
+ * A lifecycle server is initially deactivated until `activate()` is called.
  */
 class GenericLifecycle
 {
   public:
     virtual ~GenericLifecycle() = default;
 
+    /** Activates the lifecycle server and registers the callback with ROS */
     virtual void activate() = 0;
 
+    /** Deactivates the server and stops callbacks from being invoked */
     virtual void deactivate() = 0;
 
     virtual bool is_active() const = 0;
@@ -266,6 +272,8 @@ class LifecycleServer : public GenericLifecycle
 
   public:
     using config_t = typename ServerT::config_t;
+    using ptr_t = typename std::unique_ptr<LifecycleServer<ServerT>>;
+
     /**
      * @brief Construct a new Lifecycle Subscription object
      *
@@ -310,6 +318,17 @@ class LifecycleServer : public GenericLifecycle
               })
     {
     }
+
+    LifecycleServer(const LifecycleServer&) = delete;
+    LifecycleServer& operator=(const LifecycleServer&) = delete;
+
+    // Cannot move because the subscription captures the `this` pointer
+    // we could avoid this by making `m_active` a pointer, but generally it's
+    // probably more effecient to just make a pointer to the server
+    LifecycleServer(LifecycleServer&& other) noexcept = delete;
+    LifecycleServer& operator=(LifecycleServer&& other) noexcept = delete;
+
+    ~LifecycleServer() override = default;
 
     /**
      * @brief Activates the Lifecycle Subscription.

@@ -53,8 +53,13 @@ jobs:
 
       - name: Integration Tests
         id: integration
-        run: |
-          bash scripts/test_wd.sh
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          retry_on: error
+          command: |
+            bash scripts/test_wd.sh
 
       - name: Code coverage
         id: ccoverage

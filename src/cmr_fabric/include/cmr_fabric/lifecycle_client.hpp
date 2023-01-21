@@ -35,6 +35,7 @@ class LifecycleClient : public rclcpp::ClientBase
 
     using CallbackType = std::function<void(SharedFuture)>;
     using CallbackWithRequestType = std::function<void(SharedFutureWithRequest)>;
+    using ptr_t = std::unique_ptr<LifecycleClient<ServiceT>>;
 
     RCLCPP_SMART_PTR_DEFINITIONS(LifecycleClient)
 
@@ -111,4 +112,19 @@ class LifecycleClient : public rclcpp::ClientBase
 
     inline bool is_active() { return m_active; }
 };
+
+/** @brief Make a `unique_ptr` of a LifecycleClient */
+template <typename ServiceT>
+auto create_lifecycle_client_ptr(LifecycleClient<ServiceT>&& service)
+{
+    return std::make_unique<LifecycleClient<ServiceT>>(std::move(service));
+}
+
+/** @brief Make a `shared_ptr` of a  lifecycle client */
+template <typename ServiceT>
+auto create_lifecycle_client_shared(LifecycleClient<ServiceT>&& service)
+{
+    return std::make_shared<LifecycleClient<ServiceT>>(std::move(service));
+}
+
 }  // namespace cmr::fabric

@@ -40,12 +40,10 @@ bool InverseKinematics::configure(const std::shared_ptr<toml::Table>& table)
         return false;
     }
     const auto& arm_pgroup = arm_planning_group_name;
-    m_arm_pose_sub =
-        std::make_unique<fabric::LifecycleSubscription<geometry_msgs::msg::Pose>>(
-            create_lifecycle_subscription<geometry_msgs::msg::Pose>(
-                "arm_pose_topic", 10,
-                std::bind(&InverseKinematics::update_arm_position, this,
-                          std::placeholders::_1)));
+    m_arm_pose_sub = create_lifecycle_subscription<geometry_msgs::msg::Pose>(
+        "arm_pose_topic", 10,
+        std::bind(&InverseKinematics::update_arm_position, this,
+                  std::placeholders::_1));
 
     m_node = std::make_shared<rclcpp::Node>(
         "movegroupinterface_node",

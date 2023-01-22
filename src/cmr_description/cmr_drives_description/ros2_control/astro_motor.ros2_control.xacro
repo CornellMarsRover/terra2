@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="astro_motor_ros2_control" params="name joint">
+        <ros2_control name="${name}" type="actuator">
+            <hardware>
+                <plugin>cmr_control/AstroMotor</plugin>
+            </hardware>
+            <joint name="${joint}">
+                <command_interface name="position" />
+                <command_interface name="velocity" />
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+        </ros2_control>
+    </xacro:macro>
+</robot>

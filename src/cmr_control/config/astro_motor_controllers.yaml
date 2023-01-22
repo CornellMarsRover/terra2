@@ -1,0 +1,23 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 10 #Hz
+
+    joint_state_broadcaster:
+      # Doc -> https://github.com/ros-controls/ros2_controllers/blob/master/joint_state_broadcaster/doc/userdoc.rst
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    astro_motor_pos_controller:
+      type: position_controllers/JointGroupPositionController
+
+    astro_motor_vel_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+astro_motor_pos_controller:
+  ros__parameters:
+    joints:
+      - test_astro_joint
+
+astro_motor_vel_controller:
+  ros__parameters:
+    joints:
+      - test_astro_joint

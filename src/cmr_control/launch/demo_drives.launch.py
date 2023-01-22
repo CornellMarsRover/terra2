@@ -1,7 +1,7 @@
 from launch import LaunchDescription
 from launch.actions import RegisterEventHandler, DeclareLaunchArgument
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, FindExecutable, PathJoinSubstitution, LaunchConfiguration
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution, LaunchConfiguration, PythonExpression
 from launch.conditions.if_condition import IfCondition
 
 from launch_ros.actions import Node
@@ -13,7 +13,11 @@ def generate_launch_description():
     declare_rviz_config = DeclareLaunchArgument(name = 'use_rviz', 
                     default_value='True', 
                     description='Whether to launch RViz')
+    declare_astro_motor_mode = DeclareLaunchArgument(name = 'astro_motor_mode',
+                    default_value='"position"',
+                    description='Either position or velocity, depending on the mode of the astro motor')
     use_rviz = LaunchConfiguration('use_rviz')
+    astro_motor_mode = LaunchConfiguration('astro_motor_mode')
 
 
     robot_description_content = Command(
@@ -44,10 +48,14 @@ def generate_launch_description():
         [FindPackageShare("cmr_drives_description"), "config", "drives.rviz"]
     )
 
+    astro_motor_controllers = PathJoinSubstitution(
+        [FindPackageShare("cmr_control"), "config", "astro_motor_controllers.yaml"]
+    )
+
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, robot_controllers, astro_broadcasters],
+        parameters=[robot_description, robot_controllers, astro_broadcasters, astro_motor_controllers],
         output="both",
     )
 
@@ -101,6 +109,24 @@ def generate_launch_description():
         arguments=["astro_controller", "-c", "/controller_manager"]
     )
 
+    astro_motor_pos_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["astro_motor_pos_controller", "-c", "/controller_manager"],
+        condition=IfCondition(PythonExpression(
+            [astro_motor_mode, " == 'position'"]
+        ))
+    )
+
+    astro_motor_vel_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["astro_motor_vel_controller", "-c", "/controller_manager"],
+        condition=IfCondition(PythonExpression(
+            [astro_motor_mode, " == 'velocity'"]
+        ))
+    )
+
     # Delay rviz start after `joint_state_broadcaster`
     delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
@@ -130,8 +156,35 @@ def generate_launch_description():
         )
     )
 
+    # Delay start of astro_motor_pos_controller after `joint_state_broadcaster`
+    delay_astro_motor_pos_controller_spawner_after_joint_state_broadcaster_spawner = (
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[astro_motor_pos_controller_spawner],
+            ),
+            condition=IfCondition(PythonExpression(
+                [astro_motor_mode, " == 'position'"]
+            ))
+        )
+    )
+
+        # Delay start of astro_motor_vel_controller after `joint_state_broadcaster`
+    delay_astro_motor_vel_controller_spawner_after_joint_state_broadcaster_spawner = (
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=joint_state_broadcaster_spawner,
+                on_exit=[astro_motor_vel_controller_spawner],
+            ),
+            condition=IfCondition(PythonExpression(
+                [astro_motor_mode, " == 'velocity'"]
+            ))
+        )
+    )
+
     nodes = [
         declare_rviz_config,
+        declare_astro_motor_mode,
         control_node,
         robot_state_pub_node,
         joint_state_broadcaster_spawner,
@@ -139,6 +192,8 @@ def generate_launch_description():
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
         delay_astro_controller_spawner_after_astro_sensor_broadcast_spawner,
+        delay_astro_motor_pos_controller_spawner_after_joint_state_broadcaster_spawner,
+        delay_astro_motor_vel_controller_spawner_after_joint_state_broadcaster_spawner,
     ]
 
     return LaunchDescription(nodes)

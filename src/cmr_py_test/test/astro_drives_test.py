@@ -1,9 +1,10 @@
 from test_utils import *
 from cmr_msgs.msg import Float64ArrayStamped
 from geometry_msgs.msg import TwistStamped
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
 from rclpy.node import Node
 
-from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 import time
@@ -66,6 +67,37 @@ def euler_from_quaternion(quat):
      
         return roll_x, pitch_y, yaw_z # in radians
 
+def check_joint_states(sub: TopicSubscriber, joint_name, test_fn, timeout_sec=10.0):
+    """
+    Calls `test_fn` with the position and velocity of `joint_name` state and returns the a tuple of the
+    position and velocity.
+
+    Will keep waiting if `tes_fn` returns false
+    """
+    start_time = time.time()
+    last_pos = None
+    last_vel = None
+    while time.time() - start_time < timeout_sec:
+        sub.clear_msgs()
+        msg = sub.wait_for_msg()
+        if msg is None:
+            continue
+        idx = None
+        try:
+            idx = msg.name.index(joint_name)
+        except:
+            continue
+        last_pos = msg.position[idx]
+        last_vel = msg.velocity[idx]
+        if test_fn:
+            res = test_fn(last_pos, last_vel)
+            if res:
+                break
+        else:
+            break
+
+    return (last_pos, last_vel)
+
 
 class TestAstroDrives(CMRTestFixture):
     CMRTestFixture.nodes = [make_launch_file("cmr_control", "demo_drives.launch.py", 
@@ -85,6 +117,30 @@ class TestAstroDrives(CMRTestFixture):
         assert abs(msg.data[0] - 10.0) <= sys.float_info.epsilon
         assert abs(msg.data[1] - 20.0) <= sys.float_info.epsilon
         assert abs(msg.data[2] - 30.0) <= sys.float_info.epsilon
+
+    def test_astro_motor(self):
+        sub = TopicSubscriber(JointState, "/joint_states")
+        pos, _ = check_joint_states(sub, "test_astro_joint", lambda pos, _: abs(pos - 0.0) <= sys.float_info.epsilon)
+        assert abs(pos - 0.0) <= sys.float_info.epsilon
+
+        out_msg = Float64MultiArray()
+        out_msg.data = [3.0]
+        publish_to_topic(Float64MultiArray, "/astro_motor_pos_controller/commands", out_msg)
+        time.sleep(5)
+
+        pos, _ = check_joint_states(sub, "test_astro_joint", 
+                    lambda pos, _: abs(pos - out_msg.data[0]) <= sys.float_info.epsilon)
+
+        assert abs(pos - out_msg.data[0]) <= sys.float_info.epsilon
+
+        out_msg.data = [-0.3]
+        publish_to_topic(Float64MultiArray, "/astro_motor_pos_controller/commands", out_msg)
+        time.sleep(5)
+
+        pos, _ = check_joint_states(sub, "test_astro_joint", 
+                    lambda pos, _: abs(pos - out_msg.data[0]) <= sys.float_info.epsilon)
+
+        assert abs(pos - out_msg.data[0]) <= sys.float_info.epsilon
 
     def test_drives_linear(self):
         tf_node = Node('tf_node')
@@ -149,6 +205,5 @@ class TestAstroDrives(CMRTestFixture):
         assert abs(last_rpy[0]) < sys.float_info.epsilon
         assert abs(last_rpy[1]) < sys.float_info.epsilon
 
-        
 
 

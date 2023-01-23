@@ -111,6 +111,9 @@ bt_navigator:
       - nav2_back_up_cancel_bt_node
       - nav2_assisted_teleop_cancel_bt_node
       - nav2_drive_on_heading_cancel_bt_node
+      - nav2_globally_updated_goal_condition_bt_node
+      - nav2_is_path_valid_condition_bt_node
+
       # - nav2_would_a_controller_recovery_help_condition_bt_node
       # - nav2_would_a_planner_recovery_help_condition_bt_node
       # - nav2_would_a_smoother_recovery_help_condition_bt_node
@@ -181,12 +184,12 @@ controller_server:
       stateful: True
       critics:
         [
+          "PathDist",
           "RotateToGoal",
           "Oscillation",
           "BaseObstacle",
           "GoalAlign",
           "PathAlign",
-          "PathDist",
           "GoalDist",
         ]
       BaseObstacle.scale: 0.02
@@ -198,7 +201,7 @@ controller_server:
       GoalDist.scale: 24.0
       RotateToGoal.scale: 32.0
       RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
+      RotateToGoal.lookahead_time: 5.0
 
 controller_server_rclcpp_node:
   ros__parameters:
@@ -321,9 +324,9 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5
-      use_astar: false
-      allow_unknown: true
+      tolerance: 1.0
+      use_astar: True
+      allow_unknown: True
 
 planner_server_rclcpp_node:
   ros__parameters:
@@ -344,7 +347,7 @@ recoveries_server:
     global_frame: odom
     robot_base_frame: base_link
     transform_timeout: 0.1
-    use_sim_time: true
+    use_sim_time: True
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
     min_rotational_vel: 0.4
@@ -398,11 +401,11 @@ slam_toolbox:
     transform_timeout: 0.2
     tf_buffer_duration: 30.
     stack_size_to_use: 40000000 #// program needs a larger stack size to serialize large maps
-    enable_interactive_mode: true
+    enable_interactive_mode: True
 
     # General Parameters
-    use_scan_matching: true
-    use_scan_barycenter: true
+    use_scan_matching: True
+    use_scan_barycenter: True
     minimum_travel_distance: 0.5
     minimum_travel_heading: 0.5
     scan_buffer_size: 10
@@ -410,7 +413,7 @@ slam_toolbox:
     link_match_minimum_response_fine: 0.1
     link_scan_maximum_distance: 1.5
     loop_search_maximum_distance: 3.0
-    do_loop_closing: true
+    do_loop_closing: True
     loop_match_minimum_chain_size: 10
     loop_match_maximum_variance_coarse: 3.0
     loop_match_minimum_response_coarse: 0.35
@@ -435,4 +438,4 @@ slam_toolbox:
     coarse_angle_resolution: 0.0349
     minimum_angle_penalty: 0.9
     minimum_distance_penalty: 0.5
-    use_response_expansion: true
+    use_response_expansion: True

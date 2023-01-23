@@ -114,7 +114,8 @@ def generate_launch_description():
                     '-R', '0', 
                     '-P', '0', 
                     '-Y', '0'],
-        output='screen'
+        output='screen',
+        parameters=[{'use_sim_time': sim_time}]
     )
 
     start_slam_toolbox = IncludeLaunchDescription(

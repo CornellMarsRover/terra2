@@ -13,3 +13,4 @@ curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo ap
 sudo apt-get update
 
 sudo apt-get install -y ignition-fortress ros-humble-ros-ign ros-humble-ros-ign-bridge ros-humble-gazebo-ros-pkgs
+sudo apt-get install -y ros-humble-slam-toolbox ros-humble-robot-localization

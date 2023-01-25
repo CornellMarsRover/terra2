@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_cv)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
-                      "${PROJECT_SOURCE_DIR}/../../cmake")
+  "${PROJECT_SOURCE_DIR}/../../cmake")
 include(CmrUtils)
 
 # Hack for now
@@ -23,7 +23,11 @@ cmr_std_find_pkgs(
   behaviortree_cpp_v3
   nav2_util
   nav2_core
-  pluginlib)
+  pluginlib
+  rclcpp_action
+  nav2_common
+  nav2_waypoint_follower
+  nav2_lifecycle_manager)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages.
@@ -60,6 +64,10 @@ cmr_add_lib(
   src/aruco_bt_action.cpp
   DEPENDS
   rclcpp
+  rclcpp_action
+  rclcpp_lifecycle
+  sensor_msgs
+  std_srvs
   std_msgs
   cmr_msgs
   geometry_msgs
@@ -70,6 +78,7 @@ cmr_add_lib(
   nav2_util
   nav2_core
   pluginlib)
+target_compile_definitions(aruco_bt_action PRIVATE BT_PLUGIN_EXPORT)
 
 # PHOBOS_APPEND
 cmr_export()

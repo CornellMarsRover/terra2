@@ -67,26 +67,26 @@
                 <max_vel>1.0</max_vel>
                 <min_depth>0.00</min_depth> -->
                 <surface>
-                  <friction>
-                    <ode>
-                      <mu>1.5</mu>
-                      <mu2>1.5</mu2>
-                      <slip1>0</slip1>
-                      <slip2>0</slip2>
-                    </ode>
-                  </friction>
-                   <contact>
-                    <ode>
-                      <soft_cfm>0</soft_cfm>
-                      <soft_erp>0.2</soft_erp>
-                      <kp>1e+13</kp>
-                      <kd>1</kd>
-                      <max_vel>1</max_vel>
-                      <min_depth>0.01</min_depth>
-                    </ode>
-                  </contact> 
+                    <friction>
+                        <ode>
+                            <mu>1.5</mu>
+                            <mu2>1.5</mu2>
+                            <slip1>0</slip1>
+                            <slip2>0</slip2>
+                        </ode>
+                    </friction>
+                    <contact>
+                        <ode>
+                            <soft_cfm>0</soft_cfm>
+                            <soft_erp>0.2</soft_erp>
+                            <kp>1e+13</kp>
+                            <kd>1</kd>
+                            <max_vel>1</max_vel>
+                            <min_depth>0.01</min_depth>
+                        </ode>
+                    </contact>
                 </surface>
-              </gazebo>
+            </gazebo>
         </xacro:macro>
 
         <!-- Base Link -->
@@ -118,12 +118,7 @@
             <inertial>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <mass value="${lidar_mass}"/>
-                <inertia ixx="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" 
-                         ixy="0" 
-                         ixz="0" 
-                         iyy="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" 
-                         iyz="0" 
-                         izz="${0.5 * lidar_mass * lidar_radius * lidar_radius}" />
+                <inertia ixx="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" ixy="0" ixz="0" iyy="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" iyz="0" izz="${0.5 * lidar_mass * lidar_radius * lidar_radius}" />
             </inertial>
 
             <collision>
@@ -185,12 +180,7 @@
             <inertial>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <mass value="${camera_mass}"/>
-                <inertia ixx="${camera_mass / 12.0 * (cam_height * cam_height + cam_length * cam_length)}" 
-                         ixy="0" 
-                         ixz="0" 
-                         iyy="${camera_mass / 12.0 * (cam_height * cam_height + cam_width * cam_width)}" 
-                         iyz="0" 
-                         izz="${camera_mass / 12.0 * (cam_width * cam_width + cam_length * cam_length)}" />
+                <inertia ixx="${camera_mass / 12.0 * (cam_height * cam_height + cam_length * cam_length)}" ixy="0" ixz="0" iyy="${camera_mass / 12.0 * (cam_height * cam_height + cam_width * cam_width)}" iyz="0" izz="${camera_mass / 12.0 * (cam_width * cam_width + cam_length * cam_length)}" />
             </inertial>
         </link>
 
@@ -227,66 +217,66 @@
             <visualize>true</visualize>
             <imu>
                 <orientation>
-                  <x>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>2e-3</stddev>
-                    </noise>
-                  </x>
-                  <y>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>2e-3</stddev>
-                    </noise>
-                  </y>
-                  <z>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>2e-3</stddev>
-                    </noise>
-                  </z>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-3</stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-3</stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-3</stddev>
+                        </noise>
+                    </z>
                 </orientation>
                 <angular_velocity>
-                  <x>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>2e-4</stddev>
-                    </noise>
-                  </x>
-                  <y>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>2e-4</stddev>
-                    </noise>
-                  </y>
-                  <z>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>2e-4</stddev>
-                    </noise>
-                  </z>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-4</stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-4</stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-4</stddev>
+                        </noise>
+                    </z>
                 </angular_velocity>
                 <linear_acceleration>
-                  <x>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>1.7e-2</stddev>
-                    </noise>
-                  </x>
-                  <y>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>1.7e-2</stddev>
-                    </noise>
-                  </y>
-                  <z>
-                    <noise type="gaussian">
-                      <mean>0.0</mean>
-                      <stddev>1.7e-2</stddev>
-                    </noise>
-                  </z>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>1.7e-2</stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>1.7e-2</stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>1.7e-2</stddev>
+                        </noise>
+                    </z>
                 </linear_acceleration>
-              </imu>
+            </imu>
         </sensor>
     </gazebo>
     <gazebo>
@@ -319,7 +309,7 @@
             <publish_odom>true</publish_odom>
             <publish_odom_tf>true</publish_odom_tf>
             <publish_wheel_tf>false</publish_wheel_tf>
-            <odom_topic>/rover/odom</odom_topic>
+            <odom_topic>/odom</odom_topic>
             <topic>/cmd_vel</topic>
 
             <source_frame>map</source_frame>
@@ -332,7 +322,7 @@
         <sensor name="lidar" type="ray">
             <always_on>true</always_on>
             <visualize>true</visualize>
-            <update_rate>5</update_rate>
+            <update_rate>20</update_rate>
             <ray>
                 <scan>
                     <horizontal>
@@ -409,25 +399,25 @@
             <always_on>true</always_on>
             <update_rate>10.0</update_rate>
             <gps>
-            <position_sensing>
-                <horizontal>
-                <noise type="gaussian">
-                    <mean>0.0</mean>
-                    <stddev>1e-2</stddev>
-                </noise>
-                </horizontal>
-                <vertical>
-                <noise type="gaussian">
-                    <mean>0.0</mean>
-                    <stddev>1</stddev>
-                </noise>
-                </vertical>
-            </position_sensing>
+                <position_sensing>
+                    <horizontal>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>1e-2</stddev>
+                        </noise>
+                    </horizontal>
+                    <vertical>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>1</stddev>
+                        </noise>
+                    </vertical>
+                </position_sensing>
             </gps>
             <plugin name="rover_gps" filename="libgazebo_ros_gps_sensor.so">
-            <ros>
-                <remapping>~/out:=gps/fix</remapping>
-            </ros>
+                <ros>
+                    <remapping>~/out:=gps/fix</remapping>
+                </ros>
             </plugin>
         </sensor>
     </gazebo>

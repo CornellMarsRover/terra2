@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="BehaviorTree">
+    <!-- ////////// -->
+    <BehaviorTree ID="BehaviorTree">
+        <Sequence>
+            <Action ID="Print" message="Testing Aruco"/>
+            <RecoveryNode number_of_retries="3">
+                <Action ID="Aruco"/>
+                <Action ID="Print" message="{ARTag}"/>
+            </RecoveryNode>
+        </Sequence>
+    </BehaviorTree>
+</root>

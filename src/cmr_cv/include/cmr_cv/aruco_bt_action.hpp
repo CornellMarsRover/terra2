@@ -19,6 +19,7 @@ class ArucoAction : public BT::SyncActionNode
 
   private:
     std::shared_ptr<rclcpp::Node> m_ros_node;
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr m_sub;
 
     void topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg);
 
@@ -26,4 +27,3 @@ class ArucoAction : public BT::SyncActionNode
 
     geometry_msgs::msg::Vector3 m_latest_position;
 };
-

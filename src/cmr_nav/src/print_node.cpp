@@ -6,8 +6,7 @@
 namespace cmr
 {
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-PrintAction::PrintAction(const std::string& xml_tag_name,
-                         const std::string&,
+PrintAction::PrintAction(const std::string& xml_tag_name, const std::string&,
                          const BT::NodeConfiguration& conf)
     : BT::SyncActionNode(xml_tag_name, conf)
 {

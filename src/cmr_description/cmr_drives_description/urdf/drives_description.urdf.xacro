@@ -213,7 +213,7 @@
                 <initial_orientation_as_reference>false</initial_orientation_as_reference>
             </plugin>
             <always_on>true</always_on>
-            <update_rate>100</update_rate>
+            <update_rate>2</update_rate>
             <visualize>true</visualize>
             <imu>
                 <orientation>
@@ -305,7 +305,7 @@
             <max_wheel_acceleration>10.0</max_wheel_acceleration>
 
             <!-- output -->
-            <update_rate>30</update_rate>
+            <update_rate>2</update_rate>
             <publish_odom>true</publish_odom>
             <publish_odom_tf>true</publish_odom_tf>
             <publish_wheel_tf>false</publish_wheel_tf>
@@ -322,7 +322,7 @@
         <sensor name="lidar" type="ray">
             <always_on>true</always_on>
             <visualize>true</visualize>
-            <update_rate>20</update_rate>
+            <update_rate>2</update_rate>
             <ray>
                 <scan>
                     <horizontal>
@@ -355,7 +355,7 @@
 
     <gazebo reference="camera_link">
         <sensor type="camera" name="camera1">
-            <update_rate>30.0</update_rate>
+            <update_rate>2</update_rate>
             <camera name="head">
                 <horizontal_fov>1.5127496682368</horizontal_fov>
                 <verical_fov>1.6500906166776</verical_fov>
@@ -397,7 +397,7 @@
     <gazebo reference="gps_link">
         <sensor name="rover_gps" type="gps">
             <always_on>true</always_on>
-            <update_rate>10.0</update_rate>
+            <update_rate>0.5</update_rate>
             <gps>
                 <position_sensing>
                     <horizontal>

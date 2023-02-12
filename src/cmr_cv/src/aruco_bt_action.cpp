@@ -72,12 +72,12 @@ ArucoAction::ArucoAction(const std::string& name, const std::string&,
         }
     }
 
-    // average the coordinates of the poses in the m_position_to_post vector to 
+    // average the coordinates of the poses in the m_position_to_post vector to
     // get the coordinate that the rover should circle around
     double sum_x = 0;
     double sum_y = 0;
     double sum_z = 0;
-    for (auto & i : m_position_to_post) {
+    for (auto& i : m_position_to_post) {
         sum_x += i.position.x;
         sum_y += i.position.y;
         sum_z += i.position.z;
@@ -86,9 +86,9 @@ ArucoAction::ArucoAction(const std::string& name, const std::string&,
     double x_position = sum_x / size;
     double y_position = sum_y / size;
     double z_position = sum_z / size;
-    m_latest_position_average.x=x_position;
-    m_latest_position_average.y=y_position;
-    m_latest_position_average.z=z_position;
+    m_latest_position_average.x = x_position;
+    m_latest_position_average.y = y_position;
+    m_latest_position_average.z = z_position;
 }
 
 // The callback function calculates the time that is stamped on the detected

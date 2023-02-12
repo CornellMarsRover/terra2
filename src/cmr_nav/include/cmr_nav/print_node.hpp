@@ -47,9 +47,6 @@ class PrintAction : public BT::SyncActionNode
         on_tick();
         return BT::NodeStatus::SUCCESS;
     }
-
-  private:
-    std::string m_message;
 };
 
 }  // namespace cmr

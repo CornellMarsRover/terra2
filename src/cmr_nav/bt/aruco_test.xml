@@ -3,10 +3,14 @@
     <!-- ////////// -->
     <BehaviorTree ID="BehaviorTree">
         <Sequence>
-            <Action ID="Print" message="Testing Aruco"/>
-            <RecoveryNode number_of_retries="3">
-                <Action ID="Aruco"/>
-                <Action ID="Print" message="{ARTag}"/>
+            <Action ID="Print" message="Testing Pose"/>
+            <RecoveryNode number_of_retries="10">
+                <!-- <Action ID="Aruco"/> -->
+                <AlwaysFailure/>
+                <Sequence>
+                    <Action ID="PoseGenerator" has_arrived="true" goal="{goal}"/>
+                    <!-- <Action ID="Print" message="{testing}"/> -->
+                </Sequence>
             </RecoveryNode>
         </Sequence>
     </BehaviorTree>

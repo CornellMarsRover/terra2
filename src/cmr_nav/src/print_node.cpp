@@ -12,15 +12,16 @@ PrintAction::PrintAction(const std::string& xml_tag_name, const std::string&,
 {
     std::string message;
     getInput("message", message);
-    m_message = message;
     RCLCPP_INFO(rclcpp::get_logger("Print Logger"), "Initialize: %s. \n",
-                m_message.c_str());
+                message.c_str());
 }
 
 void PrintAction::on_tick()
 {
+    std::string message;
+    getInput("message", message);
     RCLCPP_INFO(rclcpp::get_logger("Print Logger"), "Message: %s. \n",
-                m_message.c_str());
+                message.c_str());
 }
 
 }  // namespace cmr

@@ -4,6 +4,7 @@
 
 #include "behaviortree_cpp_v3/action_node.h"
 #include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 namespace cmr
@@ -35,7 +36,7 @@ class PoseGeneratorAction : public BT::SyncActionNode
     {
         return {BT::InputPort<bool>(input, false,
                                     "Whether or not rover is at outputted pose"),
-                BT::OutputPort<geometry_msgs::msg::Pose>(
+                BT::OutputPort<geometry_msgs::msg::PoseStamped>(
                     output, "The next pose to travel to")};
     }
 
@@ -47,13 +48,13 @@ class PoseGeneratorAction : public BT::SyncActionNode
 
     /**
      * @brief Uses the previous pose to determine the next pose to go to
-     * 
+     *
      * @return geometry_msgs::msg::Pose The next pose to go to
      */
-    geometry_msgs::msg::Pose generate_next_pose();
+    geometry_msgs::msg::PoseStamped generate_next_pose() const;
 
   private:
-    geometry_msgs::msg::Pose m_previous_pose;
+    geometry_msgs::msg::PoseStamped m_previous_pose;
     int m_pose_id;
     int m_unit_distance;
     static std::string const input;

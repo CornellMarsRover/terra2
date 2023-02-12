@@ -93,6 +93,27 @@ cmr_add_lib(cmr_print_node SHARED
 )
 target_compile_definitions(cmr_print_node PRIVATE BT_PLUGIN_EXPORT)
 
+cmr_add_lib(cmr_pose_generator_node SHARED
+  SOURCES
+  src/pose_generator_node.cpp
+  DEPENDS
+  rclcpp
+  rclcpp_action
+  rclcpp_lifecycle
+  geometry_msgs
+  sensor_msgs
+  nav2_msgs
+  nav_msgs
+  behaviortree_cpp_v3
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  std_msgs
+  std_srvs
+  nav2_util
+)
+target_compile_definitions(cmr_pose_generator_node PRIVATE BT_PLUGIN_EXPORT)
+
 # PHOBOS_APPEND
 cmr_export()
 

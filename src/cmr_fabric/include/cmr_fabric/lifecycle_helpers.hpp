@@ -5,6 +5,13 @@ namespace cmr::fabric
 {
 
 /**
+ * @defgroup LifecycleHelpers
+ * Functions and types that wrap ROS2 lifecycle management to make it
+ * easier to use.
+ * @{
+ */
+
+/**
  * A LifecycleState is Fabric's representation of the state of a node.
  * This is a typed wrapper around ROS 2's lifecycle state which is represented as an
  * integer.
@@ -69,4 +76,6 @@ bool cleanup_node(const std::string& node_name);
  * This will block the caller thread.
  */
 LifecycleState get_lifecycle_state(const std::string& node_name);
+
+/** @} */
 }  // namespace cmr::fabric

@@ -17,7 +17,10 @@ namespace cmr_control
  * provides readings of a sensor's floting point readings.
  *
  * Can provide different ways of getting readings depending on the state interface
- * name.
+ * name. The hardware returns a floating point value for each reading it
+ * is configured to get in the controller YAML config file.
+ *
+ * Meant to be used with the `cmr_control::AstroSensorBroadcaster`.
  */
 class AstroSensorHardware : public hardware_interface::SensorInterface
 {
@@ -39,6 +42,13 @@ class AstroSensorHardware : public hardware_interface::SensorInterface
                                          const rclcpp::Duration& period) override;
 
   private:
+    /**
+     * The sensor readings.
+     *
+     * This will be the same length as `info_.sensors.size()` and the `ith` sensor
+     * defined in the controller config YAML file will be the `ith` sensor in
+     * `info_.sensors` and the `ith` value in this vector.
+     */
     std::vector<double> m_sensor_states;
 };
 

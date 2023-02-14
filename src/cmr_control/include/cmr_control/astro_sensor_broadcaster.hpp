@@ -22,6 +22,18 @@ namespace cmr_control
  * The broadcaster publishes messages of type cmr_msgs::msg::Float64ArrayStamped
  * which contains a timestamp and a vector of floating point values.
  *
+ * ## Params:
+ *
+ * Params are specified in the controllers YAML config file. Params for this
+ * include:
+ *
+ * - `sensor_name`: String. The name of the sensor
+ * - `frame_id`: String. The name of the reference frame of the sensor. May or may
+ * not be necessary depending on the sensor.
+ * - `interface_names`: List of Strings. The names of the interfaces the broadcaster
+ * will publish. The `ith` name in this list will correspond to the `ith` double
+ * in the published `cmr_msgs::msg::Float64ArrayStamped` message
+ *
  */
 class AstroSensorBroadcaster : public controller_interface::ControllerInterface
 {

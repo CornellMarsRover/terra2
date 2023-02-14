@@ -91,6 +91,7 @@ using LifecycleActionServer = LifecycleServer<ActionServerPolicy<ActionT>>;
  * @param cancel_callback callback when a goal is cancelled
  * @param accepted_callback callback when a goal is accepted from the `goal_callback`
  * @return auto
+ * @ingroup LifecycleFactory
  */
 template <typename ActionT>
 // NOLINTNEXTLINE(readability-function-size)

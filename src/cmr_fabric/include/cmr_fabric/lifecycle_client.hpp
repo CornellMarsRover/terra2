@@ -113,14 +113,20 @@ class LifecycleClient : public rclcpp::ClientBase
     inline bool is_active() { return m_active; }
 };
 
-/** @brief Make a `unique_ptr` of a LifecycleClient */
+/**
+ * @brief Make a `unique_ptr` of a LifecycleClient
+ * @ingroup LifecycleFactory
+ */
 template <typename ServiceT>
 auto create_lifecycle_client_ptr(LifecycleClient<ServiceT>&& service)
 {
     return std::make_unique<LifecycleClient<ServiceT>>(std::move(service));
 }
 
-/** @brief Make a `shared_ptr` of a  lifecycle client */
+/**
+ * @brief Make a `shared_ptr` of a  lifecycle client
+ * @ingroup LifecycleFactory
+ */
 template <typename ServiceT>
 auto create_lifecycle_client_shared(LifecycleClient<ServiceT>&& service)
 {

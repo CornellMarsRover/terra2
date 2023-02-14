@@ -17,6 +17,16 @@ namespace cmr_control
 /**
  * @brief `AstroMotor` is a hardware interface for controlling a single motor
  * with position or velocity commands.
+ *
+ * It expects that it will only be passed a single joint within the
+ * `HardwareInfo` in the call to `on_init()`. This means, from a user perspective
+ * that the AstroMotor should only have a single motor's state interface, command
+ * interface, and joint under its control as defined in the URDFs and YAML controller
+ * config files.
+ *
+ * A good controller for this is either
+ * `position_controllers/JointGroupPositionController` or
+ * `velocity_controllers/JointGroupVelocityController`.
  */
 
 class AstroMotor : public hardware_interface::ActuatorInterface
@@ -49,10 +59,15 @@ class AstroMotor : public hardware_interface::ActuatorInterface
         const std::vector<std::string>& stop_interfaces) override;
 
   private:
+    /** The current command mode */
     std::string m_command_mode;
+    /** Position state interface value */
     double m_position;
+    /** Position command interface value */
     double m_position_cmd;
+    /** Velocity state interface value */
     double m_velocity;
+    /** Velocity command interface value */
     double m_velocity_cmd;
 };
 

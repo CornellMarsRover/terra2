@@ -1,19 +1,21 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_control)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
-  "${PROJECT_SOURCE_DIR}/../../cmake")
+                      "${PROJECT_SOURCE_DIR}/../../cmake")
 include(CmrUtils)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages. find dependencies
 cmr_std_find_pkgs(rclcpp_lifecycle hardware_interface pluginlib
-  generate_parameter_library controller_interface)
+                  generate_parameter_library controller_interface)
 
 # Add other directories to install here
 cmr_install(launch config)
 
+# Converts YAML configuration parameters into source code that defines a struct
+# which can be used from the AstroSensorBroadcaster class
 generate_parameter_library(astro_sensor_broadcaster_params
-  src/astro_sensor_broadcaster_params.yaml)
+                           src/astro_sensor_broadcaster_params.yaml)
 
 # Add tests with: cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test
 # dependencies>)
@@ -46,6 +48,8 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
+# Manually add astro_sensor_broadcaster_params to the list of libraries this
+# CMake will export
 list(APPEND CMR_LIBS astro_sensor_broadcaster_params)
 
 # Export hardware pligins

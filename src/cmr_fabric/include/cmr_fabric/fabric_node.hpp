@@ -60,6 +60,54 @@ struct FabricNodeConfig {
  * invoked, the FabricNode communicates with the fault handler to notify it of the
  * error. The fault handler will then schedule this node for restart.
  *
+ * When a Fabric Node is created, it is passed a configuration file in
+ * TOML. It must contain the following section:
+ *
+ * ```
+ * [fault_handling]
+ * restart_attempts = <int>
+ * restart_delay = <int>
+ * ```
+ *
+ * The `restart_attempts` is the number of times a Fabric Node will attempt to
+ * restart when an error occurs. The `restart_delay` is the number of seconds to wait
+ * before restarting the node when it fails. A fabric node is initially in the
+ * inactive state after finishing its configuration. It then must be activated which
+ * can be done from the topic interface provided by `LifecycleManager` or from C++
+ * via `cmr::fabric::activate_node()`.
+ *
+ * Upon activation, the node will communicate with `cmr::fabric::DependencyHandler`
+ * to first activate any dependencies. The same process will happen
+ * in reverse on deactivation to deactivate any nodes that were activated for the
+ * sole purpose of being the dependency.
+ *
+ * When an error occurs, `FabricNode::schedule_restart()` should be called, which
+ * will schedule the node for restart by `cmr::fabric::FaultHandler`. When using the
+ * `cmr::fabric::LifecycleServer` which can be created by factory methods
+ * `create_lifecycle_timer()`, `create_lifecycle_subscription()`, etc., all
+ * exceptions thrown in the Callback will be caught and trigger a call to
+ * `FabricNode::schedule_restart()`. Furthermore, any assertions called within
+ * the server callback functions will also trigger a node restart.
+ *
+ * A node restart shuts down all nodes that depend on the faulting node and restarts
+ * all of them in reverse topological order to maintain the constraint that
+ * a node is never active for a nontrivial period of time without its dependencies.
+ *
+ * ## ROS Params:
+ *
+ * - `composition_ns` - the namespace to run the node in, which will be the namespace
+ * the node uses for the `~/recover_fault` service to communicate with
+ * `cmr::fabric::FaultHandler`
+ * - `config_path` - the path to the TOML config file
+ * - `config_data` - the contents of the TOML config file. Will be overriden by
+ * `config_path` if both parameters are specefied
+ *
+ * ## TOML Params:
+ *
+ * - `restart_attempts` - See above
+ * - `restart_delay` - See above
+ * - `dependencies` - List of node names that the node depends upon
+ *
  */
 class FabricNode : public rclcpp_lifecycle::LifecycleNode
 {
@@ -217,6 +265,13 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
     bool schedule_restart();
 
     /**
+     * @defgroup LifecycleFactory
+     * Creates lifecycle versions of clients and servers that communicate with
+     * ROS such as publishers, subscribers, timers, and services.
+     * @{
+     */
+
+    /**
      * @brief Create a lifecycle subscription object that can be activated and
      * deactivated and will call the fabric node error transition when an exception
      * is thrown from the callback
@@ -334,6 +389,8 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
             *this, [this]() { return this->error_transition(); }, config,
             std::forward<CallbackT>(callback));
     }
+
+    /** @} */
 };
 
 }  // namespace cmr::fabric

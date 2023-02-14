@@ -51,6 +51,7 @@ jobs:
           pytest-args: " -k SKIP_ALL_TESTS"
           other-test-args: "--packages-skip-regex ros2_aruco"
 
+      # Integration tests are a little flaky, so allow retries
       - name: Integration Tests
         id: integration
         uses: nick-fields/retry@v2

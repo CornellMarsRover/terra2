@@ -87,6 +87,11 @@ class AstroSensor
     }
 
   private:
+    /**
+     * The sensor readings.
+     *
+     * The `ith` reading in this vector corresponds to the `ith` state interface.
+     */
     std::vector<double> m_readings;
 };
 

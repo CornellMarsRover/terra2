@@ -137,10 +137,10 @@ assert_handler_t get_assert_handler() noexcept;
 // NOLINTNEXTLINE
 #define CMR_INVALID(MSG) cmr_invalid(__FILE__, __LINE__, MSG)
 
-/** @defgroup DEBUG_MACROS
+/** @{ */
+/**
  * Debug versions of `CMR_LOG` and `CMR_ASSERT`
  * Only enabled in debug builds and should be used VERY sparingly
- * @{
  */
 #ifndef NDEBUG
 // NOLINTNEXTLINE
@@ -308,7 +308,15 @@ auto narrow_cast(T&& t)
 
 /**
  * @brief A RAII helper class that simply provides a way to call a function when it
- * is destroyed
+ * is destroyed.
+ *
+ * Meant to be used with the `ALWAYS` macro.
+ *
+ * ### Example:
+ *
+ * ```C++
+ * ALWAYS(this) { this->m_finished = true; };
+ * ```
  *
  */
 template <typename Func>

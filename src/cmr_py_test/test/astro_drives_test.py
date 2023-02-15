@@ -1,5 +1,5 @@
 from test_utils import *
-from cmr_msgs.msg import Float64ArrayStamped
+from cmr_msgs.msg import Int16ArrayStamped
 from geometry_msgs.msg import TwistStamped
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
@@ -105,7 +105,7 @@ class TestAstroDrives(CMRTestFixture):
 
     def test_astro_sensor(self):
         time.sleep(5)
-        sub = TopicSubscriber(Float64ArrayStamped, "/astro_controller/sensor")
+        sub = TopicSubscriber(Int16ArrayStamped, "/astro_controller/sensor")
         msg = sub.wait_for_msg()
         start_time = time.time()
         while msg is None and time.time() - start_time < 10.0:

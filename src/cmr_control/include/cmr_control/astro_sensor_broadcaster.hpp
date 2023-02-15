@@ -19,7 +19,7 @@ namespace cmr_control
  * a timestamp to a ROS topic.
  *
  * It can be configured to publish multiple readings of different types.
- * The broadcaster publishes messages of type cmr_msgs::msg::Float64ArrayStamped
+ * The broadcaster publishes messages of type cmr_msgs::msg::Int16ArrayStamped
  * which contains a timestamp and a vector of floating point values.
  *
  * ## Params:
@@ -32,7 +32,7 @@ namespace cmr_control
  * not be necessary depending on the sensor.
  * - `interface_names`: List of Strings. The names of the interfaces the broadcaster
  * will publish. The `ith` name in this list will correspond to the `ith` double
- * in the published `cmr_msgs::msg::Float64ArrayStamped` message
+ * in the published `cmr_msgs::msg::Int16ArrayStamped` message
  *
  */
 class AstroSensorBroadcaster : public controller_interface::ControllerInterface
@@ -74,8 +74,8 @@ class AstroSensorBroadcaster : public controller_interface::ControllerInterface
     std::unique_ptr<semantic_components::AstroSensor> m_sensor;
 
     using StatePublisher =
-        realtime_tools::RealtimePublisher<cmr_msgs::msg::Float64ArrayStamped>;
-    rclcpp::Publisher<cmr_msgs::msg::Float64ArrayStamped>::SharedPtr
+        realtime_tools::RealtimePublisher<cmr_msgs::msg::Int16ArrayStamped>;
+    rclcpp::Publisher<cmr_msgs::msg::Int16ArrayStamped>::SharedPtr
         m_sensor_state_publisher;
     std::unique_ptr<StatePublisher> m_realtime_publisher;
 };

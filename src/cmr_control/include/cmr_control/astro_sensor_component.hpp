@@ -18,7 +18,7 @@ namespace semantic_components
  * in a ROS message to be published.
  */
 class AstroSensor
-    : public SemanticComponentInterface<cmr_msgs::msg::Float64ArrayStamped>
+    : public SemanticComponentInterface<cmr_msgs::msg::Int16ArrayStamped>
 {
   private:
     /** Gets the latest readings from the state interface and stores them into
@@ -60,7 +60,7 @@ class AstroSensor
     virtual ~AstroSensor() = default;
 
     /**
-     * @brief Updates a `cmr_msgs::msg::Float64ArrayStamped` message with the
+     * @brief Updates a `cmr_msgs::msg::Int16ArrayStamped` message with the
      * current sensor readings.
      *
      * Adheres to the static interface of
@@ -70,7 +70,7 @@ class AstroSensor
      * @return true on success
      */
     [[nodiscard]] bool get_values_as_message(
-        cmr_msgs::msg::Float64ArrayStamped& message)
+        cmr_msgs::msg::Int16ArrayStamped& message)
     {
         // This function is not very idiomatic, but I kept the signature the
         // same to be consistent with the SemanticInterface static

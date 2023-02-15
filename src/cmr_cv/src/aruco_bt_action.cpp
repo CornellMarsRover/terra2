@@ -29,10 +29,6 @@ inline geometry_msgs::msg::Vector3 convertFromString<geometry_msgs::msg::Vector3
 }
 }  // end namespace BT
 
-// Tick method that spins the node and returns success if there are any AR tags
-// in the vector (meaning one was detected) and failure if there wasn't one detected;
-// posts the latest position to the blackboard that is the average of the similarly
-// located tags in the vector
 BT::NodeStatus ArucoAction::tick()
 {
     rclcpp::spin_some(m_ros_node);
@@ -48,7 +44,7 @@ BT::NodeStatus ArucoAction::tick()
 
 ArucoAction::ArucoAction(const std::string& name, const std::string&,
                          const BT::NodeConfiguration& conf)
-    : BT::SyncActionNode(name, conf), m_latest({}), m_latest_position({})
+    : BT::SyncActionNode(name, conf), m_latest_position({})
 {
     // NOLINTNEXTLINE
     using namespace std::placeholders;
@@ -91,16 +87,9 @@ ArucoAction::ArucoAction(const std::string& name, const std::string&,
     m_latest_position_average.z = z_position;
 }
 
-// The callback function calculates the time that is stamped on the detected
-// AR tag and sees if it is sooner than the previous time calculated. It also
-// loops through the Aruco poses to add each pose to the vector of AR tags.
+
 void ArucoAction::topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 {
-    const auto time_now = msg->header.stamp;
-    if (time_now.sec > m_latest.sec ||
-        (time_now.nanosec > m_latest.nanosec && time_now.sec == m_latest.sec)) {
-        m_latest = time_now;
-    }
     for (const auto& pose : msg->poses) {
         m_node_vector.push_back(pose);
     }

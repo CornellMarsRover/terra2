@@ -1,5 +1,5 @@
 #pragma once
-#include <cmr_msgs/msg/float64_array_stamped.hpp>
+#include <cmr_msgs/msg/int16_array_stamped.hpp>
 #include <limits>
 #include <string>
 #include <vector>
@@ -27,7 +27,8 @@ class AstroSensor
     void update_readings()
     {
         for (auto i = 0u; i < m_readings.size(); ++i) {
-            m_readings[i] = state_interfaces_[i].get().get_value();
+            m_readings[i] =
+                static_cast<int16_t>(state_interfaces_[i].get().get_value());
         }
     }
 
@@ -92,7 +93,7 @@ class AstroSensor
      *
      * The `ith` reading in this vector corresponds to the `ith` state interface.
      */
-    std::vector<double> m_readings;
+    std::vector<std::int16_t> m_readings;
 };
 
 }  // namespace semantic_components

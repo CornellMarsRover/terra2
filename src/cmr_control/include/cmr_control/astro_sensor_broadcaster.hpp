@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "cmr_control/astro_sensor_component.hpp"
-#include "cmr_msgs/msg/float64_array_stamped.hpp"
+#include "cmr_msgs/msg/int16_array_stamped.hpp"
 #include "controller_interface/controller_interface.hpp"
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"

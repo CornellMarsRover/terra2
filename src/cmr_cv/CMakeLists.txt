@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_cv)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
-  "${PROJECT_SOURCE_DIR}/../../cmake")
+                      "${PROJECT_SOURCE_DIR}/../../cmake")
 include(CmrUtils)
+
+# Hack for now
+remove(CMR_COMPILE_FLAGS -Werror)
 
 # find dependencies
 cmr_std_find_pkgs(
@@ -12,7 +15,15 @@ cmr_std_find_pkgs(
   camera_info_manager
   sensor_msgs
   camera_calibration_parsers
-  OpenCV)
+  OpenCV
+  geometry_msgs
+  nav2_behavior_tree
+  nav_msgs
+  nav2_msgs
+  behaviortree_cpp_v3
+  nav2_util
+  nav2_core
+  pluginlib)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages.
@@ -40,6 +51,25 @@ cmr_add_node(
   image_transport
   camera_calibration_parsers
   OpenCV)
+
+# Aruco node behavior tree action plugin
+cmr_add_lib(
+  aruco_bt_action
+  SHARED
+  SOURCES
+  src/aruco_bt_action.cpp
+  DEPENDS
+  rclcpp
+  std_msgs
+  cmr_msgs
+  geometry_msgs
+  nav2_behavior_tree
+  nav_msgs
+  nav2_msgs
+  behaviortree_cpp_v3
+  nav2_util
+  nav2_core
+  pluginlib)
 
 # PHOBOS_APPEND
 cmr_export()

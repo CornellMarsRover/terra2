@@ -33,10 +33,10 @@ BT::NodeStatus ArucoAction::tick()
 {
     rclcpp::spin_some(m_ros_node);
 
-    setOutput("ARTag", m_latest_position_average);
-
     if (!m_node_vector.empty()) {
         return BT::NodeStatus::SUCCESS;
+        setOutput("ARTag", m_latest_position_average);
+
     } else {
         return BT::NodeStatus::FAILURE;
     }
@@ -44,7 +44,7 @@ BT::NodeStatus ArucoAction::tick()
 
 ArucoAction::ArucoAction(const std::string& name, const std::string&,
                          const BT::NodeConfiguration& conf)
-    : BT::SyncActionNode(name, conf), m_latest_position({})
+    : BT::SyncActionNode(name, conf)
 {
     // NOLINTNEXTLINE
     using namespace std::placeholders;
@@ -52,47 +52,75 @@ ArucoAction::ArucoAction(const std::string& name, const std::string&,
     m_ros_node->create_subscription<geometry_msgs::msg::PoseArray>(
         "/aruco_poses", 10, std::bind(&ArucoAction::topic_callback, this, _1));
 
-    // get position of first pose in vector, add it to a separate vector
-    m_latest_position.x = m_node_vector[0].position.x;
-    m_latest_position.y = m_node_vector[0].position.y;
-    m_latest_position.z = m_node_vector[0].position.z;
-    m_position_to_post.push_back(m_node_vector[0]);
-
-    // loop through the rest of the poses and if the coordinates of a pose are
-    // similar to the coordinates of the first pose add it to the separate vector
-    for (unsigned int i = 1; i < m_node_vector.size(); i++) {
-        if (m_node_vector[i].position.x - m_latest_position.x < 1 &&
-            m_node_vector[i].position.y - m_latest_position.y < 1 &&
-            m_node_vector[i].position.z - m_latest_position.z < 1) {
-            m_position_to_post.push_back(m_node_vector[i]);
-        }
-    }
-
-    // average the coordinates of the poses in the m_position_to_post vector to
-    // get the coordinate that the rover should circle around
-    double sum_x = 0;
-    double sum_y = 0;
-    double sum_z = 0;
-    for (auto& i : m_position_to_post) {
-        sum_x += i.position.x;
-        sum_y += i.position.y;
-        sum_z += i.position.z;
-    }
-    auto size = static_cast<double>(m_position_to_post.size());
-    double x_position = sum_x / size;
-    double y_position = sum_y / size;
-    double z_position = sum_z / size;
-    m_latest_position_average.x = x_position;
-    m_latest_position_average.y = y_position;
-    m_latest_position_average.z = z_position;
+    m_tf_buffer = std::make_unique<tf2_ros::Buffer>(m_ros_node->get_clock());
+    m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 }
 
+void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr msg)
+{
+    try {
+        auto t = m_tf_buffer->lookupTransform("map", msg->header.frame_id,
+                                              tf2::TimePointZero);
+
+        geometry_msgs::msg::Pose in{};
+        in.position.x = m_latest_position_average.x;
+        in.position.y = m_latest_position_average.y;
+        in.position.z = m_latest_position_average.z;
+        in.orientation.w = 1;
+
+        geometry_msgs::msg::Pose out;
+
+        tf2::doTransform(in, out, t);
+
+        setOutput("ARTag Transformation", out);
+
+    } catch (const tf2::TransformException& ex) {
+        RCLCPP_INFO(m_ros_node->get_logger(), "Could not transform %s to %s: %s",
+                    "world", msg->header.frame_id.c_str(), ex.what());
+        return;
+    }
+}
 
 void ArucoAction::topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 {
     for (const auto& pose : msg->poses) {
         m_node_vector.push_back(pose);
     }
+    geometry_msgs::msg::Vector3 latest_position;
+    std::vector<geometry_msgs::msg::Pose> poses_to_average;
+    // get position of first pose in vector, add it to a separate vector
+    latest_position.x = m_node_vector[0].position.x;
+    latest_position.y = m_node_vector[0].position.y;
+    latest_position.z = m_node_vector[0].position.z;
+    poses_to_average.push_back(m_node_vector[0]);
+    // loop through the rest of the poses and if the coordinates of a pose are
+    // similar to the coordinates of the first pose add it to the separate vector
+    for (unsigned int i = 1; i < m_node_vector.size(); i++) {
+        if (m_node_vector[i].position.x - latest_position.x < 1 &&
+            m_node_vector[i].position.y - latest_position.y < 1 &&
+            m_node_vector[i].position.z - latest_position.z < 1) {
+            poses_to_average.push_back(m_node_vector[i]);
+        }
+    }
+    // average the coordinates of the poses in the m_position_to_post vector to
+    // get the coordinate that the rover should circle around
+    double sum_x = 0;
+    double sum_y = 0;
+    double sum_z = 0;
+    for (auto& i : poses_to_average) {
+        sum_x += i.position.x;
+        sum_y += i.position.y;
+        sum_z += i.position.z;
+    }
+    auto size = static_cast<double>(poses_to_average.size());
+    double x_position = sum_x / size;
+    double y_position = sum_y / size;
+    double z_position = sum_z / size;
+    m_latest_position_average.x = x_position;
+    m_latest_position_average.y = y_position;
+    m_latest_position_average.z = z_position;
+
+    transformhelper(msg);
 }
 
 BT_REGISTER_NODES(factory)

@@ -114,6 +114,7 @@ def generate_launch_description():
                     '-R', '0', 
                     '-P', '0', 
                     '-Y', '0'],
+        parameters=[{'use_sim_time': sim_time}],
         output='screen'
     )
 
@@ -123,15 +124,19 @@ def generate_launch_description():
                           'slam_params_file': slam_params_file}.items(),
     )
     
-    start_gazebo = ExecuteProcess(cmd=['gazebo', '--verbose', '-s', 
-                'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so', world], output='screen')
-    # start_gazebo_server = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')),
-    #     launch_arguments={'world': world}.items())
+    # start_gazebo = ExecuteProcess(cmd=['gazebo', '--verbose', '-s', 
+    #             'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so', world], output='screen')
+    start_gazebo_server = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')),
+        launch_arguments={'world': world, 
+        'use_sim_time': sim_time
+        }.items())
  
-    # # Start Gazebo client    
-    # start_gazebo_client = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')))
+    # Start Gazebo client    
+    start_gazebo_client = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')),
+        launch_arguments={'use_sim_time': sim_time}.items()
+        )
 
     nav_bringup = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(bringup_dir, 'launch', 'bringup_launch.py')),
@@ -164,11 +169,11 @@ def generate_launch_description():
         parameters=[localization_config, 
         {'use_sim_time': sim_time}])
 
-    start_nav_and_rviz_after_delay = RegisterEventHandler(OnProcessStart(
-        target_action=start_gazebo,
-        on_start=[TimerAction(period=8.0, actions=[rviz_node]), 
-                  TimerAction(period=8.0, actions=[nav_bringup])]
-    ))
+    # start_nav_and_rviz_after_delay = RegisterEventHandler(OnProcessStart(
+    #     target_action=start_gazebo_server,
+    #     on_start=[TimerAction(period=8.0, actions=[rviz_node]), 
+    #               TimerAction(period=8.0, actions=[nav_bringup])]
+    # ))
 
     return LaunchDescription([
         declare_desc_pkg_cmd,
@@ -181,13 +186,16 @@ def generate_launch_description():
         declare_slam_params_cmd,
         declare_log_level_cmd,
         declare_localization_config_cmd,
-        start_gazebo,
-        # start_gazebo_server,
-        # start_gazebo_client,
+        # start_gazebo,
+        start_gazebo_server,
+        start_gazebo_client,
         joint_state_publisher_node,
         robot_state_publisher_node,
         spawn_entity,
         # start_slam_toolbox,
         # start_robot_localization,
-        start_nav_and_rviz_after_delay,
+        # start_nav_and_rviz_after_delay,
+        TimerAction(period=8.0, actions=[rviz_node]),
+        TimerAction(period=8.0, actions=[nav_bringup]),
+
     ])

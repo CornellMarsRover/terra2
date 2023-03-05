@@ -9,6 +9,14 @@
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <rclcpp/node.hpp>
 
+
+/**
+ *The class ArucoAction contains several methods, functions, and member 
+ *variables that assist in the aruco tag detection. They work together to detect
+ *multiple AR tags in the field, calculate the average coordinate position, and 
+ * post that position in a transformed reference frame to the blackboard for the 
+ * rover to follow.
+ */
 class ArucoAction : public BT::SyncActionNode
 {
   public:
@@ -30,9 +38,11 @@ class ArucoAction : public BT::SyncActionNode
     std::shared_ptr<rclcpp::Node> m_ros_node;
 
     /**
-     * The callback function calculates the time that is stamped on the detected
-     * AR tag and sees if it is sooner than the previous time calculated. It also
-     * loops through the Aruco poses to add each pose to the vector of AR tags.
+     * The callback function loops through the Aruco poses to add each pose to 
+     * the vector of AR tags. It then averages the coordinates of the closest 
+     * tags to get the position that the rover should circle around. It then
+     * calls the transform helper function to transform the calculated coordinates
+     * into the correct reference frame.
      */
 
     void topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg);

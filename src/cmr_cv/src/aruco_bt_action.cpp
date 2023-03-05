@@ -34,9 +34,8 @@ BT::NodeStatus ArucoAction::tick()
     rclcpp::spin_some(m_ros_node);
 
     if (!m_node_vector.empty()) {
-        return BT::NodeStatus::SUCCESS;
         setOutput("ARTag", m_latest_position_average);
-
+        return BT::NodeStatus::SUCCESS;
     } else {
         return BT::NodeStatus::FAILURE;
     }
@@ -62,13 +61,13 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
         auto t = m_tf_buffer->lookupTransform("map", msg->header.frame_id,
                                               tf2::TimePointZero);
 
-        geometry_msgs::msg::Pose in{};
+        geometry_msgs::msg::Vector3Stamped in{};
         in.position.x = m_latest_position_average.x;
         in.position.y = m_latest_position_average.y;
         in.position.z = m_latest_position_average.z;
         in.orientation.w = 1;
 
-        geometry_msgs::msg::Pose out;
+        geometry_msgs::msg::Vector3Stamped out;
 
         tf2::doTransform(in, out, t);
 

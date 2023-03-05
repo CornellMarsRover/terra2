@@ -1,5 +1,5 @@
 #pragma once
-#include <cmr_msgs/msg/float64_array_stamped.hpp>
+#include <cmr_msgs/msg/int16_array_stamped.hpp>
 #include <limits>
 #include <string>
 #include <vector>
@@ -18,7 +18,7 @@ namespace semantic_components
  * in a ROS message to be published.
  */
 class AstroSensor
-    : public SemanticComponentInterface<cmr_msgs::msg::Float64ArrayStamped>
+    : public SemanticComponentInterface<cmr_msgs::msg::Int16ArrayStamped>
 {
   private:
     /** Gets the latest readings from the state interface and stores them into
@@ -27,7 +27,8 @@ class AstroSensor
     void update_readings()
     {
         for (auto i = 0u; i < m_readings.size(); ++i) {
-            m_readings[i] = state_interfaces_[i].get().get_value();
+            m_readings[i] =
+                static_cast<int16_t>(state_interfaces_[i].get().get_value());
         }
     }
 
@@ -60,7 +61,7 @@ class AstroSensor
     virtual ~AstroSensor() = default;
 
     /**
-     * @brief Updates a `cmr_msgs::msg::Float64ArrayStamped` message with the
+     * @brief Updates a `cmr_msgs::msg::Int16ArrayStamped` message with the
      * current sensor readings.
      *
      * Adheres to the static interface of
@@ -70,7 +71,7 @@ class AstroSensor
      * @return true on success
      */
     [[nodiscard]] bool get_values_as_message(
-        cmr_msgs::msg::Float64ArrayStamped& message)
+        cmr_msgs::msg::Int16ArrayStamped& message)
     {
         // This function is not very idiomatic, but I kept the signature the
         // same to be consistent with the SemanticInterface static
@@ -92,7 +93,7 @@ class AstroSensor
      *
      * The `ith` reading in this vector corresponds to the `ith` state interface.
      */
-    std::vector<double> m_readings;
+    std::vector<std::int16_t> m_readings;
 };
 
 }  // namespace semantic_components

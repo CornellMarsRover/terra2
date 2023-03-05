@@ -33,7 +33,7 @@ controller_interface::CallbackReturn AstroSensorBroadcaster::on_init()
 
 inline void set_publisher_frame_id(
     const std::string& frame_id, std::unique_ptr<realtime_tools::RealtimePublisher<
-                                     cmr_msgs::msg::Float64ArrayStamped>>& publisher)
+                                     cmr_msgs::msg::Int16ArrayStamped>>& publisher)
 {
     publisher->lock();
     publisher->msg_.header.frame_id = frame_id;
@@ -66,7 +66,7 @@ controller_interface::CallbackReturn AstroSensorBroadcaster::on_configure(
     try {
         // register astro sensor data publisher
         m_sensor_state_publisher =
-            get_node()->create_publisher<cmr_msgs::msg::Float64ArrayStamped>(
+            get_node()->create_publisher<cmr_msgs::msg::Int16ArrayStamped>(
                 "~/sensor", rclcpp::SystemDefaultsQoS());
         m_realtime_publisher =
             std::make_unique<StatePublisher>(m_sensor_state_publisher);

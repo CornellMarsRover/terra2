@@ -1,8 +1,12 @@
 #pragma once
 
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/transform_listener.h>
 #include "cmr_fabric/fabric_node.hpp"
 #include "cmr_msgs/msg/joystick_reading.hpp"
 #include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "moveit/move_group_interface/move_group_interface.h"
 namespace cmr
 {
@@ -19,11 +23,13 @@ namespace cmr
 class InverseKinematics : public cmr::fabric::FabricNode
 {
   private:
-    fabric::LifecycleSubscription<geometry_msgs::msg::Pose>::ptr_t m_arm_pose_sub;
+    fabric::LifecycleSubscription<geometry_msgs::msg::PoseStamped>::ptr_t m_arm_pose_sub;
     std::unique_ptr<moveit::planning_interface::MoveGroupInterface>
         m_move_group_interface;
     std::shared_ptr<rclcpp::Node> m_node;
     std::unique_ptr<fabric::GenericLifecycle> m_wall_timer;
+    std::shared_ptr<tf2_ros::TransformListener> m_tf_listener;
+    std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
 
   public:
     /**
@@ -45,7 +51,7 @@ class InverseKinematics : public cmr::fabric::FabricNode
 
     bool cleanup() override;
 
-    bool update_arm_position(const geometry_msgs::msg::Pose msg);
+    void update_arm_position(const geometry_msgs::msg::PoseStamped msg);
 };
 
 }  // namespace cmr

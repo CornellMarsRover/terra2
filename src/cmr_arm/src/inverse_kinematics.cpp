@@ -12,9 +12,15 @@ InverseKinematics::InverseKinematics(
 {
 }
 
-bool InverseKinematics::update_arm_position(const geometry_msgs::msg::Pose msg)
+void InverseKinematics::update_arm_position(
+    const geometry_msgs::msg::PoseStamped msg)
 {
-    m_move_group_interface->setPoseTarget(msg);
+    CMR_LOG(INFO, "Update log");
+    auto transform_value = m_tf_buffer->lookupTransform("base", msg.header.frame_id,
+                                                        tf2::TimePointZero);
+    geometry_msgs::msg::Pose store;
+    tf2::doTransform(msg.pose, store, transform_value);
+    m_move_group_interface->setPoseTarget(store);
     // Create a plan to that target pose
     const auto [success, plan] = [this] {
         moveit::planning_interface::MoveGroupInterface::Plan msg2;
@@ -23,11 +29,11 @@ bool InverseKinematics::update_arm_position(const geometry_msgs::msg::Pose msg)
     }();
     // Execute the plan
     if (success) {
+        CMR_LOG(INFO, "Executing plan!");
         m_move_group_interface->execute(plan);
     } else {
         CMR_LOG(ERROR, "Planning failed!");
     }
-    return true;
 }
 
 bool InverseKinematics::configure(const std::shared_ptr<toml::Table>& table)
@@ -40,7 +46,7 @@ bool InverseKinematics::configure(const std::shared_ptr<toml::Table>& table)
         return false;
     }
     const auto& arm_pgroup = arm_planning_group_name;
-    m_arm_pose_sub = create_lifecycle_subscription<geometry_msgs::msg::Pose>(
+    m_arm_pose_sub = create_lifecycle_subscription<geometry_msgs::msg::PoseStamped>(
         "arm_pose_topic", 10,
         std::bind(&InverseKinematics::update_arm_position, this,
                   std::placeholders::_1));
@@ -56,6 +62,9 @@ bool InverseKinematics::configure(const std::shared_ptr<toml::Table>& table)
     using moveit::planning_interface::MoveGroupInterface;
     m_move_group_interface =
         std::make_unique<MoveGroupInterface>(m_node, arm_pgroup);
+
+    m_tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    m_tf_listener = std::make_shared<tf2_ros::TransformListener>(*m_tf_buffer);
 
     return true;
 }

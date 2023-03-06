@@ -1,6 +1,6 @@
 from test_utils import *
 import time
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 
 from tf2_ros.buffer import Buffer
@@ -53,60 +53,93 @@ def test_simple_ik_control(namespace):
     eps = 0.01 # 1 cm
 
 
-    target_msg = Pose()
-    target_msg.orientation.w = 1.0
-    target_msg.position.x = 0.6685640811920166
-    target_msg.position.y = 0.19633984565734863
-    target_msg.position.z = 0.5014975070953369
+    target_msg = PoseStamped()
+    target_msg.header.frame_id= 'base'
+    target_msg.pose.orientation.w = 1.0
+    target_msg.pose.position.x = 0.6685640811920166
+    target_msg.pose.position.y = 0.19633984565734863
+    target_msg.pose.position.z = 0.5014975070953369
+
 
     tr_transform = check_end_effector_to_base_transform(tf_node, tf_buffer, None)
     # Assert initial point is not target point
-    assert abs(-tr_transform.translation.x - target_msg.position.x) > eps
-    assert abs(-tr_transform.translation.y - target_msg.position.y) > eps
-    assert abs(-tr_transform.translation.z - target_msg.position.z) > eps
+    assert abs(-tr_transform.translation.x - target_msg.pose.position.x) > eps
+    assert abs(-tr_transform.translation.y - target_msg.pose.position.y) > eps
+    assert abs(-tr_transform.translation.z - target_msg.pose.position.z) > eps
 
 
-    publish_to_topic(Pose, "/arm_pose_topic", target_msg)
+    publish_to_topic(PoseStamped, "/arm_pose_topic", target_msg)
     time.sleep(8)
     tr_transform = check_end_effector_to_base_transform(tf_node, tf_buffer, 
-        lambda transform: abs(transform.translation.x - target_msg.position.x) < eps and 
-                          abs(transform.translation.y - target_msg.position.y) < eps and 
-                          abs(transform.translation.z - target_msg.position.z) < eps)
+        lambda transform: abs(transform.translation.x - target_msg.pose.position.x) < eps and 
+                          abs(transform.translation.y - target_msg.pose.position.y) < eps and 
+                          abs(transform.translation.z - target_msg.pose.position.z) < eps)
 
     print(f"Got transform: {tr_transform}")
-    assert abs(-tr_transform.translation.x - target_msg.position.x) < eps
-    assert abs(-tr_transform.translation.y - target_msg.position.y) < eps
-    assert abs(-tr_transform.translation.z - target_msg.position.z) < eps
+    assert abs(-tr_transform.translation.x - target_msg.pose.position.x) < eps
+    assert abs(-tr_transform.translation.y - target_msg.pose.position.y) < eps
+    assert abs(-tr_transform.translation.z - target_msg.pose.position.z) < eps
 
-    target_msg.position.x = 0.4860771894454956
-    target_msg.position.y = 0.22480428218841553
-    target_msg.position.z = 0.720863401889801
-
-    publish_to_topic(Pose, "/arm_pose_topic", target_msg)
+    target_msg.pose.position.x = 0.4860771894454956
+    target_msg.pose.position.y = 0.22480428218841553
+    target_msg.pose.position.z = 0.720863401889801
+    lastz=0.720863401889801
+    publish_to_topic(PoseStamped, "/arm_pose_topic", target_msg)
     time.sleep(8)
     tr_transform = check_end_effector_to_base_transform(tf_node, tf_buffer, 
-        lambda transform: abs(transform.translation.x - target_msg.position.x) < eps and 
-                          abs(transform.translation.y - target_msg.position.y) < eps and 
-                          abs(transform.translation.z - target_msg.position.z) < eps)
+        lambda transform: abs(transform.translation.x - target_msg.pose.position.x) < eps and 
+                          abs(transform.translation.y - target_msg.pose.position.y) < eps and 
+                          abs(transform.translation.z - target_msg.pose.position.z) < eps)
+    assert abs(-tr_transform.translation.x - target_msg.pose.position.x) < eps
+    lastx_transform = tr_transform.translation.x
+    assert abs(-tr_transform.translation.y - target_msg.pose.position.y) < eps
+    lasty_transform = tr_transform.translation.y
+    assert abs(-tr_transform.translation.z - target_msg.pose.position.z) < eps
 
-    assert abs(-tr_transform.translation.x - target_msg.position.x) < eps
-    assert abs(-tr_transform.translation.y - target_msg.position.y) < eps
-    assert abs(-tr_transform.translation.z - target_msg.position.z) < eps
+   
 
 
+    #Test with third_tilt reference frame
+
+    target_msg.header.frame_id= 'third_rotate'
+    target_msg.pose.orientation.w = 1.0
+    target_msg.pose.position.x = 0.0
+    target_msg.pose.position.y = 0.0
+    target_msg.pose.position.z = 0.05
+
+    # in the base frame, the arm should be
+    # x should be ~0.5251580476760864
+    # y should be ~0.2128298282623291
+    # z should be ~0.7393946647644043
+    target_z = lastz + target_msg.pose.position.z
+
+
+    publish_to_topic(PoseStamped, "/arm_pose_topic", target_msg)
+    time.sleep(8)
+    tr_transform = check_end_effector_to_base_transform(tf_node, tf_buffer, 
+        lambda transform: abs(transform.translation.x - lastx_transform) < eps and 
+                          abs(transform.translation.y - lasty_transform) < eps and 
+                          abs(-transform.translation.z - target_z) < eps)
+
+    assert abs(tr_transform.translation.x - lastx_transform) < eps
+    assert abs(tr_transform.translation.y - lasty_transform) < eps
+    assert abs(-tr_transform.translation.z - target_z) < eps
+
+    
+    
     # Test not reachable
 
-    target_msg.position.x = 0.0
-    target_msg.position.y = 0.0
-    target_msg.position.z = 0.0
+    target_msg.pose.position.x = 0.0
+    target_msg.pose.position.y = 0.0
+    target_msg.pose.position.z = 0.0
 
-    publish_to_topic(Pose, "/arm_pose_topic", target_msg)
+    publish_to_topic(PoseStamped, "/arm_pose_topic", target_msg)
     time.sleep(5)
     tr_transform = check_end_effector_to_base_transform(tf_node, tf_buffer, 
-        lambda transform: abs(transform.translation.x - target_msg.position.x) < eps and 
-                          abs(transform.translation.y - target_msg.position.y) < eps and 
-                          abs(transform.translation.z - target_msg.position.z) < eps)
+        lambda transform: abs(transform.translation.x - target_msg.pose.position.x) < eps and 
+                          abs(transform.translation.y - target_msg.pose.position.y) < eps and 
+                          abs(transform.translation.z - target_msg.pose.position.z) < eps)
 
-    assert abs(-tr_transform.translation.x - target_msg.position.x) > eps
-    assert abs(-tr_transform.translation.y - target_msg.position.y) > eps
-    assert abs(-tr_transform.translation.z - target_msg.position.z) > eps
+    assert abs(-tr_transform.translation.x - target_msg.pose.position.x) > eps
+    assert abs(-tr_transform.translation.y - target_msg.pose.position.y) > eps
+    assert abs(-tr_transform.translation.z - target_msg.pose.position.z) > eps

@@ -33,6 +33,10 @@ BT::NodeStatus ArucoAction::tick()
 {
     rclcpp::spin_some(m_ros_node);
 
+    // If the vector of nodes is not empty, meaning that there was at least 1 
+    // aruco pose detected, then the average position of the AR tags is
+    // posted to the ARTag output port and a SUCCESS is returned; if the vector
+    // is empty and no AR tags were detected then FAILURE is returned
     if (!m_node_vector.empty()) {
         setOutput("ARTag", m_latest_position_average);
         return BT::NodeStatus::SUCCESS;

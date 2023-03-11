@@ -75,7 +75,7 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
 
         tf2::doTransform(in, out, t);
 
-        setOutput("ARTag Transformation", out);
+        setOutput("ARTag", out);
 
     } catch (const tf2::TransformException& ex) {
         RCLCPP_INFO(m_ros_node->get_logger(), "Could not transform %s to %s: %s",

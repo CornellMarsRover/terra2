@@ -29,6 +29,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('nav2_bringup')
+    drives_dir = get_package_share_directory('cmr_drives_description')
     launch_dir = os.path.join(bringup_dir, 'launch')
 
     # Create the launch configuration variables
@@ -96,7 +97,8 @@ def generate_launch_description():
 
     declare_params_file_cmd = DeclareLaunchArgument(
         'params_file',
-        default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
+        #default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
+        default_value=os.path.join(drives_dir, 'config', 'nav2_params_turtle.yaml'),
         description='Full path to the ROS2 parameters file to use for all launched nodes')
 
     declare_autostart_cmd = DeclareLaunchArgument(

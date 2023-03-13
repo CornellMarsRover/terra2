@@ -5,6 +5,7 @@
 #include "behaviortree_cpp_v3/basic_types.h"
 #include "behaviortree_cpp_v3/bt_factory.h"
 #include "behaviortree_cpp_v3/utils/shared_library.h"
+#include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "nav2_behavior_tree/behavior_tree_engine.hpp"
 
 // Template specialization to convert a string to Position2D.
@@ -33,7 +34,7 @@ BT::NodeStatus ArucoAction::tick()
 {
     rclcpp::spin_some(m_ros_node);
 
-    // If the vector of nodes is not empty, meaning that there was at least 1 
+    // If the vector of nodes is not empty, meaning that there was at least 1
     // aruco pose detected, then the average position of the AR tags is
     // posted to the ARTag output port and a SUCCESS is returned; if the vector
     // is empty and no AR tags were detected then FAILURE is returned
@@ -66,16 +67,16 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
                                               tf2::TimePointZero);
 
         geometry_msgs::msg::Vector3Stamped in{};
-        in.position.x = m_latest_position_average.x;
-        in.position.y = m_latest_position_average.y;
-        in.position.z = m_latest_position_average.z;
-        in.orientation.w = 1;
+
+        in.vector.x = m_latest_position_average.x;
+        in.vector.y = m_latest_position_average.y;
+        in.vector.z = m_latest_position_average.z;
 
         geometry_msgs::msg::Vector3Stamped out;
 
         tf2::doTransform(in, out, t);
 
-        setOutput("ARTag", out);
+        setOutput("ARTag", out.vector);
 
     } catch (const tf2::TransformException& ex) {
         RCLCPP_INFO(m_ros_node->get_logger(), "Could not transform %s to %s: %s",

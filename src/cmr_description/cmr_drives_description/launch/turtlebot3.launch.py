@@ -24,6 +24,12 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from launch.substitutions import (
+    Command,
+    FindExecutable,
+    LaunchConfiguration,
+    PathJoinSubstitution,
+)
 
 
 def generate_launch_description():
@@ -150,13 +156,24 @@ def generate_launch_description():
 
     declare_robot_name_cmd = DeclareLaunchArgument(
         'robot_name',
-        default_value='turtlebot3_waffle',
+        default_value='cmr_drives',
         description='name of the robot')
 
-    declare_robot_sdf_cmd = DeclareLaunchArgument(
-        'robot_sdf',
-        default_value=os.path.join(bringup_dir, 'worlds', 'waffle.model'),
-        description='Full path to robot sdf file to spawn the robot in gazebo')
+    robot_description = Command(
+        [
+            PathJoinSubstitution([FindExecutable(name="xacro")]),
+            " ",
+            PathJoinSubstitution(
+                [drives_dir, "urdf", "drives.urdf.xacro"]
+            ),
+        ]
+    )
+
+
+    # declare_robot_sdf_cmd = DeclareLaunchArgument(
+    #     'robot_sdf',
+    #     default_value=os.path.join(bringup_dir, 'worlds', 'waffle.model'),
+    #     description='Full path to robot sdf file to spawn the robot in gazebo')
 
     # Specify the actions
     start_gazebo_server_cmd = ExecuteProcess(
@@ -171,9 +188,9 @@ def generate_launch_description():
         cmd=['gzclient'],
         cwd=[launch_dir], output='screen')
 
-    urdf = os.path.join(bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
-    with open(urdf, 'r') as infp:
-        robot_description = infp.read()
+    # urdf = os.path.join(bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
+    # with open(urdf, 'r') as infp:
+    #     robot_description = infp.read()
 
     start_robot_state_publisher_cmd = Node(
         condition=IfCondition(use_robot_state_pub),
@@ -192,7 +209,8 @@ def generate_launch_description():
         output='screen',
         arguments=[
             '-entity', robot_name,
-            '-file', robot_sdf,
+            '-topic', 'robot_description', 
+            #'-file', robot_sdf,
             '-robot_namespace', namespace,
             '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
             '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']])
@@ -238,7 +256,7 @@ def generate_launch_description():
     ld.add_action(declare_simulator_cmd)
     ld.add_action(declare_world_cmd)
     ld.add_action(declare_robot_name_cmd)
-    ld.add_action(declare_robot_sdf_cmd)
+    # ld.add_action(declare_robot_sdf_cmd)
     ld.add_action(declare_use_respawn_cmd)
 
     # Add any conditioned actions

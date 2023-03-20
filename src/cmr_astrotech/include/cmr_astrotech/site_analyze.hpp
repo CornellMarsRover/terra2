@@ -36,6 +36,10 @@ class SiteAnalyze : public cmr::fabric::FabricNode
 
     void fill(std::vector<int> sites);
 
+    void gearshift();
+
+    void scoop(std::vector<int> sites);
+
     void analyze();
 
     bool configure(const std::shared_ptr<toml::Table>& table) override;

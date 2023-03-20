@@ -7,13 +7,13 @@ SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& con
     : cmr::fabric::FabricNode::FabricNode(config)
 {
     m_node = rclcpp::Node::make_shared("site_analyze_server");
-    m_service = m_node->create_service<cmr_msgs::srv::SiteAnalyze>("site_analyze",
-                                                                   &handle_request);
+    m_service = m_node->create_service<cmr_msgs::srv::SiteAnalyze>(
+        "site_analyze", &SiteAnalyze::handle_request);
     m_motor_state_publisher =
         m_node->create_publisher<cmr_msgs::msg::MotorWriteBatch>(
             "/motor", rclcpp::SystemDefaultsQoS());
 }
-
+// NOLINTNEXTLINE
 void SiteAnalyze::handle_request(
     const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
     std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
@@ -55,15 +55,19 @@ void SiteAnalyze::handle_request(
                 analyze();
             }
             break;
+        case 5:
+            for (int i = 0; i < 4; i++) {
+                scoop({i});
+                gearshift();
+            }
+            break;
         default:
             response->success = false;
             break;
     }
 }
 
-void SiteAnalyze::analyze() {
-    fill({5});
-}
+void SiteAnalyze::analyze() { fill({5}); }
 
 void SiteAnalyze::fill(std::vector<int> sites)
 {
@@ -77,6 +81,10 @@ void SiteAnalyze::fill(std::vector<int> sites)
     }
     m_motor_state_publisher->publish(msg);
 }
+
+void SiteAnalyze::gearshift() {}
+
+void SiteAnalyze::scoop(std::vector<int> sites) {}
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
 {

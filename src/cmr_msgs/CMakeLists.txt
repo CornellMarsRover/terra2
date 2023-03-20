@@ -18,12 +18,14 @@ rosidl_generate_interfaces(
   msg/JoystickReading.msg
   msg/ArmJointEffort.msg
   msg/Int16ArrayStamped.msg
+  msg/MotorWriteBatch.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv
   srv/AcquireDependency.srv
   srv/ReleaseDependency.srv
   srv/NotifyDeactivate.srv
+  srv/SiteAnalyze.srv
   action/TestTargetPosition.action
   DEPENDENCIES
   std_msgs

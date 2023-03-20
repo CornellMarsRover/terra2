@@ -170,11 +170,11 @@ def generate_launch_description():
         parameters=[localization_config, 
         {'use_sim_time': sim_time}])
 
-    start_nav_and_rviz_after_delay = RegisterEventHandler(OnProcessStart(
-        target_action=start_gazebo,
-        on_start=[TimerAction(period=8.0, actions=[rviz_node]), 
-                  TimerAction(period=8.0, actions=[nav_bringup])]
-    ))
+    # start_nav_and_rviz_after_delay = RegisterEventHandler(OnProcessStart(
+    #     target_action=start_gazebo,
+    #     on_start=[TimerAction(period=8.0, actions=[rviz_node]), 
+    #               TimerAction(period=8.0, actions=[nav_bringup])]
+    # ))
     
     start_rviz_after_delay = TimerAction(period=10.0, actions=[rviz_node])
     return LaunchDescription([

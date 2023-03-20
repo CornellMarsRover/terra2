@@ -65,7 +65,7 @@ def generate_launch_description():
     robot_name = LaunchConfiguration('robot_name')
     robot_sdf = LaunchConfiguration('robot_sdf')
     # Whether to use the rover or turtlebot
-    use_rover = True
+    use_rover = False
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -155,7 +155,7 @@ def generate_launch_description():
         # default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
         # worlds/turtlebot3_worlds/waffle.model')
         # default_value=os.path.join(bringup_dir, 'worlds', 'world_only.model'),
-        default_value=os.path.join(drives_dir, 'world', 'smalltown.world'),
+        default_value=os.path.join(drives_dir, 'world', 'my_world.sdf'),
         description='Full path to world model file to load')
 
     declare_robot_name_cmd = DeclareLaunchArgument(

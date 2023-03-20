@@ -200,11 +200,12 @@ def generate_launch_description():
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
-        namespace=namespace,
+        # namespace=namespace,
         output='screen',
         parameters=[{'use_sim_time': use_sim_time,
                      'robot_description': robot_description}],
-        remappings=remappings)
+        )
+        #remappings=remappings)
 
     start_gazebo_spawner_cmd = Node(
         package='gazebo_ros',
@@ -214,7 +215,7 @@ def generate_launch_description():
             '-entity', robot_name,
             # '-file', robot_sdf,  # Uncomment for using turtlebot
             '-topic', 'robot_description',  # Uncomment for using rover
-            '-robot_namespace', namespace,
+            # '-robot_namespace', namespace,
             '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
             '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']])
 

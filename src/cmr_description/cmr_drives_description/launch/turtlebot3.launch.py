@@ -64,6 +64,8 @@ def generate_launch_description():
             'Y': LaunchConfiguration('yaw', default='0.00')}
     robot_name = LaunchConfiguration('robot_name')
     robot_sdf = LaunchConfiguration('robot_sdf')
+    # Whether to use the rover or turtlebot
+    use_rover = False
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -191,9 +193,10 @@ def generate_launch_description():
         cwd=[launch_dir], output='screen')
 
     # uncomment for using turtlebot
-    # urdf = os.path.join(bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
-    # with open(urdf, 'r') as infp:
-    #     robot_description = infp.read()
+    if not use_rover:
+        urdf = os.path.join(bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
+        with open(urdf, 'r') as infp:
+            robot_description = infp.read()
 
     start_robot_state_publisher_cmd = Node(
         condition=IfCondition(use_robot_state_pub),
@@ -214,17 +217,22 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}]
     )
 
+    gazebo_spawner_args = [
+        '-entity', robot_name,
+        '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
+        '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']
+    ]
+
+    if use_rover:
+        gazebo_spawner_args += ['-topic', 'robot_description']
+    else:
+        gazebo_spawner_args += ['-file', robot_sdf]
+
     start_gazebo_spawner_cmd = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
         output='screen',
-        arguments=[
-            '-entity', robot_name,
-            # '-file', robot_sdf,  # Uncomment for using turtlebot
-            '-topic', 'robot_description',  # Uncomment for using rover
-            # '-robot_namespace', namespace,
-            '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
-            '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']])
+        arguments=gazebo_spawner_args)
 
     rviz_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -277,7 +285,8 @@ def generate_launch_description():
 
     # Add the actions to launch all of the navigation nodes
     ld.add_action(start_robot_state_publisher_cmd)
-    ld.add_action(joint_state_publisher_node)
+    if use_rover:
+        ld.add_action(joint_state_publisher_node)
     ld.add_action(rviz_cmd)
     ld.add_action(bringup_cmd)
 

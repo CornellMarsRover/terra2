@@ -36,9 +36,9 @@ class SiteAnalyze : public cmr::fabric::FabricNode
 
     void fill(std::vector<int> sites);
 
-    void gearshift();
+    void gearshift(int site);
 
-    void scoop(std::vector<int> sites);
+    void scoop(int site);
 
     void analyze();
 

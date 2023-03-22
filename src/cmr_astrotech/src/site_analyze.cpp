@@ -82,9 +82,19 @@ void SiteAnalyze::fill(std::vector<int> sites)
     m_motor_state_publisher->publish(msg);
 }
 
-void SiteAnalyze::gearshift() {}
+void SiteAnalyze::gearshift(int site)
+{
+    cmr_msgs::msg::MotorWriteBatch msg{};
+    msg.motor_ids = {0xDF};
+}
 
-void SiteAnalyze::scoop(std::vector<int> sites) {}
+void SiteAnalyze::scoop(int site)
+{
+    cmr_msgs::msg::MotorWriteBatch msg{};
+    msg.motor_ids = {0xD6};
+    msg.control_modes={2};
+    msg.values={100};
+}
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
 {

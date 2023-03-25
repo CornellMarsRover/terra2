@@ -6,8 +6,9 @@ include(CmrUtils)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages. find dependencies
-cmr_std_find_pkgs(rclcpp_lifecycle hardware_interface pluginlib
-                  generate_parameter_library controller_interface)
+cmr_std_find_pkgs(
+  rclcpp_lifecycle hardware_interface pluginlib generate_parameter_library
+  controller_interface realtime_tools)
 
 # Add other directories to install here
 cmr_install(launch config)
@@ -36,6 +37,7 @@ cmr_add_lib(
   pluginlib
   rclcpp
   rclcpp_lifecycle
+  realtime_tools
   cmr_utils
   cmr_msgs
   controller_interface)

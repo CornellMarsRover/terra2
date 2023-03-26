@@ -8,13 +8,17 @@
 namespace cmr
 {
 const std::string PoseGeneratorAction::input = "has_arrived";
+const std::string PoseGeneratorAction::initial_goal_input = "initial_position";
 const std::string PoseGeneratorAction::output = "goal";
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 PoseGeneratorAction::PoseGeneratorAction(const std::string& xml_tag_name,
                                          const std::string&,
                                          const BT::NodeConfiguration& conf)
-    : BT::SyncActionNode(xml_tag_name, conf), m_pose_id(0), m_unit_distance(2)
+    : BT::SyncActionNode(xml_tag_name, conf),
+      m_origin_init(false),
+      m_pose_id(0),
+      m_unit_distance(2)
 {
     m_previous_pose = geometry_msgs::msg::PoseStamped();
 }
@@ -42,6 +46,9 @@ geometry_msgs::msg::PoseStamped PoseGeneratorAction::generate_next_pose() const
     new_pose_stamp.pose.orientation.w = c;
     new_pose_stamp.pose.orientation.z = s;
     new_pose_stamp.header.frame_id = "map";
+
+    new_pose_stamp.pose.position.x += m_origin.pose.position.x;
+    new_pose_stamp.pose.position.y += m_origin.pose.position.y;
     return new_pose_stamp;
 }
 
@@ -49,11 +56,17 @@ void PoseGeneratorAction::on_tick()
 {
     bool has_arrived = false;
     getInput<bool>(input, has_arrived);
+    if (!m_origin_init) {
+        getInput<geometry_msgs::msg::PoseStamped>(initial_goal_input, m_origin);
+        m_origin_init = true;
+    }
+
     if (has_arrived) {
         m_previous_pose = generate_next_pose();
         m_pose_id++;
     }
     setOutput(output, m_previous_pose);
+
     auto goal = config().blackboard->get<geometry_msgs::msg::PoseStamped>(output);
 
     std::string goal_out = std::to_string(goal.pose.position.x) + ", " +

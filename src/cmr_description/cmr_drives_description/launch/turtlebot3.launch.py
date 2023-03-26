@@ -155,7 +155,7 @@ def generate_launch_description():
         # default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
         # worlds/turtlebot3_worlds/waffle.model')
         # default_value=os.path.join(bringup_dir, 'worlds', 'world_only.model'),
-        default_value=os.path.join(drives_dir, 'world', 'smalltown.world'),
+        default_value=os.path.join(drives_dir, 'world', 'farm.world'),
         description='Full path to world model file to load')
 
     declare_robot_name_cmd = DeclareLaunchArgument(

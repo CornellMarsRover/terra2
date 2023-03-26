@@ -36,6 +36,7 @@ class PoseGeneratorAction : public BT::SyncActionNode
     {
         return {BT::InputPort<bool>(input, false,
                                     "Whether or not rover is at outputted pose"),
+                BT::InputPort<geometry_msgs::msg::PoseStamped>(initial_goal_input),
                 BT::OutputPort<geometry_msgs::msg::PoseStamped>(
                     output, "The next pose to travel to")};
     }
@@ -55,9 +56,12 @@ class PoseGeneratorAction : public BT::SyncActionNode
 
   private:
     geometry_msgs::msg::PoseStamped m_previous_pose;
+    geometry_msgs::msg::PoseStamped m_origin;
+    bool m_origin_init;
     int m_pose_id;
     int m_unit_distance;
     static std::string const input;
+    static std::string const initial_goal_input;
     static std::string const output;
 };
 }  // namespace cmr

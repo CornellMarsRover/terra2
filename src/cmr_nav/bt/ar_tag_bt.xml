@@ -4,7 +4,7 @@
     <BehaviorTree ID="BehaviorTree">
         <Sequence>
             <Action ID="Print" message="Hello World"/>
-            <RecoveryNode number_of_retries="1">
+            <RecoveryNode number_of_retries="6">
                 <!-- <RecoveryNode number_of_retries="6">
                     <Decorator ID="RateController" hz="1">
                         <AlwaysFailure/>
@@ -17,13 +17,14 @@
                 <AlwaysFailure/>
                 <!-- <Action ID="Print" message="This is a test"/> -->
                 <Sequence>
+                    <Action ID="Print" message="Generating Pose"/>
                     <Action ID="PoseGenerator" has_arrived="true" goal="{goal}"/>
 
                     <RecoveryNode number_of_retries="6" name="NavigateRecovery">
                         <PipelineSequence>
-                            <RateController hz="1.0">
+                            <!-- <RateController hz="1.0">
                                 <Action ID="Print" message="Navigating"/>
-                            </RateController>
+                            </RateController> -->
                             <RateController hz="1.0" name="RateControllerComputePathToPose">
                                 <RecoveryNode number_of_retries="1" name="RecoveryComputePathToPose">
                                     <Fallback name="FallbackComputePathToPose">

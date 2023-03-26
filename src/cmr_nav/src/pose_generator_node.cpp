@@ -14,7 +14,7 @@ const std::string PoseGeneratorAction::output = "goal";
 PoseGeneratorAction::PoseGeneratorAction(const std::string& xml_tag_name,
                                          const std::string&,
                                          const BT::NodeConfiguration& conf)
-    : BT::SyncActionNode(xml_tag_name, conf), m_pose_id(0), m_unit_distance(10)
+    : BT::SyncActionNode(xml_tag_name, conf), m_pose_id(0), m_unit_distance(2)
 {
     m_previous_pose = geometry_msgs::msg::PoseStamped();
 }

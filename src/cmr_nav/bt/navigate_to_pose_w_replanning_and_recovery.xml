@@ -7,7 +7,9 @@
   <BehaviorTree ID="MainTree">
     <RecoveryNode number_of_retries="6" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
-        <Action ID="Print" message="Hello World"/>
+        <!-- <RateController hz="1.0">
+          <Action ID="Print" message="Hello World"/>
+        </RateController> -->
         <RateController hz="1.0">
           <RecoveryNode number_of_retries="1" name="ComputePathToPose">
             <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>

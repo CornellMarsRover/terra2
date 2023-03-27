@@ -39,7 +39,7 @@
                 </ReactiveFallback>
             </RecoveryNode>
             <RecoveryNode number_of_retries="6">
-                <!-- <RecoveryNode number_of_retries="6">
+                <RecoveryNode number_of_retries="6">
                     <Decorator ID="RateController" hz="1">
                         <AlwaysFailure/>
                     </Decorator>
@@ -47,9 +47,8 @@
                         <Action ID="Print" message="Spinning!"/>
                         <Spin server_name="spin" spin_dist="1.05" />
                     </Sequence>
-                </RecoveryNode> -->
-                <AlwaysFailure/>
-                <!-- <Action ID="Print" message="This is a test"/> -->
+                </RecoveryNode>
+                <!-- <AlwaysFailure/> -->
                 <Sequence>
                     <Action ID="Print" message="Generating Pose"/>
                     <Action ID="PoseGenerator" has_arrived="true" initial_position="{goal}" goal="{goal}"/>
@@ -71,7 +70,9 @@
                                 </RecoveryNode>
                             </RateController>
                             <RecoveryNode number_of_retries="1" name="RecoveryFollowPath">
+                                <!-- <Customthing> -->
                                 <FollowPath path="{path}" controller_id="FollowPath"/>
+                                <!-- <Customthing> -->
                                 <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
                             </RecoveryNode>
                         </PipelineSequence>
@@ -90,6 +91,7 @@
                     </RecoveryNode>
                 </Sequence>
             </RecoveryNode>
+
         </Sequence>
     </BehaviorTree>
 </root>

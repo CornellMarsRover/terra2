@@ -1,3 +1,4 @@
+#pragma once
 #include "cmr_control/base_arm_system.hpp"
 #include "rclcpp/macros.hpp"
 

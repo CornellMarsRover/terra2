@@ -1,3 +1,3 @@
 # cmr_demo
 
-A staging package used to demonstrate frameworks
+@brief A staging package used to demonstrate frameworks

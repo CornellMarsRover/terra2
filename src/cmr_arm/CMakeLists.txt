@@ -5,7 +5,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
 include(CmrUtils)
 
 # find dependencies
-cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle)
+cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle moveit_ros_planning_interface)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages.
@@ -27,6 +27,19 @@ cmr_add_node(
   cmr_utils
   cmr_fabric
   rclcpp_lifecycle)
+
+cmr_add_node(inverse_kinematics
+  SOURCES
+  src/inverse_kinematics.cpp
+  src/inverse_kinematics_main.cpp
+  DEPENDS
+  rclcpp
+  std_msgs
+  cmr_msgs
+  cmr_utils
+  cmr_fabric
+  rclcpp_lifecycle
+  moveit_ros_planning_interface)
 
 # PHOBOS_APPEND
 cmr_export()

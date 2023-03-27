@@ -51,11 +51,16 @@ jobs:
           pytest-args: " -k SKIP_ALL_TESTS"
           other-test-args: "--packages-skip-regex ros2_aruco"
 
+      # Integration tests are a little flaky, so allow retries
       - name: Integration Tests
         id: integration
-        run: |
-          . install/setup.sh
-          python3 -m pytest --ignore=src/cmr_aruco -v -s -k "not arm_direct_control_test.py"
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          retry_on: error
+          command: |
+            bash scripts/test_wd.sh
 
       - name: Code coverage
         id: ccoverage

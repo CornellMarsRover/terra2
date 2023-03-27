@@ -9,6 +9,12 @@ namespace cmr
 {
 
 /**
+ * @defgroup ServiceUtils
+ * Utility functions for interacting with ROS services by using a temporary node.
+ * @{
+ */
+
+/**
  * @brief Helper function for `send_request`
  * Spins the node until the future is ready
  *
@@ -107,4 +113,6 @@ std::optional<std::shared_ptr<typename SrvT::Response>> send_request(
         return {};
     }
 }
+
+/** @} */
 }  // namespace cmr

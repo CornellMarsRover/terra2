@@ -24,6 +24,13 @@
         <xacro:property name="cam_width" value="${base_length / 5.0}" />
         <xacro:property name="cam_height" value="${base_height / 10.0}" />
         <xacro:property name="cam_length" value="${base_length / 10.0}" />
+        <xacro:property name="imu_width" value="${base_width}" />
+        <xacro:property name="imu_height" value="${base_height / 2.0}" />
+        <xacro:property name="imu_length" value="${base_length}" />
+        <xacro:property name="astro_length" value="0.1" />
+        <xacro:property name="astro_width" value="0.3" />
+        <xacro:property name="astro_height" value="0.03" />
+        <xacro:property name="astro_mass" value="${base_mass / 3}" />
         <!-- Space btw top of beam and the each joint -->
 
         <xacro:macro name="wheel" params="name x y">
@@ -206,6 +213,41 @@
         <xacro:wheel name="right_front" x="${base_width/2}" y="${base_length/2 + wheel_len}" />
         <xacro:wheel name="right_mid" x="0" y="${base_length/2 + wheel_len}" />
         <xacro:wheel name="right_back" x="-${base_width/2}" y="${base_length/2 + wheel_len}" />
+
+        <!-- Test astro link -->
+        <link name="test_astro">
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${astro_width} ${astro_length} ${astro_height}"/>
+                </geometry>
+            </collision>
+
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${astro_width} ${astro_length} ${astro_height}"/>
+                </geometry>
+                <material name="blue"/>
+            </visual>
+
+            <inertial>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <mass value="${astro_mass}"/>
+                <inertia ixx="${astro_mass / 12.0 * (astro_length*astro_length + astro_height*astro_height)}" ixy="0.0" ixz="0.0" 
+                         iyy="${astro_mass / 12.0 * astro_width*astro_width}" iyz="0.0" 
+                         izz="${astro_mass / 12.0 * (astro_width*astro_width + astro_length*astro_length)}"/>
+            </inertial>
+        </link>   
+
+        <joint name="test_astro_joint" type="continuous">
+            <parent link="base_link"/>
+            <child link="test_astro"/>
+            <origin xyz="${-astro_width / 2.0} 0 ${base_height * 2 + lidar_height}" rpy="0 0 0"/>
+            <axis xyz="0 0 1"/>
+            <dynamics damping="0.2"/>
+        </joint>
+
     </xacro:macro>
 
 

@@ -14,16 +14,6 @@ composition_ns = "rover"
 def generate_launch_description():
     return LaunchDescription(
         [
-            # Launch rosbridge for frontend access via socket on port 9090
-            IncludeLaunchDescription(
-                FrontendLaunchDescriptionSource(
-                    path.join(
-                        get_package_share_directory("rosbridge_server"),
-                        "launch",
-                        "rosbridge_websocket_launch.xml",
-                    )
-                )
-            ),
             Node(
                 package="cmr_fabric",
                 executable="fault_handler",

@@ -1,3 +1,3 @@
 # cmr_demo_py
 
-Some demo stuff for Python
+@brief Some demo stuff for Python

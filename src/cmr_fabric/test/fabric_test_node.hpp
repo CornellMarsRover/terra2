@@ -23,13 +23,15 @@ class FabricTestNode : public cmr::fabric::FabricNode
 
     bool m_fail_activate = false;
 
-    cmr::fabric::LifecycleSubscription<std_msgs::msg::Bool> m_test_sub;
+    cmr::fabric::LifecycleSubscription<std_msgs::msg::Bool>::ptr_t m_test_sub;
     std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Bool>>
         m_test_pub, m_timer_pub;
-    cmr::fabric::LifecycleClient<cmr_msgs::srv::ActivateNode> m_test_client;
-    cmr::fabric::LifecycleService<cmr_msgs::srv::ActivateNode> m_test_service;
-    std::unique_ptr<cmr::fabric::GenericLifecycleTimer> m_test_timer;
-    std::unique_ptr<cmr::fabric::GenericLifecycle> m_test_action;
+    cmr::fabric::LifecycleClient<cmr_msgs::srv::ActivateNode>::ptr_t m_test_client;
+    cmr::fabric::LifecycleService<cmr_msgs::srv::ActivateNode>::ptr_t m_test_service;
+    cmr::fabric::LifecycleTimer<int64_t, std::milli>::ptr_t m_test_timer;
+    // std::unique_ptr<cmr::fabric::GenericLifecycle> m_test_timer;
+    cmr::fabric::LifecycleActionServer<cmr_msgs::action::TestTargetPosition>::ptr_t
+        m_test_action;
 
     using target_pos_t = cmr_msgs::action::TestTargetPosition;
     using target_pos_goal_t = target_pos_t::Goal;
@@ -123,9 +125,9 @@ class FabricTestNode : public cmr::fabric::FabricNode
         CMR_LOG(INFO, "Activation success: %d", !m_fail_activate);
         if (!m_fail_activate) {
             m_test_pub->on_activate();
-            m_test_sub.activate();
-            m_test_client.activate();
-            m_test_service.activate();
+            m_test_sub->activate();
+            m_test_client->activate();
+            m_test_service->activate();
             m_test_timer->activate();
             m_test_action->activate();
             m_timer_pub->on_activate();
@@ -136,9 +138,9 @@ class FabricTestNode : public cmr::fabric::FabricNode
     bool deactivate() override
     {
         m_test_pub->on_deactivate();
-        m_test_sub.deactivate();
-        m_test_client.deactivate();
-        m_test_service.deactivate();
+        m_test_sub->deactivate();
+        m_test_client->deactivate();
+        m_test_service->deactivate();
         m_test_timer->deactivate();
         m_test_action->deactivate();
         m_timer_pub->on_deactivate();

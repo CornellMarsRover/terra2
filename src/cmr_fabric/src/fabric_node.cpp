@@ -24,14 +24,18 @@ constexpr auto param_config_data = "config_data";
 namespace cmr::fabric
 {
 
-FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config)
-    : rclcpp_lifecycle::LifecycleNode(monad::value_or_else(
-          monad::map(config, [](const auto& c) { return c.node_name; }), []() {
-              return "fabric_untitled_" +
-                     std::to_string(std::chrono::system_clock::now()
-                                        .time_since_epoch()
-                                        .count());
-          }))
+FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config,
+                       const rclcpp::NodeOptions& options)
+    : rclcpp_lifecycle::LifecycleNode(
+          monad::value_or_else(
+              monad::map(config, [](const auto& c) { return c.node_name; }),
+              []() {
+                  return "fabric_untitled_" +
+                         std::to_string(std::chrono::system_clock::now()
+                                            .time_since_epoch()
+                                            .count());
+              }),
+          options)
 {
     m_dependency_manager = std::make_unique<DependencyHandler>(*this);
     declare_parameter(param_config_path, "");

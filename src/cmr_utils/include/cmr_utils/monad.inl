@@ -51,4 +51,17 @@ constexpr auto value_or_else(T&& monad, Func f) noexcept(noexcept(f()))
         return f();
     }
 }
+
+template <typename T, typename U>
+constexpr U value_or(const std::pair<bool, T>& pair, U&& default_val) noexcept
+{
+    return pair.first ? pair.second : default_val;
+}
+
+template <typename T, typename Func>
+constexpr T value_or_else(const std::pair<bool, T>& pair,
+                          Func f) noexcept(noexcept(f()))
+{
+    return pair.first ? pair.second : f();
+}
 }  // namespace monad

@@ -31,8 +31,8 @@ bool CameraNode::configure_settings(const std::unique_ptr<toml::Table> settings)
     if (!width_ok) {
         CMR_LOG(
             WARN,
-            "No value configured for 'image_width'; using default value of 1280.");
-        m_image_width = 1280;
+            "No value configured for 'image_width'; using default value of 320.");
+        m_image_width = 320;
     } else {
         m_image_width = static_cast<int>(width);
     }
@@ -41,8 +41,8 @@ bool CameraNode::configure_settings(const std::unique_ptr<toml::Table> settings)
     if (!width_ok) {
         CMR_LOG(
             WARN,
-            "No value configured for 'image_height'; using default value of 720.");
-        m_image_height = 720;
+            "No value configured for 'image_height'; using default value of 240.");
+        m_image_height = 240;
     } else {
         m_image_height = static_cast<int>(height);
     }
@@ -105,6 +105,8 @@ bool CameraNode::activate()
     m_cap.open(m_camera_id);
     m_cap.set(cv::CAP_PROP_FRAME_WIDTH, m_image_width);
     m_cap.set(cv::CAP_PROP_FRAME_HEIGHT, m_image_height);
+    // use MJPG format for capture format
+    m_cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
 
     m_last_frame = std::chrono::steady_clock::now();
 
@@ -126,12 +128,7 @@ bool CameraNode::deactivate()
     return true;
 }
 
-bool CameraNode::cleanup()
-{
-    // undo the effects of configure here
-
-    return true;
-}
+bool CameraNode::cleanup() { return true; }
 
 sensor_msgs::msg::Image CameraNode::convert_frame_to_image(cv::Mat& frame) const
 {

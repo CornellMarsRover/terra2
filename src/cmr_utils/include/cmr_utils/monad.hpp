@@ -116,6 +116,35 @@ template <typename T, typename Func>
 constexpr auto value_or_else(T&& monad, Func f) noexcept(noexcept(f()))
     -> std::enable_if_t<is_monad_like_v<T>,
                         std::remove_reference_t<decltype(monad.value())>>;
+
+/**
+ * @brief Gets the value contained within the pair or the default if it is empty
+ *
+ * @tparam T value type
+ * @tparam U default type
+ * @param monad
+ * @param default_val
+ * @return the value within `monad` or `default_val`
+ */
+template <typename T, typename U>
+constexpr U value_or(const std::pair<bool, T>& pair, U&& default_val) noexcept;
+
+/**
+ * @brief Gets the value contained within the pair or the value returned by the
+ * function if it is empty
+ *
+ * Has the same exception guaruntees as `f`
+ *
+ * @tparam T monad type
+ * @tparam Func a function which takes nothing and returns a value of the wrapped
+ *  monad value
+ * @param monad
+ * @param f
+ * @return
+ */
+template <typename T, typename Func>
+constexpr T value_or_else(const std::pair<bool, T>& pair,
+                          Func f) noexcept(noexcept(f()));
 }  // namespace monad
 
 #include "cmr_utils/monad.inl"

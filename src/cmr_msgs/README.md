@@ -1,6 +1,6 @@
 # cmr_msgs
 
-This package contains all the messages (`*.msg`), services (`.srv`), and
+@brief This package contains all the messages (`*.msg`), services (`.srv`), and
 actions (`*.action`) that are defined and used by CMR packages.
 
 The reason we put them all in the same package, rather than having each package

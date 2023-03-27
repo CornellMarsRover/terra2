@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- Arm URDF without any ROS2 control plugins for use with IK, which 
+    will add position interfaces for the arm -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="arm">
+
+    <xacro:arg name="use_gazebo" default="false" />
+
+    <xacro:arg name="mock" default="true" />
+    
+    <xacro:include filename="$(find cmr_arm_description)/urdf/arm_description.urdf.xacro" />
+    <xacro:arm />
+
+</robot>

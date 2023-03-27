@@ -43,6 +43,9 @@ endfunction()
 # * <name> - name of the build target
 # * <SHARED> - optional flag, if set, builds a shared library by passing SHARED
 #   to add_library
+# * <NO_INSTALL> - optional flag, if set, does not install the library so that
+#   it can be done manually if necessary. Ex. if the library has multiple
+#   targets that need to be installed
 # * <SOURCES> - multivalue argument of all source files for the node
 # * <DEPENDS> - multivalue argument of all dependencies for the node
 #
@@ -51,7 +54,7 @@ endfunction()
 # * `cmr_add_lib(cmr_utils SOURCES src/cmr_debug.cpp DEPENDS rclcpp)`
 # * `cmr_add_lib(cmr_utils SHARED SOURCES src/cmr_debug.cpp DEPENDS rclcpp)`
 function(cmr_add_lib name)
-  set(bool_args "SHARED")
+  set(bool_args "SHARED" "NO_INSTALL")
   set(one_val_args "")
   set(multi_val_args "SOURCES" "DEPENDS")
   cmake_parse_arguments(MK_LIB "${bool_args}" "${one_val_args}"
@@ -81,12 +84,14 @@ function(cmr_add_lib name)
       "${CMR_LIBS}" "${name}"
       PARENT_SCOPE)
 
-  install(
-    TARGETS ${name}
-    EXPORT export_${PROJECT_NAME}
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin)
+  if(NOT ${MK_LIB_NO_INSTALL})
+    install(
+      TARGETS ${name}
+      EXPORT export_${PROJECT_NAME}
+      ARCHIVE DESTINATION lib
+      LIBRARY DESTINATION lib
+      RUNTIME DESTINATION bin)
+  endif()
 endfunction()
 
 # Adds a node or other executable. Sets default include directories and

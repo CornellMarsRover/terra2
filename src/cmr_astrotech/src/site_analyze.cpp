@@ -2,6 +2,10 @@
 
 namespace cmr
 {
+constexpr int pre_scoop_angle = 90;
+constexpr int post_scoop_angle = 90;
+constexpr int dump_angle = 90;
+constexpr int neutral_angle = 90;
 
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
@@ -57,8 +61,8 @@ void SiteAnalyze::handle_request(
             break;
         case 5:
             for (int i = 0; i < 4; i++) {
-                scoop({i});
-                gearshift();
+                astrotech(i);
+                gearshift(i);
             }
             break;
         default:
@@ -82,18 +86,10 @@ void SiteAnalyze::fill(std::vector<int> sites)
     m_motor_state_publisher->publish(msg);
 }
 
-void SiteAnalyze::gearshift(int site)
+void SiteAnalyze::gearshift(int /*site*/)
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
     msg.motor_ids = {0xDF};
-}
-
-void SiteAnalyze::scoop(int site)
-{
-    cmr_msgs::msg::MotorWriteBatch msg{};
-    msg.motor_ids = {0xD6};
-    msg.control_modes={2};
-    msg.values={100};
 }
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
@@ -126,5 +122,42 @@ bool SiteAnalyze::cleanup()
 
     return true;
 }
+
+void SiteAnalyze::publishmsg(int angle)
+{
+    cmr_msgs::msg::MotorWriteBatch msg{};
+    msg.motor_ids = {0xDF};
+    msg.control_modes = {1};
+    msg.values = {angle};
+    m_motor_state_publisher->publish(msg);
+}
+
+void SiteAnalyze::astrotech(int site)
+{
+    // const auto cm = 0xD4;
+    // const auto csr = 0xDF;
+    // const auto csl = 0xDF;
+    const static std::vector<int> g_sites = {1, 2, 3, 4};
+    // for (auto site : g_sites) {
+    if (site == 1 || site == 2) {
+        fill({site});
+        publishmsg(pre_scoop_angle);
+        // turn CM CCW until limit switch is triggered
+        publishmsg(post_scoop_angle);
+        // turn CM CW until limit switch is triggered
+        publishmsg(dump_angle);
+        publishmsg(neutral_angle);
+    }
+    if (site == 3 || site == 4) {
+        fill({site});
+        publishmsg(pre_scoop_angle);
+        // turn CM CCW until limit switch is triggered
+        publishmsg(post_scoop_angle);
+        // turn CM CW until limit switch is triggered
+        publishmsg(dump_angle);
+        publishmsg(neutral_angle);
+    }
+}
+// };
 
 }  // namespace cmr

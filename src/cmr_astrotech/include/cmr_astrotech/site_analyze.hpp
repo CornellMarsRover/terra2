@@ -38,8 +38,6 @@ class SiteAnalyze : public cmr::fabric::FabricNode
 
     void gearshift(int site);
 
-    void scoop(int site);
-
     void analyze();
 
     bool configure(const std::shared_ptr<toml::Table>& table) override;
@@ -49,6 +47,9 @@ class SiteAnalyze : public cmr::fabric::FabricNode
     bool deactivate() override;
 
     bool cleanup() override;
+
+    void astrotech(int site);
+    void publishmsg(int angle);
 };
 
 }  // namespace cmr

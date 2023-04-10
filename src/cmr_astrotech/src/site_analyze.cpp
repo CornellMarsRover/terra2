@@ -2,6 +2,7 @@
 
 namespace cmr
 {
+// TODO(unknown): CHANGE TO CORRECT ANGLE VALUES
 constexpr int pre_scoop_angle = 90;
 constexpr int post_scoop_angle = 90;
 constexpr int dump_angle = 90;
@@ -61,7 +62,7 @@ void SiteAnalyze::handle_request(
             break;
         case 5:
             for (int i = 0; i < 4; i++) {
-                astrotech(i);
+                scoop(i);
                 gearshift(i);
             }
             break;
@@ -123,39 +124,42 @@ bool SiteAnalyze::cleanup()
     return true;
 }
 
-void SiteAnalyze::publishmsg(int angle)
+void SiteAnalyze::publishmsg(
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_motor_ids_type id,
+    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_control_modes_type mode,
+    int angle)
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
-    msg.motor_ids = {0xDF};
-    msg.control_modes = {1};
+    msg.motor_ids = {id};
+    msg.control_modes = {mode};
     msg.values = {angle};
     m_motor_state_publisher->publish(msg);
 }
 
-void SiteAnalyze::astrotech(int site)
+void SiteAnalyze::scoop(int site)
 {
-    // const auto cm = 0xD4;
-    // const auto csr = 0xDF;
-    // const auto csl = 0xDF;
+    // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES AND ID OF RIGHT AND LEFT
+    // COLLECTION SERVO MOTORS
+
     const static std::vector<int> g_sites = {1, 2, 3, 4};
-    // for (auto site : g_sites) {
     if (site == 1 || site == 2) {
         fill({site});
-        publishmsg(pre_scoop_angle);
-        // turn CM CCW until limit switch is triggered
-        publishmsg(post_scoop_angle);
-        // turn CM CW until limit switch is triggered
-        publishmsg(dump_angle);
-        publishmsg(neutral_angle);
+        publishmsg({0xDF}, {1}, pre_scoop_angle);
+        publishmsg({0xD4}, {2}, -100);
+        publishmsg({0xDF}, {1}, post_scoop_angle);
+        publishmsg({0xD4}, {2}, 100);
+        publishmsg({0xDF}, {1}, dump_angle);
+        publishmsg({0xDF}, {1}, neutral_angle);
     }
     if (site == 3 || site == 4) {
         fill({site});
-        publishmsg(pre_scoop_angle);
-        // turn CM CCW until limit switch is triggered
-        publishmsg(post_scoop_angle);
-        // turn CM CW until limit switch is triggered
-        publishmsg(dump_angle);
-        publishmsg(neutral_angle);
+        publishmsg({0xDF}, {1}, pre_scoop_angle);
+        publishmsg({0xD4}, {2}, -100);
+        publishmsg({0xDF}, {1}, post_scoop_angle);
+        publishmsg({0xD4}, {2}, 100);
+        publishmsg({0xDF}, {1}, dump_angle);
+        publishmsg({0xDF}, {1}, neutral_angle);
     }
 }
 // };

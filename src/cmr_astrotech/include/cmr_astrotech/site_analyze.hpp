@@ -48,8 +48,12 @@ class SiteAnalyze : public cmr::fabric::FabricNode
 
     bool cleanup() override;
 
-    void astrotech(int site);
-    void publishmsg(int angle);
+    void scoop(int site);
+    void publishmsg(
+        cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_motor_ids_type id,
+        cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_control_modes_type
+            mode,
+        int angle);
 };
 
 }  // namespace cmr

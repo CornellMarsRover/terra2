@@ -25,10 +25,9 @@ class SiteAnalyze : public cmr::fabric::FabricNode
         const std::optional<cmr::fabric::FabricNodeConfig>& config = std::nullopt);
 
   private:
-    std::shared_ptr<rclcpp::Node> m_node;
-    rclcpp::Publisher<cmr_msgs::msg::MotorWriteBatch>::SharedPtr
+    rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::MotorWriteBatch>::SharedPtr
         m_motor_state_publisher;
-    rclcpp::Service<cmr_msgs::srv::SiteAnalyze>::SharedPtr m_service;
+    fabric::LifecycleService<cmr_msgs::srv::SiteAnalyze>::ptr_t m_service;
 
     void handle_request(
         const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,

@@ -11,12 +11,6 @@ constexpr int neutral_angle = 90;
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
 {
-    m_node = rclcpp::Node::make_shared("site_analyze_server");
-    m_service = m_node->create_service<cmr_msgs::srv::SiteAnalyze>(
-        "site_analyze", &SiteAnalyze::handle_request);
-    m_motor_state_publisher =
-        m_node->create_publisher<cmr_msgs::msg::MotorWriteBatch>(
-            "/motor", rclcpp::SystemDefaultsQoS());
 }
 // NOLINTNEXTLINE
 void SiteAnalyze::handle_request(
@@ -99,6 +93,11 @@ bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
     // most of the node setup logic here
 
     // Ex. const auto node_settings = table->getTable("node");
+    m_service = create_lifecycle_service<cmr_msgs::srv::SiteAnalyze>(
+        "site_analyze", &SiteAnalyze::handle_request);
+    m_motor_state_publisher =
+        create_lifecycle_publisher<cmr_msgs::msg::MotorWriteBatch>(
+            "/motor", rclcpp::SystemDefaultsQoS());
     return true;
 }
 
@@ -106,6 +105,8 @@ bool SiteAnalyze::activate()
 {
     // do any last-minute things before activation here
     // it should be quick
+    m_service->activate();
+    m_motor_state_publisher->on_activate();
 
     return true;
 }
@@ -113,6 +114,8 @@ bool SiteAnalyze::activate()
 bool SiteAnalyze::deactivate()
 {
     // undo the effects of activate here
+    m_service->deactivate();
+    m_motor_state_publisher->on_deactivate();
 
     return true;
 }

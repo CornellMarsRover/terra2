@@ -1,6 +1,7 @@
 #include <behaviortree_cpp_v3/action_node.h>
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <behaviortree_cpp_v3/tree_node.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -62,4 +63,5 @@ class ArucoAction : public BT::SyncActionNode
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener;
 
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr m_sub;
 };

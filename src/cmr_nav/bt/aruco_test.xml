@@ -3,14 +3,54 @@
     <!-- ////////// -->
     <BehaviorTree ID="BehaviorTree">
         <Sequence>
-            <Action ID="Print" message="Testing Pose"/>
-            <RecoveryNode number_of_retries="10">
-                <!-- <Action ID="Aruco"/> -->
-                <AlwaysFailure/>
+            <Action ID="Print" message="Testing Aruco Now"/>
+            <RecoveryNode number_of_retries="6">
+                <Decorator ID="RateController" hz="1">
+                    <Action ID="Aruco"/>
+                </Decorator>
                 <Sequence>
-                    <Action ID="PoseGenerator" has_arrived="true" goal="{goal}"/>
-                    <!-- <Action ID="Print" message="{testing}"/> -->
+                    <Action ID="Print" message="Spinning!"/>
+                    <Spin server_name="spin" spin_dist="1.05" />
                 </Sequence>
+            </RecoveryNode>
+            <RecoveryNode number_of_retries="10">
+                <Action ID="SquarePath" has_arrived="true" initial_position="{ARTag}" goal="{goal}"/>
+                <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+                    <PipelineSequence>
+                        <RateController hz="1.0" name="RateControllerComputePathToPose">
+                            <RecoveryNode number_of_retries="1" name="RecoveryComputePathToPose">
+                                <Fallback name="FallbackComputePathToPose">
+                                    <ReactiveSequence name="CheckIfNewPathNeeded">
+                                        <Inverter>
+                                            <GlobalUpdatedGoal/>
+                                        </Inverter>
+                                        <IsPathValid path="{path}"/>
+                                    </ReactiveSequence>
+                                    <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+                                </Fallback>
+                                <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+                            </RecoveryNode>
+                        </RateController>
+                        <RecoveryNode number_of_retries="1" name="RecoveryFollowPath">
+                            <!-- <Customthing> -->
+                            <FollowPath path="{path}" controller_id="FollowPath"/>
+                            <!-- <Customthing> -->
+                            <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+                        </RecoveryNode>
+                    </PipelineSequence>
+                    <ReactiveFallback name="FallbackRecoveries">
+                        <GoalUpdated/>
+                        <RoundRobin name="RecoveryActions">
+                            <Sequence name="ClearingActions">
+                                <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+                                <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+                            </Sequence>
+                            <Spin name="SpinRecovery" spin_dist="1.57"/>
+                            <Wait name="WaitRecovery" wait_duration="5"/>
+                            <BackUp name="BackUpRecovery" backup_dist="0.30" backup_speed="0.05"/>
+                        </RoundRobin>
+                    </ReactiveFallback>
+                </RecoveryNode>
             </RecoveryNode>
         </Sequence>
     </BehaviorTree>

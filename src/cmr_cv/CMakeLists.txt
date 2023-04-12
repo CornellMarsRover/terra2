@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(cmr_cv)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
-                      "${PROJECT_SOURCE_DIR}/../../cmake")
+  "${PROJECT_SOURCE_DIR}/../../cmake")
 include(CmrUtils)
 
 # Hack for now
@@ -27,7 +27,10 @@ cmr_std_find_pkgs(
   rclcpp_action
   nav2_common
   nav2_waypoint_follower
-  nav2_lifecycle_manager)
+  nav2_lifecycle_manager
+  tf2_geometry_msgs
+  tf2
+  tf2_ros)
 
 # Add additional dependencies as arguments here. Make sure you update
 # package.xml if you're depending on other packages.
@@ -76,6 +79,9 @@ cmr_add_lib(
   nav2_msgs
   behaviortree_cpp_v3
   nav2_util
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
   nav2_core
   pluginlib)
 target_compile_definitions(aruco_bt_action PRIVATE BT_PLUGIN_EXPORT)

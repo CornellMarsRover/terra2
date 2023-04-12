@@ -1,5 +1,6 @@
 #include "cmr_cv/aruco_bt_action.hpp"
 
+#include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include "behaviortree_cpp_v3/basic_types.h"
@@ -32,6 +33,8 @@ inline geometry_msgs::msg::Vector3 convertFromString<geometry_msgs::msg::Vector3
 
 BT::NodeStatus ArucoAction::tick()
 {
+    RCLCPP_INFO(rclcpp::get_logger("Aruco Logger"), "Ticked!");
+
     rclcpp::spin_some(m_ros_node);
 
     // If the vector of nodes is not empty, meaning that there was at least 1
@@ -53,7 +56,7 @@ ArucoAction::ArucoAction(const std::string& name, const std::string&,
     // NOLINTNEXTLINE
     using namespace std::placeholders;
     m_ros_node = std::make_shared<rclcpp::Node>("aruco_listener_node");
-    m_ros_node->create_subscription<geometry_msgs::msg::PoseArray>(
+    m_sub = m_ros_node->create_subscription<geometry_msgs::msg::PoseArray>(
         "/aruco_poses", 10, std::bind(&ArucoAction::topic_callback, this, _1));
 
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(m_ros_node->get_clock());
@@ -66,17 +69,20 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
         auto t = m_tf_buffer->lookupTransform("map", msg->header.frame_id,
                                               tf2::TimePointZero);
 
-        geometry_msgs::msg::Vector3Stamped in{};
+        geometry_msgs::msg::PoseStamped in{};
 
-        in.vector.x = m_latest_position_average.x;
-        in.vector.y = m_latest_position_average.y;
-        in.vector.z = m_latest_position_average.z;
+        in.pose.position.x = m_latest_position_average.x;
+        in.pose.position.y = m_latest_position_average.y;
+        in.pose.position.z = m_latest_position_average.z;
 
-        geometry_msgs::msg::Vector3Stamped out;
+        geometry_msgs::msg::PoseStamped out;
 
         tf2::doTransform(in, out, t);
-
-        setOutput("ARTag", out.vector);
+        std::string final_out = std::to_string(out.pose.position.x) + ", " +
+                                std::to_string(out.pose.position.y);
+        RCLCPP_INFO(rclcpp::get_logger("Aruco Logger"), "Found Pose: %s",
+                    final_out.c_str());
+        setOutput("ARTag", out.pose.position);
 
     } catch (const tf2::TransformException& ex) {
         RCLCPP_INFO(m_ros_node->get_logger(), "Could not transform %s to %s: %s",
@@ -87,6 +93,7 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
 
 void ArucoAction::topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 {
+    RCLCPP_INFO(rclcpp::get_logger("Aruco Logger"), "Callback called");
     for (const auto& pose : msg->poses) {
         m_node_vector.push_back(pose);
     }

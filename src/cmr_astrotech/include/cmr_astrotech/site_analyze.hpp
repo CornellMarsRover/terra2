@@ -9,7 +9,13 @@ namespace cmr
 /**
  * `SiteAnalyze`
  *
- * TODO
+ * The SiteAnalyze class controls the collection and analyze tasks for astrotech.
+ * It completes several tasks including analyzing, filling sites, gearshifting,
+ * and scooping. The class listens for messages of MotorWriteBatch and uses 
+ * these messages to change aspects of the different motors being used, such as
+ * the motor id, mode, and angles. 
+ * 
+
  */
 class SiteAnalyze : public cmr::fabric::FabricNode
 {
@@ -38,6 +44,7 @@ class SiteAnalyze : public cmr::fabric::FabricNode
     void gearshift(int site);
 
     void analyze();
+    void collection();
 
     bool configure(const std::shared_ptr<toml::Table>& table) override;
 

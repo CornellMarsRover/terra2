@@ -7,6 +7,8 @@ constexpr int pre_scoop_angle = 90;
 constexpr int post_scoop_angle = 90;
 constexpr int dump_angle = 90;
 constexpr int neutral_angle = 90;
+constexpr int turn_angle_pos=100;
+constexpr int turn_angle_neg=-100
 
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
@@ -26,6 +28,7 @@ void SiteAnalyze::handle_request(
             }
             break;
         case 2:
+        case 3:
             fill({1, 2});
             analyze();
             for (int i = 0; i < 3; i++) {
@@ -33,9 +36,7 @@ void SiteAnalyze::handle_request(
                 analyze();
             }
             break;
-        case 3:
-            break;
-        case 4:
+        default:
             fill({2, 3});
             analyze();
             for (int i = 0; i < 3; i++) {
@@ -54,19 +55,31 @@ void SiteAnalyze::handle_request(
                 analyze();
             }
             break;
-        case 5:
-            for (int i = 0; i < 4; i++) {
-                scoop(i);
-                gearshift(i);
-            }
-            break;
-        default:
-            response->success = false;
-            break;
+    }
+}
+void SiteAnalyze::collection() {
+    for (int i = 0; i < 4; i++) {
+        scoop(i);
+        gearshift(i);
     }
 }
 
-void SiteAnalyze::analyze() { fill({5}); }
+void SiteAnalyze::publishmsg(
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_motor_ids_type id,
+    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_control_modes_type mode,
+    int angle)
+{
+    cmr_msgs::msg::MotorWriteBatch msg{};
+    msg.motor_ids = {id};
+    msg.control_modes = {mode};
+    msg.values = {angle};
+    m_motor_state_publisher->publish(msg);
+    using namespace std::chrono_literals;
+    constexpr auto actionDelay = 3s;
+}
+
+void SiteAnalyze::analyze() { publishmsg({0xDE}, {2}, {100}); }
 
 void SiteAnalyze::fill(std::vector<int> sites)
 {
@@ -84,7 +97,7 @@ void SiteAnalyze::fill(std::vector<int> sites)
 void SiteAnalyze::gearshift(int /*site*/)
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
-    msg.motor_ids = {0xDF};
+    publishmsg ({0xDF}, {2}, {100}) 
 }
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
@@ -127,19 +140,6 @@ bool SiteAnalyze::cleanup()
     return true;
 }
 
-void SiteAnalyze::publishmsg(
-    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_motor_ids_type id,
-    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_control_modes_type mode,
-    int angle)
-{
-    cmr_msgs::msg::MotorWriteBatch msg{};
-    msg.motor_ids = {id};
-    msg.control_modes = {mode};
-    msg.values = {angle};
-    m_motor_state_publisher->publish(msg);
-}
-
 void SiteAnalyze::scoop(int site)
 {
     // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES AND ID OF RIGHT AND LEFT
@@ -149,22 +149,21 @@ void SiteAnalyze::scoop(int site)
     if (site == 1 || site == 2) {
         fill({site});
         publishmsg({0xDF}, {1}, pre_scoop_angle);
-        publishmsg({0xD4}, {2}, -100);
+        publishmsg({0xD4}, {2}, turn_angle_neg);
         publishmsg({0xDF}, {1}, post_scoop_angle);
-        publishmsg({0xD4}, {2}, 100);
+        publishmsg({0xD4}, {2}, turn_angle_pos);
         publishmsg({0xDF}, {1}, dump_angle);
         publishmsg({0xDF}, {1}, neutral_angle);
     }
     if (site == 3 || site == 4) {
         fill({site});
         publishmsg({0xDF}, {1}, pre_scoop_angle);
-        publishmsg({0xD4}, {2}, -100);
+        publishmsg({0xD4}, {2}, turn_angle_neg);
         publishmsg({0xDF}, {1}, post_scoop_angle);
-        publishmsg({0xD4}, {2}, 100);
+        publishmsg({0xD4}, {2}, turn_angle_pos);
         publishmsg({0xDF}, {1}, dump_angle);
         publishmsg({0xDF}, {1}, neutral_angle);
     }
 }
-// };
 
 }  // namespace cmr

@@ -9,9 +9,11 @@
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "nav2_behavior_tree/behavior_tree_engine.hpp"
 
+const std::string ArucoAction::output = "ARTag";
 /** Template specialization to convert a string to Position2D. */
 namespace BT
 {
+
 template <>
 inline geometry_msgs::msg::Vector3 convertFromString<geometry_msgs::msg::Vector3>(
     BT::StringView str)
@@ -42,7 +44,7 @@ BT::NodeStatus ArucoAction::tick()
     // posted to the ARTag output port and a SUCCESS is returned; if the vector
     // is empty and no AR tags were detected then FAILURE is returned
     if (!m_node_vector.empty()) {
-        setOutput("ARTag", m_latest_position_average);
+        // setOutput("ARTag", m_latest_position_average);
         return BT::NodeStatus::SUCCESS;
     } else {
         return BT::NodeStatus::FAILURE;
@@ -69,20 +71,20 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
         auto t = m_tf_buffer->lookupTransform("map", msg->header.frame_id,
                                               tf2::TimePointZero);
 
-        geometry_msgs::msg::PoseStamped in{};
+        geometry_msgs::msg::Vector3Stamped in{};
 
-        in.pose.position.x = m_latest_position_average.x;
-        in.pose.position.y = m_latest_position_average.y;
-        in.pose.position.z = m_latest_position_average.z;
+        in.vector.x = m_latest_position_average.x;
+        in.vector.y = m_latest_position_average.y;
+        in.vector.z = m_latest_position_average.z;
 
-        geometry_msgs::msg::PoseStamped out;
+        geometry_msgs::msg::Vector3Stamped out;
 
         tf2::doTransform(in, out, t);
-        std::string final_out = std::to_string(out.pose.position.x) + ", " +
-                                std::to_string(out.pose.position.y);
+        std::string final_out =
+            std::to_string(out.vector.x) + ", " + std::to_string(out.vector.y);
         RCLCPP_INFO(rclcpp::get_logger("Aruco Logger"), "Found Pose: %s",
                     final_out.c_str());
-        setOutput("ARTag", out.pose.position);
+        setOutput(output, out.vector);
 
     } catch (const tf2::TransformException& ex) {
         RCLCPP_INFO(m_ros_node->get_logger(), "Could not transform %s to %s: %s",
@@ -101,21 +103,26 @@ void ArucoAction::topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr 
     std::vector<geometry_msgs::msg::Pose> poses_to_average;
     // average the coordinates of the poses in the m_position_to_post vector to
     // get the coordinate that the rover should circle around
-    double sum_x = 0;
-    double sum_y = 0;
-    double sum_z = 0;
-    for (auto& i : poses_to_average) {
-        sum_x += i.position.x;
-        sum_y += i.position.y;
-        sum_z += i.position.z;
-    }
-    auto size = static_cast<double>(poses_to_average.size());
-    double x_position = sum_x / size;
-    double y_position = sum_y / size;
-    double z_position = sum_z / size;
-    m_latest_position_average.x = x_position;
-    m_latest_position_average.y = y_position;
-    m_latest_position_average.z = z_position;
+    // double sum_x = 0;
+    // double sum_y = 0;
+    // double sum_z = 0;
+    // for (auto& i : poses_to_average) {
+    //     sum_x += i.position.x;
+    //     sum_y += i.position.y;
+    //     sum_z += i.position.z;
+    // }
+    // auto size = static_cast<double>(poses_to_average.size());
+    // double x_position = sum_x / size;
+    // double y_position = sum_y / size;
+    // double z_position = sum_z / size;
+    // m_latest_position_average.x = x_position;
+    // m_latest_position_average.y = y_position;
+    // m_latest_position_average.z = z_position;
+
+    // FOR TESTING
+    m_latest_position_average.x = msg->poses[0].position.x;
+    m_latest_position_average.y = msg->poses[0].position.y;
+    m_latest_position_average.z = msg->poses[0].position.z;
 
     transformhelper(msg);
 }
@@ -128,9 +135,4 @@ BT_REGISTER_NODES(factory)
     };
 
     factory.registerBuilder<ArucoAction>("Aruco", builder);
-}
-
-static BT::PortsList provided_ports()
-{
-    return {BT::OutputPort<geometry_msgs::msg::Vector3>("ARTag")};
 }

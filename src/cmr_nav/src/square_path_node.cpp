@@ -37,8 +37,8 @@ geometry_msgs::msg::PoseStamped SquarePathAction::generate_next_pose() const
 
     new_pose_stamp.header.frame_id = "map";
 
-    new_pose_stamp.pose.position.x += m_origin.pose.position.x;
-    new_pose_stamp.pose.position.y += m_origin.pose.position.y;
+    new_pose_stamp.pose.position.x += m_origin.x;
+    new_pose_stamp.pose.position.y += m_origin.y;
     return new_pose_stamp;
 }
 
@@ -47,10 +47,10 @@ void SquarePathAction::on_tick()
     bool has_arrived = false;
     getInput<bool>(input, has_arrived);
     if (!m_origin_init) {
-        getInput<geometry_msgs::msg::PoseStamped>(initial_goal_input, m_origin);
+        getInput<geometry_msgs::msg::Vector3>(initial_goal_input, m_origin);
         m_origin_init = true;
-        std::string init_out = std::to_string(m_origin.pose.position.x) + ", " +
-                               std::to_string(m_origin.pose.position.y);
+        std::string init_out =
+            std::to_string(m_origin.x) + ", " + std::to_string(m_origin.y);
         RCLCPP_INFO(rclcpp::get_logger("Square Path Logger"), "Initial Pose: %s",
                     init_out.c_str());
     }

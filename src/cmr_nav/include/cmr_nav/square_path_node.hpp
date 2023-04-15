@@ -1,5 +1,6 @@
 #pragma once
 
+#include <geometry_msgs/msg/detail/vector3__struct.hpp>
 #include <string>
 
 #include "behaviortree_cpp_v3/action_node.h"
@@ -35,7 +36,7 @@ class SquarePathAction : public BT::SyncActionNode
     {
         return {BT::InputPort<bool>(input, false,
                                     "Whether or not rover is at outputted pose"),
-                BT::InputPort<geometry_msgs::msg::PoseStamped>(initial_goal_input),
+                BT::InputPort<geometry_msgs::msg::Vector3>(initial_goal_input),
                 BT::OutputPort<geometry_msgs::msg::PoseStamped>(
                     output, "The next pose to travel to")};
     }
@@ -58,7 +59,7 @@ class SquarePathAction : public BT::SyncActionNode
 
   private:
     geometry_msgs::msg::PoseStamped m_previous_pose;
-    geometry_msgs::msg::PoseStamped m_origin;
+    geometry_msgs::msg::Vector3 m_origin;
     bool m_origin_init;
     int m_pose_id;
     int m_unit_distance;

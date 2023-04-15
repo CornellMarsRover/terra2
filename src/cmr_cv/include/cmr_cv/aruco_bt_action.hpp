@@ -1,7 +1,6 @@
 #include <behaviortree_cpp_v3/action_node.h>
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <behaviortree_cpp_v3/tree_node.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -9,6 +8,7 @@
 #include <geometry_msgs/msg/detail/vector3__struct.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <rclcpp/node.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 /**
  * on /aruco_poses, then makes a list of the poses gathered from the messages and
@@ -32,6 +32,13 @@ class ArucoAction : public BT::SyncActionNode
      * the similarly located tags in the vector
      */
     BT::NodeStatus tick() override;
+
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static BT::PortsList providedPorts()
+    {
+        return {BT::OutputPort<geometry_msgs::msg::Vector3>(
+            output, "The location of the ARTag")};
+    }
 
   private:
     std::shared_ptr<rclcpp::Node> m_ros_node;
@@ -64,4 +71,5 @@ class ArucoAction : public BT::SyncActionNode
 
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr m_sub;
+    static std::string const output;
 };

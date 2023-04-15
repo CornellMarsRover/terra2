@@ -6,7 +6,7 @@
             <Action ID="Print" message="Testing Aruco Now"/>
             <RecoveryNode number_of_retries="6">
                 <Decorator ID="RateController" hz="1">
-                    <Action ID="Aruco"/>
+                    <Action ID="Aruco" ARTag="{pos}"/>
                 </Decorator>
                 <Sequence>
                     <Action ID="Print" message="Spinning!"/>
@@ -14,7 +14,7 @@
                 </Sequence>
             </RecoveryNode>
             <RecoveryNode number_of_retries="10">
-                <Action ID="SquarePath" has_arrived="true" initial_position="{ARTag}" goal="{goal}"/>
+                <Action ID="SquarePath" has_arrived="true" initial_position="{pos}" goal="{goal}"/>
                 <RecoveryNode number_of_retries="6" name="NavigateRecovery">
                     <PipelineSequence>
                         <RateController hz="1.0" name="RateControllerComputePathToPose">

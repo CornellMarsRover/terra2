@@ -35,8 +35,6 @@ inline geometry_msgs::msg::Vector3 convertFromString<geometry_msgs::msg::Vector3
 
 BT::NodeStatus ArucoAction::tick()
 {
-    RCLCPP_INFO(rclcpp::get_logger("Aruco Logger"), "Ticked!");
-
     rclcpp::spin_some(m_ros_node);
 
     // If the vector of nodes is not empty, meaning that there was at least 1

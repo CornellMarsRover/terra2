@@ -69,9 +69,10 @@
                                 </RecoveryNode>
                             </RateController>
                             <RecoveryNode number_of_retries="1" name="RecoveryFollowPath">
-                                <!-- <Customthing> -->
-                                <FollowPath path="{path}" controller_id="FollowPath"/>
-                                <!-- <Customthing> -->
+                                <Control ID="While">
+                                    <FollowPath path="{path}" controller_id="FollowPath"/>
+                                    <Action ID="Aruco" ARTag="{pos}"/>
+                                </Control>
                                 <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
                             </RecoveryNode>
                         </PipelineSequence>
@@ -109,9 +110,7 @@
                             </RecoveryNode>
                         </RateController>
                         <RecoveryNode number_of_retries="1" name="RecoveryFollowPath">
-                            <!-- <Customthing> -->
                             <FollowPath path="{path}" controller_id="FollowPath"/>
-                            <!-- <Customthing> -->
                             <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
                         </RecoveryNode>
                     </PipelineSequence>

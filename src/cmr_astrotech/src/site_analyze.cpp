@@ -8,7 +8,12 @@ constexpr int post_scoop_angle = 90;
 constexpr int dump_angle = 90;
 constexpr int neutral_angle = 90;
 constexpr int turn_angle_pos=100;
-constexpr int turn_angle_neg=-100
+constexpr int turn_angle_neg=-100;
+collection_servo_motor={0xDF};
+analysis_motor={0xDE};
+lead_screw_motor={0xD4}
+
+
 
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
@@ -79,7 +84,7 @@ void SiteAnalyze::publishmsg(
     constexpr auto actionDelay = 3s;
 }
 
-void SiteAnalyze::analyze() { publishmsg({0xDE}, {2}, {100}); }
+void SiteAnalyze::analyze() { publishmsg(analysis_motor, {2}, turn_angle_pos); }
 
 void SiteAnalyze::fill(std::vector<int> sites)
 {
@@ -97,7 +102,7 @@ void SiteAnalyze::fill(std::vector<int> sites)
 void SiteAnalyze::gearshift(int /*site*/)
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
-    publishmsg ({0xDF}, {2}, {100}) 
+    publishmsg (collection_servo_motor, {2}, turn_angle_pos) 
 }
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
@@ -148,21 +153,21 @@ void SiteAnalyze::scoop(int site)
     const static std::vector<int> g_sites = {1, 2, 3, 4};
     if (site == 1 || site == 2) {
         fill({site});
-        publishmsg({0xDF}, {1}, pre_scoop_angle);
-        publishmsg({0xD4}, {2}, turn_angle_neg);
-        publishmsg({0xDF}, {1}, post_scoop_angle);
-        publishmsg({0xD4}, {2}, turn_angle_pos);
-        publishmsg({0xDF}, {1}, dump_angle);
-        publishmsg({0xDF}, {1}, neutral_angle);
+        publishmsg(collection_servo_motor, {1}, pre_scoop_angle);
+        publishmsg(lead_screw_motor, {2}, turn_angle_neg);
+        publishmsg(collection_servo_motor, {1}, post_scoop_angle);
+        publishmsg(lead_screw_motor, {2}, turn_angle_pos);
+        publishmsg(collection_servo_motor, {1}, dump_angle);
+        publishmsg(collection_servo_motor, {1}, neutral_angle);
     }
     if (site == 3 || site == 4) {
         fill({site});
-        publishmsg({0xDF}, {1}, pre_scoop_angle);
-        publishmsg({0xD4}, {2}, turn_angle_neg);
-        publishmsg({0xDF}, {1}, post_scoop_angle);
-        publishmsg({0xD4}, {2}, turn_angle_pos);
-        publishmsg({0xDF}, {1}, dump_angle);
-        publishmsg({0xDF}, {1}, neutral_angle);
+        publishmsg(collection_servo_motor, {1}, pre_scoop_angle);
+        publishmsg(lead_screw_motor, {2}, turn_angle_neg);
+        publishmsg(collection_servo_motor, {1}, post_scoop_angle);
+        publishmsg(lead_screw_motor, {2}, turn_angle_pos);
+        publishmsg(collection_servo_motor, {1}, dump_angle);
+        publishmsg(collection_servo_motor, {1}, neutral_angle);
     }
 }
 

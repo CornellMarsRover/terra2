@@ -7,13 +7,11 @@ constexpr int pre_scoop_angle = 90;
 constexpr int post_scoop_angle = 90;
 constexpr int dump_angle = 90;
 constexpr int neutral_angle = 90;
-constexpr int turn_angle_pos=100;
-constexpr int turn_angle_neg=-100;
-collection_servo_motor={0xDF};
-analysis_motor={0xDE};
-lead_screw_motor={0xD4}
-
-
+constexpr int turn_angle_pos = 100;
+constexpr int turn_angle_neg = -100;
+constexpr int collection_servo_motor = {0xDF};
+constexpr int analysis_motor = {0xDE};
+constexpr int lead_screw_motor = {0xD4};
 
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
@@ -62,7 +60,8 @@ void SiteAnalyze::handle_request(
             break;
     }
 }
-void SiteAnalyze::collection() {
+void SiteAnalyze::collection()
+{
     for (int i = 0; i < 4; i++) {
         scoop(i);
         gearshift(i);
@@ -71,9 +70,7 @@ void SiteAnalyze::collection() {
 
 void SiteAnalyze::publishmsg(
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_motor_ids_type id,
-    cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_control_modes_type mode,
-    int angle)
+    int id, int mode, int angle)
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
     msg.motor_ids = {id};
@@ -81,10 +78,11 @@ void SiteAnalyze::publishmsg(
     msg.values = {angle};
     m_motor_state_publisher->publish(msg);
     using namespace std::chrono_literals;
-    constexpr auto actionDelay = 3s;
+    constexpr auto action_delay = 3s;
+    std::this_thread::sleep_for(action_delay);
 }
 
-void SiteAnalyze::analyze() { publishmsg(analysis_motor, {2}, turn_angle_pos); }
+void SiteAnalyze::analyze() { publishmsg(analysis_motor, 2, turn_angle_pos); }
 
 void SiteAnalyze::fill(std::vector<int> sites)
 {
@@ -102,7 +100,7 @@ void SiteAnalyze::fill(std::vector<int> sites)
 void SiteAnalyze::gearshift(int /*site*/)
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
-    publishmsg (collection_servo_motor, {2}, turn_angle_pos) 
+    publishmsg(collection_servo_motor, 2, turn_angle_pos);
 }
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
@@ -153,21 +151,21 @@ void SiteAnalyze::scoop(int site)
     const static std::vector<int> g_sites = {1, 2, 3, 4};
     if (site == 1 || site == 2) {
         fill({site});
-        publishmsg(collection_servo_motor, {1}, pre_scoop_angle);
-        publishmsg(lead_screw_motor, {2}, turn_angle_neg);
-        publishmsg(collection_servo_motor, {1}, post_scoop_angle);
-        publishmsg(lead_screw_motor, {2}, turn_angle_pos);
-        publishmsg(collection_servo_motor, {1}, dump_angle);
-        publishmsg(collection_servo_motor, {1}, neutral_angle);
+        publishmsg(collection_servo_motor, 1, pre_scoop_angle);
+        publishmsg(lead_screw_motor, 2, turn_angle_neg);
+        publishmsg(collection_servo_motor, 1, post_scoop_angle);
+        publishmsg(lead_screw_motor, 2, turn_angle_pos);
+        publishmsg(collection_servo_motor, 1, dump_angle);
+        publishmsg(collection_servo_motor, 1, neutral_angle);
     }
     if (site == 3 || site == 4) {
         fill({site});
-        publishmsg(collection_servo_motor, {1}, pre_scoop_angle);
-        publishmsg(lead_screw_motor, {2}, turn_angle_neg);
-        publishmsg(collection_servo_motor, {1}, post_scoop_angle);
-        publishmsg(lead_screw_motor, {2}, turn_angle_pos);
-        publishmsg(collection_servo_motor, {1}, dump_angle);
-        publishmsg(collection_servo_motor, {1}, neutral_angle);
+        publishmsg(collection_servo_motor, 1, pre_scoop_angle);
+        publishmsg(lead_screw_motor, 2, turn_angle_neg);
+        publishmsg(collection_servo_motor, 1, post_scoop_angle);
+        publishmsg(lead_screw_motor, 2, turn_angle_pos);
+        publishmsg(collection_servo_motor, 1, dump_angle);
+        publishmsg(collection_servo_motor, 1, neutral_angle);
     }
 }
 

@@ -11,10 +11,10 @@ namespace cmr
  *
  * The SiteAnalyze class controls the collection and analyze tasks for astrotech.
  * It completes several tasks including analyzing, filling sites, gearshifting,
- * and scooping. The class listens for messages of MotorWriteBatch and uses 
+ * and scooping. The class listens for messages of MotorWriteBatch and uses
  * these messages to change aspects of the different motors being used, such as
- * the motor id, mode, and angles. 
- * 
+ * the motor id, mode, and angles.
+ *
 
  */
 class SiteAnalyze : public cmr::fabric::FabricNode
@@ -55,11 +55,7 @@ class SiteAnalyze : public cmr::fabric::FabricNode
     bool cleanup() override;
 
     void scoop(int site);
-    void publishmsg(
-        cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_motor_ids_type id,
-        cmr_msgs::msg::MotorWriteBatch_<std::allocator<void>>::_control_modes_type
-            mode,
-        int angle);
+    void publishmsg(int id, int mode, int angle);
 };
 
 }  // namespace cmr

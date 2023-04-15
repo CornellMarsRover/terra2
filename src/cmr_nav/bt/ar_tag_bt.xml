@@ -52,7 +52,7 @@
                     <Action ID="Print" message="Generating Pose"/>
                     <Action ID="PoseGenerator" has_arrived="true" initial_position="{goal}" goal="{goal}"/>
 
-                    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+                    <RecoveryNode number_of_retries="20" name="NavigateRecovery">
                         <PipelineSequence>
                             <RateController hz="1.0" name="RateControllerComputePathToPose">
                                 <RecoveryNode number_of_retries="1" name="RecoveryComputePathToPose">

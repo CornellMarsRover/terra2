@@ -18,26 +18,6 @@ cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle geometry_msgs rclcpp_action sensor
 
 # Add tests with:
 # cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test dependencies>)
-cmr_add_node(autonomy_control_node
-  SOURCES
-  src/autonomy_control_node.cpp
-  src/autonomy_control_node_main.cpp
-  DEPENDS
-  rclcpp
-  std_msgs
-  cmr_msgs
-  cmr_utils
-  cmr_fabric
-  rclcpp_lifecycle
-  geometry_msgs
-  rclcpp_action
-  sensor_msgs
-  nav2_common
-  nav2_core
-  nav2_util
-  nav2_msgs
-  nav2_waypoint_follower
-  nav2_lifecycle_manager)
 
 # cmr_add_node(bt_navigate
 # SOURCES
@@ -52,25 +32,6 @@ cmr_add_node(autonomy_control_node
 # rclcpp_lifecycle)
 
 # add_compile_options(--compile-no-warning-as-error)
-cmr_add_lib(ar_tag_navigate SHARED
-  SOURCES
-  src/ar_tag_navigate.cpp
-  DEPENDS
-  rclcpp
-  rclcpp_action
-  rclcpp_lifecycle
-  rclcpp_components
-  std_msgs
-  geometry_msgs
-  nav2_behavior_tree
-  nav_msgs
-  nav2_msgs
-  behaviortree_cpp_v3
-  nav2_util
-  nav2_core
-  pluginlib)
-
-pluginlib_export_plugin_description_file(nav2_core navigator_plugins.xml)
 
 cmr_add_lib(cmr_print_node SHARED
   SOURCES

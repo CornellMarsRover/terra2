@@ -1,3 +1,3 @@
-int32[] sensor_ids
-float32[] values
-int32 size
+uint8[] sensor_ids
+int32[] values
+uint8 size

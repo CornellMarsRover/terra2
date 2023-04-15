@@ -17,6 +17,10 @@ rosidl_generate_interfaces(
   msg/ArucoMarkers.msg
   msg/JoystickReading.msg
   msg/ArmJointEffort.msg
+  msg/Error.msg
+  msg/MotorWriteBatch.msg
+  msg/Power.msg
+  msg/SensorReadBatch.msg
   msg/Int16ArrayStamped.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv

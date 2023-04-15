@@ -11,6 +11,8 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 /**
+ * The class ArucoAction contains several methods, functions, and member
+ * variables that assist in the aruco tag detection. The class listens for messages
  * on /aruco_poses, then makes a list of the poses gathered from the messages and
  * loops through the poses and gets the position of the first pose in the vector
  * and adds it to a separate vector. After this, the rest of the poses are looped

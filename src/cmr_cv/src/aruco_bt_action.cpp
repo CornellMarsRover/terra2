@@ -42,7 +42,6 @@ BT::NodeStatus ArucoAction::tick()
     // posted to the ARTag output port and a SUCCESS is returned; if the vector
     // is empty and no AR tags were detected then FAILURE is returned
     if (!m_node_vector.empty()) {
-        // setOutput("ARTag", m_latest_position_average);
         return BT::NodeStatus::SUCCESS;
     } else {
         return BT::NodeStatus::FAILURE;
@@ -78,10 +77,7 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
         geometry_msgs::msg::Vector3Stamped out;
 
         tf2::doTransform(in, out, t);
-        std::string final_out =
-            std::to_string(out.vector.x) + ", " + std::to_string(out.vector.y);
-        RCLCPP_INFO(rclcpp::get_logger("Aruco Logger"), "Found Pose: %s",
-                    final_out.c_str());
+
         setOutput(output, out.vector);
 
     } catch (const tf2::TransformException& ex) {
@@ -93,34 +89,43 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
 
 void ArucoAction::topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 {
-    RCLCPP_INFO(rclcpp::get_logger("Aruco Logger"), "Callback called");
+    m_node_vector = {};
     for (const auto& pose : msg->poses) {
         m_node_vector.push_back(pose);
     }
     geometry_msgs::msg::Vector3 latest_position;
     std::vector<geometry_msgs::msg::Pose> poses_to_average;
+    // get position of first pose in vector, add it to a separate vector
+    latest_position.x = m_node_vector[0].position.x;
+    latest_position.y = m_node_vector[0].position.y;
+    latest_position.z = m_node_vector[0].position.z;
+    poses_to_average.push_back(m_node_vector[0]);
+    // loop through the rest of the poses and if the coordinates of a pose are
+    // similar to the coordinates of the first pose add it to the separate vector
+    for (unsigned int i = 1; i < m_node_vector.size(); i++) {
+        if (abs(m_node_vector[i].position.x - latest_position.x) < 1 &&
+            abs(m_node_vector[i].position.y - latest_position.y) < 1 &&
+            abs(m_node_vector[i].position.z - latest_position.z) < 1) {
+            poses_to_average.push_back(m_node_vector[i]);
+        }
+    }
     // average the coordinates of the poses in the m_position_to_post vector to
     // get the coordinate that the rover should circle around
-    // double sum_x = 0;
-    // double sum_y = 0;
-    // double sum_z = 0;
-    // for (auto& i : poses_to_average) {
-    //     sum_x += i.position.x;
-    //     sum_y += i.position.y;
-    //     sum_z += i.position.z;
-    // }
-    // auto size = static_cast<double>(poses_to_average.size());
-    // double x_position = sum_x / size;
-    // double y_position = sum_y / size;
-    // double z_position = sum_z / size;
-    // m_latest_position_average.x = x_position;
-    // m_latest_position_average.y = y_position;
-    // m_latest_position_average.z = z_position;
-
-    // FOR TESTING
-    m_latest_position_average.x = msg->poses[0].position.x;
-    m_latest_position_average.y = msg->poses[0].position.y;
-    m_latest_position_average.z = msg->poses[0].position.z;
+    double sum_x = 0;
+    double sum_y = 0;
+    double sum_z = 0;
+    for (auto& i : poses_to_average) {
+        sum_x += i.position.x;
+        sum_y += i.position.y;
+        sum_z += i.position.z;
+    }
+    auto size = static_cast<double>(poses_to_average.size());
+    double x_position = sum_x / size;
+    double y_position = sum_y / size;
+    double z_position = sum_z / size;
+    m_latest_position_average.x = x_position;
+    m_latest_position_average.y = y_position;
+    m_latest_position_average.z = z_position;
 
     transformhelper(msg);
 }

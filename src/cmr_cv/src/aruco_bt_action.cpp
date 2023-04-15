@@ -1,5 +1,6 @@
 #include "cmr_cv/aruco_bt_action.hpp"
 
+#include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include "behaviortree_cpp_v3/basic_types.h"
@@ -8,11 +9,11 @@
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "nav2_behavior_tree/behavior_tree_engine.hpp"
 
-#include "nav2_behavior_tree/behavior_tree_engine.hpp"
-
+const std::string ArucoAction::output = "ARTag";
 /** Template specialization to convert a string to Position2D. */
 namespace BT
 {
+
 template <>
 inline geometry_msgs::msg::Vector3 convertFromString<geometry_msgs::msg::Vector3>(
     BT::StringView str)
@@ -41,7 +42,6 @@ BT::NodeStatus ArucoAction::tick()
     // posted to the ARTag output port and a SUCCESS is returned; if the vector
     // is empty and no AR tags were detected then FAILURE is returned
     if (!m_node_vector.empty()) {
-        setOutput("ARTag", m_latest_position_average);
         return BT::NodeStatus::SUCCESS;
     } else {
         return BT::NodeStatus::FAILURE;
@@ -55,7 +55,7 @@ ArucoAction::ArucoAction(const std::string& name, const std::string&,
     // NOLINTNEXTLINE
     using namespace std::placeholders;
     m_ros_node = std::make_shared<rclcpp::Node>("aruco_listener_node");
-    m_ros_node->create_subscription<geometry_msgs::msg::PoseArray>(
+    m_sub = m_ros_node->create_subscription<geometry_msgs::msg::PoseArray>(
         "/aruco_poses", 10, std::bind(&ArucoAction::topic_callback, this, _1));
 
     m_tf_buffer = std::make_unique<tf2_ros::Buffer>(m_ros_node->get_clock());
@@ -78,7 +78,7 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
 
         tf2::doTransform(in, out, t);
 
-        setOutput("ARTag", out.vector);
+        setOutput(output, out.vector);
 
     } catch (const tf2::TransformException& ex) {
         RCLCPP_INFO(m_ros_node->get_logger(), "Could not transform %s to %s: %s",
@@ -89,11 +89,26 @@ void ArucoAction::transformhelper(const geometry_msgs::msg::PoseArray::SharedPtr
 
 void ArucoAction::topic_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 {
+    m_node_vector = {};
     for (const auto& pose : msg->poses) {
         m_node_vector.push_back(pose);
     }
     geometry_msgs::msg::Vector3 latest_position;
     std::vector<geometry_msgs::msg::Pose> poses_to_average;
+    // get position of first pose in vector, add it to a separate vector
+    latest_position.x = m_node_vector[0].position.x;
+    latest_position.y = m_node_vector[0].position.y;
+    latest_position.z = m_node_vector[0].position.z;
+    poses_to_average.push_back(m_node_vector[0]);
+    // loop through the rest of the poses and if the coordinates of a pose are
+    // similar to the coordinates of the first pose add it to the separate vector
+    for (unsigned int i = 1; i < m_node_vector.size(); i++) {
+        if (abs(m_node_vector[i].position.x - latest_position.x) < 1 &&
+            abs(m_node_vector[i].position.y - latest_position.y) < 1 &&
+            abs(m_node_vector[i].position.z - latest_position.z) < 1) {
+            poses_to_average.push_back(m_node_vector[i]);
+        }
+    }
     // average the coordinates of the poses in the m_position_to_post vector to
     // get the coordinate that the rover should circle around
     double sum_x = 0;
@@ -123,9 +138,4 @@ BT_REGISTER_NODES(factory)
     };
 
     factory.registerBuilder<ArucoAction>("Aruco", builder);
-}
-
-static BT::PortsList provided_ports()
-{
-    return {BT::OutputPort<geometry_msgs::msg::Vector3>("ARTag")};
 }

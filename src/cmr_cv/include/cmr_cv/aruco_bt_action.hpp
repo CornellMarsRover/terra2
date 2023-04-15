@@ -8,17 +8,18 @@
 #include <geometry_msgs/msg/detail/vector3__struct.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <rclcpp/node.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 /**
- * The class ArucoAction contains several methods, functions, and member 
- * variables that assist in the aruco tag detection. The class listens for messages 
- * on /aruco_poses, then makes a list of the poses gathered from the messages and 
- * loops through the poses and gets the position of the first pose in the vector 
- * and adds it to a separate vector. After this, the rest of the poses are looped 
- * through and if their respective coordinates are within 1 of the coordinates of 
- * the first pose, it is added to that vector. The coordinates of the poses in 
+ * The class ArucoAction contains several methods, functions, and member
+ * variables that assist in the aruco tag detection. The class listens for messages
+ * on /aruco_poses, then makes a list of the poses gathered from the messages and
+ * loops through the poses and gets the position of the first pose in the vector
+ * and adds it to a separate vector. After this, the rest of the poses are looped
+ * through and if their respective coordinates are within 1 of the coordinates of
+ * the first pose, it is added to that vector. The coordinates of the poses in
  * the m_position_to_post vector are then averaged to get the coordinate that the
- * rover should circle around. This coordinate is then transformed to the "map" 
+ * rover should circle around. This coordinate is then transformed to the "map"
  * reference frame and the Vector3Stamped position is placed in the blackboaard
  * port ARTag.
  */
@@ -29,21 +30,24 @@ class ArucoAction : public BT::SyncActionNode
                 const BT::NodeConfiguration& conf);
 
     /**
-     * Tick method that spins the node and returns success if there are any AR tags
-     * in the vector (meaning one was detected) and failure if there wasn't one
      * detected; posts the latest position to the blackboard that is the average of
      * the similarly located tags in the vector
      */
     BT::NodeStatus tick() override;
 
-    static BT::PortsList provided_ports();
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static BT::PortsList providedPorts()
+    {
+        return {BT::OutputPort<geometry_msgs::msg::Vector3>(
+            output, "The location of the ARTag")};
+    }
 
   private:
     std::shared_ptr<rclcpp::Node> m_ros_node;
 
     /**
-     * The callback function loops through the Aruco poses to add each pose to 
-     * the vector of AR tags. It then averages the coordinates of the closest 
+     * The callback function loops through the Aruco poses to add each pose to
+     * the vector of AR tags. It then averages the coordinates of the closest
      * tags to get the position that the rover should circle around. It then
      * calls the transform helper function to transform the calculated coordinates
      * into the correct reference frame.
@@ -68,4 +72,6 @@ class ArucoAction : public BT::SyncActionNode
     std::shared_ptr<tf2_ros::TransformListener> m_tf_listener;
 
     std::unique_ptr<tf2_ros::Buffer> m_tf_buffer;
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr m_sub;
+    static std::string const output;
 };

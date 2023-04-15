@@ -1,6 +1,6 @@
 # cmr_cv
 
-@brief This package contains code related to computer vision tasks for the rover.
+This package contains code related to computer vision tasks for the rover.
 
 The Aruco Action node assists with the Autonomous Navigaton mission that the
 rover competes in during competition. The system overall detects AR tags in the

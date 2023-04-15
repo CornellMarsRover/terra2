@@ -16,7 +16,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             # "ign_args": "-r /cmr/terra/src/cmr_test/config/visualize_lidar.sdf"
-            "ign_args": "-r diff_drive_skid.sdf"
+            "ign_args": "-r /cmr/terra/src/cmr_description/cmr_drives_description/urdf/drives.urdf"
         }.items(),
     )
     return LaunchDescription(

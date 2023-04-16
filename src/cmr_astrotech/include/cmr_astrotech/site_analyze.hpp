@@ -39,6 +39,10 @@ class SiteAnalyze : public cmr::fabric::FabricNode
         const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
         std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response);
 
+    void collection_handle_request(
+        const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
+        std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response);
+
     void fill(std::vector<int> sites);
 
     void gearshift(int site);

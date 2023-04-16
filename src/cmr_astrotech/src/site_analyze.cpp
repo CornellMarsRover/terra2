@@ -12,6 +12,8 @@ constexpr int turn_angle_neg = -100;
 constexpr int collection_servo_motor = {0xDF};
 constexpr int analysis_motor = {0xDE};
 constexpr int lead_screw_motor = {0xD4};
+using namespace std::chrono_literals;
+constexpr auto action_delay = 3s;
 
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
@@ -60,6 +62,17 @@ void SiteAnalyze::handle_request(
             break;
     }
 }
+
+void SiteAnalyze::collection_handle_request(
+    const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
+    std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
+{
+    response->success = true;
+    switch (request->site_num) {
+        collection();
+    }
+}
+
 void SiteAnalyze::collection()
 {
     for (int i = 0; i < 4; i++) {
@@ -77,8 +90,6 @@ void SiteAnalyze::publishmsg(
     msg.control_modes = {mode};
     msg.values = {angle};
     m_motor_state_publisher->publish(msg);
-    using namespace std::chrono_literals;
-    constexpr auto action_delay = 3s;
     std::this_thread::sleep_for(action_delay);
 }
 
@@ -95,6 +106,7 @@ void SiteAnalyze::fill(std::vector<int> sites)
         msg.values.push_back(20);
     }
     m_motor_state_publisher->publish(msg);
+    std::this_thread::sleep_for(action_delay);
 }
 
 void SiteAnalyze::gearshift(int /*site*/)

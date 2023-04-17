@@ -1,7 +1,5 @@
 #include "cmr_astrotech/site_analyze.hpp"
 
-#include "std_msgs/msg/bool.hpp"
-
 namespace cmr
 {
 // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES
@@ -66,13 +64,11 @@ void SiteAnalyze::handle_request(
 }
 
 void SiteAnalyze::collection_handle_request(
-    const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
-    std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
+    const std::shared_ptr<std_srvs::srv::Trigger::Request>,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
 {
     response->success = true;
-    switch (request->site_num) {
-        collection();
-    }
+    collection();
 }
 
 void SiteAnalyze::collection()
@@ -119,17 +115,19 @@ void SiteAnalyze::gearshift(int /*site*/)
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
 {
+    using namespace std::placeholders;
     // read node config; setup subscriptions, clients, services, etc.; and
     // most of the node setup logic here
 
     // Ex. const auto node_settings = table->getTable("node");
     m_service = create_lifecycle_service<cmr_msgs::srv::SiteAnalyze>(
-        "site_analyze", &SiteAnalyze::handle_request);
+        "site_analyze", std::bind(&SiteAnalyze::handle_request, this, _1, _2));
     m_motor_state_publisher =
         create_lifecycle_publisher<cmr_msgs::msg::MotorWriteBatch>(
             "/motor", rclcpp::SystemDefaultsQoS());
-    m_collection_service = create_lifecycle_service<std_msgs::msg::Bool>(
-        "site_analyze", &SiteAnalyze::collection_handle_request);
+    m_collection_service = create_lifecycle_service<std_srvs::srv::Trigger>(
+        "site_analyze",
+        std::bind(&SiteAnalyze::collection_handle_request, this, _1, _2));
     return true;
 }
 

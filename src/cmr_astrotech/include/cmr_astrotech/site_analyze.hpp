@@ -1,9 +1,9 @@
 #pragma once
-#include <std_msgs/msg/detail/bool__struct.hpp>
 
 #include "cmr_fabric/fabric_node.hpp"
 #include "cmr_msgs/msg/motor_write_batch.hpp"
 #include "cmr_msgs/srv/site_analyze.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 namespace cmr
 {
@@ -36,15 +36,15 @@ class SiteAnalyze : public cmr::fabric::FabricNode
     rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::MotorWriteBatch>::SharedPtr
         m_motor_state_publisher;
     fabric::LifecycleService<cmr_msgs::srv::SiteAnalyze>::ptr_t m_service;
-    fabric::LifecycleService<std_msgs::msg::Bool>::ptr_t m_collection_service;
+    fabric::LifecycleService<std_srvs::srv::Trigger>::ptr_t m_collection_service;
 
     void handle_request(
         const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
         std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response);
 
     void collection_handle_request(
-        const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
-        std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response);
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
     void fill(std::vector<int> sites);
 

@@ -1,4 +1,6 @@
 #pragma once
+#include <std_msgs/msg/detail/bool__struct.hpp>
+
 #include "cmr_fabric/fabric_node.hpp"
 #include "cmr_msgs/msg/motor_write_batch.hpp"
 #include "cmr_msgs/srv/site_analyze.hpp"
@@ -34,6 +36,7 @@ class SiteAnalyze : public cmr::fabric::FabricNode
     rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::MotorWriteBatch>::SharedPtr
         m_motor_state_publisher;
     fabric::LifecycleService<cmr_msgs::srv::SiteAnalyze>::ptr_t m_service;
+    fabric::LifecycleService<std_msgs::msg::Bool>::ptr_t m_collection_service;
 
     void handle_request(
         const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,

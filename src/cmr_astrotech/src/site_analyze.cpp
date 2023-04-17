@@ -1,5 +1,7 @@
 #include "cmr_astrotech/site_analyze.hpp"
 
+#include "std_msgs/msg/bool.hpp"
+
 namespace cmr
 {
 // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES
@@ -126,6 +128,8 @@ bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
     m_motor_state_publisher =
         create_lifecycle_publisher<cmr_msgs::msg::MotorWriteBatch>(
             "/motor", rclcpp::SystemDefaultsQoS());
+    m_collection_service = create_lifecycle_service<std_msgs::msg::Bool>(
+        "site_analyze", &SiteAnalyze::collection_handle_request);
     return true;
 }
 
@@ -135,6 +139,7 @@ bool SiteAnalyze::activate()
     // it should be quick
     m_service->activate();
     m_motor_state_publisher->on_activate();
+    m_collection_service->activate();
 
     return true;
 }
@@ -144,6 +149,7 @@ bool SiteAnalyze::deactivate()
     // undo the effects of activate here
     m_service->deactivate();
     m_motor_state_publisher->on_deactivate();
+    m_collection_service->deactivate();
 
     return true;
 }

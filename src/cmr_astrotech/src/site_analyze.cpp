@@ -3,15 +3,17 @@
 namespace cmr
 {
 // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES
+// Angle and motor constants for analysis and collection
 constexpr int pre_scoop_angle = 90;
 constexpr int post_scoop_angle = 90;
 constexpr int dump_angle = 90;
 constexpr int neutral_angle = 90;
 constexpr int turn_angle_pos = 100;
 constexpr int turn_angle_neg = -100;
-constexpr int collection_servo_motor = {0xDF};
-constexpr int analysis_motor = {0xDE};
-constexpr int lead_screw_motor = {0xD4};
+constexpr int collection_servo_motor_right = {0xE5};
+constexpr int collection_servo_motor_left = {0xE6};
+constexpr int analysis_motor = {0xDB};
+constexpr int lead_screw_motor = {0xD2};
 using namespace std::chrono_literals;
 constexpr auto action_delay = 3s;
 
@@ -75,7 +77,7 @@ void SiteAnalyze::collection()
 {
     for (int i = 0; i < 4; i++) {
         scoop(i);
-        gearshift(i);
+        gearshift();
     }
 }
 
@@ -107,10 +109,10 @@ void SiteAnalyze::fill(std::vector<int> sites)
     std::this_thread::sleep_for(action_delay);
 }
 
-void SiteAnalyze::gearshift(int /*site*/)
+void SiteAnalyze::gearshift()
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
-    publishmsg(collection_servo_motor, 2, turn_angle_pos);
+    publishmsg(collection_servo_motor_right, 2, turn_angle_pos);
 }
 
 bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
@@ -167,21 +169,21 @@ void SiteAnalyze::scoop(int site)
     const static std::vector<int> g_sites = {1, 2, 3, 4};
     if (site == 1 || site == 2) {
         fill({site});
-        publishmsg(collection_servo_motor, 1, pre_scoop_angle);
+        publishmsg(collection_servo_motor_right, 1, pre_scoop_angle);
         publishmsg(lead_screw_motor, 2, turn_angle_neg);
-        publishmsg(collection_servo_motor, 1, post_scoop_angle);
+        publishmsg(collection_servo_motor_right, 1, post_scoop_angle);
         publishmsg(lead_screw_motor, 2, turn_angle_pos);
-        publishmsg(collection_servo_motor, 1, dump_angle);
-        publishmsg(collection_servo_motor, 1, neutral_angle);
+        publishmsg(collection_servo_motor_right, 1, dump_angle);
+        publishmsg(collection_servo_motor_right, 1, neutral_angle);
     }
     if (site == 3 || site == 4) {
         fill({site});
-        publishmsg(collection_servo_motor, 1, pre_scoop_angle);
+        publishmsg(collection_servo_motor_left, 1, pre_scoop_angle);
         publishmsg(lead_screw_motor, 2, turn_angle_neg);
-        publishmsg(collection_servo_motor, 1, post_scoop_angle);
+        publishmsg(collection_servo_motor_left, 1, post_scoop_angle);
         publishmsg(lead_screw_motor, 2, turn_angle_pos);
-        publishmsg(collection_servo_motor, 1, dump_angle);
-        publishmsg(collection_servo_motor, 1, neutral_angle);
+        publishmsg(collection_servo_motor_left, 1, dump_angle);
+        publishmsg(collection_servo_motor_left, 1, neutral_angle);
     }
 }
 

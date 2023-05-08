@@ -112,6 +112,8 @@ class SiteAnalyze : public cmr::fabric::FabricNode
      */
 
     void publishmsg(int id, int mode, int angle);
+
+    const std::vector<bool> m_action_delay_bool = {false, false, false, false};
 };
 
 }  // namespace cmr

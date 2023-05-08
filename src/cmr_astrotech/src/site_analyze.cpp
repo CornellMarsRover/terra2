@@ -15,7 +15,6 @@ constexpr int collection_servo_motor_left = {0xE6};
 constexpr int analysis_motor = {0xDB};
 constexpr int lead_screw_motor = {0xD2};
 using namespace std::chrono_literals;
-constexpr auto action_delay = 3s;
 
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
@@ -90,20 +89,29 @@ void SiteAnalyze::publishmsg(
     msg.control_modes = {mode};
     msg.values = {angle};
     m_motor_state_publisher->publish(msg);
-    std::this_thread::sleep_for(action_delay);
+    std::this_thread::sleep_for(3s);
 }
 
 void SiteAnalyze::analyze() { publishmsg(analysis_motor, 2, turn_angle_pos); }
 
 void SiteAnalyze::fill(std::vector<int> sites)
 {
+    std::chrono::milliseconds action_delay = 0ms;
+
     cmr_msgs::msg::MotorWriteBatch msg{};
     msg.size = static_cast<int32_t>(sites.size());
 
     for (int i : sites) {
+        if (!m_action_delay_bool[static_cast<unsigned int>(i)]) {
+            action_delay = 9005ms;
+        } else {
+            action_delay = 2005ms;
+        }
+
         msg.motor_ids.push_back(i + 217);
         msg.control_modes.push_back(2);
         msg.values.push_back(20);
+        m_action_delay_bool[static_cast<unsigned int>(i)];
     }
     m_motor_state_publisher->publish(msg);
     std::this_thread::sleep_for(action_delay);

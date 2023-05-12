@@ -127,7 +127,7 @@ void Joystick::arm_callback(std::array<AxisState, 3>& axis_state) const
                 /* Ignore init events. */
                 break;
             default:
-                CMR_ASSERT_MSG(false, "Unknown event type: %d", event->type);
+                CMR_LOG(WARN, "Unknown event type: %d", event->type);
                 break;
         }
     }

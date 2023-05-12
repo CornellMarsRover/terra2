@@ -1,7 +1,11 @@
 #include "cmr_control/drives_system.hpp"
 
+#include "cmr_control/external/boards.h"
 #include "cmr_utils/cmr_debug.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+
+const std::array<uint8_t, 6> motor_ids = {BLDC_D1, BLDC_D2, BLDC_D3,
+                                          BLDC_D4, BLDC_D5, BLDC_D6};
 
 namespace cmr_control
 {
@@ -23,6 +27,25 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_init(
                            std::numeric_limits<double>::quiet_NaN());
     m_hw_positions.resize(info_.joints.size(),
                           std::numeric_limits<double>::quiet_NaN());
+    m_hw_buffer.resize(info_.joints.size() * 2,
+                       std::numeric_limits<int>::quiet_NaN());
+
+    // Since hardware interfaces are not nodes, we need to create a node to do
+    // our communication with the CCB for us.
+    m_comm_node = rclcpp::Node::make_shared("drives_system_communicator");
+
+    // SensorDataQoS tells ROS that we don't care about resending the message
+    // if it was not acknowledged. This will prevent the system from getting
+    // severely backed up by motor messages.
+    m_motor_write_pub =
+        m_comm_node->create_publisher<cmr_msgs::msg::MotorWriteBatch>(
+            "/ccb/motors", rclcpp::SensorDataQoS());
+
+    m_motor_read_sub =
+        m_comm_node->create_subscription<cmr_msgs::msg::SensorReadBatch>(
+            "/ccb/sensors", rclcpp::SensorDataQoS(),
+            std::bind(&DrivesSystemHardware::sensor_callback, this,
+                      std::placeholders::_1));
 
     return validate_interfaces() ? hardware_interface::CallbackReturn::SUCCESS
                                  : hardware_interface::CallbackReturn::ERROR;
@@ -63,6 +86,10 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_activate(
     std::fill(m_hw_commands.begin(), m_hw_commands.end(), 0.0);
     std::fill(m_hw_velocities.begin(), m_hw_velocities.end(), 0.0);
     std::fill(m_hw_positions.begin(), m_hw_positions.end(), 0.0);
+
+    // set velocity mode for all motors
+    set_velocity_mode();
+
     return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -73,16 +100,44 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_deactivate(
 }
 
 hardware_interface::return_type DrivesSystemHardware::read(
-    const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)
+    const rclcpp::Time& /*time*/, const rclcpp::Duration& period)
 {
-    // TODO(fad35): hook this up once firmware message schema is decided
+    rclcpp::spin_some(m_comm_node);
+    for (size_t i = 0; i < m_hw_buffer.size(); i++) {
+        m_hw_velocities[i] = m_hw_buffer[i];
+
+        // if period is not close to zero, accumulate position with instantaneous vel
+        if (period.seconds() > std::numeric_limits<double>::epsilon()) {
+            m_hw_positions[i] += m_hw_buffer[i] * period.seconds();
+        } else {
+            CMR_LOG(
+                WARN,
+                "got period value of 0; velocity data is momentarily unreliable");
+        }
+    }
+
     return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type DrivesSystemHardware::write(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)
 {
-    // TODO(fad35): hook this up once firmware message schema is decided
+    cmr_msgs::msg::MotorWriteBatch msg;
+
+    auto n = m_hw_commands.size();
+    msg.size = static_cast<uint8_t>(n);
+
+    for (size_t i = 0; i < n; i++) {
+        msg.motor_ids.push_back(motor_ids.at(i));
+        // control mode of 0 indicates we're going to write a velocity value
+        msg.control_modes.push_back(0);
+        // the CCB expects integer values here, but the CommandInterface only
+        // allows doubles. to rectify, we simply round.
+        msg.values.push_back(static_cast<int>(round(m_hw_commands[i])));
+    }
+
+    m_motor_write_pub->publish(msg);
+
     return hardware_interface::return_type::OK;
 }
 
@@ -131,6 +186,43 @@ bool DrivesSystemHardware::validate_interfaces() const
         }
     }
     return true;
+}
+
+void DrivesSystemHardware::sensor_callback(const cmr_msgs::msg::SensorReadBatch& msg)
+{
+    // the ROS2 Control framework will decide when it's time to read from
+    // this system's sensors. this callback stores incoming drives encoder
+    // data in a buffer, and the read function will then set these as the
+    // state values once invoked by the framework.
+    auto n = m_hw_velocities.size();
+    for (size_t i = 0; i < std::min(n, static_cast<size_t>(msg.size)); i++) {
+        int expected_sensor_id = static_cast<int>(BLDC_D1 + i);
+        if (msg.sensor_ids[i] != expected_sensor_id) {
+            CMR_LOG(ERROR,
+                    "got sensor ID %d in position %zu; expected %d. Skipping...",
+                    msg.sensor_ids[i], i, expected_sensor_id);
+            continue;
+        }
+
+        // the CCB gives us integer values here, but the CommandInterface only
+        // allows doubles. to rectify, we simply round.
+        m_hw_buffer[i] = static_cast<int>(round(msg.values[i]));
+    }
+}
+
+void DrivesSystemHardware::set_velocity_mode() const
+{
+    cmr_msgs::msg::MotorWriteBatch msg;
+    for (const uint8_t id : motor_ids) {
+        msg.motor_ids.push_back(id);
+        // control mode of 3 indicates we want to set an ODrive setting
+        msg.control_modes.push_back(3);
+        // value not equal to 1 indicates we want to use velocity mode
+        msg.values.push_back(2);
+    }
+
+    msg.size = static_cast<uint8_t>(msg.motor_ids.size());
+    m_motor_write_pub->publish(msg);
 }
 
 }  // namespace cmr_control

@@ -4,7 +4,7 @@
         <ros2_control name="${name}" type="system">
             <hardware>
                 <xacro:if value="${mock}">
-                    <plugin>cmr_control/MockArmSystemHardware</plugin>
+                    <plugin>mock_components/GenericSystem</plugin>
                 </xacro:if>
                 <xacro:unless value="${mock}">
                     <plugin>cmr_control/ArmSystemHardware</plugin>

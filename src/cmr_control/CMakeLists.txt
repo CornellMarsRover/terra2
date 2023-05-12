@@ -26,12 +26,9 @@ cmr_add_lib(
   NO_INSTALL
   SOURCES
   src/drives_system.cpp
-  src/base_arm_system.cpp
   src/arm_system.cpp
-  src/mock_arm_system.cpp
   src/astro_sensor_broadcaster.cpp
   src/astro_sensor.cpp
-  src/astro_motor.cpp
   DEPENDS
   hardware_interface
   pluginlib

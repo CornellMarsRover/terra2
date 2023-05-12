@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def generate_launch_description(rviz = True):
+def generate_launch_description(rviz = True, mock = True):
     robot_description_content = Command(
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
@@ -17,6 +17,7 @@ def generate_launch_description(rviz = True):
                     FindPackageShare("cmr_arm_description"),
                     "urdf",
                     "arm.urdf.xacro",
+                    "mock:=" + mock.__str__().lower()
                 ]
             ),
         ]

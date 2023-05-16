@@ -43,11 +43,11 @@
 // LEFT SIDE
 #define BLDC_D1 DRIVES | BLDC | 0x0
 #define BLDC_D2 DRIVES | BLDC | 0x1
-#define BLDC_D3 DRIVES | BLDC | 0x2
+#define BLDC_D3 DRIVES | BLDC | 0x5
 // RIGHT SIDE
-#define BLDC_D4 DRIVES | BLDC | 0x3
-#define BLDC_D5 DRIVES | BLDC | 0x4
-#define BLDC_D6 DRIVES | BLDC | 0x5
+#define BLDC_D4 DRIVES | BLDC | 0x2
+#define BLDC_D5 DRIVES | BLDC | 0x3
+#define BLDC_D6 DRIVES | BLDC | 0x4
 
 #define BDC_D1 DRIVES | BDC | 0x0
 
@@ -58,12 +58,12 @@
 
 /*--------------ARM BOARD ID----------------*/
 
-#define BLDC_AR1 ARM | BLDC | 0x6
-#define BLDC_AR2 ARM | BLDC | 0x7
-#define BLDC_AR3 ARM | BLDC | 0x8
-#define BLDC_AR4 ARM | BLDC | 0x9
-#define BLDC_AR5 ARM | BLDC | 0xA
-#define BLDC_AR6 ARM | BLDC | 0xB
+#define BLDC_AR1 0x46
+#define BLDC_AR2 0x47
+#define BLDC_AR3 0x49
+#define BLDC_AR4 0x48
+#define BLDC_AR5 0x46
+#define BLDC_AR6 0x49
 
 #define BDC_EXT ARM | BDC | 0x1
 #define BDC_ENDO ARM | BDC | 0x2

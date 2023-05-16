@@ -11,7 +11,7 @@ namespace cmr_control
 
 /**
  * @brief ArmSystemHardware is a hardware interface for the arm that provides
- * effort and position control to each of the arm's joints. It also reads the
+ * velocity and position control to each of the arm's joints. It also reads the
  * current position of each arm joint from the encoders.
  */
 class ArmSystemHardware : public hardware_interface::SystemInterface
@@ -49,8 +49,8 @@ class ArmSystemHardware : public hardware_interface::SystemInterface
     std::vector<std::string> m_hw_control_modes;
     // outgoing positions of each joint
     std::vector<double> m_hw_position_commands;
-    // outgoing efforts of each joint
-    std::vector<double> m_hw_effort_commands;
+    // outgoing velocity of each joint
+    std::vector<double> m_hw_velocity_commands;
     // incoming measured velocities of each joint
     std::vector<double> m_hw_velocities;
     // incoming measured velocities of each joint
@@ -88,12 +88,28 @@ class ArmSystemHardware : public hardware_interface::SystemInterface
      * control mode of all joints to "undefined".
      *
      * This is called when the hardware interface is told to switch control modes
-     * between position and effort control. If any of the joints are not in the
+     * between position and velocity control. If any of the joints are not in the
      * "undefined" mode, this indicates that another hardware resource is using
      * this particular joint and therefore it is not safe to switch control mode
      * at this time.
      */
     void halt_all_motion();
+
+    /**
+     * @brief Set all joints to velocity mode.
+     *
+     * Warning: this function does not provide any confirmation for whether the
+     * mode was set; it is possible that the joint misses this message.
+     */
+    void set_velocity_mode() const;
+
+    /**
+     * @brief Set all joints to position mode.
+     *
+     * Warning: this function does not provide any confirmation for whether the
+     * mode was set; it is possible that the joint misses this message.
+     */
+    void set_position_mode() const;
 };
 
 }  // namespace cmr_control

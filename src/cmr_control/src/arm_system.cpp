@@ -5,6 +5,9 @@
 #include "cmr_control/external/boards.h"
 #include "std_msgs/msg/string.hpp"
 
+const std::array<uint8_t, 6> motor_ids = {BLDC_AR1, BLDC_AR2, BLDC_AR3,
+                                          BLDC_AR6, BLDC_AR5, BLDC_AR6};
+
 namespace cmr_control
 {
 
@@ -21,17 +24,18 @@ hardware_interface::CallbackReturn ArmSystemHardware::on_init(
     // We use NaN to indicate that data has not yet been set.
     m_hw_position_commands.resize(info_.joints.size(),
                                   std::numeric_limits<double>::quiet_NaN());
-    m_hw_effort_commands.resize(info_.joints.size(),
-                                std::numeric_limits<double>::quiet_NaN());
+    m_hw_velocity_commands.resize(info_.joints.size(),
+                                  std::numeric_limits<double>::quiet_NaN());
     m_hw_velocities.resize(info_.joints.size(),
                            std::numeric_limits<double>::quiet_NaN());
     m_hw_positions.resize(info_.joints.size(),
                           std::numeric_limits<double>::quiet_NaN());
     m_hw_buffer.resize(info.joints.size(), std::numeric_limits<int>::quiet_NaN());
 
-    // Effort control is set as a sensible default, and will be changed if needed by
-    // the controller.
-    m_hw_control_modes.resize(info_.joints.size(), hardware_interface::HW_IF_EFFORT);
+    // Velocity control is set as a sensible default, and will be changed if needed
+    // by the controller.
+    m_hw_control_modes.resize(info_.joints.size(),
+                              hardware_interface::HW_IF_VELOCITY);
 
     m_comm_node = rclcpp::Node::make_shared("arm_system_communicator");
     m_motor_write_pub =
@@ -71,8 +75,8 @@ ArmSystemHardware::export_command_interfaces()
             info_.joints[i].name, hardware_interface::HW_IF_POSITION,
             &m_hw_position_commands[i]));
         command_interfaces.emplace_back(hardware_interface::CommandInterface(
-            info_.joints[i].name, hardware_interface::HW_IF_EFFORT,
-            &m_hw_effort_commands[i]));
+            info_.joints[i].name, hardware_interface::HW_IF_VELOCITY,
+            &m_hw_velocity_commands[i]));
     }
 
     return command_interfaces;
@@ -83,7 +87,7 @@ hardware_interface::CallbackReturn ArmSystemHardware::on_activate(
 {
     // set initial values
     std::fill(m_hw_position_commands.begin(), m_hw_position_commands.end(), 0.0);
-    std::fill(m_hw_effort_commands.begin(), m_hw_effort_commands.end(), 0.0);
+    std::fill(m_hw_velocity_commands.begin(), m_hw_velocity_commands.end(), 0.0);
     std::fill(m_hw_velocities.begin(), m_hw_velocities.end(), 0.0);
     std::fill(m_hw_positions.begin(), m_hw_positions.end(), 0.0);
     return hardware_interface::CallbackReturn::SUCCESS;
@@ -112,8 +116,8 @@ hardware_interface::return_type ArmSystemHardware::prepare_command_mode_switch(
         if (interface == joint.name + "/" + hardware_interface::HW_IF_POSITION) {
             new_modes.emplace_back(hardware_interface::HW_IF_POSITION);
         } else if (interface ==
-                   joint.name + "/" + hardware_interface::HW_IF_EFFORT) {
-            new_modes.emplace_back(hardware_interface::HW_IF_EFFORT);
+                   joint.name + "/" + hardware_interface::HW_IF_VELOCITY) {
+            new_modes.emplace_back(hardware_interface::HW_IF_VELOCITY);
         } else {
             CMR_LOG(ERROR, "Unsupported interface '%s' requested.",
                     interface.c_str());
@@ -182,11 +186,11 @@ hardware_interface::return_type ArmSystemHardware::write(
     msg.values.resize(msg.motor_ids.size());
     for (auto i = 0u; i < info_.joints.size(); i++) {
         if (m_hw_control_modes[i] == hardware_interface::HW_IF_POSITION) {
-            msg.control_modes[i] = 0x0;
+            msg.control_modes[i] = 0;
             msg.values[i] = static_cast<int>(round(m_hw_position_commands[i]));
-        } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_EFFORT) {
-            msg.control_modes[i] = 0x0;  // TODO(fad35): what goes here
-            msg.values[i] = static_cast<int>(round(m_hw_effort_commands[i]));
+        } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_VELOCITY) {
+            msg.control_modes[i] = 0;
+            msg.values[i] = static_cast<int>(round(m_hw_velocity_commands[i]));
         }
     }
 
@@ -225,7 +229,7 @@ bool ArmSystemHardware::validate_interfaces() const
 {
     // Enforce requirements on the system's state and command interfaces.
     // We expect each joint to have one position command interface, one
-    // effort command interface, one position state interface, and one velocity
+    // velocity command interface, one position state interface, and one velocity
     // state interface.
     for (const hardware_interface::ComponentInfo& joint : info_.joints) {
         if (joint.command_interfaces.size() != 2) {
@@ -243,10 +247,10 @@ bool ArmSystemHardware::validate_interfaces() const
             return false;
         }
 
-        if (joint.command_interfaces[1].name != hardware_interface::HW_IF_EFFORT) {
+        if (joint.command_interfaces[1].name != hardware_interface::HW_IF_VELOCITY) {
             CMR_LOG(
                 FATAL,
-                "Joint '%s' has %s interface, but effort interface was expected.",
+                "Joint '%s' has %s interface, but velocity interface was expected.",
                 joint.name.c_str(), joint.command_interfaces[1].name.c_str());
             return false;
         }
@@ -290,11 +294,41 @@ void ArmSystemHardware::halt_all_motion()
     for (auto i = 0u; i < info_.joints.size(); i++) {
         if (m_hw_control_modes[i] == hardware_interface::HW_IF_POSITION) {
             m_hw_position_commands[i] = m_hw_positions[i];
-        } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_EFFORT) {
-            m_hw_effort_commands[i] = 0.0;
+        } else if (m_hw_control_modes[i] == hardware_interface::HW_IF_VELOCITY) {
+            m_hw_velocity_commands[i] = 0.0;
         }
         m_hw_control_modes[i] = "undefined";
     }
+}
+
+void ArmSystemHardware::set_velocity_mode() const
+{
+    cmr_msgs::msg::MotorWriteBatch msg;
+    for (const uint8_t id : motor_ids) {
+        msg.motor_ids.push_back(id);
+        // control mode of 3 indicates we want to set an ODrive setting
+        msg.control_modes.push_back(3);
+        // value 2 indicates we want to use velocity mode
+        msg.values.push_back(2);
+    }
+
+    msg.size = static_cast<uint8_t>(msg.motor_ids.size());
+    m_motor_write_pub->publish(msg);
+}
+
+void ArmSystemHardware::set_position_mode() const
+{
+    cmr_msgs::msg::MotorWriteBatch msg;
+    for (const uint8_t id : motor_ids) {
+        msg.motor_ids.push_back(id);
+        // control mode of 3 indicates we want to set an ODrive setting
+        msg.control_modes.push_back(3);
+        // value 3 indicates we want to use position mode
+        msg.values.push_back(3);
+    }
+
+    msg.size = static_cast<uint8_t>(msg.motor_ids.size());
+    m_motor_write_pub->publish(msg);
 }
 
 }  // namespace cmr_control

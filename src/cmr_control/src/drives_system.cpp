@@ -217,7 +217,7 @@ void DrivesSystemHardware::set_velocity_mode() const
         msg.motor_ids.push_back(id);
         // control mode of 3 indicates we want to set an ODrive setting
         msg.control_modes.push_back(3);
-        // value not equal to 1 indicates we want to use velocity mode
+        // value 2 indicates we want to use velocity mode
         msg.values.push_back(2);
     }
 

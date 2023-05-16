@@ -152,12 +152,18 @@ hardware_interface::return_type ArmSystemHardware::read(
 {
     rclcpp::spin_some(m_comm_node);
 
-    std::stringstream result;
-    std::copy(m_hw_buffer.begin(), m_hw_buffer.end(),
-              std::ostream_iterator<int>(result, " "));
-    CMR_LOG(INFO, "Got buffer %s", result.str().c_str());
+    // std::stringstream result;
+    // std::copy(m_hw_buffer.begin(), m_hw_buffer.end(),
+    //           std::ostream_iterator<int>(result, " "));
+    // CMR_LOG(INFO, "Got buffer %s", result.str().c_str());
 
     for (size_t i = 0; i < m_hw_buffer.size(); i++) {
+        // The following block is for testing the joystick with RVIZ.
+        // auto vel = m_hw_velocity_commands[i];
+        // auto pos = vel * period.seconds();
+        // m_hw_positions[i] += pos;
+        // m_hw_velocities[i] = vel;
+
         auto prev_pos = m_hw_positions[i];
         m_hw_positions[i] = m_hw_buffer[i];
         // CMR_LOG(INFO, "set position of %f at joint %zu", m_hw_positions[i], i);
@@ -165,7 +171,8 @@ hardware_interface::return_type ArmSystemHardware::read(
         if (period.seconds() > std::numeric_limits<double>::epsilon()) {
             auto vel = (m_hw_positions[i] - prev_pos) / period.seconds();
             m_hw_velocities[i] = vel;
-            // CMR_LOG(INFO, "set velocity of %f at joint %zu", m_hw_velocities[i],
+            // CMR_LOG(INFO, "set velocity of %f at joint %zu",
+            // m_hw_velocities[i],
             // i);
         } else {
             CMR_LOG(
@@ -179,6 +186,11 @@ hardware_interface::return_type ArmSystemHardware::read(
 hardware_interface::return_type ArmSystemHardware::write(
     const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)
 {
+    std::stringstream result;
+    std::copy(m_hw_velocity_commands.begin(), m_hw_velocity_commands.end(),
+              std::ostream_iterator<int>(result, " "));
+    CMR_LOG(INFO, "Got write commands %s", result.str().c_str());
+
     cmr_msgs::msg::MotorWriteBatch msg;
     msg.motor_ids = {BLDC_AR1, BLDC_AR2, BLDC_AR3, BLDC_AR4,
                      BLDC_AR5, BLDC_AR6, BDC_ENDO};

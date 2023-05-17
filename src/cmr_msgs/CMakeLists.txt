@@ -22,12 +22,14 @@ rosidl_generate_interfaces(
   msg/Power.msg
   msg/SensorReadBatch.msg
   msg/Int16ArrayStamped.msg
+  msg/MotorWriteBatch.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv
   srv/AcquireDependency.srv
   srv/ReleaseDependency.srv
   srv/NotifyDeactivate.srv
+  srv/SiteAnalyze.srv
   action/TestTargetPosition.action
   DEPENDENCIES
   std_msgs

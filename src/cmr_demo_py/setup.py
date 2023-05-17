@@ -20,6 +20,7 @@ setup(
     entry_points={
         "console_scripts": [
             "arm_effort_control = cmr_demo_py.arm_effort_control:main",
+            "drives_calibrator = cmr_demo_py.drives_calibrator:main",
             # PHOBOS_APPEND
         ],
     },

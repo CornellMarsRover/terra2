@@ -21,10 +21,8 @@ We currently have:
 * `cmr_control::AstroSensorHardware`
 * `semantic_components::AstroSensor`
 * `cmr_control::AstroSensorBroadcaster`
-* `cmr_control::AstroMotor`
 * `cmr_control::DrivesSystemHardware`
 * `cmr_control::ArmSystemHardware`
-* `cmr_control::MockArmSystemHardware` (unnecessary, see [ROS2 Control Mocks](https://control.ros.org/galactic/doc/api/classfake__components_1_1GenericSystem.html) for mocking)
 
 The Controllers are configured via a YAML file which contains parameters that link up
 a controller and hardware interface. A hardware interface must be "connected"

@@ -74,27 +74,35 @@
                 <max_vel>1.0</max_vel>
                 <min_depth>0.00</min_depth> -->
                 <surface>
-                  <friction>
-                    <ode>
-                      <mu>1.5</mu>
-                      <mu2>1.5</mu2>
-                      <slip1>0</slip1>
-                      <slip2>0</slip2>
-                    </ode>
-                  </friction>
-                   <contact>
-                    <ode>
-                      <soft_cfm>0</soft_cfm>
-                      <soft_erp>0.2</soft_erp>
-                      <kp>1e+13</kp>
-                      <kd>1</kd>
-                      <max_vel>1</max_vel>
-                      <min_depth>0.01</min_depth>
-                    </ode>
-                  </contact> 
+                    <friction>
+                        <ode>
+                            <mu>1.5</mu>
+                            <mu2>1.5</mu2>
+                            <slip1>0</slip1>
+                            <slip2>0</slip2>
+                        </ode>
+                    </friction>
+                    <contact>
+                        <ode>
+                            <soft_cfm>0</soft_cfm>
+                            <soft_erp>0.2</soft_erp>
+                            <kp>1e+13</kp>
+                            <kd>1</kd>
+                            <max_vel>1</max_vel>
+                            <min_depth>0.01</min_depth>
+                        </ode>
+                    </contact>
                 </surface>
-              </gazebo>
+            </gazebo>
         </xacro:macro>
+
+        <link name="base_footprint"/>
+
+        <joint name="base_joint" type="fixed">
+            <parent link="base_footprint"/>
+            <child link="base_link" />
+            <origin xyz="0 0 0.010" rpy="0 0 0"/>
+        </joint>
 
         <!-- Base Link -->
         <link name="base_link">
@@ -125,12 +133,7 @@
             <inertial>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <mass value="${lidar_mass}"/>
-                <inertia ixx="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" 
-                         ixy="0" 
-                         ixz="0" 
-                         iyy="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" 
-                         iyz="0" 
-                         izz="${0.5 * lidar_mass * lidar_radius * lidar_radius}" />
+                <inertia ixx="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" ixy="0" ixz="0" iyy="${lidar_mass / 12.0 * (3.0 * lidar_radius * lidar_radius + lidar_height * lidar_height)}" iyz="0" izz="${0.5 * lidar_mass * lidar_radius * lidar_radius}" />
             </inertial>
 
             <collision>
@@ -151,41 +154,27 @@
         <joint name="lidar_joint" type="fixed">
             <parent link="base_link"/>
             <child link="lidar_link"/>
-            <origin xyz="0 0 ${base_height*2}" rpy="0 0 0"/>
+            <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
         </joint>
 
         <!-- IMU Link -->
-        <link name="imu_link">
-            <visual>
-                <geometry>
-                    <box size="${imu_width} ${imu_length} ${imu_height}"/>
-                </geometry>
-            </visual>
-
-            <collision>
-                <geometry>
-                    <box size="${imu_width} ${imu_length} ${imu_height}"/>
-                </geometry>
-            </collision>
-
-            <!-- <xacro:box_inertia m="0.1" w="0.1" d="0.1" h="0.1"/> -->
-            <inertial>
-                <origin xyz="0 0 0" rpy="0 0 0"/>
-                <mass value="${imu_mass}"/>
-                <inertia ixx="${imu_mass / 12.0 * (imu_height * imu_height + imu_length * imu_length)}" 
-                         ixy="0" 
-                         ixz="0" 
-                         iyy="${imu_mass / 12.0 * (imu_height * imu_height + imu_width * imu_width)}" 
-                         iyz="0" 
-                         izz="${imu_mass / 12.0 * (imu_width * imu_width + imu_length * imu_length)}" />
-            </inertial>
-        </link>
 
         <joint name="imu_joint" type="fixed">
             <parent link="base_link"/>
             <child link="imu_link"/>
-            <origin xyz="0 0 ${base_height * 1.25}"/>
+            <origin xyz="0 0 0"/>
         </joint>
+
+        <link name="imu_link" />
+
+        <!-- GPS Link -->
+        <joint name="gps_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="gps_link"/>
+            <origin xyz="0 0 0"/>
+        </joint>
+
+        <link name="gps_link" />
 
         <!-- Camera Link -->
         <link name="camera_link">
@@ -206,19 +195,14 @@
             <inertial>
                 <origin xyz="0 0 0" rpy="0 0 0"/>
                 <mass value="${camera_mass}"/>
-                <inertia ixx="${camera_mass / 12.0 * (cam_height * cam_height + cam_length * cam_length)}" 
-                         ixy="0" 
-                         ixz="0" 
-                         iyy="${camera_mass / 12.0 * (cam_height * cam_height + cam_width * cam_width)}" 
-                         iyz="0" 
-                         izz="${camera_mass / 12.0 * (cam_width * cam_width + cam_length * cam_length)}" />
+                <inertia ixx="${camera_mass / 12.0 * (cam_height * cam_height + cam_length * cam_length)}" ixy="0" ixz="0" iyy="${camera_mass / 12.0 * (cam_height * cam_height + cam_width * cam_width)}" iyz="0" izz="${camera_mass / 12.0 * (cam_width * cam_width + cam_length * cam_length)}" />
             </inertial>
         </link>
 
         <joint name="camera_joint" type="fixed">
             <parent link="base_link"/>
             <child link="camera_link"/>
-            <origin xyz="${base_width / 2} 0 ${base_height}" rpy="0 0 0"/>
+            <origin xyz="${base_width / 2} 0 ${base_height / 2}" rpy="0 0 0"/>
         </joint>
 
         <!-- Wheels -->
@@ -269,41 +253,56 @@
 
 
     <gazebo reference="imu_link">
+        <gravity>true</gravity>
         <sensor name="imu_sensor" type="imu">
             <plugin filename="libgazebo_ros_imu_sensor.so" name="imu_plugin">
                 <ros>
-                    <namespace>/demo</namespace>
+                    <namespace>/rover</namespace>
                     <remapping>~/out:=imu</remapping>
                 </ros>
                 <initial_orientation_as_reference>false</initial_orientation_as_reference>
             </plugin>
             <always_on>true</always_on>
-            <update_rate>100</update_rate>
+            <update_rate>2</update_rate>
             <visualize>true</visualize>
             <imu>
+                <orientation>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-3</stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-3</stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>2e-3</stddev>
+                        </noise>
+                    </z>
+                </orientation>
                 <angular_velocity>
                     <x>
                         <noise type="gaussian">
                             <mean>0.0</mean>
                             <stddev>2e-4</stddev>
-                            <bias_mean>0.0000075</bias_mean>
-                            <bias_stddev>0.0000008</bias_stddev>
                         </noise>
                     </x>
                     <y>
                         <noise type="gaussian">
                             <mean>0.0</mean>
                             <stddev>2e-4</stddev>
-                            <bias_mean>0.0000075</bias_mean>
-                            <bias_stddev>0.0000008</bias_stddev>
                         </noise>
                     </y>
                     <z>
                         <noise type="gaussian">
                             <mean>0.0</mean>
                             <stddev>2e-4</stddev>
-                            <bias_mean>0.0000075</bias_mean>
-                            <bias_stddev>0.0000008</bias_stddev>
                         </noise>
                     </z>
                 </angular_velocity>
@@ -312,24 +311,18 @@
                         <noise type="gaussian">
                             <mean>0.0</mean>
                             <stddev>1.7e-2</stddev>
-                            <bias_mean>0.1</bias_mean>
-                            <bias_stddev>0.001</bias_stddev>
                         </noise>
                     </x>
                     <y>
                         <noise type="gaussian">
                             <mean>0.0</mean>
                             <stddev>1.7e-2</stddev>
-                            <bias_mean>0.1</bias_mean>
-                            <bias_stddev>0.001</bias_stddev>
                         </noise>
                     </y>
                     <z>
                         <noise type="gaussian">
                             <mean>0.0</mean>
                             <stddev>1.7e-2</stddev>
-                            <bias_mean>0.1</bias_mean>
-                            <bias_stddev>0.001</bias_stddev>
                         </noise>
                     </z>
                 </linear_acceleration>
@@ -362,16 +355,16 @@
             <max_wheel_acceleration>10.0</max_wheel_acceleration>
 
             <!-- output -->
-            <odom_publish_frequency>1</odom_publish_frequency>
+            <update_rate>30</update_rate>
             <publish_odom>true</publish_odom>
             <publish_odom_tf>true</publish_odom_tf>
-            <publish_wheel_tf>true</publish_wheel_tf>
+            <publish_wheel_tf>false</publish_wheel_tf>
             <odom_topic>/odom</odom_topic>
             <topic>/cmd_vel</topic>
 
             <source_frame>map</source_frame>
             <odometry_frame>odom</odometry_frame>
-            <robot_base_frame>base_link</robot_base_frame>
+            <robot_base_frame>base_footprint</robot_base_frame>
         </plugin>
     </gazebo>
 
@@ -379,7 +372,7 @@
         <sensor name="lidar" type="ray">
             <always_on>true</always_on>
             <visualize>true</visualize>
-            <update_rate>5</update_rate>
+            <update_rate>2</update_rate>
             <ray>
                 <scan>
                     <horizontal>
@@ -390,8 +383,8 @@
                     </horizontal>
                 </scan>
                 <range>
-                    <min>0.120000</min>
-                    <max>3.5</max>
+                    <min>0.150000</min>
+                    <max>100.0</max>
                     <resolution>0.015000</resolution>
                 </range>
                 <noise>
@@ -412,7 +405,7 @@
 
     <gazebo reference="camera_link">
         <sensor type="camera" name="camera1">
-            <update_rate>30.0</update_rate>
+            <update_rate>2</update_rate>
             <camera name="head">
                 <horizontal_fov>1.5127496682368</horizontal_fov>
                 <verical_fov>1.6500906166776</verical_fov>
@@ -447,6 +440,34 @@
                 <distortionK3>0.0</distortionK3>
                 <distortionT1>0.0</distortionT1>
                 <distortionT2>0.0</distortionT2>
+            </plugin>
+        </sensor>
+    </gazebo>
+
+    <gazebo reference="gps_link">
+        <sensor name="rover_gps" type="gps">
+            <always_on>true</always_on>
+            <update_rate>0.5</update_rate>
+            <gps>
+                <position_sensing>
+                    <horizontal>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>1e-2</stddev>
+                        </noise>
+                    </horizontal>
+                    <vertical>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>1</stddev>
+                        </noise>
+                    </vertical>
+                </position_sensing>
+            </gps>
+            <plugin name="rover_gps" filename="libgazebo_ros_gps_sensor.so">
+                <ros>
+                    <remapping>~/out:=gps/fix</remapping>
+                </ros>
             </plugin>
         </sensor>
     </gazebo>

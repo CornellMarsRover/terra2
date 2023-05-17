@@ -17,6 +17,7 @@ class MockArmSystemHardware : public cmr_control::BaseArmSystemHardware
 {
   public:
     RCLCPP_SHARED_PTR_DEFINITIONS(MockArmSystemHardware)
+    CallbackReturn on_init(const hardware_interface::HardwareInfo& info) override;
 
     hardware_interface::return_type read(const rclcpp::Time& time,
                                          const rclcpp::Duration& period) override;

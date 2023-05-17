@@ -110,7 +110,7 @@
     "**/install/**": true,
     "**/log": true
   },
-  "python.formatting.provider": "black",
+  "python.formatting.provider": "none",
   // "clang-tidy.buildPath": "${workspaceFolder}/build",
   // "clang-tidy.blacklist": [
   //   "${workspaceFolder}/install/.*"
@@ -128,5 +128,7 @@
     "cpp"
   ],
   "cmake.configureOnOpen": false,
-  "cmake.sourceDirectory": "${workspaceFolder}/src/cmr_demo",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
 }

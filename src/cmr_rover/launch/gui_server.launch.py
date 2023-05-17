@@ -4,13 +4,11 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import FrontendLaunchDescriptionSource
 
-composition_ns = "rover"
-
 
 def generate_launch_description():
     return LaunchDescription(
         [
-            # Launch rosbridge for frontend access via socket on port 9090
+            # Launch Foxglove Bridge (websocket) on default port 8765
             IncludeLaunchDescription(
                 FrontendLaunchDescriptionSource(
                     path.join(

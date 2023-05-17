@@ -3,14 +3,13 @@
 #include <string>
 #include <vector>
 
+#include "cmr_msgs/msg/motor_write_batch.hpp"
+#include "cmr_msgs/msg/sensor_read_batch.hpp"
 #include "hardware_interface/handle.hpp"
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
-#include "rclcpp/clock.hpp"
-#include "rclcpp/duration.hpp"
-#include "rclcpp/macros.hpp"
-#include "rclcpp/time.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 namespace cmr_control
 {
@@ -57,6 +56,16 @@ class DrivesSystemHardware : public hardware_interface::SystemInterface
     std::vector<double> m_hw_velocities;
     // incoming measured positions of each joint
     std::vector<double> m_hw_positions;
+    // buffered sensor readings from encoders.
+    // first |m_hw_velocities| elements should be velocities, remaining should be
+    // positions
+    std::vector<int> m_hw_buffer;
+
+    std::shared_ptr<rclcpp::Node> m_comm_node;
+    std::shared_ptr<rclcpp::Publisher<cmr_msgs::msg::MotorWriteBatch>>
+        m_motor_write_pub;
+    std::shared_ptr<rclcpp::Subscription<cmr_msgs::msg::SensorReadBatch>>
+        m_motor_read_sub;
 
     /**
      * @brief Returns true if the interfaces we're configured with make sense for
@@ -67,6 +76,10 @@ class DrivesSystemHardware : public hardware_interface::SystemInterface
      * file.
      */
     bool validate_interfaces() const;
+
+    void sensor_callback(const cmr_msgs::msg::SensorReadBatch& msg);
+
+    void set_velocity_mode() const;
 };
 
 }  // namespace cmr_control

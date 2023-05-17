@@ -11,7 +11,7 @@ cmr_std_find_pkgs(cmr_fabric rclcpp_lifecycle moveit_ros_planning_interface)
 # package.xml if you're depending on other packages.
 
 # Pass "launch" as an argument if you need a launch directory
-cmr_install(launch config)
+cmr_install(launch)
 
 # Add tests with: cmr_add_test(<test_name> SOURCES <test sources> DEPENDS <test
 # dependencies>)
@@ -28,7 +28,8 @@ cmr_add_node(
   cmr_fabric
   rclcpp_lifecycle)
 
-cmr_add_node(inverse_kinematics
+cmr_add_node(
+  inverse_kinematics
   SOURCES
   src/inverse_kinematics.cpp
   src/inverse_kinematics_main.cpp

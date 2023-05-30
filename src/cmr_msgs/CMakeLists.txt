@@ -22,7 +22,6 @@ rosidl_generate_interfaces(
   msg/Power.msg
   msg/SensorReadBatch.msg
   msg/Int16ArrayStamped.msg
-  msg/MotorWriteBatch.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv

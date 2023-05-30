@@ -16,10 +16,10 @@ def generate_launch_description(rviz = True, mock = True):
                 [
                     FindPackageShare("cmr_arm_description"),
                     "urdf",
-                    "arm.urdf.xacro",
-                    "mock:=" + mock.__str__().lower()
+                    "arm.urdf.xacro"
                 ]
             ),
+            " mock:=" + mock.__str__().lower()
         ]
     )
 

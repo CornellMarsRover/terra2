@@ -100,27 +100,28 @@ void Joystick::arm_callback(std::array<AxisState, 3>& axis_state) const
                 js_event_button_publ(event, message);
                 break;
             case JS_EVENT_AXIS: {
-                // Scaling for magnitude is 0-100 for the arm joystick.
                 size_t control = get_control_state(*event, axis_state);
+
+                auto rotate_val =
+                    axis_state.at(control).x / (joystick_max / m_max_arm_speed);
+                auto translate_val =
+                    axis_state.at(control).y / (joystick_max / m_max_arm_speed);
+
                 message.control_id = static_cast<int>(control);
                 message.axis_id = cmr_msgs::msg::JoystickReading::X_AXIS_ID;
-                message.magnitude = static_cast<int>(
-                    axis_state.at(control).x / (joystick_max / m_max_arm_speed));
+                message.magnitude = rotate_val;
                 m_joystick_pub->publish(message);
+
                 message.axis_id = cmr_msgs::msg::JoystickReading::Y_AXIS_ID;
                 if (control == 1) {
                     message.control_id = 0;
                     message.axis_id = cmr_msgs::msg::JoystickReading::Z_AXIS_ID;
                 }
-                message.magnitude = static_cast<int>(
-                    axis_state.at(control).y / (joystick_max / m_max_arm_speed));
+                message.magnitude = translate_val;
                 m_joystick_pub->publish(message);
                 // Used to display the values of each moved axis as CMR_LOGs
-                CMR_LOG(INFO, "Control %zu at (x, y) = (%6d, %6d)\n", control,
-                        static_cast<int>(axis_state.at(control).x /
-                                         (joystick_max / m_max_arm_speed)),
-                        static_cast<int>(axis_state.at(control).y /
-                                         (joystick_max / m_max_arm_speed)));
+                CMR_LOG(INFO, "Control %zu at (x, y) = (%6f, %6f)\n", control,
+                        rotate_val, translate_val);
                 break;
             }
             case JS_EVENT_INIT:

@@ -86,6 +86,18 @@ cmr_add_lib(
   pluginlib)
 target_compile_definitions(aruco_bt_action PRIVATE BT_PLUGIN_EXPORT)
 
+cmr_add_node(pan_tilt_node 
+  SOURCES 
+  src/pan_tilt_node.cpp
+  src/pan_tilt_node_main.cpp
+  DEPENDS 
+  rclcpp 
+  std_msgs 
+  cmr_msgs 
+  cmr_utils
+  cmr_fabric
+  rclcpp_lifecycle)
+
 # PHOBOS_APPEND
 cmr_export()
 

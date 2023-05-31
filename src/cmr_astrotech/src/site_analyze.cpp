@@ -254,15 +254,18 @@ void SiteAnalyze::scoop(int site)
     int n = site - 1;
 
     if (site == 1 || site == 2) {
-        //make sure scoop is a pre_scoop_angle
+        //lead screw at intermediate pos (reed), scoop at neutral_angle
+        //move scoop to pre_scoop_angle... lower lead screw to bottom...
         publishmsg(collection_servo_motor_right, 1, pre_scoop_angles[n]);
+        publishmsg(lead_screw_motor, 4, timedEffort(-100, 3000));
+        std::this_thread::sleep_for(3000);
 
         //lead screw at bottom, scoop at pre_scoop_angle
         //scoop dirt...
         publishmsg(collection_servo_motor_right, 1, post_scoop_angles[n]);
 
         //lead screw at bottom, scoop at post_scoop_angle
-        //raise lead screw... start moving scoop
+        //raise lead screw...
         publishmsg(lead_screw_motor, 3, 100);
         std::this_thread::sleep_for(3000);
 
@@ -283,23 +286,21 @@ void SiteAnalyze::scoop(int site)
         publishmsg(lead_screw_motor, 3, -100);
         std::this_thread::sleep_for(500);
 
-        //lead screw at intermediate pos (reed), scoop at neutral_angle
-        //move scoop to pre_scoop_angle... lower lead screw to bottom...
-        publishmsg(collection_servo_motor_right, 1, pre_scoop_angles[n+1]);
-        publishmsg(lead_screw_motor, 4, timedEffort(-100, 3000));
-        std::this_thread::sleep_for(2000);
     }
 
     if (site == 3 || site == 4) {
-        //make sure scoop is a pre_scoop_angle
-        publishmsg(collection_servo_motor_left, 1, pre_scoop_angles[n]);
+        //lead screw at intermediate pos (reed), scoop at neutral_angle
+        //move scoop to pre_scoop_angle... lower lead screw to bottom...
+        publishmsg(collection_servo_motor_left, 1, pre_scoop_angles[n+1]);
+        publishmsg(lead_screw_motor, 4, timedEffort(-100, 3000));
+        std::this_thread::sleep_for(3000);
 
         //lead screw at bottom, scoop at pre_scoop_angle
         //scoop dirt...
         publishmsg(collection_servo_motor_left, 1, post_scoop_angles[n]);
 
         //lead screw at bottom, scoop at post_scoop_angle
-        //raise lead screw... start moving scoop
+        //raise lead screw...
         publishmsg(lead_screw_motor, 3, 100);
         std::this_thread::sleep_for(3000);
 
@@ -319,13 +320,6 @@ void SiteAnalyze::scoop(int site)
         publishmsg(collection_servo_motor_left, 1, neutral_angles[n]);
         publishmsg(lead_screw_motor, 3, -100);
         std::this_thread::sleep_for(500);
-
-        //lead screw at intermediate pos (reed), scoop at neutral_angle
-        //move scoop to pre_scoop_angle... lower lead screw to bottom...
-        publishmsg(collection_servo_motor_left, 1, pre_scoop_angles[n+1]);
-        publishmsg(lead_screw_motor, 4, timedEffort(-100, 3000));
-        std::this_thread::sleep_for(2000);
-    }
 }
 
 }  // namespace cmr

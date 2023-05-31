@@ -28,6 +28,7 @@ rosidl_generate_interfaces(
   srv/AcquireDependency.srv
   srv/ReleaseDependency.srv
   srv/NotifyDeactivate.srv
+  srv/SiteAnalyze.srv
   action/TestTargetPosition.action
   DEPENDENCIES
   std_msgs

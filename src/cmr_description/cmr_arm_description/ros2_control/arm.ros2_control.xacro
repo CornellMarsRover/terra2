@@ -3,12 +3,7 @@
     <xacro:macro name="arm_ros2_control" params="name mock">
         <ros2_control name="${name}" type="system">
             <hardware>
-                <xacro:if value="${mock}">
-                    <plugin>mock_components/GenericSystem</plugin>
-                </xacro:if>
-                <xacro:unless value="${mock}">
-                    <plugin>cmr_control/ArmSystemHardware</plugin>
-                </xacro:unless>
+                <plugin>cmr_control/ArmSystemHardware</plugin>
             </hardware>
             <joint name="base_rotate">
                 <command_interface name="position"/>
@@ -48,7 +43,7 @@
             </joint>
             <joint name="end_effector">
                 <command_interface name="position"/>
-                <command_interface name="effort"/>
+                <command_interface name="velocity"/>
                 <state_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>

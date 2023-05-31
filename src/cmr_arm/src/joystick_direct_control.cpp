@@ -24,6 +24,15 @@ JoystickDirectControl::JoystickDirectControl(
 {
 }
 
+inline auto scale_magnitude(double mag, double factor)
+{
+    if (mag < 0) {
+        return -pow(-1 * mag, factor);
+    } else {
+        return pow(mag, factor);
+    }
+}
+
 /**
  * @brief Get the arm control msg object based on the current joystick reading,
  * arm segment, and sensitivity
@@ -33,33 +42,37 @@ JoystickDirectControl::JoystickDirectControl(
  * @param current_segment the arm segment being controlled
  * @return std_msgs::msg::Float64MultiArray the message to send to the hardware
  */
+// NOLINTNEXTLINE
 static auto get_arm_control_msg(const JoystickReading& msg, double sensitivity,
                                 ArmSegment current_segment)
 {
     auto message = std_msgs::msg::Float64MultiArray();
     message.data.resize(7, 0.0);
+
+    auto mag = scale_magnitude(msg.magnitude, 2);
+
     // logic to send effort values to certain motors based on control value
     if (msg.control_id == JoystickReading::MAIN_JOYSTICK_ID) {
         switch (current_segment) {
             case ArmSegment::Base:
                 if (msg.axis_id == JoystickReading::Y_AXIS_ID) {
-                    message.data[shoulder_idx] = msg.magnitude * sensitivity;
+                    message.data[shoulder_idx] = mag;
                 } else if (msg.axis_id == JoystickReading::Z_AXIS_ID) {
-                    message.data[base_rotate_idx] = msg.magnitude * sensitivity;
+                    message.data[base_rotate_idx] = mag * sensitivity;
                 }
                 break;
             case ArmSegment::Elbow:
                 if (msg.axis_id == JoystickReading::Y_AXIS_ID) {
-                    message.data[elbow_idx] = msg.magnitude * sensitivity;
+                    message.data[elbow_idx] = mag;
                 } else if (msg.axis_id == JoystickReading::Z_AXIS_ID) {
-                    message.data[second_rotate_idx] = msg.magnitude * sensitivity;
+                    message.data[second_rotate_idx] = mag * sensitivity;
                 }
                 break;
             case ArmSegment::Wrist:
                 if (msg.axis_id == JoystickReading::Y_AXIS_ID) {
-                    message.data[third_tilt_idx] = msg.magnitude * sensitivity;
+                    message.data[third_tilt_idx] = mag;
                 } else if (msg.axis_id == JoystickReading::Z_AXIS_ID) {
-                    message.data[third_rotate_idx] = msg.magnitude * sensitivity;
+                    message.data[third_rotate_idx] = mag * sensitivity;
                 }
                 break;
             default:
@@ -69,7 +82,7 @@ static auto get_arm_control_msg(const JoystickReading& msg, double sensitivity,
         }
     } else if (msg.control_id == JoystickReading::SECOND_JOYSTICK_ID) {
         if (msg.axis_id == JoystickReading::Y_AXIS_ID) {
-            message.data[end_effector_idx] = msg.magnitude * sensitivity;
+            message.data[end_effector_idx] = mag;
         }
     }
     return message;
@@ -83,16 +96,17 @@ void JoystickDirectControl::update_arm_position(const JoystickReading& msg)
     CMR_LOG(DEBUG, "JoystickDirectControl::update_arm_position");
     if (msg.control_id == JoystickReading::SENS_SLIDER_ID) {
         m_sensitivity = msg.magnitude * m_sens_scaler;
-    } else if (msg.control_id == JoystickReading::THIRD_BUTTON_ID) {
+    } else if (msg.control_id == JoystickReading::THIRD_BUTTON_ID &&
+               msg.magnitude == 1) {
         m_active_segment =
             static_cast<ArmSegment>((static_cast<int>(m_active_segment) + 1) % 3);
-        CMR_LOG(DEBUG, "Active segment: %d", static_cast<uint8_t>(m_active_segment));
+        CMR_LOG(INFO, "Active segment: %d", static_cast<uint8_t>(m_active_segment));
     } else {
         const auto message =
             get_arm_control_msg(msg, m_sensitivity, m_active_segment);
 
         m_arm_control_pub->publish(message);
-        CMR_LOG(DEBUG, "JoystickDirectControl::update_arm_position: published");
+        CMR_LOG(INFO, "JoystickDirectControl::update_arm_position: published");
     }
 }
 

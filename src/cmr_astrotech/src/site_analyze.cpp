@@ -26,36 +26,9 @@ using namespace std::chrono_literals;
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
 {
-    switch (request->site_num) {
-        case 1:
-            for (int i = 0; i < 4; i++) {
-                analyze();
-            }
-            break;
-        case 2:
-        case 3:
-            analyze();
-            for (int i = 0; i < 3; i++) {
-                analyze();
-            }
-            break;
-        default:
-            analyze();
-            for (int i = 0; i < 3; i++) {
-                analyze();
-            }
-            analyze();
-
-            for (int i = 0; i < 4; i++) {
-                analyze();
-            }
-
-            for (int i = 0; i < 3; i++) {
-                analyze();
-            }
-            break;
+    for (int i = 0; i < 4; i++) {
+        analyze();
     }
-
 }
 
 /*

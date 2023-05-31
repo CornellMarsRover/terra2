@@ -14,12 +14,51 @@ constexpr int collection_servo_motor_right = {0xE5};
 constexpr int collection_servo_motor_left = {0xE6};
 constexpr int analysis_motor = {0xDB};
 constexpr int lead_screw_motor = {0xD2};
+
+constexpr int pump_motor_1 = {0xD7}; 
+constexpr int pump_motor_2 = {0xD8};
+constexpr int pump_motor_3 = {0xD9};
+constexpr int pump_motor_4 = {0xDA};
+
+
 using namespace std::chrono_literals;
 
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
 {
+    switch (request->site_num) {
+        case 1:
+            for (int i = 0; i < 4; i++) {
+                analyze();
+            }
+            break;
+        case 2:
+        case 3:
+            analyze();
+            for (int i = 0; i < 3; i++) {
+                analyze();
+            }
+            break;
+        default:
+            analyze();
+            for (int i = 0; i < 3; i++) {
+                analyze();
+            }
+            analyze();
+
+            for (int i = 0; i < 4; i++) {
+                analyze();
+            }
+
+            for (int i = 0; i < 3; i++) {
+                analyze();
+            }
+            break;
+    }
+
 }
+
+/*
 // NOLINTNEXTLINE
 void SiteAnalyze::handle_request(
     const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
@@ -64,6 +103,18 @@ void SiteAnalyze::handle_request(
     }
 }
 
+*/
+
+void SiteAnalyze::handle_request(
+    const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
+    std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
+{
+    response->success = true;
+    
+
+
+}
+
 void SiteAnalyze::collection_handle_request(
     const std::shared_ptr<std_srvs::srv::Trigger::Request>,
     std::shared_ptr<std_srvs::srv::Trigger::Response> response)
@@ -92,8 +143,33 @@ void SiteAnalyze::publishmsg(
     std::this_thread::sleep_for(3s);
 }
 
-void SiteAnalyze::analyze() { publishmsg(analysis_motor, 2, turn_angle_pos); }
 
+//void SiteAnalyze::analyze() { publishmsg(analysis_motor, 2, turn_angle_pos); }
+
+long timedEfffort(signed char effort, unsigned short time) {
+    long eff = (long)effort << 16;
+    long timEff = eff + (long)time;
+    timEff << 8;
+    return timEff;
+}
+
+void SiteAnalyze::analyze() { 
+
+    //spin analysis motor until the cuvette falls into the spectrometer
+    publishmsg(analysis_motor, 3, 100); 
+
+    //(maybe) spin analysis motor slightly more
+    //publishmsg(analysis_motor, 3, analysis_effort_1|time);
+
+    //fill the next cuvette and wait
+    fill(request->site_num);
+
+    //spin analysis motor, raising cuvette out of spectrometer
+    publishmsg(analysis_motor, 3, -80);
+
+}
+
+/*
 void SiteAnalyze::fill(std::vector<int> sites)
 {
     std::chrono::milliseconds action_delay = 0ms;
@@ -115,6 +191,24 @@ void SiteAnalyze::fill(std::vector<int> sites)
     }
     m_motor_state_publisher->publish(msg);
     std::this_thread::sleep_for(action_delay);
+}
+*/
+void SiteAnalyze::fill(int site)
+{
+    long delay = 2005;
+
+    //start filling next cuvette
+    if (site == 1) {
+        publishmsg(pump_motor_1, 2, timedEffort(100, delay));
+    } else if (site == 2) {
+        publishmsg(pump_motor_2, 2, timedEffort(100, delay)); 
+    } else if (site == 3) {
+        publishmsg(pump_motor_3, 2, timedEffort(100, delay));
+    } else if (site == 4) {
+        publishmsg(pump_motor_4, 2, timedEffort(100, delay));
+    }
+    //sleep while cuvette fills and spectrometer analyzes samples
+    std::this_thread::sleep_for(delay);
 }
 
 void SiteAnalyze::gearshift()

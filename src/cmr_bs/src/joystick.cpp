@@ -14,6 +14,7 @@
 #include "cmr_utils/external/tomlcpp.hxx"
 #include "cmr_utils/monad.hpp"
 #include "cmr_utils/string_utils.hpp"
+#include "std_msgs/msg/int32.hpp"
 
 using namespace std::chrono_literals;
 // Constants
@@ -94,6 +95,49 @@ uint8_t get_control_state(const js_event& event,
 void Joystick::arm_callback(std::array<AxisState, 3>& axis_state) const
 {
     auto message = cmr_msgs::msg::JoystickReading();
+    if (const auto event = read_event(m_js); event) {
+        switch (event->type) {
+            case JS_EVENT_BUTTON:
+                js_event_button_publ(event, message);
+                break;
+            case JS_EVENT_AXIS: {
+                size_t control = get_control_state(*event, axis_state);
+
+                auto rotate_val =
+                    axis_state.at(control).x / (joystick_max / m_max_arm_speed);
+                auto translate_val =
+                    axis_state.at(control).y / (joystick_max / m_max_arm_speed);
+
+                message.control_id = static_cast<int>(control);
+                message.axis_id = cmr_msgs::msg::JoystickReading::X_AXIS_ID;
+                message.magnitude = rotate_val;
+                m_joystick_pub->publish(message);
+
+                message.axis_id = cmr_msgs::msg::JoystickReading::Y_AXIS_ID;
+                if (control == 1) {
+                    message.control_id = 0;
+                    message.axis_id = cmr_msgs::msg::JoystickReading::Z_AXIS_ID;
+                }
+                message.magnitude = translate_val;
+                m_joystick_pub->publish(message);
+                // Used to display the values of each moved axis as CMR_LOGs
+                CMR_LOG(INFO, "Control %zu at (x, y) = (%6f, %6f)\n", control,
+                        rotate_val, translate_val);
+                break;
+            }
+            case JS_EVENT_INIT:
+                /* Ignore init events. */
+                break;
+            default:
+                CMR_LOG(WARN, "Unknown event type: %d", event->type);
+                break;
+        }
+    }
+}
+
+void Joystick::pan_tilt_cam_callback(std::array<AxisState, 3>& axis_state) const
+{
+    auto message = std_msgs::msg::Int32();
     if (const auto event = read_event(m_js); event) {
         switch (event->type) {
             case JS_EVENT_BUTTON:

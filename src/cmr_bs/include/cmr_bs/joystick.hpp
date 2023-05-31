@@ -140,9 +140,19 @@ class Joystick : public cmr::fabric::FabricNode
      * the main arm joystick.
      *
      * @param axis_state an array of axis pulled from the js_events
-     * @return publishesthe arm movement message to the m_joystick_pub
+     * @return publishes the arm movement message to the m_joystick_pub
      */
     void arm_callback(std::array<AxisState, 3>& axis_state) const;
+
+    /**
+     * @brief Used to read values from the joystick and send inputs in the form of
+     * messages. Will send the x, y, z axis and magnitudes for every control stick on
+     * the main arm joystick. Sends messages to tilt and rotate the camera.
+     *
+     * @param axis_state an array of axis pulled from the js_events
+     * @return publishes the cam movement message to the m_joystick_pub
+     */
+    void pan_tilt_cam_callback(std::array<AxisState, 3>& axis_state) const;
 
     /**
      * @brief Used to read values from the drives controller and send inputs in the

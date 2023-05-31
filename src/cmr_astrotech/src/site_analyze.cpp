@@ -5,12 +5,13 @@ namespace cmr
 // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES
 // Angle and motor constants for analysis and collection
 
-//The angles will likley be different for each site
-//You must test and adjust these angles 
-constexpr int pre_scoop_angles[4] = {45,45,45,45}
-constexpr int post_scoop_angles[4] = {45,45,45,45};
-constexpr int dump_angles[4] = {45,45,45,45};
-constexpr int neutral_angles[4] = {45,45,45,45};
+// The angles will likley be different for each site
+// You must test and adjust these angles 
+
+constexpr int pre_scoop_angles[4] = {45, 45, 45, 45};
+constexpr int post_scoop_angles[4] = {45, 45, 45, 45};
+constexpr int dump_angles[4] = {45, 45, 45, 45};
+constexpr int neutral_angles[4] = {45, 45, 45, 45};
 
 constexpr int collection_servo_motor_right = {0xE5};
 constexpr int collection_servo_motor_left = {0xE6};
@@ -33,61 +34,11 @@ SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& con
     }
 }
 
-/*
-// NOLINTNEXTLINE
 void SiteAnalyze::handle_request(
     const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
     std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
 {
     response->success = true;
-    switch (request->site_num) {
-        case 1:
-            for (int i = 0; i < 4; i++) {
-                fill({1});
-                analyze();
-            }
-            break;
-        case 2:
-        case 3:
-            fill({1, 2});
-            analyze();
-            for (int i = 0; i < 3; i++) {
-                fill({2});
-                analyze();
-            }
-            break;
-        default:
-            fill({2, 3});
-            analyze();
-            for (int i = 0; i < 3; i++) {
-                fill({3});
-                analyze();
-            }
-            fill({3, 4});
-            analyze();
-
-            for (int i = 0; i < 4; i++) {
-                fill({4});
-                analyze();
-            }
-
-            for (int i = 0; i < 3; i++) {
-                analyze();
-            }
-            break;
-    }
-}
-
-*/
-
-void SiteAnalyze::handle_request(
-    const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
-    std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
-{
-    response->success = true;
-    
-
-
 }
 
 void SiteAnalyze::collection_handle_request(

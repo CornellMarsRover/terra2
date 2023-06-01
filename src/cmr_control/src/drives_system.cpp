@@ -133,7 +133,9 @@ hardware_interface::return_type DrivesSystemHardware::write(
         msg.control_modes.push_back(0);
         // the CCB expects integer values here, but the CommandInterface only
         // allows doubles. to rectify, we simply round.
-        msg.values.push_back(static_cast<int>(round(m_hw_commands[i])));
+        if (motor_ids.at(i) <= 0x41 || motor_ids.at(i) == 0x45)
+            msg.values.push_back(static_cast<int>(round(m_hw_commands[i])));
+        else msg.values.push_back(static_cast<int>(round(-1 * m_hw_commands[i])));
     }
 
     m_motor_write_pub->publish(msg);

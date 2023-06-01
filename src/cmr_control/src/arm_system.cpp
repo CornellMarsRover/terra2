@@ -5,8 +5,8 @@
 #include "cmr_control/external/boards.h"
 #include "std_msgs/msg/string.hpp"
 
-const std::array<uint8_t, 6> motor_ids = {BLDC_AR1, BLDC_AR2, BLDC_AR3,
-                                          BLDC_AR6, BLDC_AR5, BLDC_AR6};
+const std::array<uint8_t, 7> motor_ids = {BLDC_AR1, BLDC_AR2, BLDC_AR3, BLDC_AR4,
+                                          BLDC_AR5, BLDC_AR6, BDC_ENDO};
 
 namespace cmr_control
 {
@@ -192,8 +192,8 @@ hardware_interface::return_type ArmSystemHardware::write(
     CMR_LOG(INFO, "Got write commands %s", result.str().c_str());
 
     cmr_msgs::msg::MotorWriteBatch msg;
-    msg.motor_ids = {BLDC_AR1, BLDC_AR2, BLDC_AR3, BLDC_AR4,
-                     BLDC_AR5, BLDC_AR6, BDC_ENDO};
+    std::vector<uint8_t> id_vec(motor_ids.cbegin(), motor_ids.cend());
+    msg.motor_ids = id_vec;
     msg.control_modes.resize(msg.motor_ids.size());
     msg.values.resize(msg.motor_ids.size());
     for (auto i = 0u; i < info_.joints.size(); i++) {

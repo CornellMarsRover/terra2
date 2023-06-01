@@ -32,53 +32,6 @@ SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& con
     }
 }
 
-/*
-// NOLINTNEXTLINE
-void SiteAnalyze::handle_request(
-    const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
-    std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
-{
-    response->success = true;
-    switch (request->site_num) {
-        case 1:
-            for (int i = 0; i < 4; i++) {
-                fill({1});
-                analyze();
-            }
-            break;
-        case 2:
-        case 3:
-            fill({1, 2});
-            analyze();
-            for (int i = 0; i < 3; i++) {
-                fill({2});
-                analyze();
-            }
-            break;
-        default:
-            fill({2, 3});
-            analyze();
-            for (int i = 0; i < 3; i++) {
-                fill({3});
-                analyze();
-            }
-            fill({3, 4});
-            analyze();
-
-            for (int i = 0; i < 4; i++) {
-                fill({4});
-                analyze();
-            }
-
-            for (int i = 0; i < 3; i++) {
-                analyze();
-            }
-            break;
-    }
-}
-
-*/
-
 void SiteAnalyze::handle_request(
     const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request>,
     std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)

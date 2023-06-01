@@ -37,13 +37,16 @@ hardware_interface::CallbackReturn ArmSystemHardware::on_init(
     m_hw_control_modes.resize(info_.joints.size(),
                               hardware_interface::HW_IF_VELOCITY);
 
+    // SensorDataQoS tells ROS that we don't care about resending the message
+    // if it was not acknowledged. This will prevent the system from getting
+    // severely backed up by motor messages.
     m_comm_node = rclcpp::Node::make_shared("arm_system_communicator");
     m_motor_write_pub =
-        m_comm_node->create_publisher<cmr_msgs::msg::MotorWriteBatch>("/ccb/motors",
-                                                                      10);
+        m_comm_node->create_publisher<cmr_msgs::msg::MotorWriteBatch>(
+            "/ccb/motors", rclcpp::SensorDataQoS());
     m_motor_read_sub =
         m_comm_node->create_subscription<cmr_msgs::msg::SensorReadBatch>(
-            "/ccb/sensors", 10,
+            "/ccb/sensors", rclcpp::SensorDataQoS(),
             std::bind(&ArmSystemHardware::sensor_callback, this,
                       std::placeholders::_1));
 

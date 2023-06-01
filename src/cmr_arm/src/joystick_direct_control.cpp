@@ -110,6 +110,37 @@ void JoystickDirectControl::update_arm_position(const JoystickReading& msg)
     }
 }
 
+void JoystickDirectControl::update_end_effector_velocity(int vel)
+{
+    if (!m_is_activated) {
+        return;
+    }
+    CMR_LOG(DEBUG, "JoystickDirectControl::update_end_effector_velocity");
+
+    cmr_msgs::msg::MotorWriteBatch msg;
+    msg.motor_ids = {0xA4};
+    msg.control_modes = {0x2};
+    msg.values = {vel};
+    msg.size = 1;
+    m_motor_write_pub->publish(msg);
+}
+
+void JoystickDirectControl::update_hex_driver_velocity(int vel)
+{
+    if (!m_is_activated) {
+        return;
+    }
+    CMR_LOG(DEBUG, "JoystickDirectControl::update_end_effector_velocity");
+
+    cmr_msgs::msg::MotorWriteBatch msg;
+    // TODO(dz268): update motor ID to reflect correct ID for hex driver servo
+    msg.motor_ids = {0x00};
+    msg.control_modes = {0x2};
+    msg.values = {vel};
+    msg.size = 1;
+    m_motor_write_pub->publish(msg);
+}
+
 bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
 {
     // read node config; setup subscriptions, clients, services, etc.; and
@@ -130,6 +161,14 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
         "js_input", buf_size, [this](const JoystickReading& joy_msg) {
             return update_arm_position(joy_msg);
         });
+    m_end_effector_sub = this->create_subscription<std_msgs::msg::Int32>(
+        "/ee_input", buf_size, [this](const std_msgs::msg::Int32& msg) {
+            update_end_effector_velocity(msg.data);
+        });
+    m_hex_driver_sub = this->create_subscription<std_msgs::msg::Int32>(
+        "/hex_input", buf_size, [this](const std_msgs::msg::Int32& msg) {
+            update_hex_driver_velocity(msg.data);
+        });
     m_arm_control_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(
         "/arm_controller/commands", buf_size);
     m_sensitivity = start_sens;
@@ -139,6 +178,7 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
 bool JoystickDirectControl::activate()
 {
     m_arm_control_pub->on_activate();
+    m_motor_write_pub->on_activate();
     m_is_activated = true;
     return true;
 }
@@ -146,6 +186,7 @@ bool JoystickDirectControl::activate()
 bool JoystickDirectControl::deactivate()
 {
     m_arm_control_pub->on_deactivate();
+    m_motor_write_pub->on_deactivate();
     m_is_activated = false;
     return true;
 }

@@ -71,17 +71,11 @@ def generate_launch_description():
         )
     )
 
-    joystick_controller_node = Node(
-        package="cmr_arm",
-        executable="joystick_direct_control"
-    )
-
     nodes = [
         control_node,
         robot_state_pub_node,
         joint_state_broadcaster_spawner,
-        delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        joystick_controller_node
+        delay_robot_controller_spawner_after_joint_state_broadcaster_spawner
     ]
 
     return LaunchDescription(nodes)

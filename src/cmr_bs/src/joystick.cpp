@@ -24,7 +24,7 @@ namespace cmr
 {
 
 void Joystick::js_event_button_arm_publ(std::optional<js_event> event,
-                                    cmr_msgs::msg::JoystickReading message) const
+                                        cmr_msgs::msg::JoystickReading message) const
 {
     auto control_id = event->number + 3;
     auto magnitude = event->value != 0 ? 1 : 0;
@@ -45,6 +45,16 @@ void Joystick::js_event_button_arm_publ(std::optional<js_event> event,
         ee_message.data = 0;
     }
     m_end_effector_pub->publish(ee_message);
+
+    auto hex_driver_msg = std_msgs::msg::Int32();
+    if (control_id == 10) {
+        hex_driver_msg.data = magnitude;
+    } else if (control_id == 15) {
+        hex_driver_msg.data = -1 * magnitude;
+    } else {
+        hex_driver_msg.data = 0;
+    }
+    m_hex_driver_pub->publish(hex_driver_msg);
 }
 
 Joystick::Joystick(const std::optional<cmr::fabric::FabricNodeConfig>& config)
@@ -147,6 +157,7 @@ void Joystick::arm_callback(std::array<AxisState, 3>& axis_state) const
     }
 }
 
+// NOLINTNEXTLINE(readability-function-size)
 void Joystick::drives_callback(std::array<AxisState, 3>& axis_state)
 {
     CMR_LOG(INFO, "Running");
@@ -163,8 +174,8 @@ void Joystick::drives_callback(std::array<AxisState, 3>& axis_state)
                 /*assuming x, y, and z start at 0*/
                 if (static_cast<int>(control) == 0 ||
                     static_cast<int>(control) == 1) {
-                    // Create drives message and set member variable to constructed message,
-                    // to be published on the drive publisher timer
+                    // Create drives message and set member variable to constructed
+                    // message, to be published on the drive publisher timer
 
                     // Scaling for both angular and linear is 0-2
                     message.twist.linear.x =
@@ -179,8 +190,9 @@ void Joystick::drives_callback(std::array<AxisState, 3>& axis_state)
                     m_last_drives_twist = message;
                     m_got_first_message = true;
                 } else if (static_cast<int>(control) == 2) {
-                    // Create camera tilt and pan message and set member variable to 
-                    // constructed message, to be published on the drive publisher timer
+                    // Create camera tilt and pan message and set member variable to
+                    // constructed message, to be published on the drive publisher
+                    // timer
                     auto y = axis_state.at(2).y;
                     auto x = axis_state.at(2).x;
                     cam_message_pan.data = y;
@@ -221,6 +233,7 @@ void Joystick::drives_publish_callback() const
     }
 }
 
+// NOLINTNEXTLINE(readability-function-size)
 bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
 {
     // read node config; setup subscriptions, clients, services, etc.; and
@@ -229,21 +242,18 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
     m_joystick_pub =
         this->create_lifecycle_publisher<cmr_msgs::msg::JoystickReading>(
             "js_input", buffer_size);
-    m_end_effector_pub =
-        this->create_lifecycle_publisher<std_msgs::msg::Int32>(
-            "/ee_input", buffer_size);
-    m_pan_cam1_pub =
-        this->create_lifecycle_publisher<std_msgs::msg::Int32>(
-            "/pancam1", buffer_size);
-    m_tilt_cam1_pub =
-        this->create_lifecycle_publisher<std_msgs::msg::Int32>(
-            "/tiltcam1", buffer_size);
-    m_pan_cam2_pub =
-        this->create_lifecycle_publisher<std_msgs::msg::Int32>(
-            "/pancam2", buffer_size);
-    m_tilt_cam2_pub =
-        this->create_lifecycle_publisher<std_msgs::msg::Int32>(
-            "/tiltcam2", buffer_size);
+    m_end_effector_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/ee_input", buffer_size);
+    m_hex_driver_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/hex_input", buffer_size);
+    m_pan_cam1_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/pancam1", buffer_size);
+    m_tilt_cam1_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/tiltcam1", buffer_size);
+    m_pan_cam2_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/pancam2", buffer_size);
+    m_tilt_cam2_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/tiltcam2", buffer_size);
     m_drives_pub =
         this->create_lifecycle_publisher<geometry_msgs::msg::TwistStamped>(
             "/drives_controller/cmd_vel", buffer_size);
@@ -254,7 +264,7 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
     arm_max_speed - the max speed the arm can move
     max_speed - the max speed the rover can drive
     */
-    
+
     const auto node_settings = table->getTable("node");
     const auto [ok, device] = node_settings->getString("device");
     const auto [ok_type, type] = node_settings->getString("type");
@@ -271,6 +281,7 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
     return true;
 }
 
+// NOLINTNEXTLINE(readability-function-size)
 bool Joystick::activate()
 {
     // opens the joystick to be read
@@ -298,6 +309,7 @@ bool Joystick::activate()
     // Activates the publishers needed
     m_joystick_pub->on_activate();
     m_end_effector_pub->on_activate();
+    m_hex_driver_pub->on_activate();
 
     m_pan_cam1_pub->on_activate();
     m_tilt_cam1_pub->on_activate();
@@ -320,6 +332,7 @@ bool Joystick::deactivate()
     // Deactivates the publishers and timers
     m_joystick_pub->on_deactivate();
     m_end_effector_pub->on_deactivate();
+    m_hex_driver_pub->on_deactivate();
 
     m_pan_cam1_pub->on_deactivate();
     m_tilt_cam1_pub->on_deactivate();

@@ -125,40 +125,41 @@ class Joystick : public cmr::fabric::FabricNode
     /**
      * @brief The publisher for the end effector read function
      */
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+    std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
         m_end_effector_pub;
+
+    /**
+     * @brief The publisher for the hex driver read function
+     */
+    std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+        m_hex_driver_pub;
 
     /**
      * @brief The publisher for the pantilt camera read function, pan value
      * for camera 1
      */
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+    std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
         m_pan_cam1_pub;
 
     /**
-     * @brief The publisher for the pantilt camera read function, tilt value 
+     * @brief The publisher for the pantilt camera read function, tilt value
      * for camera 1
      */
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+    std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
         m_tilt_cam1_pub;
 
     /**
      * @brief The publisher for the pantilt camera read function, pan value
      * for camera 2
      */
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+    std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
         m_pan_cam2_pub;
 
     /**
-     * @brief The publisher for the pantilt camera read function, tilt value 
+     * @brief The publisher for the pantilt camera read function, tilt value
      * for camera 2
      */
-    std::shared_ptr<
-        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+    std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
         m_tilt_cam2_pub;
 
     /**
@@ -175,14 +176,14 @@ class Joystick : public cmr::fabric::FabricNode
     geometry_msgs::msg::TwistStamped m_last_drives_twist;
 
     /**
-     * @brief contains the last camera pan message that was sent out by the drives callback
-     * function
+     * @brief contains the last camera pan message that was sent out by the drives
+     * callback function
      */
     std_msgs::msg::Int32 m_last_pan;
 
     /**
-     * @brief contains the last camera tilt message that was sent out by the drives callback
-     * function
+     * @brief contains the last camera tilt message that was sent out by the drives
+     * callback function
      */
     std_msgs::msg::Int32 m_last_tilt;
 
@@ -224,7 +225,7 @@ class Joystick : public cmr::fabric::FabricNode
      * eventually be published
      */
     void js_event_button_arm_publ(std::optional<js_event> event,
-                              cmr_msgs::msg::JoystickReading message) const;
+                                  cmr_msgs::msg::JoystickReading message) const;
 
     /**
      * @brief initilizes publishers and member variables to be used

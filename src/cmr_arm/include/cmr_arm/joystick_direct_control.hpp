@@ -2,7 +2,9 @@
 #include "cmr_fabric/fabric_node.hpp"
 #include "cmr_msgs/msg/arm_joint_effort.hpp"
 #include "cmr_msgs/msg/joystick_reading.hpp"
+#include "cmr_msgs/msg/motor_write_batch.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/int32.hpp"
 namespace cmr
 {
 /**
@@ -33,10 +35,19 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
     /** listens for messages from the joystick hardware */
     std::shared_ptr<rclcpp::Subscription<cmr_msgs::msg::JoystickReading>>
         m_joystick_sub;
+    /** listens for messages from the end effector controller hardware */
+    std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Int32>> m_end_effector_sub;
+    /** listens for messages from the end effector controller hardware */
+    std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Int32>> m_hex_driver_sub;
     /** publishes messages to the ros2 control hardware interface */
     std::shared_ptr<
         rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>>
         m_arm_control_pub;
+    /** publishes messages directly to the motors; used for the end effector and hex
+     * screw */
+    std::shared_ptr<
+        rclcpp_lifecycle::LifecyclePublisher<cmr_msgs::msg::MotorWriteBatch>>
+        m_motor_write_pub;
     double m_sensitivity;
     double m_sens_scaler;
     bool m_is_activated;
@@ -70,6 +81,18 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
      * corresponds to a certain effort amount to a certain motor's axis.)
      */
     void update_arm_position(const cmr_msgs::msg::JoystickReading& msg);
+
+    /**
+     * @brief update_end_effector_velocity will send a motor write to the end
+     * effector's motor in order to command its velocity.
+     */
+    void update_end_effector_velocity(int vel);
+
+    /**
+     * @brief update_hex_driver_velocity will send a motor write to the end
+     * effector's hex driver servo in order to command its velocity.
+     */
+    void update_hex_driver_velocity(int vel);
 };
 
 }  // namespace cmr

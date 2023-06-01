@@ -79,6 +79,8 @@ class SiteAnalyze : public cmr::fabric::FabricNode
 
     void analyze();
 
+    void fill(int site);
+
     /**
      * Calls scoop at each site and then runs the gearshift function.
      */
@@ -112,6 +114,8 @@ class SiteAnalyze : public cmr::fabric::FabricNode
      */
 
     void publishmsg(int id, int mode, int angle);
+
+    int timed_effort(signed char effort, unsigned short time);
 
     const std::vector<bool> m_action_delay_bool = {false, false, false, false};
 };

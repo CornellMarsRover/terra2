@@ -5,23 +5,22 @@ namespace cmr
 // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES
 // Angle and motor constants for analysis and collection
 
-//The angles will likley be different for each site
-//You must test and adjust these angles 
-constexpr int pre_scoop_angles[4] = {45,45,45,45}
-constexpr int post_scoop_angles[4] = {45,45,45,45};
-constexpr int dump_angles[4] = {45,45,45,45};
-constexpr int neutral_angles[4] = {45,45,45,45};
+// The angles will likley be different for each site
+// You must test and adjust these angles
+constexpr int pre_scoop_angles[4] = {45, 45, 45, 45};
+constexpr int post_scoop_angles[4] = {45, 45, 45, 45};
+constexpr int dump_angles[4] = {45, 45, 45, 45};
+constexpr int neutral_angles[4] = {45, 45, 45, 45};
 
 constexpr int collection_servo_motor_right = {0xE5};
 constexpr int collection_servo_motor_left = {0xE6};
 constexpr int analysis_motor = {0xDB};
 constexpr int lead_screw_motor = {0xD2};
 
-constexpr int pump_motor_1 = {0xD7}; 
+constexpr int pump_motor_1 = {0xD7};
 constexpr int pump_motor_2 = {0xD8};
 constexpr int pump_motor_3 = {0xD9};
 constexpr int pump_motor_4 = {0xDA};
-
 
 using namespace std::chrono_literals;
 
@@ -81,13 +80,10 @@ void SiteAnalyze::handle_request(
 */
 
 void SiteAnalyze::handle_request(
-    const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request> request,
+    const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request>,
     std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
 {
     response->success = true;
-    
-
-
 }
 
 void SiteAnalyze::collection_handle_request(
@@ -102,7 +98,7 @@ void SiteAnalyze::collection()
 {
     for (int i = 0; i < 4; i++) {
         scoop(i);
-        //gearshift();
+        // gearshift();
     }
 }
 
@@ -111,41 +107,40 @@ void SiteAnalyze::publishmsg(
     int id, int mode, int angle)
 {
     cmr_msgs::msg::MotorWriteBatch msg{};
-    msg.motor_ids = {id};
-    msg.control_modes = {mode};
+    msg.motor_ids = {static_cast<uint8_t>(id)};
+    msg.control_modes = {static_cast<uint8_t>(mode)};
     msg.values = {angle};
     m_motor_state_publisher->publish(msg);
     std::this_thread::sleep_for(3s);
 }
 
+// void SiteAnalyze::analyze() { publishmsg(analysis_motor, 2, turn_angle_pos); }
 
-//void SiteAnalyze::analyze() { publishmsg(analysis_motor, 2, turn_angle_pos); }
-
-//takes an 8-bit signed integer (effort) and a 16-bit unsigned integer (time)
-//concatenates these two in binary
-//the output (timEff) can be sent to a brushed motor (with control_mode or func = 4)
-//sending such a command will spin the motor at that effort for that amount of time
-long timedEffort(signed char effort, unsigned short time) {
-    long eff = (long)effort << 16;
-    long timEff = eff + (long)time;
-    timEff << 8;
-    return timEff;
+// takes an 8-bit signed integer (effort) and a 16-bit unsigned integer (time)
+// concatenates these two in binary
+// the output (timEff) can be sent to a brushed motor (with control_mode or func = 4)
+// sending such a command will spin the motor at that effort for that amount of time
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+int SiteAnalyze::timed_effort(signed char effort, unsigned short time)
+{
+    int eff = effort << 16;
+    int tim_eff = eff + time;
+    return tim_eff << 8;
 }
 
-void SiteAnalyze::analyze() { 
-
-    //spin analysis motor until the cuvette falls into the spectrometer
-    publishmsg(analysis_motor, 3, 100); 
+void SiteAnalyze::analyze()
+{
+    // spin analysis motor until the cuvette falls into the spectrometer
+    publishmsg(analysis_motor, 3, 100);
 
     //(maybe) spin analysis motor slightly more
-    //publishmsg(analysis_motor, 3, analysis_effort_1|time);
+    // publishmsg(analysis_motor, 3, analysis_effort_1|time);
 
-    //fill the next cuvette and wait
-    fill(request->site_num);
+    // fill the next cuvette and wait
+    // fill(request->site_num);
 
-    //spin analysis motor, raising cuvette out of spectrometer
+    // spin analysis motor, raising cuvette out of spectrometer
     publishmsg(analysis_motor, 3, -80);
-
 }
 
 /*
@@ -174,23 +169,21 @@ void SiteAnalyze::fill(std::vector<int> sites)
 */
 void SiteAnalyze::fill(int site)
 {
+    // PUMP TIME NEEDS TO BE TUNED
+    // MAY NEED TO USE DIFFERENT VALUE FOR EACH SITE
+    unsigned short delay = 2005;
 
-    //PUMP TIME NEEDS TO BE TUNED
-    //MAY NEED TO USE DIFFERENT VALUE FOR EACH SITE
-    long delay = 2005;
-
-    //start filling next cuvette
+    // start filling next cuvette
     if (site == 1) {
-        publishmsg(pump_motor_1, 2, timedEffort(100, delay));
+        publishmsg(pump_motor_1, 2, timed_effort(100, delay));
     } else if (site == 2) {
-        publishmsg(pump_motor_2, 2, timedEffort(100, delay)); 
+        publishmsg(pump_motor_2, 2, timed_effort(100, delay));
     } else if (site == 3) {
-        publishmsg(pump_motor_3, 2, timedEffort(100, delay));
+        publishmsg(pump_motor_3, 2, timed_effort(100, delay));
     } else if (site == 4) {
-        publishmsg(pump_motor_4, 2, timedEffort(100, delay));
+        publishmsg(pump_motor_4, 2, timed_effort(100, delay));
     }
-    //sleep while cuvette fills and spectrometer analyzes samples
-    std::this_thread::sleep_for(delay);
+    // sleep while cuvette fills and spectrometer analyzes samples
 }
 /*
 void SiteAnalyze::gearshift()
@@ -245,6 +238,7 @@ bool SiteAnalyze::cleanup()
     return true;
 }
 
+// NOLINTNEXTLINE
 void SiteAnalyze::scoop(int site)
 {
     // TODO(unknown): CHANGE TO CORRECT ANGLE VALUES AND ID OF RIGHT AND LEFT
@@ -254,72 +248,72 @@ void SiteAnalyze::scoop(int site)
     int n = site - 1;
 
     if (site == 1 || site == 2) {
-        //lead screw at intermediate pos (reed), scoop at neutral_angle
-        //move scoop to pre_scoop_angle... lower lead screw to bottom...
+        // lead screw at intermediate pos (reed), scoop at neutral_angle
+        // move scoop to pre_scoop_angle... lower lead screw to bottom...
         publishmsg(collection_servo_motor_right, 1, pre_scoop_angles[n]);
-        publishmsg(lead_screw_motor, 4, timedEffort(-100, 3000));
-        std::this_thread::sleep_for(3000);
+        publishmsg(lead_screw_motor, 4, timed_effort(-100, 3000));
+        std::this_thread::sleep_for(3s);
 
-        //lead screw at bottom, scoop at pre_scoop_angle
-        //scoop dirt...
+        // lead screw at bottom, scoop at pre_scoop_angle
+        // scoop dirt...
         publishmsg(collection_servo_motor_right, 1, post_scoop_angles[n]);
 
-        //lead screw at bottom, scoop at post_scoop_angle
-        //raise lead screw...
+        // lead screw at bottom, scoop at post_scoop_angle
+        // raise lead screw...
         publishmsg(lead_screw_motor, 3, 100);
-        std::this_thread::sleep_for(3000);
+        std::this_thread::sleep_for(3s);
 
-        //lead screw at intermediate pos (at reed), scoop at post_scoop_angle
-        //move scoop slightly... raise lead screw...
+        // lead screw at intermediate pos (at reed), scoop at post_scoop_angle
+        // move scoop slightly... raise lead screw...
         publishmsg(collection_servo_motor_right, 1, neutral_angles[n]);
-        std::this_thread::sleep_for(200);
+        std::this_thread::sleep_for(200ms);
         publishmsg(lead_screw_motor, 3, 100);
 
-        //lead screw at dump pos (at limit), scoop at neutral_angle
-        //dump scoop...
+        // lead screw at dump pos (at limit), scoop at neutral_angle
+        // dump scoop...
         publishmsg(collection_servo_motor_right, 1, dump_angles[n]);
-        std::this_thread::sleep_for(200);
+        std::this_thread::sleep_for(200ms);
 
-        //scoop at dump_angle
-        //move scoop slightly back... move lead screw down
+        // scoop at dump_angle
+        // move scoop slightly back... move lead screw down
         publishmsg(collection_servo_motor_right, 1, neutral_angles[n]);
         publishmsg(lead_screw_motor, 3, -100);
-        std::this_thread::sleep_for(500);
-
+        std::this_thread::sleep_for(500ms);
     }
 
     if (site == 3 || site == 4) {
-        //lead screw at intermediate pos (reed), scoop at neutral_angle
-        //move scoop to pre_scoop_angle... lower lead screw to bottom...
-        publishmsg(collection_servo_motor_left, 1, pre_scoop_angles[n+1]);
-        publishmsg(lead_screw_motor, 4, timedEffort(-100, 3000));
-        std::this_thread::sleep_for(3000);
+        // lead screw at intermediate pos (reed), scoop at neutral_angle
+        // move scoop to pre_scoop_angle... lower lead screw to bottom...
+        publishmsg(collection_servo_motor_left, 1, pre_scoop_angles[n + 1]);
+        publishmsg(lead_screw_motor, 4, timed_effort(-100, 3000));
+        std::this_thread::sleep_for(3s);
 
-        //lead screw at bottom, scoop at pre_scoop_angle
-        //scoop dirt...
+        // lead screw at bottom, scoop at pre_scoop_angle
+        // scoop dirt...
         publishmsg(collection_servo_motor_left, 1, post_scoop_angles[n]);
 
-        //lead screw at bottom, scoop at post_scoop_angle
-        //raise lead screw...
+        // lead screw at bottom, scoop at post_scoop_angle
+        // raise lead screw...
         publishmsg(lead_screw_motor, 3, 100);
-        std::this_thread::sleep_for(3000);
+        std::this_thread::sleep_for(3s);
 
-        //lead screw at intermediate pos (at reed), scoop at post_scoop_angle
-        //move scoop slightly... raise lead screw...
+        // lead screw at intermediate pos (at reed), scoop at post_scoop_angle
+        // move scoop slightly... raise lead screw...
         publishmsg(collection_servo_motor_left, 1, neutral_angles[n]);
-        std::this_thread::sleep_for(200);
+        std::this_thread::sleep_for(200ms);
         publishmsg(lead_screw_motor, 3, 100);
 
-        //lead screw at dump pos (at limit), scoop at neutral_angle
-        //dump scoop...
+        // lead screw at dump pos (at limit), scoop at neutral_angle
+        // dump scoop...
         publishmsg(collection_servo_motor_left, 1, dump_angles[n]);
-        std::this_thread::sleep_for(200);
+        std::this_thread::sleep_for(200ms);
 
-        //scoop at dump_angle
-        //move scoop slightly back... move lead screw down
+        // scoop at dump_angle
+        // move scoop slightly back... move lead screw down
         publishmsg(collection_servo_motor_left, 1, neutral_angles[n]);
         publishmsg(lead_screw_motor, 3, -100);
-        std::this_thread::sleep_for(500);
-}
+        std::this_thread::sleep_for(500ms);
+    }
 
+}  // namespace cmr
 }  // namespace cmr

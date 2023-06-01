@@ -141,6 +141,21 @@ void JoystickDirectControl::update_hex_driver_velocity(int vel)
     m_motor_write_pub->publish(msg);
 }
 
+void JoystickDirectControl::update_extendo_velocity(int vel)
+{
+    if (!m_is_activated) {
+        return;
+    }
+    CMR_LOG(DEBUG, "JoystickDirectControl::update_extendo_velocity");
+
+    cmr_msgs::msg::MotorWriteBatch msg;
+    msg.motor_ids = {0x90};
+    msg.control_modes = {0x2};
+    msg.values = {vel};
+    msg.size = 1;
+    m_motor_write_pub->publish(msg);
+}
+
 bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
 {
     // read node config; setup subscriptions, clients, services, etc.; and
@@ -168,6 +183,10 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
     m_hex_driver_sub = this->create_subscription<std_msgs::msg::Int32>(
         "/hex_input", buf_size, [this](const std_msgs::msg::Int32& msg) {
             update_hex_driver_velocity(msg.data);
+        });
+    m_extendo_sub = this->create_subscription<std_msgs::msg::Int32>(
+        "/extendo_input", buf_size, [this](const std_msgs::msg::Int32& msg) {
+            update_extendo_velocity(msg.data);
         });
     m_arm_control_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(
         "/arm_controller/commands", buf_size);

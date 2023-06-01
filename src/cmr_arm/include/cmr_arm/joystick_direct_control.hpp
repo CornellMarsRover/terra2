@@ -39,6 +39,8 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
     std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Int32>> m_end_effector_sub;
     /** listens for messages from the end effector controller hardware */
     std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Int32>> m_hex_driver_sub;
+    /** listens for messages from the end effector controller hardware */
+    std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Int32>> m_extendo_sub;
     /** publishes messages to the ros2 control hardware interface */
     std::shared_ptr<
         rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float64MultiArray>>
@@ -93,6 +95,12 @@ class JoystickDirectControl : public cmr::fabric::FabricNode
      * effector's hex driver servo in order to command its velocity.
      */
     void update_hex_driver_velocity(int vel);
+
+    /**
+     * @brief update_extendo_velocity will send a motor write to the end
+     * effector's hex driver servo in order to command its velocity.
+     */
+    void update_extendo_velocity(int vel);
 };
 
 }  // namespace cmr

@@ -55,6 +55,16 @@ void Joystick::js_event_button_arm_publ(std::optional<js_event> event,
         hex_driver_msg.data = 0;
     }
     m_hex_driver_pub->publish(hex_driver_msg);
+
+    auto extendo_msg = std_msgs::msg::Int32();
+    if (control_id == 11) {
+        extendo_msg.data = magnitude;
+    } else if (control_id == 14) {
+        extendo_msg.data = -1 * magnitude;
+    } else {
+        extendo_msg.data = 0;
+    }
+    m_extendo_pub->publish(extendo_msg);
 }
 
 Joystick::Joystick(const std::optional<cmr::fabric::FabricNodeConfig>& config)
@@ -246,6 +256,8 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
         "/ee_input", buffer_size);
     m_hex_driver_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
         "/hex_input", buffer_size);
+    m_extendo_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/extendo_input", buffer_size);
     m_pan_cam1_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
         "/pancam1", buffer_size);
     m_tilt_cam1_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
@@ -310,6 +322,7 @@ bool Joystick::activate()
     m_joystick_pub->on_activate();
     m_end_effector_pub->on_activate();
     m_hex_driver_pub->on_activate();
+    m_extendo_pub->on_activate();
 
     m_pan_cam1_pub->on_activate();
     m_tilt_cam1_pub->on_activate();
@@ -333,6 +346,7 @@ bool Joystick::deactivate()
     m_joystick_pub->on_deactivate();
     m_end_effector_pub->on_deactivate();
     m_hex_driver_pub->on_deactivate();
+    m_extendo_pub->on_deactivate();
 
     m_pan_cam1_pub->on_deactivate();
     m_tilt_cam1_pub->on_deactivate();

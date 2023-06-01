@@ -6,6 +6,7 @@
 #include "cmr_msgs/msg/joystick_reading.hpp"
 #include "cmr_utils/thread_wrapper.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
+#include "std_msgs/msg/int32.hpp"
 
 namespace cmr
 {
@@ -104,7 +105,7 @@ class Joystick : public cmr::fabric::FabricNode
 
     /**
      * @brief Checks if a message has been received in order to continue to the
-     * publish part knowing a message exist
+     * publish part knowing a message exists
      */
     bool m_got_first_message = false;
 
@@ -122,6 +123,38 @@ class Joystick : public cmr::fabric::FabricNode
         m_joystick_pub;
 
     /**
+     * @brief The publisher for the pantilt camera read function, pan value
+     * for camera 1
+     */
+    std::shared_ptr<
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+        m_pan_cam1_pub;
+
+    /**
+     * @brief The publisher for the pantilt camera read function, tilt value 
+     * for camera 1
+     */
+    std::shared_ptr<
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+        m_tilt_cam1_pub;
+
+    /**
+     * @brief The publisher for the pantilt camera read function, pan value
+     * for camera 2
+     */
+    std::shared_ptr<
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+        m_pan_cam2_pub;
+
+    /**
+     * @brief The publisher for the pantilt camera read function, tilt value 
+     * for camera 2
+     */
+    std::shared_ptr<
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+        m_tilt_cam2_pub;
+
+    /**
      * @brief The publisher for the drives read function
      */
     std::shared_ptr<
@@ -135,6 +168,18 @@ class Joystick : public cmr::fabric::FabricNode
     geometry_msgs::msg::TwistStamped m_last_drives_twist;
 
     /**
+     * @brief contains the last camera pan message that was sent out by the drives callback
+     * function
+     */
+    std_msgs::msg::Int32 m_last_pan;
+
+    /**
+     * @brief contains the last camera tilt message that was sent out by the drives callback
+     * function
+     */
+    std_msgs::msg::Int32 m_last_tilt;
+
+    /**
      * @brief Used to read values from the joystick and send inputs in the form of
      * messages. Will send the x, y, z axis and magnitudes for every control stick on
      * the main arm joystick.
@@ -145,19 +190,11 @@ class Joystick : public cmr::fabric::FabricNode
     void arm_callback(std::array<AxisState, 3>& axis_state) const;
 
     /**
-     * @brief Used to read values from the joystick and send inputs in the form of
-     * messages. Will send the x, y, z axis and magnitudes for every control stick on
-     * the main arm joystick. Sends messages to tilt and rotate the camera.
-     *
-     * @param axis_state an array of axis pulled from the js_events
-     * @return publishes the cam movement message to the m_joystick_pub
-     */
-    void pan_tilt_cam_callback(std::array<AxisState, 3>& axis_state) const;
-
-    /**
      * @brief Used to read values from the drives controller and send inputs in the
      * form of messages. Will store the messages in the form of a TwistStamped to be
      * published by another callback timer
+     *
+     * Also used for pan and tilting camera.
      *
      * @param axis_state an array of axis pulled from the js_events
      */
@@ -173,13 +210,13 @@ class Joystick : public cmr::fabric::FabricNode
 
     /**
      * @brief Used to assign values and publish a message whenever a button is
-     * pressed or released.
+     * pressed or released. This is used for arm callback.
      *
      * @param event the js_event by which the values are pulled from
      * @param message the message that is copied from arm_callback and will
      * eventually be published
      */
-    void js_event_button_publ(std::optional<js_event> event,
+    void js_event_button_arm_publ(std::optional<js_event> event,
                               cmr_msgs::msg::JoystickReading message) const;
 
     /**

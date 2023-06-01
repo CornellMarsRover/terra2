@@ -26,12 +26,25 @@ namespace cmr
 void Joystick::js_event_button_arm_publ(std::optional<js_event> event,
                                     cmr_msgs::msg::JoystickReading message) const
 {
-    message.control_id = event->number + 3;
+    auto control_id = event->number + 3;
+    auto magnitude = event->value != 0 ? 1 : 0;
+    message.control_id = control_id;
     message.axis_id = cmr_msgs::msg::JoystickReading::X_AXIS_ID;
-    message.magnitude = event->value != 0 ? 1 : 0;
+    message.magnitude = magnitude;
     CMR_LOG(INFO, "Button %u %s\n", event->number + 3,
             event->value != 0 ? "pressed" : "released");
     m_joystick_pub->publish(message);
+
+    // End effector control: publish to m_end_effector_pub
+    auto ee_message = std_msgs::msg::Int32();
+    if (control_id == 4) {
+        ee_message.data = magnitude;
+    } else if (control_id == 9) {
+        ee_message.data = -1 * magnitude;
+    } else {
+        ee_message.data = 0;
+    }
+    m_end_effector_pub->publish(ee_message);
 }
 
 Joystick::Joystick(const std::optional<cmr::fabric::FabricNodeConfig>& config)
@@ -216,6 +229,9 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
     m_joystick_pub =
         this->create_lifecycle_publisher<cmr_msgs::msg::JoystickReading>(
             "js_input", buffer_size);
+    m_end_effector_pub =
+        this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+            "/ee_input", buffer_size);
     m_pan_cam1_pub =
         this->create_lifecycle_publisher<std_msgs::msg::Int32>(
             "/pancam1", buffer_size);
@@ -281,6 +297,7 @@ bool Joystick::activate()
 
     // Activates the publishers needed
     m_joystick_pub->on_activate();
+    m_end_effector_pub->on_activate();
 
     m_pan_cam1_pub->on_activate();
     m_tilt_cam1_pub->on_activate();
@@ -302,6 +319,7 @@ bool Joystick::deactivate()
 {
     // Deactivates the publishers and timers
     m_joystick_pub->on_deactivate();
+    m_end_effector_pub->on_deactivate();
 
     m_pan_cam1_pub->on_deactivate();
     m_tilt_cam1_pub->on_deactivate();

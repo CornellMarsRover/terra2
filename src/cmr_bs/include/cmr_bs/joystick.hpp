@@ -123,6 +123,13 @@ class Joystick : public cmr::fabric::FabricNode
         m_joystick_pub;
 
     /**
+     * @brief The publisher for the end effector read function
+     */
+    std::shared_ptr<
+        rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+        m_end_effector_pub;
+
+    /**
      * @brief The publisher for the pantilt camera read function, pan value
      * for camera 1
      */

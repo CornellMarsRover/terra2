@@ -176,6 +176,8 @@ bool JoystickDirectControl::configure(const std::shared_ptr<toml::Table>& table)
         "js_input", buf_size, [this](const JoystickReading& joy_msg) {
             return update_arm_position(joy_msg);
         });
+    m_motor_write_pub = this->create_publisher<cmr_msgs::msg::MotorWriteBatch>(
+        "/ccb/motors", rclcpp::SensorDataQoS());
     m_end_effector_sub = this->create_subscription<std_msgs::msg::Int32>(
         "/ee_input", buf_size, [this](const std_msgs::msg::Int32& msg) {
             update_end_effector_velocity(msg.data);

@@ -169,6 +169,12 @@ class Joystick : public cmr::fabric::FabricNode
         m_tilt_cam2_pub;
 
     /**
+     * @brief The publisher for the astrotech start function for scooping
+     */
+    std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int32>>
+        m_astrotech_pub;
+
+    /**
      * @brief The publisher for the drives read function
      */
     std::shared_ptr<

@@ -199,7 +199,7 @@ void Joystick::drives_callback(std::array<AxisState, 3>& axis_state)
                     message.header.frame_id = "base_link";
                     m_last_drives_twist = message;
                     m_got_first_message = true;
-                } else if (static_cast<int>(control) == 2) {
+                } else if (static_cast<int>(control) == 12) {
                     // Create camera tilt and pan message and set member variable to
                     // constructed message, to be published on the drive publisher
                     // timer
@@ -211,6 +211,13 @@ void Joystick::drives_callback(std::array<AxisState, 3>& axis_state)
                     m_got_first_message = true;
                     m_last_pan = cam_message_pan;
                     m_last_tilt = cam_message_tilt;
+                } else if (static_cast<int>(control) == 3) {
+                    // Create camera tilt and pan message and set member variable to
+                    // constructed message, to be published on the drive publisher
+                    // timer
+                    int start = 0;
+                    m_astrotech_pub->publish(start);
+                    m_got_first_message = true;
                 } else {
                     CMR_LOG(INFO, "Control numbers invalid!");
                 }
@@ -260,6 +267,8 @@ bool Joystick::configure(const std::shared_ptr<toml::Table>& table)
         "/extendo_input", buffer_size);
     m_pan_cam1_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
         "/pancam1", buffer_size);
+    m_astrotech_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
+        "/astrotech", buffer_size);
     m_tilt_cam1_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
         "/tiltcam1", buffer_size);
     m_pan_cam2_pub = this->create_lifecycle_publisher<std_msgs::msg::Int32>(
@@ -328,6 +337,7 @@ bool Joystick::activate()
     m_tilt_cam1_pub->on_activate();
     m_pan_cam2_pub->on_activate();
     m_tilt_cam2_pub->on_activate();
+    m_astrotech_pub->on_activate();
 
     m_drives_pub->on_activate();
     m_buffer_timer->activate();
@@ -352,6 +362,7 @@ bool Joystick::deactivate()
     m_tilt_cam1_pub->on_deactivate();
     m_pan_cam2_pub->on_deactivate();
     m_tilt_cam2_pub->on_deactivate();
+    m_astrotech_pub->on_deactivate();
 
     m_drives_pub->on_deactivate();
     m_buffer_timer->deactivate();

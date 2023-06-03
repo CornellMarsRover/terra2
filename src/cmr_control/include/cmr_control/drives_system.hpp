@@ -67,6 +67,9 @@ class DrivesSystemHardware : public hardware_interface::SystemInterface
     std::shared_ptr<rclcpp::Subscription<cmr_msgs::msg::SensorReadBatch>>
         m_motor_read_sub;
 
+    /** listens for messages from astrotech controller hardware */
+    std::shared_ptr<rclcpp::Subscription<std_msgs::msg::Int32>> m_astrotech_sub;
+
     /**
      * @brief Returns true if the interfaces we're configured with make sense for
      * this hardware.
@@ -80,6 +83,8 @@ class DrivesSystemHardware : public hardware_interface::SystemInterface
     void sensor_callback(const cmr_msgs::msg::SensorReadBatch& msg);
 
     void set_velocity_mode() const;
+
+    void update_astrotech(int start);
 };
 
 }  // namespace cmr_control

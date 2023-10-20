@@ -27,10 +27,9 @@ using namespace std::chrono_literals;
 SiteAnalyze::SiteAnalyze(const std::optional<cmr::fabric::FabricNodeConfig>& config)
     : cmr::fabric::FabricNode::FabricNode(config)
 {
-    // TODO: LOGIC CANNOT GO IN THE CONSTRUCTOR, PLEASE REMOVE
-    // for (int i = 0; i < 4; i++) {
-    //     analyze();
-    // }
+    for (int i = 0; i < 4; i++) {
+        analyze();
+    }
 }
 /*
 // NOLINTNEXTLINE
@@ -79,7 +78,6 @@ void SiteAnalyze::handle_request(
     const std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Request>,
     std::shared_ptr<cmr_msgs::srv::SiteAnalyze::Response> response)
 {
-    // TODO: this is where the site analyze logic should go
     response->success = true;
 }
 
@@ -87,7 +85,6 @@ void SiteAnalyze::collection_handle_request(
     const std::shared_ptr<std_srvs::srv::Trigger::Request>,
     std::shared_ptr<std_srvs::srv::Trigger::Response> response)
 {
-    // TODO: this is where the collection logic should go
     response->success = true;
     collection();
 }
@@ -198,12 +195,12 @@ bool SiteAnalyze::configure(const std::shared_ptr<toml::Table>&)
 
     // Ex. const auto node_settings = table->getTable("node");
     m_service = create_lifecycle_service<cmr_msgs::srv::SiteAnalyze>(
-        "/site_analyze", std::bind(&SiteAnalyze::handle_request, this, _1, _2));
+        "site_analyze", std::bind(&SiteAnalyze::handle_request, this, _1, _2));
     m_motor_state_publisher =
         create_lifecycle_publisher<cmr_msgs::msg::MotorWriteBatch>(
-            "/ccb/motors", rclcpp::SensorDataQoS());
+            "/motor", rclcpp::SystemDefaultsQoS());
     m_collection_service = create_lifecycle_service<std_srvs::srv::Trigger>(
-        "/collection",
+        "site_analyze",
         std::bind(&SiteAnalyze::collection_handle_request, this, _1, _2));
     return true;
 }

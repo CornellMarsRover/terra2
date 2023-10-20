@@ -30,11 +30,6 @@ hardware_interface::CallbackReturn DrivesSystemHardware::on_init(
     m_hw_buffer.resize(info_.joints.size() * 2,
                        std::numeric_limits<int>::quiet_NaN());
 
-    m_astrotech_sub = this->create_subscription<std_msgs::msg::Int32>(
-        "/astrotech", buf_size, [this](const std_msgs::msg::Int32& msg) {
-            update_astrotech(msg.data);
-        });
-
     // Since hardware interfaces are not nodes, we need to create a node to do
     // our communication with the CCB for us.
     m_comm_node = rclcpp::Node::make_shared("drives_system_communicator");
@@ -69,18 +64,6 @@ DrivesSystemHardware::export_state_interfaces()
             &m_hw_velocities[i]));
     }
     return state_interfaces;
-}
-
-void DrivesSystemHardware::update_astrotech(int start)
-{
-    CMR_LOG(DEBUG, "JoystickDirectControl::update_astrotech");
-
-    cmr_msgs::msg::MotorWriteBatch msg;
-    msg.motor_ids = {0xc0 | 0x10 | 0x3};
-    msg.control_modes = {0x1};
-    msg.values = {start};
-    msg.size = 1;
-    m_motor_write_pub->publish(msg);
 }
 
 std::vector<hardware_interface::CommandInterface>

@@ -229,9 +229,9 @@ void Joystick::drives_publish_callback() const
         // publish latest drive message
         m_drives_pub->publish(m_last_drives_twist);
         // Used to display the values of the controller as a CMR_LOG
-        CMR_LOG(INFO, "Linear: %6f, Angular: %6f",
-                m_last_drives_twist.twist.linear.x,
-                m_last_drives_twist.twist.angular.z);
+        // CMR_LOG(INFO, "Linear: %6f, Angular: %6f",
+        //         m_last_drives_twist.twist.linear.x,
+        //         m_last_drives_twist.twist.angular.z);
 
         // publish latest camera pan and tilt message
         m_pan_cam1_pub->publish(m_last_pan);

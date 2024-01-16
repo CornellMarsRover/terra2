@@ -3,6 +3,49 @@ from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 import time
 import serial
+import struct
+
+valid_subteams = ["arm", "drives", "astrotech", "business", "homeless san fran ben dodson"]
+valid_motors = ["front_right", "front_left", "back_right", "back_left"]
+
+#subteam = which subteam is being controller
+#motor_id = which motor is being commanded
+#position = the position of the arm motor from 0 to 100 (0 = 0 degress or n o turn, 100 = 360 degrees or full turn )
+
+def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, logger):
+    if subteam not in valid_subteams:
+        raise ValueError(f"Invalid Subteam in command, needs to be one of {valid_subteams}")
+    if motor not in valid_motors:
+        raise ValueError("Invalid motor_id")
+    if position is not None and position not in range(100):
+        raise ValueError("Invalid position")
+    if not isinstance(drives_velocity, float) and not isinstance(drives_velocity, int) :
+        raise TypeError("drives_velocity must be an float or int")
+    
+    #Init hex values to be output
+
+
+    subteam_ids = {"drives": 0x01, "arm": 0x02, "astrotech": 0x03}
+    motor_ids = {"front_left": 0x01, "front_right": 0x03, "back_right": 0x02, "back_left": 0x04}
+    
+    subteam_hex = subteam_ids.get(subteam, 0x00)
+    motor_hex = motor_ids.get(motor, 0x00)
+    position_hex = struct.pack('f', position) if position is not None else b'\xFF\xFF\xFF\xFF'
+    drives_vel_hex = struct.pack('B', abs(int(drives_velocity)))
+    direction_hex = struct.pack('B', int(drives_velocity < 0))
+    max_torque_hex = struct.pack('f', max_torque) if max_torque is not None else b'\xFF\xFF\xFF\xFF'
+    max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF'
+    max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF'
+
+    drives_vel_hex_string = drives_vel_hex.hex()
+    logger.info(f'Vel: {drives_vel_hex_string}')
+
+    # Concatenate the parts and pad to ensure the total length is 40 bytes
+    output = bytes([subteam_hex, motor_hex]) + position_hex + drives_vel_hex + direction_hex + max_torque_hex + max_vel_hex + max_accel_hex
+    output = output.ljust(40, b'\x00')
+
+    return output
+
 
 class CmdVelSubscriber(Node):
     def __init__(self):
@@ -61,19 +104,22 @@ class CmdVelSubscriber(Node):
         target_speed = self.scale_value(msg.twist.linear.x, -2.5, 2.5, -53, 53)
         self.gradually_increase_speed(target_speed)
 
-        direction = int(self.current_speed < 0)
-        direction_byte = direction.to_bytes(1, byteorder='big')
+        # direction = int(self.current_speed < 0)
+        # direction_byte = direction.to_bytes(1, byteorder='big')
 
-        hex_vel = abs(int(self.current_speed))
-        hex_vel_byte = hex_vel.to_bytes(1, byteorder='big')
+        # hex_vel = abs(int(self.current_speed))
+        # hex_vel_byte = hex_vel.to_bytes(1, byteorder='big')
 
-        #Log direction and velocity
-        direction_str = "{:02x}".format(direction)
-        hex_vel_str = "{:02x}".format(hex_vel)
-        self.get_logger().info(f'Velocity: {hex_vel_str}')
-        self.get_logger().info(f'Direction: {direction_str}')
+        # #Log direction and velocity
+        # direction_str = "{:02x}".format(direction)
+        # hex_vel_str = "{:02x}".format(hex_vel)
+        # self.get_logger().info(f'Velocity: {hex_vel_str}')
+        # self.get_logger().info(f'Direction: {direction_str}')
 
-        self.send_number(self.serial_port, bytes([0x01, 0x03, 0xFF, 0xFF]) + hex_vel_byte + direction_byte + bytes([0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C]))
+        output = byte_command_converter("drives", "front_right", None, self.current_speed, None, None, None, self.get_logger())
+        self.send_number(self.serial_port, output)
+
+        # self.send_number(self.serial_port, bytes([0x01, 0x03, 0xFF, 0xFF]) + hex_vel_byte + direction_byte + bytes([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
 
 
 

@@ -20,8 +20,9 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
+            "armnet = cmr_rovernet.armnet:main",
             # PHOBOS_APPEND
-            'rovernet_node = cmr_rovernet.rovernet:main'
+            'drivesnet_node = cmr_rovernet.drivesnet:main'
         ],
     },
 )

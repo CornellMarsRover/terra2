@@ -170,7 +170,7 @@ void Joystick::arm_callback(std::array<AxisState, 3>& axis_state) const
 // NOLINTNEXTLINE(readability-function-size)
 void Joystick::drives_callback(std::array<AxisState, 3>& axis_state)
 {
-    CMR_LOG(INFO, "Running");
+    //CMR_LOG(INFO, "Running");
 
     auto message = geometry_msgs::msg::TwistStamped();
     auto cam_message_pan = std_msgs::msg::Int32();

@@ -37,11 +37,20 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF'
     max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF'
 
-    drives_vel_hex_string = drives_vel_hex.hex()
-    logger.info(f'Vel: {drives_vel_hex_string}')
+    # drives_vel_hex_string = drives_vel_hex.hex()
+    # logger.info(f'Vel: {drives_vel_hex_string}')
+
+    # max_torque_hex_string = max_torque_hex.hex()
+    # logger.info(f'Vel: {max_torque_hex_string}')
+
+    # max_accel_hex_string = max_accel_hex.hex()
+    # logger.info(f'Vel: {max_accel_hex_string}')
 
     # Concatenate the parts and pad to ensure the total length is 40 bytes
     output = bytes([subteam_hex, motor_hex]) + position_hex + drives_vel_hex + direction_hex + max_torque_hex + max_vel_hex + max_accel_hex
+
+    output_string = output.hex()
+    logger.info(f'Output: {output_string}')
     output = output.ljust(40, b'\x00')
 
     return output
@@ -116,7 +125,7 @@ class CmdVelSubscriber(Node):
         # self.get_logger().info(f'Velocity: {hex_vel_str}')
         # self.get_logger().info(f'Direction: {direction_str}')
 
-        output = byte_command_converter("drives", "front_right", None, self.current_speed, None, None, None, self.get_logger())
+        output = byte_command_converter("drives", "back_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
         self.send_number(self.serial_port, output)
 
         # self.send_number(self.serial_port, bytes([0x01, 0x03, 0xFF, 0xFF]) + hex_vel_byte + direction_byte + bytes([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))

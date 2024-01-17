@@ -22,7 +22,7 @@ class CmdVelSubscriber(Node):
         self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
 
     
-    def gradually_increase_speed(self, target_speed):
+    def gradually_increase_speed_linear(self, target_speed):
         current_time = time.time()
         time_difference = current_time - self.last_time
         self.last_time = current_time
@@ -49,24 +49,31 @@ class CmdVelSubscriber(Node):
 
     def listener_callback(self, msg):
         target_speed = scale_value(msg.twist.linear.x, -2.5, 2.5, -53, 53)
-        self.gradually_increase_speed(target_speed)
+        self.gradually_increase_speed_linear(target_speed)
+        # if msg.twist.angular.z == 2.5: 
+        #    output = byte_command_converter("drives", "back_right", None, None, None, None, None, self.get_logger())
+        if msg.twist.linear.x != 0:
+            back_right = byte_command_converter("drives", "back_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
+            front_right = byte_command_converter("drives", "front_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
+            front_left = byte_command_converter("drives", "front_left", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
+            back_left = byte_command_converter("drives", "back_left", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
+            send_number(self.serial_port, back_right)
+            send_number(self.serial_port, front_right)
+            send_number(self.serial_port, front_left)
+            send_number(self.serial_port, back_left)
+        
+        if msg.twist.angular.z != 0:
+            back_right = byte_command_converter("drives", "back_right", None, -self.current_speed, 1.5, None, 5.0, self.get_logger())
+            front_right = byte_command_converter("drives", "front_right", None, -self.current_speed, 1.5, None, 5.0, self.get_logger())
+            front_left = byte_command_converter("drives", "front_left", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
+            back_left = byte_command_converter("drives", "back_left", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
+            send_number(self.serial_port, back_right)
+            send_number(self.serial_port, front_right)
+            send_number(self.serial_port, front_left)
+            send_number(self.serial_port, back_left)
 
-        # direction = int(self.current_speed < 0)
-        # direction_byte = direction.to_bytes(1, byteorder='big')
-
-        # hex_vel = abs(int(self.current_speed))
-        # hex_vel_byte = hex_vel.to_bytes(1, byteorder='big')
-
-        # #Log direction and velocity
-        # direction_str = "{:02x}".format(direction)
-        # hex_vel_str = "{:02x}".format(hex_vel)
-        # self.get_logger().info(f'Velocity: {hex_vel_str}')
-        # self.get_logger().info(f'Direction: {direction_str}')
-
-        output = byte_command_converter("drives", "back_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
-        send_number(self.serial_port, output)
-
-        # self.send_number(self.serial_port, bytes([0x01, 0x03, 0xFF, 0xFF]) + hex_vel_byte + direction_byte + bytes([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
+        #output = byte_command_converter("drives", "back_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
+        #send_number(self.serial_port, output)
 
 
 

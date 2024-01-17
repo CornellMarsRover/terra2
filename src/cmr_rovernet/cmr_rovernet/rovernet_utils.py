@@ -3,6 +3,7 @@ import struct
 VALID_SUBTEAMS = ["arm", "drives", "astrotech", "business", "homeless san fran ben dodson"]
 VALID_MOTORS = ["front_right", "front_left", "back_right", "back_left"]
 
+#stop command - subteam byte, motor byte, then all FF bytes
 #subteam = which subteam is being controller
 #motor_id = which motor is being commanded
 #position = the position of the arm motor from 0 to 100 (0 = 0 degress or n o turn, 100 = 360 degrees or full turn )
@@ -26,8 +27,8 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     subteam_hex = subteam_ids.get(subteam, 0x00)
     motor_hex = motor_ids.get(motor, 0x00)
     position_hex = struct.pack('f', position) if position is not None else b'\xFF\xFF\xFF\xFF'
-    drives_vel_hex = struct.pack('B', abs(int(drives_velocity)))
-    direction_hex = struct.pack('B', int(drives_velocity < 0))
+    drives_vel_hex = struct.pack('B', abs(int(drives_velocity))) if drives_velocity is not None else b'\xFF\xFF'
+    direction_hex = struct.pack('B', int(drives_velocity < 0)) if drives_velocity is not None else b'\xFF\xFF'
     max_torque_hex = struct.pack('f', max_torque) if max_torque is not None else b'\xFF\xFF\xFF\xFF'
     max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF'
     max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF'

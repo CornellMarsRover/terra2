@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = "controller_remote"
+package_name = "cmr_controller_remote"
 
 setup(
     name=package_name,
@@ -9,6 +9,7 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
+        ('share/' + package_name + '/launch', ['launch/connect.launch.py']),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -20,6 +21,7 @@ setup(
     entry_points={
         "console_scripts": [
             # PHOBOS_APPEND
+            'connect_node = cmr_controller_remote.connect:main'
         ],
     },
 )

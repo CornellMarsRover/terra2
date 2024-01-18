@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 import time
-#import serial
+import serial
 from cmr_rovernet.rovernet_utils import *
 
 
@@ -26,12 +26,12 @@ class CmdVelSubscriber(Node):
         self.last_time = time.time()
         self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
-       #self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
-        self.serial_port = None
+        self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        # self.serial_port = None
         self.logger = self.get_logger()
         
         # Init constants given TOML file
-        drives_controller_table = parse_toml("drivescontroller")
+        drives_controller_table = parse_toml("connect")
         drives_net_table = parse_toml("drivesnet")
         drives_net_node = drives_net_table['node']
         self.CONTROLLER_MAX_SPEED = drives_controller_table['node']['max_speed']

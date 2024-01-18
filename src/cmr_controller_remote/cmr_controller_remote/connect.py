@@ -12,7 +12,7 @@ sock.bind((UDP_IP, UDP_PORT))
 class CmdVelPublisher(Node):
   def __init__(self):
     super().__init__('cmd_vel_publisher')
-    self.publisher_ = self.create_publisher(TwistStamped, '/remote_control/cmd_vel', 10)
+    self.publisher_ = self.create_publisher(TwistStamped, '/drives_controller/cmd_vel', 10)
     self.timer = self.create_timer(0.1, self.publish_msg)
   
   def publish_msg(self):
@@ -20,7 +20,7 @@ class CmdVelPublisher(Node):
     linear_velocity, angular_velocity = self.parse_controller_data(data)
     msg = self.create_twist_stamped(linear_velocity, angular_velocity)
     self.publisher_.publish(msg)
-    self.get_logger().info('Publishing: "%s"' % msg)
+    #self.get_logger().info('Publishing: "%s"' % msg)
 
 
   def create_twist_stamped(self, linear_velocity, angular_velocity):
@@ -31,7 +31,12 @@ class CmdVelPublisher(Node):
   def parse_controller_data(self, raw_data):
 
     # Extract the first two bytes as linear and angular velocities
-    linear_velocity, angular_velocity = raw_data[0], raw_data[1]
+    linear_velocity_raw, angular_velocity_raw = raw_data[0], raw_data[1]
+
+    # Scale the raw values to the desired range
+    linear_velocity = self.scale_value(linear_velocity_raw, 0, 255, -2.5, 2.5)
+    angular_velocity = self.scale_value(angular_velocity_raw, 0, 255, -2.5, 2.5)
+
     print(f"Linear Velocity: {linear_velocity}, Angular Velocity: {angular_velocity}")
 
     # Extract button states (assuming each state is one byte)
@@ -45,6 +50,10 @@ class CmdVelPublisher(Node):
     hat_switch = hat_switch_data.split(b'\x00')[0].decode('utf-8') # Split at null byte and decode
     print("Hat Switch Direction:", hat_switch)
     return float(linear_velocity), float(angular_velocity)
+
+  def scale_value(self, value, old_min, old_max, new_min, new_max):
+    # Scale the old range to the new range
+    return ((value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min
 
 
 def main(args = None):

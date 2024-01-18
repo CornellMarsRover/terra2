@@ -51,8 +51,8 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
 
-    # drives_vel_hex_string = drives_vel_hex.hex()
-    # logger.info(f'Vel: {drives_vel_hex_string}')
+    drives_vel_hex_string = drives_vel_hex.hex()
+    logger.info(f'Vel: {drives_vel_hex_string}')
 
     # max_torque_hex_string = max_torque_hex.hex()
     # logger.info(f'Vel: {max_torque_hex_string}')
@@ -63,10 +63,9 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     # Concatenate the parts and pad to ensure the total length is 40 bytes
     output = bytes([subteam_hex, motor_hex]) + position_hex + drives_vel_hex + direction_hex + max_torque_hex + max_vel_hex + max_accel_hex
 
-    output_string = output.hex()
-    logger.info(f'Output: {output_string}')
+    # output_string = output.hex()
+    # logger.info(f'Output: {output_string}')
     output = output.ljust(40, b'\x00')
-
     return output
 
 

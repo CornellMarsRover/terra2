@@ -13,6 +13,18 @@ BACK_RIGHT = 0x02
 FRONT_RIGHT = 0x03
 BACK_LEFT = 0x04
 
+#TRIGGERS - INDEX 0 OF BUTTON_ARRAY
+L1 = 1 #0x01
+R1 = 256 #0x0101
+L2 = 65536 #0x010101
+R2 = 16777216 #0x01010101
+
+#BUTTONS - INDEX 1 OF BUTTON_ARRAY
+SQUARE = 1 #0x01
+X = 256 #0x0101
+CIRCLE = 65536 #0x010101
+TRIANGLE = 16777216 #0x01010101
+
 
 def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, logger):
     """
@@ -41,7 +53,7 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
         raise ValueError("Invalid motor_id")
     if position is not None and position not in range(100):
         raise ValueError("Invalid position")
-    if not isinstance(drives_velocity, float) and not isinstance(drives_velocity, int) :
+    if drives_velocity is not None and not isinstance(drives_velocity, float) and not isinstance(drives_velocity, int):
         raise TypeError("drives_velocity must be an float or int")
     
     #Init hex values to be output

@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
+from cmr_msgs.msg import DrivesControllerReading
 import time
 import serial
 from cmr_rovernet.rovernet_utils import *
@@ -19,6 +20,11 @@ class CmdVelSubscriber(Node):
             TwistStamped,
             '/drives_controller/cmd_vel',
             self.listener_callback,
+            10)
+        self.button_subscription = self.create_subscription(
+            DrivesControllerReading,
+            '/drives_controller/cmd_buttons',
+            self.listener_button_callback,
             10)
         self.subscription  # prevent unused variable warning
         self.current_speed = 0
@@ -113,7 +119,24 @@ class CmdVelSubscriber(Node):
 
         #output = byte_command_converter(DRIVES, "back_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
         #send_number(self.serial_port, output)
+            
+    def listener_button_callback(self, msg):
+        trigger_val = msg.button_array[0]
+        button_val = msg.button_array[1]
+        # self.logger.info(f'button_array: {msg.button_array[1]}')
+        if trigger_val == L2 and button_val == TRIANGLE: 
+            self.current_speed = 0
+            self.current_speed_angular = 0
+            back_right_stop = byte_command_converter(DRIVES, BACK_RIGHT, None, None, None, None, None, self.logger)
+            front_right_stop = byte_command_converter(DRIVES, FRONT_RIGHT, None, None, None, None, None, self.logger)
+            front_left_stop = byte_command_converter(DRIVES, FRONT_LEFT, None, None, None, None, None, self.logger)
+            back_left_stop = byte_command_converter(DRIVES, BACK_LEFT, None, None, None, None, None, self.logger)
+            send_number(self.serial_port, back_right_stop)
+            send_number(self.serial_port, front_right_stop)
+            send_number(self.serial_port, front_left_stop)
+            send_number(self.serial_port, back_left_stop)
 
+        
 
 def main(args=None):
     rclpy.init(args=args)

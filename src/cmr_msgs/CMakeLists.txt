@@ -16,6 +16,7 @@ rosidl_generate_interfaces(
   msg/State.msg
   msg/ArucoMarkers.msg
   msg/JoystickReading.msg
+  msg/DrivesControllerReading.msg
   msg/ArmJointEffort.msg
   msg/Error.msg
   msg/MotorWriteBatch.msg

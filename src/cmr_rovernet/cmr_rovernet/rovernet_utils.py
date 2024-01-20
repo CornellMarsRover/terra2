@@ -2,8 +2,16 @@ import struct
 from toml import load
 from os import path
 
-VALID_SUBTEAMS = ["arm", "drives", "astrotech", "business", "homeless san fran ben dodson"]
-VALID_MOTORS = ["front_right", "front_left", "back_right", "back_left"]
+#VALID SUBTEAMS
+DRIVES = 0x01
+ARM = 0x02
+ASTROTECH = 0x03
+
+#VALID MOTORS
+FRONT_LEFT = 0x01
+BACK_RIGHT = 0x02
+FRONT_RIGHT = 0x03
+BACK_LEFT = 0x04
 
 
 def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, logger):
@@ -11,7 +19,7 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     Helper function to convert a given motor command into a 40-byte encoding. Current format, with 
     number of bytes written in parantheses:
     
-    - SUBTEAM (1): either 'arm', 'drives', 'astrotech', 'business'
+    - SUBTEAM (1): either 'drives', 'arm', 'astrotech', 'business'
     - MOTOR (1): either 'front_right', 'front_left', 'back_right', 'back_left'
     - POSITION (4)
     - DRIVES_VELOCITY (1)
@@ -27,9 +35,9 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     #motor_id = which motor is being commanded
     #position = the position of the arm motor from 0 to 100 (0 = 0 degress or n o turn, 100 = 360 degrees or full turn )
     
-    if subteam not in VALID_SUBTEAMS:
-        raise ValueError(f"Invalid Subteam in command, needs to be one of {VALID_SUBTEAMS}")
-    if motor not in VALID_MOTORS:
+    if subteam < DRIVES or subteam > ASTROTECH:
+        raise ValueError(f"Invalid Subteam in command")
+    if motor < FRONT_LEFT or motor > BACK_LEFT:
         raise ValueError("Invalid motor_id")
     if position is not None and position not in range(100):
         raise ValueError("Invalid position")
@@ -37,13 +45,9 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
         raise TypeError("drives_velocity must be an float or int")
     
     #Init hex values to be output
-
-
-    subteam_ids = {"drives": 0x01, "arm": 0x02, "astrotech": 0x03}
-    motor_ids = {"front_left": 0x01, "front_right": 0x03, "back_right": 0x02, "back_left": 0x04}
     
-    subteam_hex = subteam_ids.get(subteam, 0x00) #1 byte
-    motor_hex = motor_ids.get(motor, 0x00) #1 byte
+    subteam_hex = subteam #1 byte
+    motor_hex = motor #1 byte
     position_hex = struct.pack('f', position) if position is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     drives_vel_hex = struct.pack('B', abs(int(drives_velocity))) if drives_velocity is not None else b'\xFF' #1 byte
     direction_hex = struct.pack('B', int(drives_velocity < 0)) if drives_velocity is not None else b'\xFF' #1 byte

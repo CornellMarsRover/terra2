@@ -18,17 +18,16 @@ directions = {
 print("Connecting Drives")
 drives_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 drives_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+drives_sock.setblocking(0)
 drives_sock.bind((UDP_IP, UDP_PORT_DRIVES))
 print(drives_sock)
 
 print("Connecting Arm")
 arm_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 arm_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+arm_sock.setblocking(0)
 arm_sock.bind((UDP_IP, UDP_PORT_ARM))
 print(arm_sock)
-
-data_test, ad = drives_sock.recvfrom(1024)
-print(data_test)
 
 class CmdVelPublisher(Node):
   def __init__(self):
@@ -43,29 +42,33 @@ class CmdVelPublisher(Node):
     self.logger = self.get_logger()
   
   def publish_msg(self):
-    data, addr = drives_sock.recvfrom(1024)
-    arm_data, addr = arm_sock.recvfrom(1024)
 
-    linear_velocity, angular_velocity = self.parse_controller_data(data)
-    velocities = self.parse_arm_data(arm_data)
-    
-    button_array, dpad = self.parse_button_data(data)
-    arm_button_array = velocities[1]
-    
-    msg = self.create_twist_stamped(linear_velocity, angular_velocity)
-    button_msg = self.create_button_message(button_array, dpad)
-
-    arm_msg = self.create_twist_stamped(velocities[0])
-    arm_button_msg = self.create_arm_button_message(arm_button_array)
-
-    self.logger.info(f'VEL: {velocities[0]}')
-
-    self.publisher_.publish(msg)
-    self.button_publisher_.publish(button_msg)
-
-    self.arm_publisher_.publish(arm_msg)
-    self.arm_button_publisher_.publish(arm_button_msg)
-    #self.get_logger().info('Publishing: "%s"' % msg)
+      try:
+          data, addr = drives_sock.recvfrom(1024)
+          linear_velocity, angular_velocity = self.parse_controller_data(data)
+          button_array, dpad = self.parse_button_data(data)
+          msg = self.create_twist_stamped([linear_velocity, angular_velocity])
+          button_msg = self.create_button_message(button_array, dpad)
+          self.publisher_.publish(msg)
+          self.button_publisher_.publish(button_msg)
+          # process data
+      except BlockingIOError:
+          # Handle the case where no data is received
+          pass
+      
+      try:
+        arm_data, addr = arm_sock.recvfrom(1024)
+        # process arm_data
+        velocities = self.parse_arm_data(arm_data)
+        self.logger.info(velocities)
+        arm_button_array = velocities[1]
+        arm_msg = self.create_twist_stamped(velocities[0])
+        arm_button_msg = self.create_arm_button_message(arm_button_array)
+        self.arm_publisher_.publish(arm_msg)
+        self.arm_button_publisher_.publish(arm_button_msg)
+      except BlockingIOError:
+        # Handle the case where no data is received
+        pass
 
   def create_twist_stamped(self, velocities):
     if len(velocities) == 2:
@@ -115,10 +118,11 @@ class CmdVelPublisher(Node):
     return buttons, dpad
   
   def parse_arm_data(self, raw_data):
+      
       x_axis = struct.unpack('<d', raw_data[1:9])[0]
       y_axis = struct.unpack('<d', raw_data[9:17])[0]
       z_axis = struct.unpack('<d', raw_data[17:25])[0]
-      button_data = struct.unpack('16B', raw_data[25:])
+      button_data = struct.unpack('15B', raw_data[25:])
       print(button_data)
       print(f"X: {x_axis}, Y: {y_axis}, Z: {z_axis}")
       return [[float(x_axis), float(y_axis), float(y_axis)], button_data]

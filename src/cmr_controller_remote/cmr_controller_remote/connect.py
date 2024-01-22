@@ -1,47 +1,93 @@
 from geometry_msgs.msg import TwistStamped
-from cmr_msgs.msg import DrivesControllerReading
+from cmr_msgs.msg import ControllerReading
 import socket
 import rclpy 
 from rclpy.node import Node
+import struct
 
 UDP_IP = "0.0.0.0" # Listen on all available IPs
-UDP_PORT = 5010
+UDP_PORT_DRIVES = 5010
+UDP_PORT_ARM = 5020
 
 directions = {
     "neutral" : 8, "N" : 0, "NE" : 1, "E" : 2, "SE" : 3,
     "S" : 4, "SW" : 5, "W" : 6, "NW" : 7
 }
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.bind((UDP_IP, UDP_PORT))
 
+print("Connecting Drives")
+drives_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+drives_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+drives_sock.bind((UDP_IP, UDP_PORT_DRIVES))
+print(drives_sock)
+
+print("Connecting Arm")
+arm_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+arm_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+arm_sock.bind((UDP_IP, UDP_PORT_ARM))
+print(arm_sock)
+
+data_test, ad = drives_sock.recvfrom(1024)
+print(data_test)
 
 class CmdVelPublisher(Node):
   def __init__(self):
     super().__init__('cmd_vel_publisher')
     self.publisher_ = self.create_publisher(TwistStamped, '/drives_controller/cmd_vel', 10)
-    self.button_publisher_ = self.create_publisher(DrivesControllerReading, '/drives_controller/cmd_buttons', 10)
+    self.arm_publisher_ = self.create_publisher(TwistStamped, '/arm_controller/cmd_vel', 10)
+
+    self.button_publisher_ = self.create_publisher(ControllerReading, '/drives_controller/cmd_buttons', 10)
+    self.arm_button_publisher_ = self.create_publisher(ControllerReading, '/arm_controller/cmd_buttons', 10)
     self.timer = self.create_timer(0.1, self.publish_msg)
+
+    self.logger = self.get_logger()
   
   def publish_msg(self):
-    data, addr = sock.recvfrom(1024)
+    data, addr = drives_sock.recvfrom(1024)
+    arm_data, addr = arm_sock.recvfrom(1024)
+
     linear_velocity, angular_velocity = self.parse_controller_data(data)
+    velocities = self.parse_arm_data(arm_data)
+    
     button_array, dpad = self.parse_button_data(data)
+    arm_button_array = velocities[1]
+    
     msg = self.create_twist_stamped(linear_velocity, angular_velocity)
     button_msg = self.create_button_message(button_array, dpad)
+
+    arm_msg = self.create_twist_stamped(velocities[0])
+    arm_button_msg = self.create_arm_button_message(arm_button_array)
+
+    self.logger.info(f'VEL: {velocities[0]}')
+
     self.publisher_.publish(msg)
     self.button_publisher_.publish(button_msg)
+
+    self.arm_publisher_.publish(arm_msg)
+    self.arm_button_publisher_.publish(arm_button_msg)
     #self.get_logger().info('Publishing: "%s"' % msg)
 
-  def create_twist_stamped(self, linear_velocity, angular_velocity):
-    twist_msg = TwistStamped()
-    twist_msg.twist.linear.x, twist_msg.twist.angular.z = linear_velocity, angular_velocity
-    return twist_msg
+  def create_twist_stamped(self, velocities):
+    if len(velocities) == 2:
+      twist_msg = TwistStamped()
+      twist_msg.twist.linear.x, twist_msg.twist.angular.z = velocities[0], velocities[1]
+      return twist_msg
+    elif len(velocities) == 3:
+      twist_msg = TwistStamped()
+      twist_msg.twist.linear.x, twist_msg.twist.angular.z, twist_msg.twist.linear.z = velocities[0], velocities[1], velocities[2]
+      return twist_msg
+    else:
+      self.get_logger().warn('Received unexpected number of velocity states')
+      return None
   
   def create_button_message(self, button_array, dpad):
-    button_msg = DrivesControllerReading()
+    button_msg = ControllerReading()
     button_msg.button_array, button_msg.dpad = button_array, dpad
+    return button_msg
+  
+  def create_arm_button_message(self, button_array):
+    button_msg = ControllerReading()
+    button_msg.button_array = button_array
     return button_msg
 
   def parse_controller_data(self, raw_data):
@@ -67,9 +113,15 @@ class CmdVelPublisher(Node):
     dpad = raw_data[10]
     dpad = directions.get(dpad, -1)
     return buttons, dpad
-
-
-
+  
+  def parse_arm_data(self, raw_data):
+      x_axis = struct.unpack('<d', raw_data[1:9])[0]
+      y_axis = struct.unpack('<d', raw_data[9:17])[0]
+      z_axis = struct.unpack('<d', raw_data[17:25])[0]
+      button_data = struct.unpack('16B', raw_data[25:])
+      print(button_data)
+      print(f"X: {x_axis}, Y: {y_axis}, Z: {z_axis}")
+      return [[float(x_axis), float(y_axis), float(y_axis)], button_data]
 
   def scale_value(self, value, old_min, old_max, new_min, new_max):
     # Scale the old range to the new range

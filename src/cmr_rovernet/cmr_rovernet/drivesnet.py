@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
-from cmr_msgs.msg import DrivesControllerReading
+from cmr_msgs.msg import ControllerReading
 import time
 import serial
 from cmr_rovernet.rovernet_utils import *
@@ -22,7 +22,7 @@ class CmdVelSubscriber(Node):
             self.listener_callback,
             10)
         self.button_subscription = self.create_subscription(
-            DrivesControllerReading,
+            ControllerReading,
             '/drives_controller/cmd_buttons',
             self.listener_button_callback,
             10)

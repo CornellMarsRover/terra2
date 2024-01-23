@@ -60,7 +60,6 @@ class CmdVelPublisher(Node):
         arm_data, addr = arm_sock.recvfrom(1024)
         # process arm_data
         velocities = self.parse_arm_data(arm_data)
-        self.logger.info(velocities)
         arm_button_array = velocities[1]
         arm_msg = self.create_twist_stamped(velocities[0])
         arm_button_msg = self.create_arm_button_message(arm_button_array)
@@ -77,7 +76,7 @@ class CmdVelPublisher(Node):
       return twist_msg
     elif len(velocities) == 3:
       twist_msg = TwistStamped()
-      twist_msg.twist.linear.x, twist_msg.twist.angular.z, twist_msg.twist.linear.z = velocities[0], velocities[1], velocities[2]
+      twist_msg.twist.linear.x, twist_msg.twist.linear.y, twist_msg.twist.linear.z = velocities[0], velocities[1], velocities[2]
       return twist_msg
     else:
       self.get_logger().warn('Received unexpected number of velocity states')
@@ -119,13 +118,13 @@ class CmdVelPublisher(Node):
   
   def parse_arm_data(self, raw_data):
       
-      x_axis = struct.unpack('<d', raw_data[1:9])[0]
-      y_axis = struct.unpack('<d', raw_data[9:17])[0]
-      z_axis = struct.unpack('<d', raw_data[17:25])[0]
-      button_data = struct.unpack('15B', raw_data[25:])
+      x_axis = struct.unpack('<d', raw_data[0:8])[0]
+      y_axis = struct.unpack('<d', raw_data[8:16])[0]
+      z_axis = struct.unpack('<d', raw_data[16:24])[0]
+      button_data = struct.unpack('16B', raw_data[24:])
       print(button_data)
       print(f"X: {x_axis}, Y: {y_axis}, Z: {z_axis}")
-      return [[float(x_axis), float(y_axis), float(y_axis)], button_data]
+      return [[float(x_axis), float(y_axis), float(z_axis)], button_data]
 
   def scale_value(self, value, old_min, old_max, new_min, new_max):
     # Scale the old range to the new range

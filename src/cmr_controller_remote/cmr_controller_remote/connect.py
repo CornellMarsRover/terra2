@@ -115,7 +115,6 @@ class CmdVelPublisher(Node):
     dpad = raw_data[10]
     dpad = directions.get(dpad, -1)
     return buttons, dpad
-<<<<<<< HEAD
   
   def parse_arm_data(self, raw_data):
       
@@ -126,8 +125,6 @@ class CmdVelPublisher(Node):
       print(button_data)
       print(f"X: {x_axis}, Y: {y_axis}, Z: {z_axis}")
       return [[float(x_axis), float(y_axis), float(z_axis)], button_data]
-=======
->>>>>>> 7275cc53905872e38af2ab5de0dba04bb238b7a7
 
   def scale_value(self, value, old_min, old_max, new_min, new_max):
     # Scale the old range to the new range

@@ -68,9 +68,6 @@ class CmdVelPublisher(Node):
     dpad = directions.get(dpad, -1)
     return buttons, dpad
 
-
-
-
   def scale_value(self, value, old_min, old_max, new_min, new_max):
     # Scale the old range to the new range
     return ((value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min

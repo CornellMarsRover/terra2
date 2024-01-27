@@ -29,6 +29,7 @@ class CmdVelSubscriber(Node):
         self.subscription  # prevent unused variable warning
         self.current_speed = 0
         self.current_speed_angular = 0
+        self.turn_thread_lock = 0
         self.last_time = time.time()
         self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
@@ -91,7 +92,7 @@ class CmdVelSubscriber(Node):
         
         # if msg.twist.angular.z == 2.5: 
         #    output = byte_command_converter(DRIVES, "back_right", None, None, None, None, None, self.get_logger())
-        if msg.twist.linear.x != 0:
+        if self.turn_thread_lock == False:
             target_speed = scale_value(msg.twist.linear.x, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
                                        -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
             self.gradually_increase_speed_linear(target_speed)
@@ -104,8 +105,8 @@ class CmdVelSubscriber(Node):
             send_number(self.serial_port, front_left)
             send_number(self.serial_port, back_left)
             
-        elif msg.twist.angular.z != 0:
-            target_speed_angular = scale_value(msg.twist.angular.y, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
+        if self.turn_thread_lock == True:
+            target_speed_angular = scale_value(msg.twist.angular.z, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
                                        -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
             self.gradually_increase_speed_angular(target_speed_angular)
             back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed_angular, 1.5, None, 5.0, self.logger)
@@ -135,6 +136,8 @@ class CmdVelSubscriber(Node):
             send_number(self.serial_port, front_right_stop)
             send_number(self.serial_port, front_left_stop)
             send_number(self.serial_port, back_left_stop)
+        if trigger_val == L2 and button_val == CIRCLE: 
+            self.turn_thread_lock = not self.turn_thread_lock
 
         
 

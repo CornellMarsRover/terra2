@@ -10,9 +10,9 @@ RECEIVE_DATA = 0x04
 
 #VALID MOTORS
 FRONT_LEFT = 0x01
-BACK_RIGHT = 0x02
+BACK_RIGHT = 0x04
 FRONT_RIGHT = 0x03
-BACK_LEFT = 0x04
+BACK_LEFT = 0x02
 
 #VALID ARM MOTORS
 ARM1 = 0x05
@@ -58,7 +58,7 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     
     if subteam < DRIVES or subteam > ASTROTECH:
         raise ValueError(f"Invalid Subteam in command")
-    if motor < FRONT_LEFT or motor > BACK_LEFT:
+    if motor < FRONT_LEFT or motor > BACK_RIGHT:
         raise ValueError("Invalid motor_id")
     if position is not None and position not in range(100):
         raise ValueError("Invalid position")

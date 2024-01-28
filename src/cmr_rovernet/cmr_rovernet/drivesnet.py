@@ -96,8 +96,8 @@ class CmdVelSubscriber(Node):
             target_speed = scale_value(msg.twist.linear.x, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
                                        -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
             self.gradually_increase_speed_linear(target_speed)
-            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, self.current_speed, 1.5, None, 5.0, self.logger)
-            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, self.current_speed, 1.5, None, 5.0, self.logger)
+            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed, 1.5, None, 5.0, self.logger)
+            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed, 1.5, None, 5.0, self.logger)
             front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed, 1.5, None, 5.0, self.logger)
             back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed, 1.5, None, 5.0, self.logger)
             send_number(self.serial_port, back_right)
@@ -109,8 +109,8 @@ class CmdVelSubscriber(Node):
             target_speed_angular = scale_value(msg.twist.angular.z, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
                                        -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
             self.gradually_increase_speed_angular(target_speed_angular)
-            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed_angular, 1.5, None, 5.0, self.logger)
-            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed_angular, 1.5, None, 5.0, self.logger)
+            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, self.current_speed_angular, 1.5, None, 5.0, self.logger)
+            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, self.current_speed_angular, 1.5, None, 5.0, self.logger)
             front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed_angular, 1.5, None, 5.0, self.logger)
             back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed_angular, 1.5, None, 5.0, self.logger)
             send_number(self.serial_port, back_right)

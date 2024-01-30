@@ -1,21 +1,59 @@
+# Calibration file generated from image-common/cameracalibrator node.
+# This is taken from the ros2_usb_camera repository and must be updated to
+# reflect the actual calibration of our cameras, which should be done during JanFab.
 image_width: 640
 image_height: 480
-camera_name: narrow_stereo
+camera_name: camera
 camera_matrix:
   rows: 3
   cols: 3
-  data: [903.5954, 0., 338.62864, 0., 899.54784, 248.82051, 0., 0., 1.]
+  data:
+    [
+      944.012173,
+      0.000000,
+      534.248944,
+      0.000000,
+      893.428920,
+      358.594765,
+      0.000000,
+      0.000000,
+      1.000000,
+    ]
 distortion_model: plumb_bob
 distortion_coefficients:
   rows: 1
   cols: 5
-  data: [-0.121852, 1.003310, 0.005448, -0.003793, 0.000000]
+  data: [0.260086, -0.025048, 0.089063, 0.138628, 0.000000]
 rectification_matrix:
   rows: 3
   cols: 3
-  data: [1., 0., 0., 0., 1., 0., 0., 0., 1.]
+  data:
+    [
+      1.000000,
+      0.000000,
+      0.000000,
+      0.000000,
+      1.000000,
+      0.000000,
+      0.000000,
+      0.000000,
+      1.000000,
+    ]
 projection_matrix:
   rows: 3
   cols: 4
   data:
-    [916.04724, 0., 335.72631, 0., 0., 914.91559, 249.5583, 0., 0., 0., 1., 0.]
+    [
+      852.395142,
+      0.000000,
+      565.897630,
+      0.000000,
+      0.000000,
+      922.066223,
+      386.586250,
+      0.000000,
+      0.000000,
+      0.000000,
+      1.000000,
+      0.000000,
+    ]

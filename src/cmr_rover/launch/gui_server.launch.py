@@ -13,6 +13,7 @@ def generate_launch_description():
                 FrontendLaunchDescriptionSource(
                     path.join(
                         get_package_share_directory("foxglove_bridge"),
+                        "launch",
                         "foxglove_bridge_launch.xml",
                     )
                 )

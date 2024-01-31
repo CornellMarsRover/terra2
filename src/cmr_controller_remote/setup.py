@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = "cmr_rovernet"
+package_name = "cmr_controller_remote"
 
 setup(
     name=package_name,
@@ -9,20 +9,19 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
-        ('share/' + package_name + '/launch', ['launch/rovernet.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/connect.launch.py']),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="CMR",
     maintainer_email="team@cornellmarsrover.org",
-    description="The CCB-Jetson communication package omitting the micro ros agent",
+    description="Remote connection scripts for Jetson to receive remote control inputs wirelessly",
     license="MIT",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "armnet_node = cmr_rovernet.armnet:main",
             # PHOBOS_APPEND
-            'drivesnet_node = cmr_rovernet.drivesnet:main'
+            'connect_node = cmr_controller_remote.connect:main'
         ],
     },
 )

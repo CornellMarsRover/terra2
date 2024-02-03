@@ -1,0 +1,30 @@
+<package format="3">
+    <name>cmr_arm_sim</name>
+    <version>0.0.0</version>
+    <description>The arm simulator for the 2024 CMR arm</description>
+    <maintainer email="team@cornellmarsrover.org">CMR</maintainer>
+    <license>MIT</license>
+
+    <!-- Example dependencies -->
+    <depend>rviz2</depend>
+    <depend>robot_state_publisher</depend>
+    <depend>tf2_ros</depend>
+    <depend>tf2_geometry_msgs</depend>
+    <depend>xacro</depend>
+    <depend>joint_state_publisher</depend>
+    <depend>joint_state_publisher_gui</depend>
+
+    <!-- If you're using any messages, services, or actions -->
+    <depend>geometry_msgs</depend>
+    <depend>sensor_msgs</depend>
+    <depend>std_msgs</depend>
+    <depend>std_srvs</depend>
+    <depend>nav_msgs</depend>
+    <depend>visualization_msgs</depend>
+
+    <test_depend>python3-pytest</test_depend>
+
+    <export>
+        <build_type>ament_python</build_type>
+    </export>
+</package>

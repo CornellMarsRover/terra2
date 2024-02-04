@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="Arm">
+<robot name="Arm">
 
 
 <link name="base_link">
@@ -11,13 +11,13 @@
   <visual>
     <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
     <geometry>
-      <mesh filename="meshes/base_link.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/base_link.stl" scale="1 1 1"/>
     </geometry>
   </visual>
   <collision>
     <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
     <geometry>
-      <mesh filename="meshes/base_link.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/base_link.stl" scale="1 1 1"/>
     </geometry>
   </collision>
 </link>
@@ -31,13 +31,13 @@
   <visual>
     <origin xyz="0 0 3.42" rpy="-1.57079632679 0 0"/>
     <geometry>
-      <mesh filename="meshes/shoulder.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/shoulder.stl" scale="1 1 1"/>
     </geometry>
   </visual>
   <collision>
     <origin xyz="0 0 3.42" rpy="-1.57079632679 0 0"/>
     <geometry>
-      <mesh filename="meshes/shoulder.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/shoulder.stl" scale="1 1 1"/>
     </geometry>
   </collision>
 </link>
@@ -51,13 +51,13 @@
   <visual>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="meshes/lower_arm.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/lower_arm.stl" scale="1 1 1"/>
     </geometry>
   </visual>
   <collision>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="meshes/lower_arm.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/lower_arm.stl" scale="1 1 1"/>
     </geometry>
   </collision>
 </link>
@@ -71,13 +71,13 @@
   <visual>
     <origin xyz="0 14.425 0" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="meshes/upper_arm.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/upper_arm.stl" scale="1 1 1"/>
     </geometry>
   </visual>
   <collision>
     <origin xyz="0 14.425 0" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="meshes/upper_arm.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/upper_arm.stl" scale="1 1 1"/>
     </geometry>
   </collision>
 </link>
@@ -91,13 +91,13 @@
   <visual>
     <origin xyz="-1.12 -28.85 0" rpy="3.14159265358979323846264338327 0 0"/>
     <geometry>
-      <mesh filename="meshes/wrist_rotate.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/wrist_rotate.stl" scale="1 1 1"/>
     </geometry>
   </visual>
   <collision>
     <origin xyz="-1.12 -28.85 0" rpy="3.14159265358979323846264338327 0 0"/>
     <geometry>
-      <mesh filename="meshes/wrist_rotate.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/wrist_rotate.stl" scale="1 1 1"/>
     </geometry>
   </collision>
 </link>
@@ -111,13 +111,13 @@
   <visual>
     <origin xyz="-1.15 -26.8 -0.0508" rpy="3.14159265358979323846264338327 0 0"/>
     <geometry>
-      <mesh filename="meshes/wrist_twist_rotate.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/wrist_twist_rotate.stl" scale="1 1 1"/>
     </geometry>
   </visual>
   <collision>
     <origin xyz="-1.15 -26.8 -0.0508" rpy="3.14159265358979323846264338327 0 0"/>
     <geometry>
-      <mesh filename="meshes/wrist_twist_rotate.stl" scale="1 1 1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/wrist_twist_rotate.stl" scale="1 1 1"/>
     </geometry>
   </collision>
 </link>
@@ -131,13 +131,13 @@
   <visual>
     <origin xyz="-1.95 -3.8 1.5" rpy="-1.57079632679 0 1.57079632679"/> 
     <geometry>
-      <mesh filename="meshes/end_effector.stl" scale=".039 .039 .039"/>
+      <mesh filename="package://cmr_arm_sim/meshes/end_effector.stl" scale=".039 .039 .039"/>
     </geometry>
   </visual>
   <collision>
     <origin xyz="-1.95 -3.8 1.5" rpy="-1.57079632679 0 1.57079632679"/>
     <geometry>
-      <mesh filename="meshes/end_effector.stl" scale=".039 .039 .039"/>
+      <mesh filename="package://cmr_arm_sim/meshes/end_effector.stl" scale=".039 .039 .039"/>
     </geometry>
   </collision>
 </link>

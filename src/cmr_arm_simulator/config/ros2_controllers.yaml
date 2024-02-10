@@ -7,6 +7,10 @@ controller_manager:
       type: joint_trajectory_controller/JointTrajectoryController
 
 
+    end_effector_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
@@ -18,6 +22,15 @@ main_arm_controller:
       - elbow_joint
       - wrist_rotate
       - wrist_twist
+      - wrist_rotate_two
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+end_effector_controller:
+  ros__parameters:
+    joints:
       - wrist_rotate_two
     command_interfaces:
       - position

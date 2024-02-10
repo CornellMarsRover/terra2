@@ -5,6 +5,7 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 moveit_simple_controller_manager:
   controller_names:
     - main_arm_controller
+    - end_effector_controller
 
   main_arm_controller:
     type: FollowJointTrajectory
@@ -16,4 +17,12 @@ moveit_simple_controller_manager:
       - elbow_joint
       - wrist_rotate
       - wrist_twist
+      - wrist_rotate_two
+    action_ns: follow_joint_trajectory
+    default: true
+  end_effector_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
       - wrist_rotate_two

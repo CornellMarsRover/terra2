@@ -46,16 +46,17 @@ class CCBReadPublisher(Node):
             self.process_data(data)
 
     def process_data(self, data):
-        format_string = 'BBBiii'
+        format_string = 'BBBiiii'
         try: 
-            subteam, motor_id, mode, position, velocity, torque = struct.unpack(format_string, data)
-            self.logger.info(f"Received - Subteam: {subteam}, Motor ID: {motor_id}, Mode: {mode}, Position: {position}, Velocity: {velocity}, Torque: {torque}")
+            subteam, motor_id, mode, position, velocity, torque, current = struct.unpack(format_string, data)
+            self.logger.info(f"Received - Subteam: {subteam}, Motor ID: {motor_id}, Mode: {mode}, Position: {position}, Velocity: {velocity}, Torque: {torque}, Current: {current}")
             if motor_id in self.motor_data_mapping:
                 motor_data = self.motor_data_mapping[motor_id]
                 motor_data.mode = mode 
                 motor_data.position = position 
                 motor_data.velocity = velocity 
                 motor_data.torque = torque 
+                motor_data.current = current
 
         except struct.error as e: 
             self.logger.error(f"Error unpacking data: {e}")

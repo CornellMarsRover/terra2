@@ -93,26 +93,26 @@ class CmdVelSubscriber(Node):
         # if msg.twist.angular.z == 2.5: 
         #    output = byte_command_converter(DRIVES, "back_right", None, None, None, None, None, self.get_logger())
         if self.turn_thread_lock == False:
-            target_speed = scale_value(msg.twist.linear.x, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
+            target_speed = scale_value(msg.twist.linear.y, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
                                        -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
             self.gradually_increase_speed_linear(target_speed)
-            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed, 10, None, 5.0, self.logger)
-            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed, 10, None, 5.0, self.logger)
-            front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed, 10, None, 5.0, self.logger)
-            back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed, 10, None, 5.0, self.logger)
+            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed, 20, None, 50.0, self.logger)
+            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed, 20, None, 50.0, self.logger)
+            front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed, 20, None, 50.0, self.logger)
+            back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed, 20, None, 50.0, self.logger)
             send_number(self.serial_port, back_right)
             send_number(self.serial_port, front_right)
             send_number(self.serial_port, front_left)
             send_number(self.serial_port, back_left)
             
         if self.turn_thread_lock == True:
-            target_speed_angular = scale_value(msg.twist.angular.z, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
+            target_speed_angular = scale_value(msg.twist.angular.x, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
                                        -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
             self.gradually_increase_speed_angular(target_speed_angular)
-            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, self.current_speed_angular, 10, None, 5.0, self.logger)
-            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, self.current_speed_angular, 10, None, 5.0, self.logger)
-            front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed_angular, 10, None, 5.0, self.logger)
-            back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed_angular, 10, None, 5.0, self.logger)
+            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
+            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
+            front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
+            back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
             send_number(self.serial_port, back_right)
             send_number(self.serial_port, front_right)
             send_number(self.serial_port, front_left)
@@ -124,7 +124,7 @@ class CmdVelSubscriber(Node):
     def listener_button_callback(self, msg):
         trigger_val = msg.button_array[0]
         button_val = msg.button_array[1]
-        # self.logger.info(f'button_array: {msg.button_array[1]}')
+        #self.logger.info(f'button_array: {msg.button_array[0]}')
         if trigger_val == L2 and button_val == TRIANGLE: 
             self.current_speed = 0
             self.current_speed_angular = 0
@@ -138,6 +138,11 @@ class CmdVelSubscriber(Node):
             send_number(self.serial_port, back_left_stop)
         if trigger_val == L2 and button_val == CIRCLE: 
             self.turn_thread_lock = not self.turn_thread_lock
+            if self.turn_thread_lock == False:
+                self.logger.info('Switching to Linear')
+            else:
+                self.logger.info('Switching to Angular')
+
 
         
 

@@ -45,9 +45,9 @@ class CmdVelPublisher(Node):
 
       try:
           data, addr = drives_sock.recvfrom(1024)
-          linear_velocity, angular_velocity = self.parse_controller_data(data)
+          lx, ly, rx, ry = self.parse_controller_data(data)
           button_array, dpad = self.parse_button_data(data)
-          msg = self.create_twist_stamped([linear_velocity, angular_velocity])
+          msg = self.create_twist_stamped([lx, ly, rx, ry])
           button_msg = self.create_button_message(button_array, dpad)
           self.publisher_.publish(msg)
           self.button_publisher_.publish(button_msg)
@@ -70,9 +70,9 @@ class CmdVelPublisher(Node):
         pass
 
   def create_twist_stamped(self, velocities):
-    if len(velocities) == 2:
+    if len(velocities) == 4:
       twist_msg = TwistStamped()
-      twist_msg.twist.linear.x, twist_msg.twist.angular.z = velocities[0], velocities[1]
+      twist_msg.twist.linear.x, twist_msg.twist.linear.y, twist_msg.twist.angular.x, twist_msg.twist.angular.y = velocities[0], velocities[1], velocities[2], velocities[3]
       return twist_msg
     elif len(velocities) == 3:
       twist_msg = TwistStamped()
@@ -95,25 +95,29 @@ class CmdVelPublisher(Node):
   def parse_controller_data(self, raw_data):
 
     # Extract the first two bytes as linear and angular velocities
-    linear_velocity_raw, angular_velocity_raw = raw_data[0], raw_data[1]
+    lx_raw, ly_raw, rx_raw, ry_raw = raw_data[0], raw_data[1], raw_data[2], raw_data[3]
 
     # Scale the raw values to the desired range
-    linear_velocity = self.scale_value(linear_velocity_raw, 0, 255, -2.5, 2.5)
-    angular_velocity = self.scale_value(angular_velocity_raw, 0, 255, -2.5, 2.5)
+    lx = self.scale_value(lx_raw, 0, 255, -2.5, 2.5)
+    ly = self.scale_value(ly_raw, 0, 255, -2.5, 2.5)
+    rx = self.scale_value(rx_raw, 0, 255, -2.5, 2.5)
+    ry = self.scale_value(ry_raw, 0, 255, -2.5, 2.5)
 
-    print(f"Linear Velocity: {linear_velocity}, Angular Velocity: {angular_velocity}")
+    #print(f"Linear Velocity: {lx}, Angular Velocity: {rx}")
 
     # Extract and decode the hat switch direction string
     # Assuming it starts from the 11th byte to the end
-    hat_switch_data = raw_data[10:]
+    hat_switch_data = raw_data[12:]
     hat_switch = hat_switch_data.split(b'\x00')[0].decode('utf-8') # Split at null byte and decode
     print("Hat Switch Direction:", hat_switch)
-    return float(linear_velocity), float(angular_velocity)
+    return float(lx), float(ly), float(rx), float(ry)
 
   def parse_button_data(self, raw_data):
-    buttons = raw_data[2:10]
-    dpad = raw_data[10]
-    dpad = directions.get(dpad, -1)
+    buttons = raw_data[4:12]
+    # dpad = raw_data[12]
+    # dpad = directions.get(dpad, -1)
+    # DPAD UNIMPLEMENTED
+    dpad = 0
     return buttons, dpad
   
   def parse_arm_data(self, raw_data):

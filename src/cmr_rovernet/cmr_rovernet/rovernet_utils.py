@@ -25,8 +25,8 @@ ARM6 = 0x0A
 #TRIGGERS - INDEX 0 OF BUTTON_ARRAY
 L1 = 1 #0x01
 R1 = 256 #0x0101
-L2 = 65536 #0x010101
-R2 = 16777216 #0x01010101
+L2 = 16711680 
+R2 = -16777216 #0x01010101
 
 #BUTTONS - INDEX 1 OF BUTTON_ARRAY
 SQUARE = 1 #0x01
@@ -56,14 +56,14 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     #motor_id = which motor is being commanded
     #position = the position of the arm motor from 0 to 100 (0 = 0 degress or n o turn, 100 = 360 degrees or full turn )
     
-    if subteam < DRIVES or subteam > ASTROTECH:
+    if subteam < DRIVES or subteam > RECEIVE_DATA:
         raise ValueError(f"Invalid Subteam in command")
     if motor < FRONT_LEFT or motor > BACK_RIGHT:
         raise ValueError("Invalid motor_id")
-    if position is not None and position not in range(100):
-        raise ValueError("Invalid position")
-    if drives_velocity is not None and not isinstance(drives_velocity, float) and not isinstance(drives_velocity, int):
-        raise TypeError("drives_velocity must be an float or int")
+    # if position is not None and position not in range(100):
+    #     raise ValueError("Invalid position")
+    # if drives_velocity is not None and not isinstance(drives_velocity, float) and not isinstance(drives_velocity, int):
+    #     raise TypeError("drives_velocity must be an float or int")
     
     #Init hex values to be output
     

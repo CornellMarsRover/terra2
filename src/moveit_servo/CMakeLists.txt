@@ -48,7 +48,7 @@ find_package(ament_cmake REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 foreach(dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
-  find_package(${Dependency} REQUIRED)
+  find_package(${dependency} REQUIRED)
 endforeach()
 
 include_directories(include)
@@ -137,7 +137,6 @@ install(
 # Install Binaries
 install(
   TARGETS ${SERVO_NODE_MAIN_NAME} ${CPP_DEMO_NAME} ${POSE_TRACKING_DEMO_NAME}
-          ${FAKE_SERVO_CMDS_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})

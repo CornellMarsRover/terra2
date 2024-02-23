@@ -59,9 +59,9 @@ class CmdVelPublisher(Node):
       try:
         arm_data, addr = arm_sock.recvfrom(1024)
         # process arm_data
-        velocities = self.parse_arm_data(arm_data)
-        arm_button_array = velocities[1]
-        arm_msg = self.create_twist_stamped(velocities[0])
+        lx, ly, rx, ry = self.parse_controller_data(arm_data)
+        arm_button_array, dpad = self.parse_button_data(arm_data)
+        arm_msg = self.create_twist_stamped([rx, ry, arm_button_array[2], arm_button_array[3], arm_button_array[0], arm_button_array[1], lx, ly])
         arm_button_msg = self.create_arm_button_message(arm_button_array)
         self.arm_publisher_.publish(arm_msg)
         self.arm_button_publisher_.publish(arm_button_msg)
@@ -74,9 +74,19 @@ class CmdVelPublisher(Node):
       twist_msg = TwistStamped()
       twist_msg.twist.linear.x, twist_msg.twist.linear.y, twist_msg.twist.angular.x, twist_msg.twist.angular.y = velocities[0], velocities[1], velocities[2], velocities[3]
       return twist_msg
-    elif len(velocities) == 3:
+    elif len(velocities) == 8:
       twist_msg = TwistStamped()
-      twist_msg.twist.linear.x, twist_msg.twist.linear.y, twist_msg.twist.linear.z = velocities[0], velocities[1], velocities[2]
+      twist_msg.twist.linear.y, twist_msg.twist.linear.z = velocities[0], velocities[1]
+      twist_msg.twist.angular.y, twist_msg.twist.angular.z = velocities[6], velocities[7]
+      if velocities[2]:
+        twist_msg.twist.linear.x = 2.5
+      elif velocities[3]:
+        twist_msg.twist.linear.x = -2.5
+      if velocities[4]:
+        twist_msg.twist.angular.x = 2.5
+      elif velocities[5]:
+        twist_msg.twist.angular.x = -2.5
+      self.get_logger().info(str(twist_msg))
       return twist_msg
     else:
       self.get_logger().warn('Received unexpected number of velocity states')

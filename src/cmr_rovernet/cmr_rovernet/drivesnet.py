@@ -27,10 +27,11 @@ class CmdVelSubscriber(Node):
             self.listener_button_callback,
             10)
         self.subscription  # prevent unused variable warning
-        self.current_speed = 0
-        self.current_speed_angular = 0
+        self.current_speed_left = 0
+        self.current_speed_right = 0
         self.turn_thread_lock = 0
-        self.last_time = time.time()
+        self.last_time_left = time.time()
+        self.last_time_right = time.time()
         self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
         self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
@@ -47,10 +48,10 @@ class CmdVelSubscriber(Node):
         self.BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
 
     
-    def gradually_increase_speed_linear(self, target_speed):
+    def gradually_increase_speed_left(self, target_speed):
         current_time = time.time()
-        time_difference = current_time - self.last_time
-        self.last_time = current_time
+        time_difference = current_time - self.last_time_left
+        self.last_time_left = current_time
 
         # Base rate of speed change
         base_rate = self.GRADUAL_INCREASE_RATE * time_difference
@@ -62,15 +63,16 @@ class CmdVelSubscriber(Node):
         # Ensure dynamic_rate does not drop below a certain threshold
         dynamic_rate = max(dynamic_rate, base_rate * self.BASE_DYNAMIC_RATIO)
 
-        if self.current_speed < target_speed:
-            self.current_speed = min(self.current_speed+dynamic_rate, target_speed)
-        elif self.current_speed > target_speed:
-            self.current_speed = max(self.current_speed-dynamic_rate, target_speed)
 
-    def gradually_increase_speed_angular(self, target_speed):
+        if self.current_speed_left < target_speed:
+            self.current_speed_left = min(self.current_speed_left+dynamic_rate, target_speed)
+        elif self.current_speed_left > target_speed:
+            self.current_speed_left = max(self.current_speed_left-dynamic_rate, target_speed)
+
+    def gradually_increase_speed_right(self, target_speed):
         current_time = time.time()
-        time_difference = current_time - self.last_time
-        self.last_time = current_time
+        time_difference = current_time - self.last_time_right
+        self.last_time_right = current_time
 
         # Base rate of speed change
         base_rate = self.GRADUAL_INCREASE_RATE * time_difference
@@ -78,45 +80,35 @@ class CmdVelSubscriber(Node):
         # Modify the rate based on how close the target speed is to neutral (0)
         # The rate of change is faster when the joystick is near neutral
         dynamic_rate = base_rate * (1 - abs(target_speed) / 35)  # Assuming 35 is the max speed
-
         # Ensure dynamic_rate does not drop below a certain threshold
         dynamic_rate = max(dynamic_rate, base_rate * self.BASE_DYNAMIC_RATIO)
 
-        if self.current_speed_angular < target_speed:
-            self.current_speed_angular = min(self.current_speed_angular+dynamic_rate, target_speed)
-        elif self.current_speed_angular > target_speed:
-            self.current_speed_angular = max(self.current_speed_angular-dynamic_rate, target_speed)
+        if self.current_speed_right < target_speed:
+            self.current_speed_right = min(self.current_speed_right+dynamic_rate, target_speed)
+        elif self.current_speed_right > target_speed:
+            self.current_speed_right = max(self.current_speed_right-dynamic_rate, target_speed)
+        #self.logger.info(f'{self.current_speed_right}')
 
 
     def listener_callback(self, msg):
         
         # if msg.twist.angular.z == 2.5: 
         #    output = byte_command_converter(DRIVES, "back_right", None, None, None, None, None, self.get_logger())
-        if self.turn_thread_lock == False:
-            target_speed = scale_value(msg.twist.linear.y, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
-                                       -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
-            self.gradually_increase_speed_linear(target_speed)
-            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed, 20, None, 50.0, self.logger)
-            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed, 20, None, 50.0, self.logger)
-            front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed, 20, None, 50.0, self.logger)
-            back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed, 20, None, 50.0, self.logger)
-            send_number(self.serial_port, back_right)
-            send_number(self.serial_port, front_right)
-            send_number(self.serial_port, front_left)
-            send_number(self.serial_port, back_left)
-            
-        if self.turn_thread_lock == True:
-            target_speed_angular = scale_value(msg.twist.angular.x, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
-                                       -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
-            self.gradually_increase_speed_angular(target_speed_angular)
-            back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
-            front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
-            front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
-            back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed_angular, 20, None, 50.0, self.logger)
-            send_number(self.serial_port, back_right)
-            send_number(self.serial_port, front_right)
-            send_number(self.serial_port, front_left)
-            send_number(self.serial_port, back_left)
+        target_speed_left = scale_value(msg.twist.linear.y, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
+                                -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
+        target_speed_right = scale_value(msg.twist.angular.y, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
+                                -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
+        self.gradually_increase_speed_left(target_speed_left)
+        self.gradually_increase_speed_right(target_speed_right)
+        back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed_right, 20, None, 50.0, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed_right, 20, None, 50.0, self.logger)
+        front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed_left, 20, None, 50.0, self.logger)
+        back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed_left, 20, None, 50.0, self.logger)
+        self.logger.info(f'Left Speed: {-self.current_speed_left}, Right Speed: {-self.current_speed_right}')
+        send_number(self.serial_port, back_right)
+        send_number(self.serial_port, front_right)
+        send_number(self.serial_port, front_left)
+        send_number(self.serial_port, back_left)
 
         #output = byte_command_converter(DRIVES, "back_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
         #send_number(self.serial_port, output)

@@ -12,23 +12,15 @@ moveit_simple_controller_manager:
   # Moveit controller names must be named the same as the corresponding ROS2 controller names
   controller_names:
     - arm_controller
-    - end_effector_controller
 
   arm_controller:
     type: FollowJointTrajectory
     joints:
-      - base_rotate
-      - shoulder
-      - elbow
-      - second_rotate
-      - third_tilt
-      - third_rotate
+      - base_joint
+      - shoulder_joint
+      - elbow_joint
+      - wrist_rotate
+      - wrist_twist
+      - wrist_rotate_two
     action_ns: follow_joint_trajectory
-    default: true
-
-  end_effector_controller:
-    type: GripperCommand
-    joints:
-      - end_effector
-    action_ns: gripper_cmd
     default: true

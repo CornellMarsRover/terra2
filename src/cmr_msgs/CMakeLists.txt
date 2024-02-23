@@ -20,6 +20,8 @@ rosidl_generate_interfaces(
   msg/ArmJointEffort.msg
   msg/Error.msg
   msg/MotorWriteBatch.msg
+  msg/MotorData.msg
+  msg/MotorReadData.msg
   msg/Power.msg
   msg/SensorReadBatch.msg
   msg/Int16ArrayStamped.msg

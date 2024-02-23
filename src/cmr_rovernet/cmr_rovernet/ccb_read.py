@@ -14,9 +14,9 @@ class CCBReadPublisher(Node):
 
     def __init__(self):
         super().__init__('cmd_vel_publisher')
-        self.encoder_data_publisher_ = self.create_publisher(MotorReadData, '/ccb/cmd_vel', 10)
-        self.read_timer = self.create_timer(0.1, self.read_data)
-        self.timer = self.create_timer(0.5, self.publish_msg)
+        self.encoder_data_publisher_ = self.create_publisher(MotorReadData, '/ccb/read', 10)
+        #self.read_timer = self.create_timer(0.1, self.read_data)
+        self.timer = self.create_timer(0.001, self.publish_msg)
         self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
         self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
@@ -31,31 +31,44 @@ class CCBReadPublisher(Node):
         }
 
     def publish_msg(self):
-        back_left_request = byte_command_converter(RECEIVE_DATA, BACK_LEFT, None, None, None, None, None, self.logger)
-        back_right_request = byte_command_converter(RECEIVE_DATA, BACK_RIGHT, None, None, None, None, None, self.logger)
-        front_left_request = byte_command_converter(RECEIVE_DATA, FRONT_LEFT, None, None, None, None, None, self.logger)
-        front_right_request = byte_command_converter(RECEIVE_DATA, FRONT_RIGHT, None, None, None, None, None, self.logger)
+        back_right_request = byte_command_converter(RECEIVE_DATA, BACK_RIGHT, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, back_right_request)
+        self.read_data()
+
+        front_right_request = byte_command_converter(RECEIVE_DATA, FRONT_RIGHT, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, front_right_request)
+        self.read_data()
+
+        front_left_request = byte_command_converter(RECEIVE_DATA, FRONT_LEFT, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, front_left_request)
+        self.read_data()
+
+        back_left_request = byte_command_converter(RECEIVE_DATA, BACK_LEFT, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, back_left_request)
+        self.read_data()
 
     def read_data(self):
-        if self.serial_port.in_waiting > 0:
-            data = self.serial_port.read_until()  # Adjust read method based on your data format
-            self.process_data(data)
-
+        data = self.serial_port.read(20)  # Adjust read method based on your data format
+        #self.logger.info(f'data: {data.hex()}')
+        self.process_data(data)
+            
     def process_data(self, data):
-        format_string = 'BBBiii'
+        format_string = '<BBBffffB'
         try: 
-            subteam, motor_id, mode, position, velocity, torque = struct.unpack(format_string, data)
-            self.logger.info(f"Received - Subteam: {subteam}, Motor ID: {motor_id}, Mode: {mode}, Position: {position}, Velocity: {velocity}, Torque: {torque}")
+            subteam, motor_id, mode, position, velocity, torque, current, fault = struct.unpack(format_string, data)
+            #self.logger.info(f"Received - Subteam: {subteam}, Motor ID: {motor_id}, Mode: {mode}, Position: {position}, Velocity: {velocity}, Torque: {torque}, Current: {current}")
             if motor_id in self.motor_data_mapping:
                 motor_data = self.motor_data_mapping[motor_id]
                 motor_data.mode = mode 
-                motor_data.position = position 
-                motor_data.velocity = velocity 
+                motor_data.position = position
+                #self.logger.info(f'pos: {position.hex()}')
+                motor_data.velocity = velocity
+                #self.logger.info(f'vel: {velocity.hex()}')
                 motor_data.torque = torque 
+                #self.logger.info(f'tor: {torque.hex()}')
+                motor_data.current = current
+                #self.logger.info(f'curr: {current.hex()}')
+            self.encoder_data_publisher_.publish(self.stored_data)
 
         except struct.error as e: 
             self.logger.error(f"Error unpacking data: {e}")

@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = "cmr_rovernet"
+package_name = "cmr_param_gui"
 
 setup(
     name=package_name,
@@ -9,22 +9,19 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
-        ('share/' + package_name + '/launch', ['launch/rovernet.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/gui.launch.py']),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="CMR",
     maintainer_email="team@cornellmarsrover.org",
-    description="The CCB-Jetson communication package omitting the micro ros agent",
+    description="Basic Parameter GUI for Rover Drives and Arm Dev (NOT FOR COMP)",
     license="MIT",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "armnet_node = cmr_rovernet.armnet:main",
             # PHOBOS_APPEND
-            'drivesnet_node = cmr_rovernet.drivesnet:main',
-            'cmr_read_node = cmr_rovernet.ccb_read:main',
-            'debug_node = cmr_rovernet.debug:main'
+            'gui_node = cmr_param_gui.gui:main'
         ],
     },
 )

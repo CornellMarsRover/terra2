@@ -1,4 +1,5 @@
 int32 mode
-int32 position
-int32 velocity
-int32 torque
+float64 position
+float64 velocity
+float64 torque
+float64 current

@@ -90,6 +90,12 @@ def generate_launch_description():
         arguments=["main_arm_controller", "-c", "/controller_manager"],
     )
 
+    controller_remote = Node(
+        package="cmr_controller_remote",
+        executable="connect_node",
+        arguments=[],
+    )
+
     # Launch as much as possible in components
     container = ComposableNodeContainer(
         name="moveit_servo_demo_container",
@@ -155,6 +161,7 @@ def generate_launch_description():
             joint_state_broadcaster_spawner,
             panda_arm_controller_spawner,
             servo_node,
+            controller_remote,
             container,
         ]
     )

@@ -76,8 +76,8 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
 
-    drives_vel_hex_string = drives_vel_hex.hex()
-    logger.info(f'Vel: {drives_vel_hex_string}')
+    # drives_vel_hex_string = drives_vel_hex.hex()
+    # logger.info(f'Vel: {drives_vel_hex_string}')
 
     # max_torque_hex_string = max_torque_hex.hex()
     # logger.info(f'Vel: {max_torque_hex_string}')

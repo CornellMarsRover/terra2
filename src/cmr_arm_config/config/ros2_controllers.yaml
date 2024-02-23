@@ -6,31 +6,18 @@ controller_manager:
     arm_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-    end_effector_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
 arm_controller:
   ros__parameters:
     joints:
-      - base_rotate
-      - shoulder
-      - elbow
-      - second_rotate
-      - third_tilt
-      - third_rotate
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-
-end_effector_controller:
-  ros__parameters:
-    joints:
-      - end_effector
+      - base_joint
+      - shoulder_joint
+      - elbow_joint
+      - wrist_rotate
+      - wrist_twist
+      - wrist_rotate_two
     command_interfaces:
       - position
     state_interfaces:

@@ -1,0 +1,248 @@
+<?xml version="1.0" ?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+<robot name="Arm">
+
+
+<link name="base_link">
+  <inertial>
+    <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+    <mass value="0.2689091995006286"/>
+    <inertia ixx="0.0002408366428192344" iyy="0.0001965672947454995" izz="0.0002424930780899016" ixy="-7.00575013293154e-16" iyz="7.933863408177614e-06" ixz="-6.01067807617016e-17"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+    <geometry>
+      <mesh filename="meshes/base_link.stl" scale="1 1 1"/>
+    </geometry>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+    <geometry>
+      <mesh filename="meshes/base_link.stl" scale="1 1 1"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="shoulder">
+  <inertial>
+    <origin xyz="0 0 0" rpy="-1.57079632679 0 0"/>
+    <mass value="0.4313488821929788"/>
+    <inertia ixx="0.0003124994298400346" iyy="0.0005106434645971917" izz="0.0005464028450648415" ixy="-2.483982786710172e-05" iyz="-4.971764224987835e-06" ixz="5.171870177614032e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 3.42" rpy="-1.57079632679 0 0"/>
+    <geometry>
+      <mesh filename="meshes/shoulder.stl" scale="1 1 1"/>
+    </geometry>
+  </visual>
+  <collision>
+    <origin xyz="0 0 3.42" rpy="-1.57079632679 0 0"/>
+    <geometry>
+      <mesh filename="meshes/shoulder.stl" scale="1 1 1"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="lower_arm">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="0.6171685502216904"/>
+    <inertia ixx="0.0063731112041358895" iyy="0.0002193424289573356" izz="0.006262212418448342" ixy="2.9581372074094503e-15" iyz="7.108667432481271e-18" ixz="2.3372990857653054e-19"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="meshes/lower_arm.stl" scale="1 1 1"/>
+    </geometry>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="meshes/lower_arm.stl" scale="1 1 1"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="upper_arm">
+  <inertial>
+    <origin xyz="0 -14.425 0" rpy="0 0 0"/>
+    <mass value="1.0473806295634103"/>
+    <inertia ixx="0.01731119919222368" iyy="0.0008396658760116199" izz="0.01753140472050435" ixy="0.0011267961891559507" iyz="1.7658594867117153e-05" ixz="-7.452645136013033e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 14.425 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="meshes/upper_arm.stl" scale="1 1 1"/>
+    </geometry>
+  </visual>
+  <collision>
+    <origin xyz="0 14.425 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="meshes/upper_arm.stl" scale="1 1 1"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="wrist_rotate">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="0.2260913074125969"/>
+    <inertia ixx="0.00021278553590153848" iyy="0.00013932651115324126" izz="0.00018035542785257985" ixy="2.097343119030967e-06" iyz="-5.926051072718819e-06" ixz="6.671150022647325e-07"/>
+  </inertial>
+  <visual>
+    <origin xyz="-1.12 -28.85 0" rpy="3.14159265358979323846264338327 0 0"/>
+    <geometry>
+      <mesh filename="meshes/wrist_rotate.stl" scale="1 1 1"/>
+    </geometry>
+  </visual>
+  <collision>
+    <origin xyz="-1.12 -28.85 0" rpy="3.14159265358979323846264338327 0 0"/>
+    <geometry>
+      <mesh filename="meshes/wrist_rotate.stl" scale="1 1 1"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="wrist_twist_rotate">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="0.4389803651612308"/>
+    <inertia ixx="0.00040070141851661356" iyy="0.001209612370818616" izz="0.001204139896083145" ixy="0.00013623958530035226" iyz="-2.0352344504863396e-05" ixz="0.0001534404246037917"/>
+  </inertial>
+  <visual>
+    <origin xyz="-1.15 -26.8 -0.0508" rpy="3.14159265358979323846264338327 0 0"/>
+    <geometry>
+      <mesh filename="meshes/wrist_twist_rotate.stl" scale="1 1 1"/>
+    </geometry>
+  </visual>
+  <collision>
+    <origin xyz="-1.15 -26.8 -0.0508" rpy="3.14159265358979323846264338327 0 0"/>
+    <geometry>
+      <mesh filename="meshes/wrist_twist_rotate.stl" scale="1 1 1"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="end_effector">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="0.4985786647054013"/>
+    <inertia ixx="0.0007315326979296377" iyy="0.0014043612271926742" izz="0.0010429988376861876" ixy="9.658048714039635e-05" iyz="-0.0001831704203076462" ixz="3.722825937527846e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="-1.95 -3.8 1.5" rpy="-1.57079632679 0 1.57079632679"/> 
+    <geometry>
+      <mesh filename="meshes/end_effector.stl" scale=".039 .039 .039"/>
+    </geometry>
+  </visual>
+  <collision>
+    <origin xyz="-1.95 -3.8 1.5" rpy="-1.57079632679 0 1.57079632679"/>
+    <geometry>
+      <mesh filename="meshes/end_effector.stl" scale=".039 .039 .039"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="base_joint" type="continuous">
+  <origin xyz="0.0 0.04335 0.0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="shoulder"/>
+  <axis xyz="0.0 0.0 1.0"/>
+</joint>
+<transmission name="base_transmission">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="base_joint_revolute">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="base_actuator">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<joint name="shoulder_joint" type="continuous">
+  <origin xyz="0 0 3.61" rpy="0 0 0"/>
+  <parent link="shoulder"/>
+  <child link="lower_arm"/>
+  <axis xyz="1 0 0"/>
+</joint>
+<transmission name="shoulder_transmission">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="shoulder_joint_revolute">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="shoulder_actuator">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<joint name="elbow_joint" type="continuous">
+  <origin xyz="0 -14.425 0" rpy="0 0 0"/>
+  <parent link="lower_arm"/>
+  <child link="upper_arm"/>
+  <axis xyz="1 0 0"/>
+</joint>
+<transmission name="elbow_transmission">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="elbow_joint_revolute">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="elbow_actuator">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<joint name="wrist_rotate" type="continuous">
+  <origin xyz="1.12 -14.425 0" rpy="0 0 0"/>
+  <parent link="upper_arm"/>
+  <child link="wrist_rotate"/>
+  <axis xyz="0 1 0"/>
+</joint>
+<transmission name="wrist_rotate_transmission">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="wrist_rotate_revolute">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="wrist_rotate_actuator">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<joint name="wrist_twist" type="continuous">
+  <origin xyz="0.0 -2 0.0508" rpy="0 0 0"/>
+  <parent link="wrist_rotate"/>
+  <child link="wrist_twist_rotate"/>
+  <axis xyz="0 0 1"/>
+</joint>
+<transmission name="wrist_twist_transmission">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="wrist_twist_revolute">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="wrist_twist_actuator">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<joint name="wrist_rotate_two" type="continuous">
+  <origin xyz="-3.85 0 -4.2" rpy="0 0 0"/>
+  <parent link="wrist_twist_rotate"/>
+  <child link="end_effector"/>
+  <axis xyz="0 1 0"/>
+</joint>
+<transmission name="wrist_rotate_two_transmission">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="wrist_rotate_two_actuator">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="wrist_rotate_two_actuator">
+    <hardwareInterface>PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+</robot>

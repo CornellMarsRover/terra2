@@ -1,9 +1,11 @@
 from geometry_msgs.msg import TwistStamped
 from cmr_msgs.msg import ControllerReading
+from sensor_msgs.msg import Joy
 import socket
 import rclpy 
 from rclpy.node import Node
 import struct
+import math
 
 UDP_IP = "0.0.0.0" # Listen on all available IPs
 UDP_PORT_DRIVES = 5010
@@ -33,7 +35,7 @@ class CmdVelPublisher(Node):
   def __init__(self):
     super().__init__('cmd_vel_publisher')
     self.publisher_ = self.create_publisher(TwistStamped, '/drives_controller/cmd_vel', 10)
-    self.arm_publisher_ = self.create_publisher(TwistStamped, '/arm_controller/cmd_vel', 10)
+    self.arm_publisher_ = self.create_publisher(Joy, '/arm_controller/cmd_vel', 10)
 
     self.button_publisher_ = self.create_publisher(ControllerReading, '/drives_controller/cmd_buttons', 10)
     self.arm_button_publisher_ = self.create_publisher(ControllerReading, '/arm_controller/cmd_buttons', 10)
@@ -61,33 +63,48 @@ class CmdVelPublisher(Node):
         # process arm_data
         lx, ly, rx, ry = self.parse_controller_data(arm_data)
         arm_button_array, dpad = self.parse_button_data(arm_data)
-        arm_msg = self.create_twist_stamped([rx, ry, arm_button_array[2], arm_button_array[3], arm_button_array[0], arm_button_array[1], lx, ly])
+        arm_msg = self.create_twist_stamped([lx, ly, arm_button_array[2], rx, ry, arm_button_array[3], arm_button_array[5], arm_button_array[6], arm_button_array[7], arm_button_array[4], arm_button_array[0], arm_button_array[1]])
         arm_button_msg = self.create_arm_button_message(arm_button_array)
+        print(str(arm_msg))
         self.arm_publisher_.publish(arm_msg)
         self.arm_button_publisher_.publish(arm_button_msg)
       except BlockingIOError:
         # Handle the case where no data is received
         pass
+  
+  def axis_map_for_arm(self, axis):
+    if axis >= 1: 
+      result = -1
+    elif axis <= -1:
+      result = 1
+    else:
+      result = 0
+    return result
 
   def create_twist_stamped(self, velocities):
     if len(velocities) == 4:
       twist_msg = TwistStamped()
       twist_msg.twist.linear.x, twist_msg.twist.linear.y, twist_msg.twist.angular.x, twist_msg.twist.angular.y = velocities[0], velocities[1], velocities[2], velocities[3]
       return twist_msg
-    elif len(velocities) == 8:
-      twist_msg = TwistStamped()
-      twist_msg.twist.linear.y, twist_msg.twist.linear.z = velocities[0], velocities[1]
-      twist_msg.twist.angular.y, twist_msg.twist.angular.z = velocities[6], velocities[7]
-      if velocities[2]:
-        twist_msg.twist.linear.x = 2.5
-      elif velocities[3]:
-        twist_msg.twist.linear.x = -2.5
-      if velocities[4]:
-        twist_msg.twist.angular.x = 2.5
-      elif velocities[5]:
-        twist_msg.twist.angular.x = -2.5
-      self.get_logger().info(str(twist_msg))
-      return twist_msg
+    elif len(velocities) == 12:
+      joy_msg = Joy()
+      lx, ly, l2, rx, ry, r2, x, circle, triangle, square, l1, r1 = velocities
+      lx_val, ly_val, rx_val, ry_val = self.axis_map_for_arm(lx), self.axis_map_for_arm(ly), self.axis_map_for_arm(rx), self.axis_map_for_arm(ry)
+      if l2: 
+        l2 = -1
+      else:
+        l2 = 1
+      if r2: 
+        r2 = -1
+      else:
+        r2 = 1
+      axes = [float(lx_val), float(ly_val), float(l2), float(rx_val), float(ry_val), float(r2), 0.0, 0.0]
+      buttons = [x, circle, triangle, square, l1, r1, 0, 0, 0, 0, 0, 0, 0]
+      frame_id = 'joy'
+      joy_msg.header.frame_id = frame_id
+      joy_msg.axes = axes
+      joy_msg.buttons = buttons
+      return joy_msg
     else:
       self.get_logger().warn('Received unexpected number of velocity states')
       return None

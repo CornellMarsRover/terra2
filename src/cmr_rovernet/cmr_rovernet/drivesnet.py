@@ -104,7 +104,7 @@ class CmdVelSubscriber(Node):
         front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed_right, 20, None, 50.0, self.logger)
         front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed_left, 20, None, 50.0, self.logger)
         back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed_left, 20, None, 50.0, self.logger)
-        self.logger.info(f'Left Speed: {-self.current_speed_left}, Right Speed: {-self.current_speed_right}')
+        #self.logger.info(f'Left Speed: {-self.current_speed_left}, Right Speed: {-self.current_speed_right}')
         send_number(self.serial_port, back_right)
         send_number(self.serial_port, front_right)
         send_number(self.serial_port, front_left)

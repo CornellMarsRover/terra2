@@ -15,12 +15,12 @@ FRONT_RIGHT = 0x03
 BACK_LEFT = 0x02
 
 #VALID ARM MOTORS
-ARM1 = 0x05
-ARM2 = 0x06
-ARM3 = 0x07
-ARM4 = 0x08
-ARM5 = 0x09
-ARM6 = 0x0A
+ARM_BASE = 0x09
+ARM_SHOULDER = 0x0B
+ARM_ELBOW = 0x0A
+WRIST_ROTATE_1 = 0x0C
+WRIST_ROTATE_2 = 0x0E
+WRIST_TILT = 0x0D
 
 #TRIGGERS - INDEX 0 OF BUTTON_ARRAY
 L1 = 1 #0x01
@@ -58,8 +58,8 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     
     if subteam < DRIVES or subteam > RECEIVE_DATA:
         raise ValueError(f"Invalid Subteam in command")
-    if motor < FRONT_LEFT or motor > BACK_RIGHT:
-        raise ValueError("Invalid motor_id")
+    # if motor < FRONT_LEFT or motor > BACK_RIGHT:
+    #     raise ValueError("Invalid motor_id")
     # if position is not None and position not in range(100):
     #     raise ValueError("Invalid position")
     # if drives_velocity is not None and not isinstance(drives_velocity, float) and not isinstance(drives_velocity, int):

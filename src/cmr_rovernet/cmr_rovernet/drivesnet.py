@@ -35,14 +35,15 @@ class CmdVelSubscriber(Node):
         self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
         self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        self.feed_forward_torque = 0.0
         # self.serial_port = None
         self.logger = self.get_logger()
         
         # Init constants given TOML file
-        drives_controller_table = parse_toml("connect")
+        #drives_controller_table = parse_toml("connect")
         drives_net_table = parse_toml("drivesnet")
         drives_net_node = drives_net_table['node']
-        self.CONTROLLER_MAX_SPEED = drives_controller_table['node']['max_speed']
+        self.CONTROLLER_MAX_SPEED = 2.5
         self.MOTOR_MAX_SPEED = drives_net_node['motor_max_speed']
         self.GRADUAL_INCREASE_RATE = drives_net_node['gradual_increase_rate']
         self.BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
@@ -100,11 +101,20 @@ class CmdVelSubscriber(Node):
                                 -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
         self.gradually_increase_speed_left(target_speed_left)
         self.gradually_increase_speed_right(target_speed_right)
-        back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -self.current_speed_right, 20, None, 50.0, self.logger)
-        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.current_speed_right, 20, None, 50.0, self.logger)
-        front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, self.current_speed_left, 20, None, 50.0, self.logger)
-        back_left = byte_command_converter(DRIVES, BACK_LEFT, None, self.current_speed_left, 20, None, 50.0, self.logger)
-        #self.logger.info(f'Left Speed: {-self.current_speed_left}, Right Speed: {-self.current_speed_right}')
+        if self.current_speed_right < 2 and self.current_speed_right > -2:
+            right_speed = 0
+        else:
+            right_speed = self.current_speed_right
+
+        if self.current_speed_left < 2 and self.current_speed_left > -2:
+            left_speed = 0
+        else:
+            left_speed = self.current_speed_left
+        back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -right_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -right_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
+        front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, left_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
+        back_left = byte_command_converter(DRIVES, BACK_LEFT, None, left_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
+        self.logger.info(f'Left Speed: {-self.current_speed_left}, Right Speed: {-self.current_speed_right}')
         send_number(self.serial_port, back_right)
         send_number(self.serial_port, front_right)
         send_number(self.serial_port, front_left)
@@ -120,10 +130,10 @@ class CmdVelSubscriber(Node):
         if trigger_val == L2 and button_val == TRIANGLE: 
             self.current_speed = 0
             self.current_speed_angular = 0
-            back_right_stop = byte_command_converter(DRIVES, BACK_RIGHT, None, None, None, None, None, self.logger)
-            front_right_stop = byte_command_converter(DRIVES, FRONT_RIGHT, None, None, None, None, None, self.logger)
-            front_left_stop = byte_command_converter(DRIVES, FRONT_LEFT, None, None, None, None, None, self.logger)
-            back_left_stop = byte_command_converter(DRIVES, BACK_LEFT, None, None, None, None, None, self.logger)
+            back_right_stop = byte_command_converter(DRIVES, BACK_RIGHT, None, None, None, None, None, None, self.logger)
+            front_right_stop = byte_command_converter(DRIVES, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
+            front_left_stop = byte_command_converter(DRIVES, FRONT_LEFT, None, None, None, None, None, None, self.logger)
+            back_left_stop = byte_command_converter(DRIVES, BACK_LEFT, None, None, None, None, None, None, self.logger)
             send_number(self.serial_port, back_right_stop)
             send_number(self.serial_port, front_right_stop)
             send_number(self.serial_port, front_left_stop)
@@ -134,6 +144,10 @@ class CmdVelSubscriber(Node):
                 self.logger.info('Switching to Linear')
             else:
                 self.logger.info('Switching to Angular')
+        if trigger_val == L2 and button_val == X:
+            self.feed_forward_torque += 0.1
+        if trigger_val == L1 and button_val == X: 
+            self.feed_forward_torque = 0 
 
 
         

@@ -27,24 +27,53 @@ class CCBReadPublisher(Node):
             BACK_RIGHT: self.stored_data.back_right,
             FRONT_RIGHT: self.stored_data.front_right,
             BACK_LEFT: self.stored_data.back_left,
-            # Add mappings for ARM TODO
+            ARM_BASE: self.stored_data.base, 
+            ARM_SHOULDER: self.stored_data.shoulder,
+            ARM_ELBOW: self.stored_data.elbow,
+            WRIST_ROTATE_1: self.stored_data.wrist_r1, 
+            WRIST_TILT: self.stored_data.wrist_twist,
+            WRIST_ROTATE_2: self.stored_data.wrist_r2
         }
 
     def publish_msg(self):
-        back_right_request = byte_command_converter(RECEIVE_DATA, BACK_RIGHT, 10, 10, 10, 10, 10, self.logger)
+        back_right_request = byte_command_converter(RECEIVE_DATA, BACK_RIGHT, 10, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, back_right_request)
         self.read_data()
 
-        front_right_request = byte_command_converter(RECEIVE_DATA, FRONT_RIGHT, 10, 10, 10, 10, 10, self.logger)
+        front_right_request = byte_command_converter(RECEIVE_DATA, FRONT_RIGHT, 10, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, front_right_request)
         self.read_data()
 
-        front_left_request = byte_command_converter(RECEIVE_DATA, FRONT_LEFT, 10, 10, 10, 10, 10, self.logger)
+        front_left_request = byte_command_converter(RECEIVE_DATA, FRONT_LEFT, 10, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, front_left_request)
         self.read_data()
 
-        back_left_request = byte_command_converter(RECEIVE_DATA, BACK_LEFT, 10, 10, 10, 10, 10, self.logger)
+        back_left_request = byte_command_converter(RECEIVE_DATA, BACK_LEFT, 10, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, back_left_request)
+        self.read_data()
+
+        base_request = byte_command_converter(RECEIVE_DATA, ARM_BASE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, base_request)
+        self.read_data()
+
+        shoulder_request = byte_command_converter(RECEIVE_DATA, ARM_SHOULDER, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, shoulder_request)
+        self.read_data()
+
+        elbow_request = byte_command_converter(RECEIVE_DATA, ARM_ELBOW, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, elbow_request)
+        self.read_data()
+
+        wrist_rotate_1_request = byte_command_converter(RECEIVE_DATA, WRIST_ROTATE_1, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, wrist_rotate_1_request)
+        self.read_data()
+
+        wrist_twist_request = byte_command_converter(RECEIVE_DATA, WRIST_ROTATE_2, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, wrist_twist_request)
+        self.read_data()
+
+        wrist_rotate_2_request = byte_command_converter(RECEIVE_DATA, WRIST_TILT, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, wrist_rotate_2_request)
         self.read_data()
 
     def read_data(self):

@@ -35,7 +35,7 @@ CIRCLE = 65536 #0x010101
 TRIANGLE = 16777216 #0x01010101
 
 
-def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, logger):
+def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, ff_torque, logger):
     """
     Helper function to convert a given motor command into a 40-byte encoding. Current format, with 
     number of bytes written in parantheses:
@@ -48,6 +48,7 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     - MAX_TORQUE (4)
     - MAX_VELOCITY (4)
     - MAX_ACCEL (4) 
+    - FEED FORWARD TORQUE (4)
     - EXTRA (20) 
     """
     
@@ -75,9 +76,13 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     max_torque_hex = struct.pack('f', max_torque) if max_torque is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
+    ff_torque_hex = struct.pack('f', ff_torque) if ff_torque is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
 
     # drives_vel_hex_string = drives_vel_hex.hex()
     # logger.info(f'Vel: {drives_vel_hex_string}')
+
+    ff_torque_hex_string = ff_torque_hex.hex()
+    logger.info(f'Vel: {ff_torque_hex_string}')
 
     # max_torque_hex_string = max_torque_hex.hex()
     # logger.info(f'Vel: {max_torque_hex_string}')
@@ -86,7 +91,7 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     # logger.info(f'Vel: {max_accel_hex_string}')
 
     # Concatenate the parts and pad to ensure the total length is 40 bytes
-    output = bytes([subteam_hex, motor_hex]) + position_hex + drives_vel_hex + direction_hex + max_torque_hex + max_vel_hex + max_accel_hex
+    output = bytes([subteam_hex, motor_hex]) + position_hex + drives_vel_hex + direction_hex + max_torque_hex + max_vel_hex + max_accel_hex + ff_torque_hex
 
     # output_string = output.hex()
     # logger.info(f'Output: {output_string}')

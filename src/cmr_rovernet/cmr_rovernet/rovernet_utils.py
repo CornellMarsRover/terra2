@@ -68,21 +68,26 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     
     #Init hex values to be output
     
+    
+
     subteam_hex = subteam #1 byte
     motor_hex = motor #1 byte
     position_hex = struct.pack('f', position) if position is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
-    drives_vel_hex = struct.pack('B', abs(int(drives_velocity))) if drives_velocity is not None else b'\xFF' #1 byte
-    direction_hex = struct.pack('B', int(drives_velocity < 0)) if drives_velocity is not None else b'\xFF' #1 byte
+    drives_vel_hex = struct.pack('f', drives_velocity) if drives_velocity is not None else b'\xFF\xFF\xFF\xFF' #4 byte
+    direction_hex = struct.pack('B', drives_velocity < 0) if drives_velocity is not None else b'\xFF' #1 byte
     max_torque_hex = struct.pack('f', max_torque) if max_torque is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     ff_torque_hex = struct.pack('f', ff_torque) if ff_torque is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
 
-    # drives_vel_hex_string = drives_vel_hex.hex()
-    # logger.info(f'Vel: {drives_vel_hex_string}')
+    drives_vel_hex_string = drives_vel_hex.hex()
+    logger.info(f'Vel: {drives_vel_hex_string}')
 
-    ff_torque_hex_string = ff_torque_hex.hex()
-    logger.info(f'Vel: {ff_torque_hex_string}')
+    direction_hex_string = direction_hex.hex()
+    logger.info(f'Direction: {direction_hex_string}')
+
+    # ff_torque_hex_string = ff_torque_hex.hex()
+    # logger.info(f'Vel: {ff_torque_hex_string}')
 
     # max_torque_hex_string = max_torque_hex.hex()
     # logger.info(f'Vel: {max_torque_hex_string}')

@@ -24,6 +24,7 @@ rosidl_generate_interfaces(
   msg/MotorReadData.msg
   msg/Power.msg
   msg/SensorReadBatch.msg
+  msg/IMUSensorData.msg
   msg/Int16ArrayStamped.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv

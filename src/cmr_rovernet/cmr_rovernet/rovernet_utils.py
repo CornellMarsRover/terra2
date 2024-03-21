@@ -26,6 +26,7 @@ WRIST_TILT = 0x0D
 L1 = 1 #0x01
 R1 = 256 #0x0101
 L2 = 16711680 
+R2_MIN = 16777216
 R2 = -16777216 #0x01010101
 
 #BUTTONS - INDEX 1 OF BUTTON_ARRAY
@@ -80,11 +81,14 @@ def byte_command_converter(subteam, motor, position, drives_velocity, max_torque
     max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
     ff_torque_hex = struct.pack('f', ff_torque) if ff_torque is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
 
-    drives_vel_hex_string = drives_vel_hex.hex()
-    logger.info(f'Vel: {drives_vel_hex_string}')
+    # drives_vel_hex_string = drives_vel_hex.hex()
+    # logger.info(f'Vel: {drives_vel_hex_string}')
 
-    direction_hex_string = direction_hex.hex()
-    logger.info(f'Direction: {direction_hex_string}')
+    # direction_hex_string = direction_hex.hex()
+    # logger.info(f'Direction: {direction_hex_string}')
+    
+    # position_hex_string = position_hex.hex()
+    # logger.info(f'Direction: {position_hex_string}')
 
     # ff_torque_hex_string = ff_torque_hex.hex()
     # logger.info(f'Vel: {ff_torque_hex_string}')

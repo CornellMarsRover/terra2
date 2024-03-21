@@ -47,7 +47,15 @@ class CmdVelSubscriber(Node):
         self.MOTOR_MAX_SPEED = drives_net_node['motor_max_speed']
         self.GRADUAL_INCREASE_RATE = drives_net_node['gradual_increase_rate']
         self.BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
+        self.MAX_ACCELERATION = drives_net_node['acceleration_limit']
+        self.MAX_TORQUE = drives_net_node['torque_limit']
+        self.MAX_FEED_FORWARD_TORQUE = drives_net_node['feed_forward_torque_limit']
 
+    # def set_feed_forward_torque(self, trigger_input):
+    #     trigger_input = trigger_input/255
+    #     ff_torque_output = trigger_input*self.MAX_FEED_FORWARD_TORQUE
+    #     self.feed_forward_torque = ff_torque_output
+    #     return ff_torque_output
     
     def gradually_increase_speed_left(self, target_speed):
         current_time = time.time()
@@ -101,19 +109,19 @@ class CmdVelSubscriber(Node):
                                 -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
         self.gradually_increase_speed_left(target_speed_left)
         self.gradually_increase_speed_right(target_speed_right)
-        if self.current_speed_right < 2 and self.current_speed_right > -2:
+        if self.current_speed_right < 0.2 and self.current_speed_right > -0.2:
             right_speed = 0
         else:
             right_speed = self.current_speed_right
 
-        if self.current_speed_left < 2 and self.current_speed_left > -2:
+        if self.current_speed_left < 0.2 and self.current_speed_left > -0.2:
             left_speed = 0
         else:
             left_speed = self.current_speed_left
-        back_right = byte_command_converter(DRIVES, BACK_RIGHT, None, -right_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
-        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -right_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
-        front_left = byte_command_converter(DRIVES, FRONT_LEFT, None, left_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
-        back_left = byte_command_converter(DRIVES, BACK_LEFT, None, left_speed, 20, None, 50.0, self.feed_forward_torque, self.logger)
+        back_right =  byte_command_converter(DRIVES, BACK_RIGHT, None, -left_speed, self.MAX_TORQUE, None,  self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -left_speed, self.MAX_TORQUE, None, self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
+        front_left =  byte_command_converter(DRIVES, FRONT_LEFT, None, left_speed, self.MAX_TORQUE, None,    self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
+        back_left =   byte_command_converter(DRIVES, BACK_LEFT, None, left_speed, self.MAX_TORQUE, None,     self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
         self.logger.info(f'Left Speed: {left_speed}, Right Speed: {right_speed}')
         send_number(self.serial_port, back_right)
         send_number(self.serial_port, front_right)
@@ -127,6 +135,8 @@ class CmdVelSubscriber(Node):
         trigger_val = msg.button_array[0]
         button_val = msg.button_array[1]
         #self.logger.info(f'button_array: {msg.button_array[0]}')
+        # if trigger_val > R2_MIN and trigger_val < R2_MIN:
+        #     self.set_feed_forward_torque(trigger_val)
         if trigger_val == L2 and button_val == TRIANGLE: 
             self.current_speed = 0
             self.current_speed_angular = 0
@@ -148,7 +158,6 @@ class CmdVelSubscriber(Node):
             self.feed_forward_torque += 0.1
         if trigger_val == L1 and button_val == X: 
             self.feed_forward_torque = 0 
-
 
         
 

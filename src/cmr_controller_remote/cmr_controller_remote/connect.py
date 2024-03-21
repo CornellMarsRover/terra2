@@ -65,7 +65,7 @@ class CmdVelPublisher(Node):
         arm_button_array, dpad = self.parse_button_data(arm_data)
         arm_msg = self.create_twist_stamped([lx, ly, arm_button_array[2], rx, ry, arm_button_array[3], arm_button_array[5], arm_button_array[6], arm_button_array[7], arm_button_array[4], arm_button_array[0], arm_button_array[1]])
         arm_button_msg = self.create_arm_button_message(arm_button_array)
-        print(str(arm_msg))
+        # self.logger.info(f'data: {arm_msg}')
         self.arm_publisher_.publish(arm_msg)
         self.arm_button_publisher_.publish(arm_button_msg)
       except BlockingIOError:

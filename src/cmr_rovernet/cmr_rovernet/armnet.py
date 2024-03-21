@@ -72,19 +72,20 @@ class JSInputSubscriber(Node):
 
     
     def translate_to_electrical(self, positions, velocities):
-        output_pos = [self.convert_angle_to_custom_range(positions[0], 100), 
-                      self.convert_angle_to_custom_range(positions[1], 100), 
+        output_pos = [-self.convert_angle_to_custom_range(positions[0], 100), 
+                      -self.convert_angle_to_custom_range(positions[1], 100), 
                       self.convert_angle_to_custom_range(positions[2], 100), 
-                      self.convert_angle_to_custom_range(positions[3], 50), 
-                      self.convert_angle_to_custom_range(positions[4], 50), 
-                      self.convert_angle_to_custom_range(positions[5], 50), 
+                      -self.convert_angle_to_custom_range(positions[3], 50), 
+                      -self.convert_angle_to_custom_range(positions[4], 50), 
+                      -self.convert_angle_to_custom_range(positions[5], 50), 
                       ]
-        output_vels = [self.convert_radians_to_motor_rotation(velocities[0], 100), 
-                       self.convert_radians_to_motor_rotation(velocities[1], 100), 
-                       self.convert_radians_to_motor_rotation(velocities[2], 100), 
-                       self.convert_radians_to_motor_rotation(velocities[3], 50), 
-                       self.convert_radians_to_motor_rotation(velocities[4], 50),
-                       self.convert_radians_to_motor_rotation(velocities[5], 50)]
+        # output_vels = [self.convert_radians_to_motor_rotation(velocities[0], 100), 
+        #                self.convert_radians_to_motor_rotation(velocities[1], 100), 
+        #                -self.convert_radians_to_motor_rotation(velocities[2], 100), 
+        #                self.convert_radians_to_motor_rotation(velocities[3], 50), 
+        #                self.convert_radians_to_motor_rotation(velocities[4], 50),
+        #                self.convert_radians_to_motor_rotation(velocities[5], 50)]
+        output_vels = [6, 6, 6, 6, 6, 6]
         #indexing [base_joint, shoulder_joint, elbow_joint, wrist_rotate, wrist_twist, wrist_rotate_two]
         self.get_logger().info(f'{output_pos}, {output_vels}')
         return output_pos, output_vels
@@ -104,8 +105,7 @@ class JSInputSubscriber(Node):
         send_number(self.serial_port, wrist_rotate_1)
         send_number(self.serial_port, wrist_tilt)
         send_number(self.serial_port, wrist_rotate_2)
-        
-        #print(str(positions[0]) + " " + str(velocities[0]))
+
         
 
 

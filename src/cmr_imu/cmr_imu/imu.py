@@ -166,7 +166,7 @@ def main(args = None):
     )
     device.ADDR = 0x50  # 设置传感器ID Setting the Sensor ID
     if (platform.system().lower() == 'linux'):
-        device.serialConfig.portName = "/dev/cmr/compass"  # 设置串口 Set serial port
+        device.serialConfig.portName = "/dev/ttyUSB0"  # 设置串口 Set serial port
     else:
         device.serialConfig.portName = "COM82"  # 设置串口 Set serial port
     device.serialConfig.baud = 9600  # 设置波特率 Set baud rate

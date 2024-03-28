@@ -34,9 +34,9 @@ class CmdVelSubscriber(Node):
         self.last_time_right = time.time()
         self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
-        self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
         self.feed_forward_torque = 0.0
-        # self.serial_port = None
+        self.serial_port = None
         self.logger = self.get_logger()
         
         # Init constants given TOML file
@@ -123,20 +123,32 @@ class CmdVelSubscriber(Node):
         front_left =  byte_command_converter(DRIVES, FRONT_LEFT, None, left_speed, self.MAX_TORQUE, None,    self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
         back_left =   byte_command_converter(DRIVES, BACK_LEFT, None, left_speed, self.MAX_TORQUE, None,     self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
         self.logger.info(f'Left Speed: {left_speed}, Right Speed: {right_speed}')
-        send_number(self.serial_port, back_right)
-        send_number(self.serial_port, front_right)
-        send_number(self.serial_port, front_left)
-        send_number(self.serial_port, back_left)
+        # send_number(self.serial_port, back_right)
+        # send_number(self.serial_port, front_right)
+        # send_number(self.serial_port, front_left)
+        # send_number(self.serial_port, back_left)
 
         #output = byte_command_converter(DRIVES, "back_right", None, self.current_speed, 1.5, None, 5.0, self.get_logger())
         #send_number(self.serial_port, output)
+    
+    def r2TriggerConverter(self, val):
+        # Convert the integer to a hexadecimal string
+        hex_value = hex(val & 0xFFFFFFFF)  # Mask with 0xFFFFFFFF to handle negative values correctly
+        # Take the first two hex digits (after '0x')
+        first_two_hex = hex_value[2:4]
+        # Convert the two hex digits back to an integer
+        result_int = int(first_two_hex, 16)
+        return result_int
             
     def listener_button_callback(self, msg):
         trigger_val = msg.button_array[0]
         button_val = msg.button_array[1]
-        #self.logger.info(f'button_array: {msg.button_array[0]}')
-        # if trigger_val > R2_MIN and trigger_val < R2_MIN:
-        #     self.set_feed_forward_torque(trigger_val)
+        # self.logger.info(f'button_array: {msg.button_array[0]}')
+        R2trigger = self.r2TriggerConverter(trigger_val)
+        if R2trigger >= 0 and R2trigger <= 255:
+            FF_val = scale_value(R2trigger, float(0), float(255), 0, self.MAX_FEED_FORWARD_TORQUE)
+            self.set_feed_forward_torque(FF_val)
+            # self.logger.info(f'R2: {r2val}')
         if trigger_val == L2 and button_val == TRIANGLE: 
             self.current_speed = 0
             self.current_speed_angular = 0
@@ -144,10 +156,10 @@ class CmdVelSubscriber(Node):
             front_right_stop = byte_command_converter(DRIVES, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
             front_left_stop = byte_command_converter(DRIVES, FRONT_LEFT, None, None, None, None, None, None, self.logger)
             back_left_stop = byte_command_converter(DRIVES, BACK_LEFT, None, None, None, None, None, None, self.logger)
-            send_number(self.serial_port, back_right_stop)
-            send_number(self.serial_port, front_right_stop)
-            send_number(self.serial_port, front_left_stop)
-            send_number(self.serial_port, back_left_stop)
+            # send_number(self.serial_port, back_right_stop)
+            # send_number(self.serial_port, front_right_stop)
+            # send_number(self.serial_port, front_left_stop)
+            # send_number(self.serial_port, back_left_stop)
         if trigger_val == L2 and button_val == CIRCLE: 
             self.turn_thread_lock = not self.turn_thread_lock
             if self.turn_thread_lock == False:

@@ -1,6 +1,7 @@
 import struct
 from toml import load
 from os import path
+import time
 
 #VALID SUBTEAMS
 DRIVES = 0x01
@@ -34,6 +35,16 @@ SQUARE = 1 #0x01
 X = 256 #0x0101
 CIRCLE = 65536 #0x010101
 TRIANGLE = 16777216 #0x01010101
+
+drives_net_table = parse_toml("drivesnet")
+drives_net_node = drives_net_table['node']
+CONTROLLER_MAX_SPEED = 2.5
+MOTOR_MAX_SPEED = drives_net_node['motor_max_speed']
+GRADUAL_INCREASE_RATE = drives_net_node['gradual_increase_rate']
+BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
+MAX_ACCELERATION = drives_net_node['acceleration_limit']
+MAX_TORQUE = drives_net_node['torque_limit']
+MAX_FEED_FORWARD_TORQUE = drives_net_node['feed_forward_torque_limit']
 
 
 def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, ff_torque, logger):
@@ -142,4 +153,62 @@ def parse_toml(toml_name):
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
+def set_speed(speed, serial_port): 
+    """
+    Helper function to drive forward or backword at a certain speed
+
+    speed - Units in RPM, negative speed for reverse  
+    serial_port - serial port to send information
+
+    Example for port:
+    self.port = "/dev/ttyTHS0"
+    self.baud_rate = 115200
+    self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+    """
+    back_right =  byte_command_converter(DRIVES, BACK_RIGHT, None, -speed, MAX_TORQUE, None,  MAX_ACCELERATION, 0, None)
+    front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -speed, MAX_TORQUE, None, MAX_ACCELERATION, 0, None)
+    front_left =  byte_command_converter(DRIVES, FRONT_LEFT, None, speed, MAX_TORQUE, None,   MAX_ACCELERATION, 0, None)
+    back_left =   byte_command_converter(DRIVES, BACK_LEFT, None, speed, MAX_TORQUE, None,    MAX_ACCELERATION, 0, None)
+    send_number(serial_port, back_right)
+    send_number(serial_port, front_right)
+    send_number(serial_port, front_left)
+    send_number(serial_port, back_left)
+    
+
+def set_speed_forward_timed(speed, drive_time, serial_port):
+    """
+    Helper function to drive forward or backword at a certain speed 
+    for a certain amount of time
+
+    speed - Units in RPM, negative speed for reverse  
+    drive_time - duration of drive
+    serial_port - serial port to send information
+
+    Example for port:
+    self.port = "/dev/ttyTHS0"
+    self.baud_rate = 115200
+    self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+    """
+    set_speed(speed, serial_port)
+    time.sleep(drive_time)
+    set_speed(0, serial_port)
+ 
+def drive_distance(speed, distance, wheel_diameter, serial_port):
+    """
+    Helper function to drive forward or backword for a set distance
+
+    speed - Units in RPM, negative speed for reverse  
+    distance - distance in inches
+    wheel_diameter - Right now, the wheel diameter is 11 inches
+    serial_port - serial port to send information
+
+    Example for port:
+    self.port = "/dev/ttyTHS0"
+    self.baud_rate = 115200
+    self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+    """    
+    pi = 3.14159
+    time_in_minutes = distance / ((pi * wheel_diameter) * speed)
+    set_speed_forward_timed(speed, time_in_minutes*60, serial_port)
+    
 

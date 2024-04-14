@@ -72,11 +72,11 @@ class JSInputSubscriber(Node):
 
     
     def translate_to_electrical(self, positions, velocities):
-        output_pos = [-self.convert_angle_to_custom_range(positions[0], 100), 
-                      -self.convert_angle_to_custom_range(positions[1], 100), 
-                      self.convert_angle_to_custom_range(positions[2], 100), 
-                      -self.convert_angle_to_custom_range(positions[3], 50), 
-                      -self.convert_angle_to_custom_range(positions[4], 50), 
+        output_pos = [self.convert_angle_to_custom_range(positions[0], 100), 
+                      self.convert_angle_to_custom_range(positions[1], 100), 
+                      -self.convert_angle_to_custom_range(positions[2], 100), 
+                      self.convert_angle_to_custom_range(positions[3], 50), 
+                      self.convert_angle_to_custom_range(positions[4], 50), 
                       -self.convert_angle_to_custom_range(positions[5], 50), 
                       ]
         # output_vels = [self.convert_radians_to_motor_rotation(velocities[0], 100), 

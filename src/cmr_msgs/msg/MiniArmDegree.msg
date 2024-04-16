@@ -1,0 +1,6 @@
+float64 base_angle
+float64 shoulder_angle
+float64 elbow_angle 
+float64 first_rotate_angle
+float64 tilt_angle
+float64 second_rotate_angle

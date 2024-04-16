@@ -1,5 +1,6 @@
 from geometry_msgs.msg import TwistStamped
 from cmr_msgs.msg import ControllerReading
+from cmr_msgs.msg import MiniArmDegree
 from sensor_msgs.msg import Joy
 import socket
 import rclpy 
@@ -10,6 +11,7 @@ import math
 UDP_IP = "0.0.0.0" # Listen on all available IPs
 UDP_PORT_DRIVES = 5010
 UDP_PORT_ARM = 5020
+UDP_PORT_MINI_ARM = 5030
 
 directions = {
     "neutral" : 8, "N" : 0, "NE" : 1, "E" : 2, "SE" : 3,
@@ -31,6 +33,13 @@ arm_sock.setblocking(0)
 arm_sock.bind((UDP_IP, UDP_PORT_ARM))
 print(arm_sock)
 
+print("Connecting Mini Arm")
+mini_arm_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+mini_arm_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+mini_arm_sock.setblocking(0)
+mini_arm_sock.bind((UDP_IP, UDP_PORT_MINI_ARM))
+print(mini_arm_sock)
+
 class CmdVelPublisher(Node):
   def __init__(self):
     super().__init__('cmd_vel_publisher')
@@ -39,6 +48,8 @@ class CmdVelPublisher(Node):
 
     self.button_publisher_ = self.create_publisher(ControllerReading, '/drives_controller/cmd_buttons', 10)
     self.arm_button_publisher_ = self.create_publisher(ControllerReading, '/arm_controller/cmd_buttons', 10)
+
+    self.mini_arm_publisher = self.create_publisher(MiniArmDegree, '/mini_arm_controller/cmd_degrees', 10)
     self.timer = self.create_timer(0.1, self.publish_msg)
 
     self.logger = self.get_logger()
@@ -71,7 +82,29 @@ class CmdVelPublisher(Node):
       except BlockingIOError:
         # Handle the case where no data is received
         pass
+
+      try:
+        mini_arm_data_raw, addr = mini_arm_sock.recvfrom(1024)
+        # process mini_arm_data
+        mini_arm_data = struct.unpack('ffffff', mini_arm_data_raw)
+        self.logger.info(f'mini arm data: {mini_arm_data}')
+        mini_arm_msg = self.create_mini_arm_message(mini_arm_data)
+        self.mini_arm_publisher.publish(mini_arm_msg)
+
+      except BlockingIOError:
+        # Handle the case where no data is received
+        pass
   
+  def create_mini_arm_message(self, mini_arm_data):
+    msg = MiniArmDegree()
+    msg.base_angle = mini_arm_data[0]
+    msg.shoulder_angle = mini_arm_data[1]
+    msg.elbow_angle = mini_arm_data[2]
+    msg.first_rotate_angle = mini_arm_data[3]
+    msg.tilt_angle = mini_arm_data[4]
+    msg.second_rotate_angle = mini_arm_data[5]
+    return msg 
+
   def axis_map_for_arm(self, axis):
     if axis >= 1: 
       result = -1

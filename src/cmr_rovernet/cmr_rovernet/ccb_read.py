@@ -32,7 +32,11 @@ class CCBReadPublisher(Node):
             ARM_ELBOW: self.stored_data.elbow,
             WRIST_ROTATE_1: self.stored_data.wrist_r1, 
             WRIST_TILT: self.stored_data.wrist_twist,
-            WRIST_ROTATE_2: self.stored_data.wrist_r2
+            WRIST_ROTATE_2: self.stored_data.wrist_r2,
+            FRONT_LEFT_SWERVE: self.stored_data.front_left_swerve, 
+            BACK_RIGHT_SWERVE: self.stored_data.back_right_swerve, 
+            FRONT_RIGHT_SWERVE: self.stored_data.front_right_swerve,
+            BACK_LEFT_SWERVE: self.stored_data.back_left_swerve
         }
 
     def publish_msg(self):
@@ -74,6 +78,22 @@ class CCBReadPublisher(Node):
 
         wrist_rotate_2_request = byte_command_converter(RECEIVE_DATA, WRIST_TILT, 10, 10, 10, 10, 10, 10, self.logger)
         send_number(self.serial_port, wrist_rotate_2_request)
+        self.read_data()
+
+        back_right_swerve_request = byte_command_converter(RECEIVE_DATA, BACK_RIGHT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, back_right_swerve_request)
+        self.read_data()
+
+        front_right_swerve_request = byte_command_converter(RECEIVE_DATA, FRONT_RIGHT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, front_right_swerve_request)
+        self.read_data()
+
+        front_left_swerve_request = byte_command_converter(RECEIVE_DATA, FRONT_LEFT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, front_left_swerve_request)
+        self.read_data()
+
+        back_left_swerve_request = byte_command_converter(RECEIVE_DATA, BACK_LEFT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, back_left_swerve_request)
         self.read_data()
 
     def read_data(self):

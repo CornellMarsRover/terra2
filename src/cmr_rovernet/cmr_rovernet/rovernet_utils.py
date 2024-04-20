@@ -2,12 +2,14 @@ import struct
 from toml import load
 from os import path
 import time
+import math
 
 #VALID SUBTEAMS
 DRIVES = 0x01
 ARM = 0x02
 ASTROTECH = 0x03
 RECEIVE_DATA = 0x04
+BRAKE = 0x08
 
 #VALID MOTORS
 FRONT_LEFT = 0x01
@@ -36,16 +38,17 @@ X = 256 #0x0101
 CIRCLE = 65536 #0x010101
 TRIANGLE = 16777216 #0x01010101
 
-drives_net_table = parse_toml("drivesnet")
-drives_net_node = drives_net_table['node']
-CONTROLLER_MAX_SPEED = 2.5
-MOTOR_MAX_SPEED = drives_net_node['motor_max_speed']
-GRADUAL_INCREASE_RATE = drives_net_node['gradual_increase_rate']
-BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
-MAX_ACCELERATION = drives_net_node['acceleration_limit']
-MAX_TORQUE = drives_net_node['torque_limit']
-MAX_FEED_FORWARD_TORQUE = drives_net_node['feed_forward_torque_limit']
+#SWERVE MOTORS
+FRONT_LEFT_SWERVE = 0x13
+BACK_RIGHT_SWERVE = 0x11
+FRONT_RIGHT_SWERVE = 0x12
+BACK_LEFT_SWERVE = 0x10
 
+#WHEEL BASE IN METERS
+ROVER_LENGTH = 39
+ROVER_WIDTH = 20
+R = math.sqrt(ROVER_LENGTH**2 + ROVER_WIDTH**2)
+maxWheelVelocity = 12
 
 def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, ff_torque, logger):
     """
@@ -152,6 +155,16 @@ def parse_toml(toml_name):
         
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+
+drives_net_table = parse_toml("drivesnet")
+drives_net_node = drives_net_table['node']
+CONTROLLER_MAX_SPEED = 2.5
+MOTOR_MAX_SPEED = drives_net_node['motor_max_speed']
+GRADUAL_INCREASE_RATE = drives_net_node['gradual_increase_rate']
+BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
+MAX_ACCELERATION = drives_net_node['acceleration_limit']
+MAX_TORQUE = drives_net_node['torque_limit']
+MAX_FEED_FORWARD_TORQUE = drives_net_node['feed_forward_torque_limit']
 
 def set_speed(speed, serial_port): 
     """

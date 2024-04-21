@@ -49,7 +49,7 @@ class CmdVelPublisher(Node):
     self.button_publisher_ = self.create_publisher(ControllerReading, '/drives_controller/cmd_buttons', 10)
     self.arm_button_publisher_ = self.create_publisher(ControllerReading, '/arm_controller/cmd_buttons', 10)
 
-    self.mini_arm_publisher = self.create_publisher(MiniArmDegree, '/mini_arm_controller/cmd_degrees', 10)
+    self.mini_arm_publisher = self.create_publisher(MiniArmDegree, '/mini_arm_controller/cmd_pos', 1)
     self.timer = self.create_timer(0.1, self.publish_msg)
 
     self.logger = self.get_logger()

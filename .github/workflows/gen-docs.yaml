@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 jobs:
   gen:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     container: ros:humble
     steps:
       - name: Check out repository

@@ -7,7 +7,7 @@ on:
     - cron: "30 8 * * *"
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     # Ideally, we want to keep build and tests relatively short, but if
     # tests legitimately take longer than this it can be increased
     # (although it may be in our best interest to try and optimize tests if this

@@ -41,6 +41,7 @@ class CmdVelSubscriber(Node):
         self.baud_rate = 115200
         self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
         self.feed_forward_torque = 0.0
+        self.velocity = 0
         # self.serial_port = None
         self.logger = self.get_logger()
         self.swerve = False
@@ -146,10 +147,10 @@ class CmdVelSubscriber(Node):
         if(ws4 > max): max = ws4
         if(max > 1): ws1 /= max; ws2 /= max; ws3 /= max; ws4 /= max
 
-        ws1 = round(ws1, 3) * MAX_TORQUE
-        ws2 = round(ws2, 3) * MAX_TORQUE
-        ws3 = round(ws3, 3) * MAX_TORQUE
-        ws4 = round(ws4, 3) * MAX_TORQUE
+        ws1 = round(ws1, 3) 
+        ws2 = round(ws2, 3) 
+        ws3 = round(ws3, 3)
+        ws4 = round(ws4, 3) 
         
         wa1 = (round(wa1, 3)) / 360 * 100
         wa2 = (round(wa2, 3)) / 360 * 100
@@ -200,11 +201,12 @@ class CmdVelSubscriber(Node):
             self.controller_command_rx = 0
         self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)
-        # self.logger.info(f'WS1: {ws1}, WS2: {ws2}, WS3: {ws3}, WS4: {ws4} ')
-        back_right =  byte_command_converter(DRIVES, BACK_RIGHT, None, 0, self.MAX_TORQUE, None,  self.MAX_ACCELERATION, ws4, self.logger)
-        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, 0, self.MAX_TORQUE, None, self.MAX_ACCELERATION, ws1, self.logger)
-        front_left =  byte_command_converter(DRIVES, FRONT_LEFT, None, 0, self.MAX_TORQUE, None,    self.MAX_ACCELERATION, -ws2, self.logger)
-        back_left =   byte_command_converter(DRIVES, BACK_LEFT, None, 0, self.MAX_TORQUE, None,     self.MAX_ACCELERATION, -ws3, self.logger)
+        self.logger.info(f'VEL: {self.velocity}')
+        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, self.velocity*ws1,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, self.velocity*ws4,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, -self.velocity*ws2, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, -self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        
         br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, wa4, None, 5, 120, 120, None, self.logger)
         fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, wa1, None, 5, 120, 120, None, self.logger)
         fl_swerve = byte_command_converter(ARM, FRONT_LEFT_SWERVE, wa2, None, 5, 120, 120, None, self.logger)
@@ -234,10 +236,13 @@ class CmdVelSubscriber(Node):
         # self.logger.info(f'button_array: {msg.button_array[0]}')
         R2trigger = self.r2TriggerConverter(trigger_val)
         if R2trigger >= 0 and R2trigger <= 255:
-            FF_val = scale_value(R2trigger, float(0), float(255), 0, self.MAX_FEED_FORWARD_TORQUE)
-            self.set_feed_forward_torque = FF_val 
+            vel = scale_value(R2trigger, float(0), float(255), 0, self.MOTOR_MAX_SPEED)
+            self.velocity = vel 
+        if trigger_val >= L2_MIN and trigger_val <= L2:
+            vel = scale_value(trigger_val, L2_MIN, L2, 0, self.MOTOR_MAX_SPEED)
+            self.velocity = -vel
             # self.logger.info(f'R2: {r2val}')
-        if trigger_val == L2 and button_val == TRIANGLE: 
+        if trigger_val == L1 and button_val == TRIANGLE: 
             self.current_speed = 0
             self.current_speed_angular = 0
             back_right_stop = byte_command_converter(DRIVES, BACK_RIGHT, None, None, None, None, None, None, self.logger)
@@ -248,7 +253,7 @@ class CmdVelSubscriber(Node):
             send_number(self.serial_port, front_right_stop)
             send_number(self.serial_port, front_left_stop)
             send_number(self.serial_port, back_left_stop)
-        if trigger_val == L2 and button_val == SQUARE: 
+        if trigger_val == L1 and button_val == SQUARE: 
             back_right_brake = byte_command_converter(BRAKE, BACK_RIGHT, None, None, None, None, None, None, self.logger)
             front_right_brake = byte_command_converter(BRAKE, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
             front_left_brake = byte_command_converter(BRAKE, FRONT_LEFT, None, None, None, None, None, None, self.logger)
@@ -257,22 +262,12 @@ class CmdVelSubscriber(Node):
             send_number(self.serial_port, front_right_brake)
             send_number(self.serial_port, front_left_brake)
             send_number(self.serial_port, back_left_brake)
-        if trigger_val == L2 and button_val == CIRCLE: 
+        if trigger_val == L1 and button_val == CIRCLE: 
             self.turn_thread_lock = not self.turn_thread_lock
             if self.turn_thread_lock == False:
                 self.logger.info('Switching to Linear')
             else:
                 self.logger.info('Switching to Angular')
-        if trigger_val == L2 and button_val == X:
-            self.feed_forward_torque += 0.1
-        if trigger_val == L1 and button_val == X: 
-            self.feed_forward_torque = 0 
-        if trigger_val == L1 and button_val == SQUARE:
-            # raise Exception("L1 and Square buttons pressed")
-            self.logger.info(f'Switching to {self.swerve}')
-            self.swerve = not self.swerve
-
-        
 
 def main(args=None):
     rclpy.init(args=args)

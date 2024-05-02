@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
-from cmr_msgs.msg import ControllerReading
+from cmr_msgs.msg import ControllerReading, AutonomyDrive
 import time
 import serial
 import math
@@ -23,6 +23,11 @@ class CmdVelSubscriber(Node):
             self.listener_callback,
             10)
         self.button_subscription = self.create_subscription(
+            AutonomyDrive,
+            '/autonomy_move',
+            self.autonomy_callback,
+            10)
+        self.autonomy_subscription = self.create_subscription(
             ControllerReading,
             '/drives_controller/cmd_buttons',
             self.listener_button_callback,
@@ -220,6 +225,32 @@ class CmdVelSubscriber(Node):
         send_number(self.serial_port, fl_swerve)
         send_number(self.serial_port, bl_swerve)
         
+    def autonomy_callback(self, msg):
+        vel = msg.vel
+        fl_angle = scale_value(msg.fl_angle, -360, 360, -100, 100)
+        fr_angle = scale_value(msg.fr_angle, -360, 360, -100, 100)
+        bl_angle = scale_value(msg.bl_angle, -360, 360, -100, 100)
+        br_angle = scale_value(msg.br_angle, -360, 360, -100, 100)
+
+
+        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, -vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, -vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        
+        br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, br_angle, None, 5, 120, 120, None, self.logger)
+        fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, fr_angle, None, 5, 120, 120, None, self.logger)
+        fl_swerve = byte_command_converter(ARM, FRONT_LEFT_SWERVE, fl_angle, None, 5, 120, 120, None, self.logger)
+        bl_swerve = byte_command_converter(ARM, BACK_LEFT_SWERVE, bl_angle, None, 5, 120, 120, None, self.logger)
+        send_number(self.serial_port, back_right)
+        send_number(self.serial_port, front_right)
+        send_number(self.serial_port, front_left)
+        send_number(self.serial_port, back_left)
+        send_number(self.serial_port, br_swerve)
+        send_number(self.serial_port, fr_swerve)
+        send_number(self.serial_port, fl_swerve)
+        send_number(self.serial_port, bl_swerve)
+
 
     def r2TriggerConverter(self, val):
         # Convert the integer to a hexadecimal string
@@ -253,15 +284,15 @@ class CmdVelSubscriber(Node):
             send_number(self.serial_port, front_right_stop)
             send_number(self.serial_port, front_left_stop)
             send_number(self.serial_port, back_left_stop)
-        if trigger_val == L1 and button_val == SQUARE: 
-            back_right_brake = byte_command_converter(BRAKE, BACK_RIGHT, None, None, None, None, None, None, self.logger)
-            front_right_brake = byte_command_converter(BRAKE, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
-            front_left_brake = byte_command_converter(BRAKE, FRONT_LEFT, None, None, None, None, None, None, self.logger)
-            back_left_brake = byte_command_converter(BRAKE, BACK_LEFT, None, None, None, None, None, None, self.logger)
-            send_number(self.serial_port, back_right_brake)
-            send_number(self.serial_port, front_right_brake)
-            send_number(self.serial_port, front_left_brake)
-            send_number(self.serial_port, back_left_brake)
+        # if trigger_val == L1 and button_val == SQUARE: 
+        #     back_right_brake = byte_command_converter(BRAKE, BACK_RIGHT, None, None, None, None, None, None, self.logger)
+        #     front_right_brake = byte_command_converter(BRAKE, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
+        #     front_left_brake = byte_command_converter(BRAKE, FRONT_LEFT, None, None, None, None, None, None, self.logger)
+        #     back_left_brake = byte_command_converter(BRAKE, BACK_LEFT, None, None, None, None, None, None, self.logger)
+        #     send_number(self.serial_port, back_right_brake)
+        #     send_number(self.serial_port, front_right_brake)
+        #     send_number(self.serial_port, front_left_brake)
+        #     send_number(self.serial_port, back_left_brake)
         if trigger_val == L1 and button_val == CIRCLE: 
             self.turn_thread_lock = not self.turn_thread_lock
             if self.turn_thread_lock == False:

@@ -18,26 +18,38 @@ class DriveToCoord():
                                           self.context.LONG, 
                                           self.context.LAT_TARGET,
                                           self.context.LONG_TARGET)
-        print(f"hi {distance}")
+
         while distance > self.threshold: 
             bearing = self.context.calc_bearing(self.context.LAT, 
                                           self.context.LONG, 
                                           self.context.LAT_TARGET,
                                           self.context.LONG_TARGET)
             
-            #print(f'Distance: {distance}   bearing: {bearing}')
-            autonomy_msg = AutonomyDrive()
-            autonomy_msg.fl_angle = -self.context.ANGLE_Z + bearing
-            autonomy_msg.fr_angle = -self.context.ANGLE_Z + bearing
-            autonomy_msg.bl_angle = 0.0
-            autonomy_msg.br_angle = 0.0
-            autonomy_msg.vel = 2.0
-            self.context.automove_pub.publish(autonomy_msg)
+            print(f'Distance: {distance}   bearing: {bearing}')
+
+            PLACEHOLDER = 0.0 #TODO
+
+            close_enough = lambda curr_pos, turn_pos : abs(curr_pos - turn_pos) < PLACEHOLDER
+
+            if (close_enough(self.context.FRONT_LEFT_SWERVE, PLACEHOLDER) and close_enough(self.context.FRONT_RIGHT_SWERVE, PLACEHOLDER)
+            and close_enough(self.context.BACK_LEFT_SWERVE, PLACEHOLDER) and close_enough(self.context.BACK_RIGHT_SWERVE, PLACEHOLDER)):
+                autonomy_msg = AutonomyDrive()
+                autonomy_msg.fl_angle = -self.context.ANGLE_Z + bearing
+                autonomy_msg.fr_angle = -self.context.ANGLE_Z + bearing
+                autonomy_msg.bl_angle = 0.0
+                autonomy_msg.br_angle = 0.0
+                autonomy_msg.vel = 2.0
+                self.context.automove_pub.publish(autonomy_msg)
 
             distance = self.context.haversine(self.context.LAT, 
                                           self.context.LONG, 
                                           self.context.LAT_TARGET,
                                           self.context.LONG_TARGET)
+            
+
+            
+
+
 
         self.reached_goal = True
 

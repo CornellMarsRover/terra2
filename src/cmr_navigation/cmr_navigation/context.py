@@ -36,7 +36,7 @@ class Context(Node):
         self.gps_sub = self.create_subscription(NavSatFix, '/fake_navsatfix_data', self.gps_callback, 10) 
         # Change to NavSatFix IRL
         self.imu_sub = self.create_subscription(IMUSensorData, '/imu', self.imu_callback, 10)
-        # self.ccb_read_sub = self.create_subscription(MotorReadData, '/ccb/read', self.ccb_read_callback, 10)
+        self.motor_sub = self.create_subscription(MotorReadData, '/ccb_read', self.ccb_read_callback, 10)
         self.automove_pub = self.create_publisher(AutonomyDrive, '/autonomy_move', 10)
 
         # GNSS GOAL
@@ -66,11 +66,11 @@ class Context(Node):
         self.ANGLE_Z = msg.angle_z
 
     def ccb_read_callback(self, msg):
-        self.get_logger().info('CCB Data: {msg.front_left}, {msg.back_right}, {msg.front_right}, {msg.back_left}')
-        self.FRONT_LEFT = msg.front_left
-        self.BACK_RIGHT = msg.back_right
-        self.FRONT_RIGHT = msg.front_right
-        self.BACK_LEFT = msg.back_left
+        self.get_logger().info('CCB Data: {msg.front_left_swerve}, {msg.back_right_swerve}, {msg.front_right_swerve}, {msg.back_left_swerve}')
+        self.FRONT_LEFT_SWERVE= msg.front_left_swerve
+        self.BACK_RIGHT_SWERVE = msg.back_right_swerve
+        self.FRONT_RIGHT_SWERVE = msg.front_right_swerve
+        self.BACK_LEFT_SWERVE = msg.back_left_swerve
 
     def calc_bearing(self, lat1, long1, lat2, long2):
     # Convert latitude and longitude to radians

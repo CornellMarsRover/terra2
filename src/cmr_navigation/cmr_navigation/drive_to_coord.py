@@ -11,7 +11,7 @@ class DriveToCoord():
     def __init__(self, LAT_GOAL, LONG_GOAL): 
         self.context = Context(LAT_TARGET=LAT_GOAL, LONG_TARGET=LONG_GOAL)
         self.reached_goal = False
-        self.threshold = 1.5
+        self.threshold = 0.5
 
     def drive_to_goal(self):
         distance = self.context.haversine(self.context.LAT, 
@@ -34,11 +34,11 @@ class DriveToCoord():
             if (close_enough(self.context.FRONT_LEFT_SWERVE, PLACEHOLDER) and close_enough(self.context.FRONT_RIGHT_SWERVE, PLACEHOLDER)
             and close_enough(self.context.BACK_LEFT_SWERVE, PLACEHOLDER) and close_enough(self.context.BACK_RIGHT_SWERVE, PLACEHOLDER)):
                 autonomy_msg = AutonomyDrive()
-                autonomy_msg.fl_angle = -self.context.ANGLE_Z + bearing
-                autonomy_msg.fr_angle = -self.context.ANGLE_Z + bearing
-                autonomy_msg.bl_angle = 0.0
-                autonomy_msg.br_angle = 0.0
-                autonomy_msg.vel = 2.0
+                autonomy_msg.fl_angle = -118.0
+                autonomy_msg.fr_angle = -61.0
+                autonomy_msg.bl_angle = 118.0
+                autonomy_msg.br_angle = 61.0
+                autonomy_msg.vel = 0.3
                 self.context.automove_pub.publish(autonomy_msg)
 
             distance = self.context.haversine(self.context.LAT, 
@@ -59,7 +59,7 @@ def main(args=None):
     if args is None:
         args = sys.argv[1:]
     if len(args) != 2:
-        print("Usage: ros2 run your_package your_node <goal_latitude> <goal_longitude>")
+        print("Usage: ros2 run cmr_navigation drive_to_coord_node <goal_latitude> <goal_longitude>")
         return
     GOAL_LAT = float(args[0])
     GOAL_LON = float(args[1])

@@ -7,7 +7,7 @@ import time
 import serial
 from cmr_rovernet.rovernet_utils import *
 
-MAX_TORQUE = 1.0
+MAX_TORQUE = 0.7
 MAX_ACCEL = 5.0
 
 class JSInputSubscriber(Node):
@@ -28,7 +28,7 @@ class JSInputSubscriber(Node):
             MiniArmDegree,
             '/mini_arm_controller/cmd_pos',
             self.listener_callback_mini,
-            1)
+            10)
         self.button_subscription = self.create_subscription(
             ControllerReading,
             '/arm_controller/cmd_buttons',
@@ -40,7 +40,7 @@ class JSInputSubscriber(Node):
         self.last_time = time.time()
         self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
-        # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
         self.moveit_mode = 1
         # self.serial_port = None
         self.logger = self.get_logger()
@@ -106,22 +106,23 @@ class JSInputSubscriber(Node):
     def listener_callback(self, msg):
         if self.moveit_mode:
             positions, velocities = self.translate_to_electrical(msg.points[0].positions, msg.points[0].velocities)
+            print(positions)
             base = byte_command_converter(ARM, ARM_BASE, positions[0], None, MAX_TORQUE, velocities[0], MAX_ACCEL, None, self.get_logger())
             shoulder = byte_command_converter(ARM, ARM_SHOULDER, positions[1], None, MAX_TORQUE, velocities[1], MAX_ACCEL, None, self.get_logger())
             elbow = byte_command_converter(ARM, ARM_ELBOW, positions[2], None, MAX_TORQUE, velocities[2], MAX_ACCEL, None, self.get_logger())
             wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, positions[3], None, MAX_TORQUE, velocities[3], MAX_ACCEL, None, self.get_logger())
             wrist_tilt = byte_command_converter(ARM, WRIST_TILT, positions[4], None, MAX_TORQUE, velocities[4], MAX_ACCEL, None, self.get_logger())
             wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, positions[5], None, MAX_TORQUE, velocities[5], MAX_ACCEL, None, self.get_logger())
-            # send_number(self.serial_port, base)
-            # send_number(self.serial_port, shoulder)
-            # send_number(self.serial_port, elbow)
-            # send_number(self.serial_port, wrist_rotate_1)
-            # send_number(self.serial_port, wrist_tilt)
-            # send_number(self.serial_port, wrist_rotate_2)
+            send_number(self.serial_port, base)
+            send_number(self.serial_port, shoulder)
+            send_number(self.serial_port, elbow)
+            send_number(self.serial_port, wrist_rotate_1)
+            send_number(self.serial_port, wrist_tilt)
+            send_number(self.serial_port, wrist_rotate_2)
 
     def listener_callback_mini(self, msg):  
         if not self.moveit_mode:
-            max_velocity = 6
+            max_velocity = 3
             print([msg.base_angle, msg.shoulder_angle, msg.elbow_angle, msg.first_rotate_angle, msg.tilt_angle, msg.second_rotate_angle])
             base = byte_command_converter(ARM, ARM_BASE, msg.base_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
             shoulder = byte_command_converter(ARM, ARM_SHOULDER, msg.shoulder_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
@@ -129,12 +130,12 @@ class JSInputSubscriber(Node):
             wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, msg.first_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
             wrist_tilt = byte_command_converter(ARM, WRIST_TILT, msg.tilt_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
             wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, msg.second_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            # send_number(self.serial_port, base)
-            # send_number(self.serial_port, shoulder)
-            # send_number(self.serial_port, elbow)
-            # send_number(self.serial_port, wrist_rotate_1)
-            # send_number(self.serial_port, wrist_tilt)
-            # send_number(self.serial_port, wrist_rotate_2)
+            send_number(self.serial_port, base)
+            send_number(self.serial_port, shoulder)
+            send_number(self.serial_port, elbow)
+            send_number(self.serial_port, wrist_rotate_1)
+            send_number(self.serial_port, wrist_tilt)
+            send_number(self.serial_port, wrist_rotate_2)
 
 
     def listener_button_callback(self, msg):

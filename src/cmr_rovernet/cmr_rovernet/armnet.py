@@ -148,6 +148,15 @@ class JSInputSubscriber(Node):
             if trigger_val == L1 and button_val == CIRCLE:
                 self.moveit_mode = 1
                 print("MoveIt arm mode: " + str(self.moveit_mode))
+            if trigger_val == R1 and button_val == SQUARE:
+                self.moveit_mode = 1
+                print("MoveIt arm mode: " + str(self.moveit_mode))
+            if trigger_val == R1 and button_val == CIRCLE:
+                self.moveit_mode = 1
+                print("MoveIt arm mode: " + str(self.moveit_mode))
+            if trigger_val == R1 and button_val == TRIANGLE:
+                self.moveit_mode = 1
+                print("MoveIt arm mode: " + str(self.moveit_mode))
 
 
 def main(args=None):

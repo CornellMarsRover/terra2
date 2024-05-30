@@ -205,12 +205,12 @@ class CmdVelSubscriber(Node):
         if abs(msg.twist.angular.x) < 0.1:
             self.controller_command_rx = 0
         self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
-        ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)
+        ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)
         self.logger.info(f'VEL: {self.velocity}')
-        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, self.velocity*ws1,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, self.velocity*ws4,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, -self.velocity*ws2, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, -self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, -self.velocity*ws1,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.velocity*ws4,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, self.velocity*ws2, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
         
         br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, wa4, None, 5, 120, 120, None, self.logger)
         fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, wa1, None, 5, 120, 120, None, self.logger)
@@ -233,10 +233,10 @@ class CmdVelSubscriber(Node):
         br_angle = scale_value(msg.br_angle, -360, 360, -100, 100)
 
 
-        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, -vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, -vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, -vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
         
         br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, br_angle, None, 5, 120, 120, None, self.logger)
         fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, fr_angle, None, 5, 120, 120, None, self.logger)

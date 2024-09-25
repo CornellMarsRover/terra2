@@ -13,6 +13,8 @@ find_package(geometry_msgs REQUIRED)
 # Add paths to additional messages, services, and actions here.
 rosidl_generate_interfaces(
   ${PROJECT_NAME}
+  msg/ObstaclePosition.msg
+  msg/ObstaclePositions.msg
   msg/AutonomyInfo.msg
   msg/State.msg
   msg/ArucoMarkers.msg

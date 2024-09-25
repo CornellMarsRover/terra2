@@ -1,0 +1,1 @@
+ObstaclePosition[] positions

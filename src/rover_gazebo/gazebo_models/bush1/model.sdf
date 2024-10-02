@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="bush1">
+    <static>true</static> <!-- Set to true if the model should not move -->
+    <pose>0 0 0.1 0 0 0</pose>
+
+    <link name="link">
+      <collision name="bush1_collision">
+        <geometry>
+          <sphere>1</sphere>
+        </geometry>
+      </collision>
+      <visual name="bush1_visual">
+        <geometry>
+          <sphere>1</sphere>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://materials/scripts/green.material</uri>
+            <name>GreenMaterial</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
+

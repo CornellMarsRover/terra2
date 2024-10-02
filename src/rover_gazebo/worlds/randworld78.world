@@ -1,0 +1,7026 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="default">
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+      <uri>model://custom_ground</uri>
+    </include>
+
+    <spherical_coordinates>
+      <!-- currently gazebo has a bug: instead of outputting lat, long, altitude in ENU
+      (x = East, y = North and z = Up) as the default configurations, it's outputting (-E)(-N)U,
+      therefore we rotate the default frame 180 so that it would go back to ENU 
+      see: https://github.com/osrf/gazebo/issues/2022 -->
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>38.161479</latitude_deg>
+      <longitude_deg>-122.454630</longitude_deg>
+      <elevation>488.0</elevation>
+      <heading_deg>180</heading_deg>
+    </spherical_coordinates>
+
+
+        <model name="hill1_1">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1206.94 139.23 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_2">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2339.2 115.58 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_3">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2345.64 -376.25 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_4">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1162.41 -162.7 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_5">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>810.66 148.1 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_6">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>215.27 -383.46 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_7">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>106.32 55.27 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_8">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>83.07 -27.99 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_9">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1185.63 -164.29 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_10">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>286.87 309.86 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_11">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1834.47 379.87 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_12">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2223.16 -267.97 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_13">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1190.78 -216.18 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_14">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1173.49 -269.59 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_15">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1655.49 -30.58 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_16">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2046.22 -174.77 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_17">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>620.7 99.88 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_18">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2537.43 334.83 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_19">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1700.46 304.12 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_20">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>616.85 214.69 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_21">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2011.58 318.3 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_22">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1878.41 106.69 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_23">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2311.94 -148.28 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_24">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>580.2 -287.32 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_25">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1461.62 163.07 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_26">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>669.39 155.53 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_27">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1485.58 182.82 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_28">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1449.26 -331.99 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_29">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>502.46 -148.81 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_30">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1542.37 150.4 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_31">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1809.05 -125.28 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_32">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1261.42 83.58 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_33">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>823.33 -40.47 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_34">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>724.56 -372.54 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_35">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>371.83 -316.32 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_36">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1527.2 189.6 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_37">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1066.97 -11.05 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_38">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1122.6 216.59 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_39">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>835.64 190.12 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_40">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>978.11 -184.21 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_41">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1493.48 -231.95 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_42">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>702.4 294.71 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_43">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>95.2 271.15 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_44">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>281.69 46.63 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_45">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2092.77 -81.3 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_46">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1518.49 -49.01 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_47">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1435.54 -111.03 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_48">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2271.22 -174.29 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_49">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1258.05 115.19 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_50">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>276.67 190.76 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_51">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>550.17 -257.38 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_52">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>851.88 -221.48 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_53">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1182.36 -227.39 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_54">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>309.45 81.08 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_55">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2100.76 -4.57 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_56">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2524.1 85.29 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_57">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2001.43 223.03 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_58">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>314.85 29.62 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_59">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>871.83 -411.8 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_60">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>232.61 -96.46 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_61">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1566.94 378.53 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_62">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>289.1 51.41 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_63">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1932.71 151.75 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_64">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2198.05 -264.4 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_65">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2284.35 146.31 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_66">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>529.2 -209.73 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_67">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2015.55 87.85 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_68">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1606.33 374.76 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_69">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1253.57 -251.63 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_70">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2352.87 -284.48 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_71">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2515.7 -159.67 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_72">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>756.61 -376.76 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_73">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2380.59 -171.54 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_74">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>832.07 55.73 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_75">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>504.7 364.65 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_76">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2325.94 338.09 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_77">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1489.1 -22.91 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_78">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1116.72 -372.53 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_79">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1283.07 76.44 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_80">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1215.4 -257.8 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_81">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1204.58 173.25 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_82">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>357.98 -117.6 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_83">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2478.05 156.91 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_84">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1968.25 -40.98 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_85">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1256.07 166.6 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_86">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>95.24 -370.75 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_87">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>151.08 -248.98 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_88">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2086.42 -2.45 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_89">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1523.53 -18.56 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_90">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2308.73 -293.78 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_91">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>615.91 193.35 -1.6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_92">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1712.75 317.04 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_93">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>885.93 247.9 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_94">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2657.47 -29.13 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_95">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1478.41 97.58 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_96">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1330.2 -61.54 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_97">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>991.43 -417.53 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_98">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>754.62 -65.96 -1.6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_99">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>2188.95 387.89 -1.6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill1_100">
+          <include>
+            <uri>model://hill1</uri>
+            <pose>1651.46 46.82 -1.6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_1">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1987.6 -96.06 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_2">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1751.65 -261.58 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_3">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>725.97 326.17 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_4">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>701.9 -393.55 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_5">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2123.33 176.83 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_6">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2196.93 -52.23 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_7">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1621.67 -170.87 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_8">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1724.82 -344.95 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_9">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>519.93 79.03 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_10">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1433.86 -215.41 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_11">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1140.02 363.17 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_12">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>890.79 294.57 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_13">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2630.48 -258.48 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_14">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1515.93 202.44 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_15">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2038.48 88.78 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_16">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2071.67 279.65 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_17">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1159.9 -321.56 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_18">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>88.59 -289.27 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_19">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1275.61 -85.33 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_20">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>250.83 -289.29 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_21">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>303.8 -252.16 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_22">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1234.53 136.58 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_23">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>170.35 244.88 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_24">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1928.88 182.87 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_25">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1344.63 -18.79 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_26">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2315.3 64.5 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_27">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>460.25 246.69 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_28">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1787.6 -97.43 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_29">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1386.8 -137.15 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_30">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2194.85 -148.21 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_31">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>169.12 6.68 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_32">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1323.33 105.41 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_33">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>513.64 -325.7 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_34">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1174.53 -342.02 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_35">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>629.84 -332.75 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_36">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1975.53 -396.95 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_37">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2654.19 -284.96 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_38">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1312.19 -200.39 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_39">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>775.58 170.41 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_40">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>548.55 -304.26 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_41">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2067.64 214.15 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_42">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2253.07 167.68 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_43">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>122.22 -312.37 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_44">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1684.9 61.07 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_45">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>998.09 -184.0 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_46">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>121.42 339.53 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_47">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2406.09 35.06 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_48">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2185.91 270.48 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_49">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>289.67 92.01 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_50">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2290.94 -406.31 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_51">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1595.55 356.68 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_52">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2551.89 -284.1 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_53">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2524.08 -169.38 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_54">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2408.4 82.91 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_55">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2417.88 307.93 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_56">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1340.19 -238.36 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_57">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1480.41 69.51 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_58">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1718.14 -336.92 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_59">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1248.8 107.54 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_60">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>510.5 344.04 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_61">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2101.45 -134.95 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_62">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>913.93 181.84 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_63">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2398.45 -220.59 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_64">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1632.24 -13.12 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_65">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>793.59 -231.04 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_66">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>905.61 353.9 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_67">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1817.63 -5.83 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_68">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1442.26 69.91 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_69">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1536.99 296.75 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_70">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2552.79 102.03 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_71">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2438.55 340.24 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_72">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2675.99 -44.5 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_73">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1448.97 -29.27 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_74">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2638.43 312.04 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_75">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>763.18 -153.3 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_76">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1910.38 -254.62 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_77">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1365.95 -152.15 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_78">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>936.01 151.54 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_79">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2155.89 -284.67 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_80">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1825.29 290.58 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_81">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2453.29 218.36 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_82">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1543.18 39.51 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_83">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1925.4 75.08 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_84">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>139.25 130.31 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_85">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2069.83 49.52 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_86">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1908.34 -47.2 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_87">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1799.51 386.74 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_88">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1514.76 -376.95 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_89">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1514.47 -237.56 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_90">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1477.62 -14.62 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_91">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1360.05 -219.33 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_92">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>947.26 -301.82 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_93">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>444.0 185.45 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_94">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1388.77 -110.21 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_95">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>169.73 209.45 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_96">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>290.88 215.64 -6 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_97">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1838.44 317.26 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_98">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>670.55 389.92 -6 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_99">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>1485.14 88.12 -6 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill2_100">
+          <include>
+            <uri>model://hill2</uri>
+            <pose>2128.0 286.53 -6 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_1">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1759.95 337.24 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_2">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2544.85 173.0 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_3">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1787.13 -403.32 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_4">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1463.0 141.77 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_5">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>225.8 -149.54 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_6">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>207.59 271.33 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_7">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1074.91 3.47 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_8">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1648.29 258.7 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_9">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2247.6 -29.8 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_10">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>833.66 -145.67 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_11">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>55.52 -34.09 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_12">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2256.81 70.32 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_13">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>750.25 -345.79 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_14">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>780.85 -104.54 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_15">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1783.87 91.94 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_16">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2530.78 168.29 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_17">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2070.37 266.43 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_18">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>661.15 -54.79 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_19">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>181.62 275.5 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_20">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2211.52 136.9 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_21">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>884.74 -43.31 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_22">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>872.57 338.58 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_23">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1483.98 -294.86 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_24">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1167.42 -104.41 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_25">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2534.84 -277.61 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_26">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>767.17 52.4 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_27">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2418.19 44.47 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_28">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2070.6 -63.64 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_29">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1152.64 -176.3 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_30">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1425.95 288.64 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_31">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1456.41 -149.27 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_32">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>847.27 29.12 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_33">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>821.04 -181.43 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_34">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1574.04 -253.55 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_35">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>188.09 201.22 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_36">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1049.32 -370.38 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_37">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1174.9 346.53 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_38">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1893.01 82.91 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_39">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2060.89 -113.3 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_40">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1356.94 -239.6 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_41">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>435.66 134.51 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_42">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1783.43 116.44 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_43">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1673.16 95.03 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_44">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1168.06 266.27 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_45">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>355.74 -151.53 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_46">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>78.71 264.9 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_47">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>151.05 -325.2 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_48">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2533.54 225.53 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_49">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1591.44 317.05 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_50">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2251.92 -112.61 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_51">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2335.06 25.63 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_52">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>957.14 -365.79 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_53">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>334.82 -38.78 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_54">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1921.61 209.93 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_55">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>631.41 334.68 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_56">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>921.71 368.09 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_57">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1743.26 181.23 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_58">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>974.89 -290.78 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_59">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1672.4 73.35 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_60">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2439.36 -354.16 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_61">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1169.27 275.98 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_62">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1870.45 197.3 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_63">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2647.87 -119.09 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_64">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2698.19 -61.37 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_65">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1302.07 -130.8 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_66">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2621.31 216.96 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_67">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2451.58 -15.46 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_68">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1640.87 253.51 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_69">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>606.31 -229.37 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_70">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2501.07 348.39 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_71">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2657.24 18.13 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_72">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2581.21 152.95 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_73">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1244.36 -315.37 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_74">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1185.93 284.43 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_75">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2454.47 331.49 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_76">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>768.34 -413.21 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_77">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>567.09 233.08 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_78">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>325.1 -374.04 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_79">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1212.54 -342.91 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_80">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1560.18 8.75 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_81">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1227.09 -214.45 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_82">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1953.04 237.89 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_83">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>759.8 225.39 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_84">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>695.77 121.88 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_85">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2036.29 9.16 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_86">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2246.03 353.92 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_87">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1652.37 -346.78 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_88">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1381.59 96.78 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_89">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1585.66 212.51 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_90">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>2535.48 -49.44 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_91">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1278.99 -6.08 -1 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_92">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1937.37 -155.9 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_93">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1174.54 -359.41 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_94">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1124.44 176.94 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_95">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1657.45 243.34 -1 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_96">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1358.68 -295.92 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_97">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1712.39 -368.38 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_98">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>435.23 284.91 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_99">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>663.77 262.33 -1 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="hill3_100">
+          <include>
+            <uri>model://hill3</uri>
+            <pose>1346.82 159.55 -1 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_1">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2595.69 -336.13 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_2">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>134.83 12.07 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_3">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>991.62 158.92 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_4">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2644.0 236.24 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_5">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1431.25 -103.18 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_6">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1883.29 -193.89 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_7">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2049.76 -159.05 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_8">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1118.62 366.36 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_9">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2397.98 138.41 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_10">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1991.64 -205.67 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_11">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>143.76 -60.91 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_12">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>433.55 350.23 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_13">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1314.27 403.31 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_14">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1662.4 -64.4 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_15">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1073.41 -254.52 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_16">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1802.1 -246.85 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_17">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1805.06 -452.05 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_18">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1759.74 232.39 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_19">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>495.35 454.96 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_20">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>991.35 -375.73 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_21">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1693.1 399.64 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_22">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>21.58 -438.28 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_23">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>231.86 263.79 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_24">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>61.26 -100.37 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_25">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2377.26 176.02 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_26">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>177.01 466.94 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_27">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>737.45 -71.67 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_28">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>41.27 90.78 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_29">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1989.17 -386.69 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_30">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2710.49 -38.27 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_31">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>608.89 169.86 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_32">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1407.4 314.85 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_33">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2409.28 -2.71 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_34">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1157.95 175.84 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_35">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1759.44 452.72 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_36">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>837.2 -161.91 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_37">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2107.0 376.05 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_38">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1060.99 290.07 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_39">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>244.26 171.76 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_40">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>895.48 -384.63 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_41">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>634.07 -464.79 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_42">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1486.17 -138.6 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_43">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>29.62 -400.75 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_44">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1967.51 -209.9 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_45">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>843.52 -81.73 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_46">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1432.79 17.72 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_47">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>51.87 -183.7 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_48">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>472.88 271.13 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_49">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2734.62 -338.14 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_50">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2598.28 26.17 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_51">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>448.44 272.61 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_52">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>907.41 203.06 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_53">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1380.44 215.44 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_54">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2464.82 -58.95 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_55">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>635.12 -82.75 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_56">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>127.53 -194.04 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_57">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>660.61 -234.4 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_58">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1648.26 -477.95 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_59">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2345.24 210.76 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_60">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>299.57 -3.6 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_61">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>464.62 201.12 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_62">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1174.7 -252.67 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_63">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1500.3 390.14 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_64">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>574.7 17.82 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_65">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1941.9 -9.73 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_66">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>709.2 -142.05 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_67">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>412.28 384.79 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_68">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1946.02 417.82 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_69">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1752.67 142.12 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_70">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>342.6 -305.61 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_71">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2042.99 183.1 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_72">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1397.17 -124.59 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_73">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>532.06 -228.02 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_74">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2474.91 -188.6 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_75">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1725.9 -271.16 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_76">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>530.01 335.73 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_77">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1958.19 -215.18 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_78">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2790.27 -108.7 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_79">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1796.79 398.07 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_80">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>167.56 -253.9 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_81">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2262.75 -28.92 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_82">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2762.61 155.47 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_83">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1895.21 398.39 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_84">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>679.3 -413.03 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_85">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2784.35 11.38 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_86">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1937.86 -327.57 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_87">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>26.55 474.19 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_88">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2581.04 -130.4 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_89">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1009.83 55.91 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_90">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>368.59 -127.26 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_91">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1185.86 35.75 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_92">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1959.28 -181.23 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_93">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>383.08 -343.75 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_94">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>366.52 355.18 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_95">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2731.64 384.36 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_96">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>79.12 -163.8 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_97">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2570.81 289.41 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_98">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>876.79 410.22 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_99">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>727.55 28.49 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_100">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1198.66 418.06 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_101">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>449.64 -265.51 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_102">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1653.85 339.24 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_103">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1079.9 98.8 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_104">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>531.3 -227.76 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_105">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>996.99 456.0 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_106">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1071.88 370.75 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_107">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1119.44 -432.86 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_108">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2017.2 348.24 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_109">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2037.91 -110.89 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_110">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1670.96 -107.19 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_111">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1860.22 317.25 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_112">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>281.47 -459.55 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_113">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2692.61 -441.0 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_114">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>372.8 451.0 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_115">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2103.43 -464.48 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_116">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1892.34 -164.96 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_117">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>883.27 363.72 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_118">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1634.88 136.97 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_119">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>217.77 -372.62 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_120">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>316.89 -1.57 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_121">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2783.86 315.44 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_122">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2689.11 -362.29 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_123">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1516.36 307.72 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_124">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1233.62 320.16 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_125">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1951.77 -118.7 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_126">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>570.45 -230.94 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_127">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1613.75 314.02 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_128">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2557.68 -60.74 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_129">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1552.76 260.19 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_130">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2614.9 297.7 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_131">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2570.66 208.41 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_132">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1288.88 -97.11 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_133">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2673.86 204.62 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_134">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>569.9 24.14 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_135">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1636.98 -306.33 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_136">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2449.79 49.79 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_137">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>870.02 -348.25 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_138">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>393.92 -39.64 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_139">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1415.92 -177.09 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_140">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1073.16 7.01 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_141">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1302.46 -199.24 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_142">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>378.75 -101.59 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_143">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>181.41 -293.44 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_144">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>643.57 -120.08 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_145">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>128.48 -157.08 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_146">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1188.77 457.79 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_147">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1614.02 -332.53 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_148">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1551.15 -224.37 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_149">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1759.28 351.12 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_150">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2536.76 -141.27 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_151">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>193.14 -54.34 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_152">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1388.72 -11.36 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_153">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2562.32 -371.04 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_154">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>932.3 -371.41 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_155">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>21.16 -425.4 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_156">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>167.83 384.77 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_157">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2559.98 -359.38 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_158">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>998.55 -184.74 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_159">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>441.06 194.5 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_160">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1868.03 -46.15 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_161">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2738.38 -424.89 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_162">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2560.01 62.49 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_163">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1145.69 125.43 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_164">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2530.88 134.31 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_165">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1715.93 45.14 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_166">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>650.12 479.54 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_167">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1796.06 201.85 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_168">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1785.13 -372.0 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_169">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2204.05 -223.26 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_170">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>877.46 150.46 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_171">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2435.24 -354.4 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_172">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1568.8 -35.13 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_173">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>170.43 150.04 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_174">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2264.49 172.68 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_175">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>107.23 -299.02 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_176">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2615.05 -151.65 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_177">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1380.18 -87.71 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_178">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>690.48 210.8 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_179">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2737.73 -150.11 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_180">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1856.65 415.44 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_181">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2127.84 -463.51 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_182">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1474.85 -416.76 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_183">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1637.8 113.31 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_184">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>363.71 -35.94 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_185">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>945.01 90.28 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_186">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2328.94 -294.67 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_187">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1184.67 192.33 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_188">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>551.95 -360.76 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_189">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1308.72 479.07 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_190">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2375.78 -352.94 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_191">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1206.12 307.0 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_192">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2032.05 -108.21 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_193">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>1843.39 -79.07 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_194">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>2726.53 275.01 0.5 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_195">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>318.73 203.58 0.5 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_196">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>154.44 -172.54 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_197">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>775.43 209.8 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_198">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>404.89 26.45 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_199">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>471.39 -340.27 0.5 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock1_200">
+          <include>
+            <uri>model://rock1</uri>
+            <pose>395.58 -68.26 0.5 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_1">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1903.93 112.98 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_2">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>822.46 255.28 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_3">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>316.88 139.27 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_4">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1685.01 -62.86 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_5">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>474.79 174.74 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_6">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2474.67 -215.4 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_7">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>861.6 72.41 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_8">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1378.57 378.84 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_9">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>465.53 105.12 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_10">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>270.55 219.06 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_11">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1636.12 -117.68 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_12">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2475.66 -190.98 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_13">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1002.72 -63.75 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_14">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1218.47 228.41 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_15">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1349.33 187.9 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_16">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>224.26 -174.91 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_17">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>427.99 269.11 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_18">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2426.61 259.56 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_19">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1111.53 -351.76 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_20">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1605.21 -18.76 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_21">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>156.61 227.25 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_22">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1834.6 -328.14 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_23">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1542.45 213.86 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_24">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2752.05 4.5 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_25">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>828.92 57.26 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_26">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>783.89 85.89 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_27">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1169.4 460.96 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_28">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>232.83 -398.82 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_29">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>918.71 427.47 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_30">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1747.67 -0.57 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_31">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1127.54 169.94 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_32">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1400.22 -415.72 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_33">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>588.06 325.52 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_34">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1236.9 292.44 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_35">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1833.97 -190.94 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_36">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2528.78 102.72 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_37">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1983.86 -157.12 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_38">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1591.27 -48.54 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_39">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>63.53 -377.5 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_40">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>127.22 49.66 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_41">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1339.88 30.86 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_42">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>890.39 -290.46 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_43">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2345.63 396.29 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_44">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>444.58 250.95 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_45">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2790.93 -421.31 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_46">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1382.52 302.5 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_47">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>538.07 -88.08 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_48">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>323.54 95.98 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_49">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2459.58 398.96 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_50">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>165.44 89.78 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_51">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1943.7 350.56 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_52">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>116.21 -202.93 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_53">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>529.09 338.09 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_54">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>392.03 178.02 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_55">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1442.34 113.3 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_56">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>47.29 -438.3 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_57">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2065.21 175.15 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_58">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>230.92 366.85 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_59">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>141.19 -174.21 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_60">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2729.91 73.84 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_61">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1816.46 97.77 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_62">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>94.02 -205.63 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_63">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2456.59 177.92 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_64">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>958.96 331.93 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_65">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>760.99 -195.7 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_66">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1837.5 -14.92 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_67">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>558.98 -442.05 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_68">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2258.66 -85.09 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_69">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1256.21 266.05 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_70">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>162.03 0.13 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_71">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>634.75 -97.33 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_72">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>423.28 -457.94 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_73">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1949.44 -294.92 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_74">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2017.7 44.19 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_75">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1733.19 91.4 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_76">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1113.49 -137.57 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_77">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2408.54 234.83 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_78">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>828.86 173.99 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_79">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1931.46 -144.03 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_80">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>866.15 -133.66 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_81">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>642.3 -198.35 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_82">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>759.65 -27.0 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_83">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>308.12 305.49 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_84">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1888.86 104.05 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_85">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2607.28 -330.4 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_86">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1299.82 -310.07 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_87">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2691.38 -425.19 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_88">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1287.64 -148.88 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_89">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1464.06 3.24 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_90">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1052.52 140.38 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_91">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1679.77 -414.43 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_92">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2340.63 -339.71 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_93">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1629.29 -14.86 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_94">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>209.25 6.63 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_95">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1613.92 311.62 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_96">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1123.77 -406.5 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_97">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>857.5 125.39 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_98">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1552.91 -35.74 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_99">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2242.68 -27.53 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_100">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1821.15 89.46 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_101">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1505.6 -129.55 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_102">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2179.78 -454.16 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_103">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1163.75 479.22 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_104">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1323.9 130.47 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_105">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2309.53 -84.26 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_106">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>565.9 209.75 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_107">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>248.61 -260.98 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_108">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>880.77 141.65 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_109">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1254.86 -457.72 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_110">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2232.44 -250.29 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_111">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1180.93 353.47 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_112">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>710.29 17.14 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_113">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>622.2 325.68 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_114">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2666.02 169.44 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_115">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>601.24 -145.59 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_116">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>553.97 -99.62 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_117">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2662.68 438.57 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_118">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2319.56 52.72 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_119">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1779.06 208.19 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_120">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1585.61 422.83 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_121">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>420.37 14.83 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_122">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1587.37 406.34 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_123">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1464.12 -337.06 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_124">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1303.51 -430.76 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_125">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1464.98 100.87 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_126">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>67.26 -390.23 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_127">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2342.38 229.65 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_128">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2059.77 175.63 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_129">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1020.2 65.11 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_130">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2065.33 -151.11 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_131">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1820.52 -41.81 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_132">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>711.53 -464.8 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_133">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1527.32 420.95 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_134">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2606.69 330.45 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_135">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1969.81 377.0 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_136">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>344.67 448.01 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_137">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2656.39 -468.93 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_138">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>417.29 345.09 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_139">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1878.47 87.03 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_140">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>613.75 -140.21 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_141">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>394.31 -263.9 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_142">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2197.58 298.1 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_143">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1350.09 -270.7 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_144">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>256.32 -17.93 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_145">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1501.95 170.56 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_146">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2352.98 -143.36 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_147">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>795.14 -438.46 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_148">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2343.04 197.38 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_149">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1431.93 -128.03 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_150">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1096.95 448.45 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_151">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1548.8 177.87 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_152">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>678.85 277.02 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_153">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>577.26 -322.7 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_154">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>266.55 70.4 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_155">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>491.46 -420.0 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_156">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1901.8 445.7 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_157">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2648.71 344.17 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_158">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2660.06 -84.95 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_159">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1926.46 -343.98 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_160">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>347.9 -104.91 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_161">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>624.4 233.57 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_162">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>166.16 357.68 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_163">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1119.27 -4.23 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_164">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2191.13 -399.79 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_165">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1452.57 31.7 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_166">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>843.26 370.73 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_167">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2202.96 81.91 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_168">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>247.49 -102.48 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_169">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2102.65 -100.45 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_170">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>601.48 170.6 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_171">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1717.47 398.45 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_172">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2274.53 370.44 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_173">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>533.8 308.19 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_174">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>244.18 -96.27 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_175">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>748.28 -258.72 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_176">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2332.63 340.73 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_177">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>810.94 -445.71 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_178">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2161.16 -143.49 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_179">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>598.76 -91.76 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_180">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>665.58 -98.59 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_181">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1741.87 -60.4 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_182">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>576.85 -461.71 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_183">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2166.09 432.62 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_184">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1357.64 442.27 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_185">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>664.08 14.04 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_186">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>741.21 200.32 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_187">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>804.08 -332.69 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_188">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>625.73 117.98 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_189">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2578.27 60.59 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_190">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>388.6 -311.38 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_191">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2157.95 300.72 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_192">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>681.58 114.3 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_193">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1801.42 -264.95 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_194">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1171.42 428.44 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_195">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>853.81 258.31 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_196">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1690.63 368.16 0.3 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_197">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1462.61 132.1 0.3 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_198">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1421.25 71.01 0.3 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_199">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>1043.02 140.97 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock2_200">
+          <include>
+            <uri>model://rock2</uri>
+            <pose>2498.81 364.46 0.3 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_1">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>609.48 200.35 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_2">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>654.28 -362.55 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_3">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1535.76 326.78 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_4">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1691.67 393.01 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_5">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1324.87 -407.83 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_6">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2753.54 -62.1 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_7">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1187.14 123.58 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_8">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2601.14 -475.93 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_9">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>573.29 30.8 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_10">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1885.95 315.96 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_11">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1413.91 404.82 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_12">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>711.04 -359.76 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_13">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1697.99 -327.63 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_14">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>130.66 -0.76 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_15">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2295.3 92.64 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_16">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>952.35 -152.91 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_17">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1255.73 -350.1 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_18">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2026.02 216.33 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_19">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1040.25 -240.71 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_20">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>618.96 406.85 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_21">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1256.31 383.51 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_22">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>324.19 257.73 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_23">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>255.39 -365.3 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_24">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1065.43 -463.42 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_25">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>528.67 168.59 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_26">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2520.12 -89.15 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_27">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>611.83 -361.39 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_28">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2325.95 -401.62 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_29">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2492.32 -207.07 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_30">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1586.41 -278.96 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_31">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2268.71 -188.88 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_32">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1276.66 -124.8 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_33">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>408.9 -409.31 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_34">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>214.48 -357.91 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_35">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2751.6 329.4 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_36">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2133.02 122.02 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_37">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1650.74 -128.02 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_38">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>451.22 -47.52 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_39">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1367.53 -313.28 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_40">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1574.57 186.77 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_41">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2087.97 -256.31 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_42">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1485.56 -39.65 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_43">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>374.76 -108.14 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_44">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1050.47 -340.58 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_45">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>587.21 -319.78 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_46">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1789.17 -41.4 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_47">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>74.71 148.16 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_48">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1502.1 -73.75 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_49">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>481.29 354.52 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_50">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1373.18 -170.52 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_51">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2330.31 470.53 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_52">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2541.55 261.82 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_53">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2710.16 331.47 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_54">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>361.13 -473.49 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_55">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>844.67 380.05 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_56">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2186.41 135.02 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_57">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>242.78 141.68 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_58">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>406.93 -263.4 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_59">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>820.26 1.34 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_60">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>850.58 -346.99 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_61">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2540.11 -266.75 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_62">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1943.01 -185.36 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_63">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2240.89 112.92 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_64">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1576.49 424.34 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_65">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>697.86 -11.92 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_66">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>510.34 -240.95 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_67">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>396.99 -183.11 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_68">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>823.61 -418.7 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_69">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2663.65 99.65 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_70">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1274.6 44.01 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_71">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1040.57 376.26 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_72">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>560.96 -344.6 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_73">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>987.48 -457.11 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_74">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>885.04 210.18 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_75">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>398.01 42.64 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_76">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>180.77 -474.21 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_77">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2384.82 329.25 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_78">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2642.16 -170.47 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_79">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1334.6 310.99 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_80">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1715.16 297.38 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_81">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1145.07 238.35 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_82">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>927.26 167.12 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_83">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2255.41 -465.15 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_84">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2067.45 9.43 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_85">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1989.63 359.45 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_86">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>598.92 262.09 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_87">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1449.71 -148.59 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_88">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1486.22 58.35 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_89">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2407.83 180.41 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_90">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1752.57 81.85 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_91">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>138.18 202.22 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_92">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1211.37 -48.55 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_93">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>387.32 -59.35 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_94">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>657.35 -172.5 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_95">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2657.73 439.94 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_96">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1121.06 190.13 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_97">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>616.41 -15.72 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_98">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2552.17 -389.97 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_99">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2103.54 203.65 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_100">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>910.95 -424.29 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_101">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2257.87 320.76 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_102">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1432.04 -344.28 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_103">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2793.45 232.81 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_104">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1925.01 -282.1 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_105">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>48.36 424.09 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_106">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>420.32 177.63 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_107">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2279.93 322.74 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_108">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2749.24 240.1 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_109">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1806.09 74.43 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_110">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>541.76 -295.36 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_111">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2224.2 77.6 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_112">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>177.68 422.57 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_113">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2725.98 467.38 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_114">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>716.92 -248.04 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_115">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>947.12 -331.77 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_116">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>878.46 -275.81 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_117">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2385.68 -470.64 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_118">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2035.93 387.46 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_119">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>232.27 392.88 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_120">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>814.1 359.51 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_121">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>671.27 258.76 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_122">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2334.48 -168.1 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_123">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2318.55 -232.88 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_124">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2183.84 202.78 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_125">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2431.06 270.69 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_126">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>281.44 -425.1 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_127">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2425.26 10.49 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_128">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1682.04 235.11 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_129">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2489.57 -445.32 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_130">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1045.14 -202.6 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_131">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1066.2 -356.77 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_132">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1107.74 -266.82 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_133">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2783.49 183.7 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_134">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>456.62 469.61 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_135">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1784.62 -418.32 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_136">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>628.64 -275.39 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_137">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2733.17 226.46 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_138">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2333.73 -227.33 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_139">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>629.65 -220.38 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_140">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1909.57 258.11 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_141">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2627.38 237.75 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_142">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>946.64 -431.09 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_143">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>278.05 1.54 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_144">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1405.21 -351.51 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_145">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1067.09 -379.29 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_146">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2512.1 182.59 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_147">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2254.08 -410.39 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_148">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1391.26 -249.24 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_149">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>912.78 -387.9 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_150">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>488.57 -386.18 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_151">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>969.0 -373.15 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_152">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2187.61 -168.35 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_153">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1527.48 12.31 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_154">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2549.91 -5.56 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_155">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>160.99 -46.91 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_156">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2402.67 -158.31 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_157">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1592.39 -118.41 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_158">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>820.53 -439.27 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_159">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>894.93 289.8 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_160">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1627.09 311.49 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_161">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2299.87 305.89 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_162">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1866.61 450.41 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_163">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>508.78 91.15 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_164">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>956.88 12.95 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_165">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1011.62 397.12 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_166">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2231.8 -113.43 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_167">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>832.37 -164.59 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_168">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>325.29 -440.98 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_169">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>275.08 189.17 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_170">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1182.4 -134.39 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_171">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1701.8 306.37 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_172">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1920.66 -307.2 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_173">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>240.02 -50.13 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_174">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>428.34 28.52 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_175">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1977.51 140.62 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_176">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1500.84 132.69 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_177">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2738.34 471.07 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_178">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>872.44 202.62 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_179">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2127.23 193.79 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_180">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>302.33 -249.3 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_181">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>361.24 358.95 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_182">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1657.2 40.88 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_183">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2396.36 418.2 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_184">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>311.96 -277.07 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_185">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1537.84 180.78 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_186">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1794.67 -131.23 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_187">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2209.72 210.29 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_188">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2524.91 -403.08 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_189">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>553.72 476.08 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_190">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1922.28 332.37 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_191">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>262.11 -157.76 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_192">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1204.76 -90.08 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_193">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2641.92 -474.55 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_194">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2746.15 -63.97 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_195">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1534.09 -456.35 0.2 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_196">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>2192.15 -429.28 0.2 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_197">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>185.64 154.48 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_198">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1948.08 399.04 0.2 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_199">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>1590.07 369.29 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="rock3_200">
+          <include>
+            <uri>model://rock3</uri>
+            <pose>251.68 -427.07 0.2 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_1">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2391.4 -80.75 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_2">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>612.49 -101.64 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_3">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1154.73 -421.32 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_4">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2420.87 -317.7 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_5">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>783.42 -384.11 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_6">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1270.57 376.11 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_7">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2694.68 -231.03 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_8">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1959.49 -432.22 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_9">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2349.39 416.97 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_10">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2517.85 -469.65 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_11">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2457.57 -24.85 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_12">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1385.11 428.47 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_13">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1262.71 -220.4 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_14">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>602.24 -25.33 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_15">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2467.45 -355.44 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_16">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2710.1 -364.05 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_17">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1458.56 313.82 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_18">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1647.63 67.82 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_19">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2396.53 -358.22 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_20">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1611.58 -126.93 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_21">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2317.34 -150.59 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_22">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1652.45 135.31 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_23">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>961.53 234.02 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_24">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>811.35 -255.3 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_25">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1488.67 -207.61 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_26">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>839.32 -399.64 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_27">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1185.05 -315.48 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_28">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>324.04 -164.28 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_29">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2289.25 380.67 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_30">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1756.73 -110.39 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_31">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2384.8 477.35 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_32">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2778.45 467.49 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_33">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1708.55 -196.01 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_34">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1371.07 -414.73 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_35">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>156.59 234.31 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_36">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2426.48 476.36 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_37">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>527.81 -455.24 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_38">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2539.2 408.86 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_39">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1253.43 -266.08 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_40">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>663.84 -383.89 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_41">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1728.92 140.33 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_42">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>759.15 -167.19 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_43">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>181.14 184.32 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_44">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>996.33 -12.54 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_45">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2246.24 -223.14 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_46">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1000.24 -128.03 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_47">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1547.69 386.04 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_48">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>642.3 -135.17 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_49">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>183.25 -473.17 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_50">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2731.97 370.16 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_51">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>842.89 -415.7 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_52">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>658.0 -85.34 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_53">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>759.97 89.59 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_54">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1447.22 388.28 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_55">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1708.16 287.07 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_56">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1014.79 411.24 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_57">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>207.53 414.53 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_58">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1076.9 -155.3 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_59">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2680.1 -137.29 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_60">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1500.05 475.93 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_61">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>668.41 311.11 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_62">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1540.95 -361.17 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_63">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2515.37 -219.98 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_64">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>969.02 -68.62 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_65">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2120.29 111.62 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_66">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>943.97 -419.93 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_67">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1076.76 186.35 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_68">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2554.36 337.18 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_69">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2360.31 128.56 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_70">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1706.54 -224.52 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_71">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1442.38 -342.19 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_72">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2718.13 -431.81 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_73">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1778.28 405.95 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_74">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>610.08 -85.65 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_75">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1703.74 386.84 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_76">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1311.09 365.28 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_77">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>66.5 153.34 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_78">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1454.8 309.62 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_79">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2151.22 276.75 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_80">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>323.54 401.47 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_81">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1276.99 -10.79 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_82">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2428.82 251.05 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_83">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2292.19 -141.76 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_84">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>291.36 -167.01 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_85">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>563.38 -455.85 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_86">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1204.26 411.67 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_87">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1369.95 252.96 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_88">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>967.58 -47.32 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_89">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2091.8 -19.53 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_90">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>984.29 -177.35 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_91">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>397.41 -322.77 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_92">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1895.39 422.77 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_93">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2435.44 328.06 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_94">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2302.52 1.78 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_95">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1435.14 -468.23 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_96">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>829.53 114.75 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_97">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1680.45 -467.11 0.0 0 0 3.1416</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_98">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>465.37 -67.07 0.0 0 0 4.7124</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_99">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>1952.19 411.51 0.0 0 0 0.0</pose>
+          </include>
+        </model>
+    
+        <model name="bush1_100">
+          <include>
+            <uri>model://bush1</uri>
+            <pose>2699.9 65.68 0.0 0 0 1.5708</pose>
+          </include>
+        </model>
+      </world>
+</sdf>

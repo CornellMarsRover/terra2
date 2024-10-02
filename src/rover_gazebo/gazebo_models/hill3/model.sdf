@@ -1,0 +1,36 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="hill3">
+    <static>true</static> <!-- Set to true if the model should not move -->
+    <pose>0 0 0 0 0 0</pose>
+    <!--z offset is -18 for full scale-->
+
+    <link name="link">
+      <collision name="hill3_collision">
+        
+        <geometry>
+          <mesh>
+            <uri>model://meshes/hills.stl</uri>
+            <scale>0.5 0.5 0.5</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="hill3_visual">
+        
+        <geometry>
+          <mesh>
+            <uri>model://meshes/hills.stl</uri>
+            <scale>0.5 0.5 0.5</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://materials/scripts/sand_pebbles.material</uri>
+            <name>custom_ground/Image</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
+

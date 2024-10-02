@@ -1,0 +1,320 @@
+<?xml version="1.0"?>
+<robot name="rover" xmlns:xacro="http://ros.org/wiki/xacro">
+
+
+  <!-- Properties for dimensions and other constants -->
+  <xacro:property name="chassis_length" value="0.6096"/>
+  <xacro:property name="chassis_width" value="0.4318"/>
+  <xacro:property name="chassis_height" value="0.1524"/>
+  <xacro:property name="wheel_radius" value="0.1397"/>
+  <xacro:property name="wheel_length" value="0.0762"/>
+  <xacro:property name="leg_radius" value="0.0254"/>
+  <xacro:property name="leg_length" value="0.4572"/>
+  <xacro:property name="swerve_z_off" value="-0.2286"/>
+  <xacro:property name="z_offset" value="0.2"/>
+
+  <xacro:macro name="base" params="name">
+    <link name="${name}" />
+  </xacro:macro>
+
+  <!-- Chassis Link -->
+  <xacro:macro name="chassis" params="name parent">
+    <link name="${name}">
+      <inertial>
+        <mass value="250"/>
+        <origin xyz="0 0 -0.3"/>
+        <inertia ixx="4.368270834" ixy="0" ixz="0" iyy="8.22579" iyz="0" izz="11.62632083"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" />
+        <geometry>
+          <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+        <material name="white">
+          <color rgba="1.0 1.0 1.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="body_joint" type="fixed">
+      <parent link="${parent}" />
+      <child link="${name}" />
+      <origin xyz="0 0 0" />
+    </joint>
+  </xacro:macro>
+
+  <!-- Define Macros for Reusability -->
+
+  <!-- Macro for Legs -->
+  <xacro:macro name="leg" params="prefix x y z roll pitch yaw">
+    <link name="${prefix}_leg_link">
+      <inertial>
+        <mass value="0.1"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.001758061" ixy="0" ixz="0" iyy="0.001758061" iyz="0" izz="0.000032258"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <cylinder radius="${leg_radius}" length="${leg_length}"/>
+        </geometry>
+        <material name="green">
+          <color rgba="0.0 1.0 0.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <cylinder radius="${leg_radius}" length="${leg_length}"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="${prefix}_leg_joint" type="fixed">
+      <parent link="chassis_link"/>
+      <child link="${prefix}_leg_link"/>
+      <origin xyz="${x} ${y} ${z}" rpy="${roll} ${pitch} ${yaw}"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Macro for Swerve Modules -->
+  <xacro:macro name="swerve" params="prefix x y z roll pitch yaw">
+    <link name="${prefix}_steering_link">
+      <inertial>
+        <mass value="1"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.0009375" ixy="0" ixz="0" iyy="0.0009375" iyz="0" izz="0.0009375"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <box size="0.075 0.075 0.075"/>
+        </geometry>
+        <material name="blue">
+          <color rgba="0.0 0.0 1.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <box size="0.075 0.075 0.075"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="steering_${prefix}_joint" type="revolute">
+      <parent link="${prefix}_leg_link"/>
+      <child link="${prefix}_steering_link"/>
+      <origin xyz="${x} ${y} ${z}" rpy="${roll} ${pitch} ${yaw}"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-2.1" upper="2.1" effort="20" velocity="6.28"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Macro for Wheels -->
+  <xacro:macro name="wheel" params="prefix">
+    <link name="${prefix}_wheel_link">
+      <inertial>
+        <mass value="4"/>
+        <origin xyz="0 0 -0.1905" rpy ="-1.5707 0 0" />
+        <inertia ixx="0.021452" ixy="0" ixz="0" iyy="0.039032" iyz="0" izz="0.021452"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 -0.1905" rpy ="-1.5707 0 0" />
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+        </geometry>
+        <material name="red">
+          <color rgba="1.0 0.0 0.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 -0.1905" rpy ="-1.5707 0 0" />
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="wheel_${prefix}_joint" type="revolute">
+      <parent link="${prefix}_steering_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit effort="1.0" velocity="27.0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Instantiate Chassis -->
+  <xacro:base name="base_link" />
+  <xacro:chassis name="chassis_link" parent="base_link" />  
+
+  <!-- Instantiate Legs -->
+  <xacro:leg prefix = "front_right" x="0.3164" y="-0.2413" z="-0.0529" roll="0" pitch="-1.22173" yaw="0"/>
+  <xacro:leg prefix = "front_left" x="0.3164" y="0.2413" z="-0.0529" roll="0" pitch="-1.22173" yaw="0"/>
+  <xacro:leg prefix = "rear_right" x="-0.1132" y="-0.2413" z="-0.0529" roll="0" pitch="1.22173" yaw="0"/>
+  <xacro:leg prefix = "rear_left" x="-0.1132" y="0.2413" z="-0.0529" roll="0" pitch="1.22173" yaw="0"/>
+
+  <!-- Instantiate Swerve Modules -->
+  <xacro:swerve prefix = "front_right" x="0" y="0" z="${swerve_z_off}" roll="0" pitch="1.22173" yaw="0"/>
+  <xacro:swerve prefix = "front_left" x="0" y="0" z="${swerve_z_off}" roll="0" pitch="1.22173" yaw="0"/>
+  <xacro:swerve prefix = "rear_right" x="0" y="0" z="${swerve_z_off}" roll="0" pitch="-1.22173" yaw="0"/>
+  <xacro:swerve prefix = "rear_left" x="0" y="0" z="${swerve_z_off}" roll="0" pitch="-1.22173" yaw="0"/>
+
+  <!-- Instantiate Wheels -->
+  <xacro:wheel prefix = "front_right"/>
+  <xacro:wheel prefix = "front_left"/>
+  <xacro:wheel prefix = "rear_right"/>
+  <xacro:wheel prefix = "rear_left"/>
+
+  <xacro:arg name="gazebo_controllers" default="$(find rover_description)/config/sim_controllers.yaml" />
+
+  <!-- Wheel transmission -->
+  <xacro:macro name="wheel_transmission" params="locationprefix">
+    <joint name="wheel_${locationprefix}_joint">
+      <command_interface name="velocity">
+        <param name="min">-20</param>
+        <param name="max">20</param>
+      </command_interface>
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+  </xacro:macro>
+
+  <!-- Steer transmission -->
+  <xacro:macro name="steer_transmission" params="locationprefix">
+    <joint name="steering_${locationprefix}_joint">
+      <command_interface name="position">
+        <param name="min">-2.1</param>
+        <param name="max">2.1</param>
+      </command_interface>
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="swerve_gazebo_ros2_control">
+
+    <ros2_control name="rover_gazebo_system" type="system">
+      <hardware>
+        <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+      </hardware>
+      <xacro:wheel_transmission locationprefix="front_right" />
+      <xacro:wheel_transmission locationprefix="front_left" />
+      <xacro:wheel_transmission locationprefix="rear_left" />
+      <xacro:wheel_transmission locationprefix="rear_right" />
+      <xacro:steer_transmission locationprefix="front_right" />
+      <xacro:steer_transmission locationprefix="front_left" />
+      <xacro:steer_transmission locationprefix="rear_left" />
+      <xacro:steer_transmission locationprefix="rear_right" />
+      
+    </ros2_control>
+
+    <gazebo>
+      <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
+        <parameters>$(arg gazebo_controllers)</parameters>
+      </plugin>
+    </gazebo>
+
+  </xacro:macro>
+
+  <xacro:swerve_gazebo_ros2_control />
+
+<!-- =========================== -->
+  <!--          DEPTH CAMERA        -->
+  <!-- =========================== -->
+
+  <!--RGB Camera-->
+  <link name='camera_link'>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.02 0.04 0.01" />
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="camera_link_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.5" />
+    <parent link="base_link" />
+    <child link="camera_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="camera_link_frame"></link>
+  <joint name="camera_frame_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708" />
+    <parent link="camera_link" />
+    <child link="camera_link_frame" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <gazebo reference="camera_link">
+    <sensor type="depth" name="camera">
+      <update_rate>10.0</update_rate>
+      <camera>
+
+        <pose>0 0 0 0 0 0</pose>
+
+        <horizontal_fov>1.089</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>]
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>10.0</far>
+        </clip>
+      </camera>
+
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <frame_name>camera_link_frame</frame_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!--GPS Stuff-->
+  <link name="base_footprint" />
+  <joint name="base_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="base_footprint" />
+    <origin xyz="0 0 -0.010" rpy="0 0 0"/>
+  </joint>
+
+  <gazebo reference="base_footprint">
+    <sensor name="rover_gps" type="gps">
+      <always_on>true</always_on>
+      <update_rate>30</update_rate>
+      <pose>0 0 0 0 0 0</pose>
+      <gps>
+        <position_sensing>
+          <horizontal>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>0.01</stddev>
+            </noise>
+          </horizontal>
+          <vertical>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>0.01</stddev>
+            </noise>
+          </vertical>
+        </position_sensing>
+      </gps>
+      <plugin name="my_gps_plugin" filename="libgazebo_ros_gps_sensor.so">
+        <ros>
+          <remapping>~/out:=/gps/fix</remapping>
+        </ros>
+      </plugin>
+    </sensor>
+  </gazebo>
+  
+  <xacro:include filename="imu_sensor.xacro" />
+
+</robot>

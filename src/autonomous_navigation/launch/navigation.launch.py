@@ -36,10 +36,10 @@ def generate_launch_description():
         parameters=[
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
             {'waypoints_file': LaunchConfiguration('waypoints_file')},
-            {'max_linear_vel': 0.05},
-            {'max_angular_vel': 0.05},
-            {'waypoint_tolerance': 1.0},
-            {'angle_threshold_deg': 5.0},
+            {'max_linear_vel': 0.3},
+            {'max_angular_vel': 0.3},
+            {'waypoint_tolerance': 3.0},
+            {'angle_threshold_deg': 13.0},
         ]
     )
 

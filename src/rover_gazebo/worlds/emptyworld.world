@@ -1,0 +1,96 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="default">
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+      <uri>model://custom_ground</uri>
+    </include>
+
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>38.161479</latitude_deg>
+      <longitude_deg>-122.454630</longitude_deg>
+      <elevation>488.0</elevation>
+      <heading_deg>90</heading_deg>
+    </spherical_coordinates>
+
+    <model name="cylinder_1">
+        <static>true</static>
+        <link name="link">
+        <visual name="visual">
+            <geometry>
+            <cylinder>
+                <radius>1</radius>
+                <length>500</length>
+            </cylinder>
+            </geometry>
+        </visual>
+        </link>
+        <pose>10 0 0 0 0 0</pose>
+    </model>
+
+    <model name="cylinder_2">
+        <static>true</static>
+        <link name="link">
+        <visual name="visual">
+            <geometry>
+            <cylinder>
+                <radius>1</radius>
+                <length>500</length>
+            </cylinder>
+            </geometry>
+        </visual>
+        </link>
+        <pose>200 100 0 0 0 0</pose>
+    </model>
+
+    <model name="cylinder_3">
+        <static>true</static>
+        <link name="link">
+        <visual name="visual">
+            <geometry>
+            <cylinder>
+                <radius>1</radius>
+                <length>500</length>
+            </cylinder>
+            </geometry>
+        </visual>
+        </link>
+        <pose>500 50 0 0 0 0</pose>
+    </model>
+
+    <model name="cylinder_4">
+        <static>true</static>
+        <link name="link">
+        <visual name="visual">
+            <geometry>
+            <cylinder>
+                <radius>1</radius>
+                <length>500</length>
+            </cylinder>
+            </geometry>
+        </visual>
+        </link>
+        <pose>1000 -300 0 0 0 0</pose>
+    </model>
+
+    <model name="cylinder_5">
+        <static>true</static>
+        <link name="link">
+        <visual name="visual">
+            <geometry>
+            <cylinder>
+                <radius>1</radius>
+                <length>500</length>
+            </cylinder>
+            </geometry>
+        </visual>
+        </link>
+        <pose>1500 -400 0 0 0 0</pose>
+    </model>
+    </world>
+</sdf>

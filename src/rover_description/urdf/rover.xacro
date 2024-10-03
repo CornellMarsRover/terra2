@@ -55,9 +55,9 @@
   <xacro:macro name="leg" params="prefix x y z roll pitch yaw">
     <link name="${prefix}_leg_link">
       <inertial>
-        <mass value="0.1"/>
+        <mass value="0.5"/>
         <origin xyz="0 0 0"/>
-        <inertia ixx="0.001758061" ixy="0" ixz="0" iyy="0.001758061" iyz="0" izz="0.000032258"/>
+        <inertia ixx="0.008790305" ixy="0" ixz="0" iyy="0.008790305" iyz="0" izz="0.00016129"/>
       </inertial>
       <visual>
         <origin xyz="0 0 0"/>
@@ -117,12 +117,12 @@
   </xacro:macro>
 
   <!-- Macro for Wheels -->
-  <xacro:macro name="wheel" params="prefix">
+  <xacro:macro name="wheel" params="prefix x y">
     <link name="${prefix}_wheel_link">
       <inertial>
-        <mass value="4"/>
-        <origin xyz="0 0 -0.1905" rpy ="-1.5707 0 0" />
-        <inertia ixx="0.021452" ixy="0" ixz="0" iyy="0.039032" iyz="0" izz="0.021452"/>
+        <mass value="2"/>
+        <origin xyz="0 0 -0.1905" rpy="-1.5707 0 0" />
+        <inertia ixx="0.010726" ixy="0" ixz="0" iyy="0.019516" iyz="0" izz="0.010726"/>
       </inertial>
       <visual>
         <origin xyz="0 0 -0.1905" rpy ="-1.5707 0 0" />
@@ -145,7 +145,8 @@
       <child link="${prefix}_wheel_link"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
-      <limit effort="1.0" velocity="27.0"/>
+      <limit effort="2.0" velocity="27.0"/>
+      <dynamics damping="0.2" friction="0.05"/>
     </joint>
   </xacro:macro>
 
@@ -166,10 +167,10 @@
   <xacro:swerve prefix = "rear_left" x="0" y="0" z="${swerve_z_off}" roll="0" pitch="-1.22173" yaw="0"/>
 
   <!-- Instantiate Wheels -->
-  <xacro:wheel prefix = "front_right"/>
-  <xacro:wheel prefix = "front_left"/>
-  <xacro:wheel prefix = "rear_right"/>
-  <xacro:wheel prefix = "rear_left"/>
+  <xacro:wheel prefix = "front_right" x="-0.5312" y="-0.2413"/>
+  <xacro:wheel prefix = "front_left" x="-0.5312" y="0.2413"/>
+  <xacro:wheel prefix = "rear_right" x="0.328" y="-0.2413"/>
+  <xacro:wheel prefix = "rear_left" x="0.328" y="0.2413"/>
 
   <xacro:arg name="gazebo_controllers" default="$(find rover_description)/config/sim_controllers.yaml" />
 
@@ -267,8 +268,8 @@
           <format>R8G8B8</format>
         </image>
         <clip>
-          <near>0.05</near>
-          <far>10.0</far>
+          <near>0.3</near>
+          <far>15.0</far>
         </clip>
       </camera>
 

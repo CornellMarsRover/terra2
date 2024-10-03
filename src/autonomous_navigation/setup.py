@@ -13,7 +13,6 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/navigation.launch.py']),
-        ('share/' + package_name + '/launch', ['launch/run_navigation.launch.py']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
     ],
     install_requires=['setuptools'],

@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    
+  <xacro:property name="chassis_length" value="0.6096"/>
+  <xacro:property name="chassis_width" value="0.4318"/>
+  <xacro:property name="chassis_height" value="0.1524"/>
+
+  <xacro:macro name="base" params="name">
+    <link name="${name}" />
+  </xacro:macro>
+
+  <!-- Chassis Link -->
+  <xacro:macro name="chassis" params="name parent">
+    <link name="${name}">
+      <inertial>
+        <mass value="250"/>
+        <origin xyz="0 0 -0.3"/>
+        <inertia ixx="4.368270834" ixy="0" ixz="0" iyy="8.22579" iyz="0" izz="11.62632083"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" />
+        <geometry>
+          <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+        <material name="white">
+          <color rgba="1.0 1.0 1.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="body_joint" type="fixed">
+      <parent link="${parent}" />
+      <child link="${name}" />
+      <origin xyz="0 0 0" />
+    </joint>
+  </xacro:macro>
+
+  <!-- Instantiate Chassis -->
+  <xacro:base name="base_link" />
+  <xacro:chassis name="chassis_link" parent="base_link" />  
+
+</robot>

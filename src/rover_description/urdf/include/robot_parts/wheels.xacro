@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    
+  <xacro:property name="wheel_radius" value="0.1397"/>
+  <xacro:property name="wheel_length" value="0.0762"/>
+
+  <!-- Macro for Wheels -->
+  <xacro:macro name="wheel" params="prefix x y">
+    <link name="${prefix}_wheel_link">
+      <inertial>
+        <mass value="2"/>
+        <origin xyz="0 0 -0.1905" rpy="-1.5707 0 0" />
+        <inertia ixx="0.010726" ixy="0" ixz="0" iyy="0.019516" iyz="0" izz="0.010726"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 -0.1905" rpy ="-1.5707 0 0" />
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+        </geometry>
+        <material name="red">
+          <color rgba="1.0 0.0 0.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 -0.1905" rpy ="-1.5707 0 0" />
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="wheel_${prefix}_joint" type="revolute">
+      <parent link="${prefix}_steering_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit effort="2.0" velocity="27.0"/>
+      <dynamics damping="0.2" friction="0.05"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Instantiate Wheels -->
+  <xacro:wheel prefix = "front_right" x="-0.5312" y="-0.2413"/>
+  <xacro:wheel prefix = "front_left" x="-0.5312" y="0.2413"/>
+  <xacro:wheel prefix = "rear_right" x="0.328" y="-0.2413"/>
+  <xacro:wheel prefix = "rear_left" x="0.328" y="0.2413"/>
+
+</robot>

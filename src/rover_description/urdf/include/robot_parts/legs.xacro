@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    
+  <xacro:property name="leg_radius" value="0.0254"/>
+  <xacro:property name="leg_length" value="0.4572"/>
+
+  <!-- Macro for Legs -->
+  <xacro:macro name="leg" params="prefix x y z roll pitch yaw">
+    <link name="${prefix}_leg_link">
+      <inertial>
+        <mass value="0.5"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.008790305" ixy="0" ixz="0" iyy="0.008790305" iyz="0" izz="0.00016129"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <cylinder radius="${leg_radius}" length="${leg_length}"/>
+        </geometry>
+        <material name="green">
+          <color rgba="0.0 1.0 0.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0"/>
+        <geometry>
+          <cylinder radius="${leg_radius}" length="${leg_length}"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="${prefix}_leg_joint" type="fixed">
+      <parent link="chassis_link"/>
+      <child link="${prefix}_leg_link"/>
+      <origin xyz="${x} ${y} ${z}" rpy="${roll} ${pitch} ${yaw}"/>
+    </joint>
+  </xacro:macro>
+
+
+  <!-- Instantiate Legs -->
+  <xacro:leg prefix = "front_right" x="0.3164" y="-0.2413" z="-0.0529" roll="0" pitch="-1.22173" yaw="0"/>
+  <xacro:leg prefix = "front_left" x="0.3164" y="0.2413" z="-0.0529" roll="0" pitch="-1.22173" yaw="0"/>
+  <xacro:leg prefix = "rear_right" x="-0.1132" y="-0.2413" z="-0.0529" roll="0" pitch="1.22173" yaw="0"/>
+  <xacro:leg prefix = "rear_left" x="-0.1132" y="0.2413" z="-0.0529" roll="0" pitch="1.22173" yaw="0"/>
+
+</robot>

@@ -16,7 +16,6 @@ from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
-
 from .swerve_joints import (
     JointEnd,
     JointKind,

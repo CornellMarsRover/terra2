@@ -14,6 +14,13 @@ def generate_launch_description():
         "robot_geometry.yaml",
     )
 
+    node_commander = Node(
+        package="swerve_controller",
+        name="controller",
+        executable="general_wheel_cmd_publisher",
+        parameters=[config],
+    )
+
     node_swerve_commander = Node(
         package="swerve_controller",
         name="swerve_commander",
@@ -28,6 +35,10 @@ def generate_launch_description():
         parameters=[config],
     )
 
-    ld.add_action(node_swerve_commander)
+    #commander = node_swerve_commander
+    commander = node_commander
+
+    ld.add_action(commander)
     ld.add_action(node_swerve_odom)
+
     return ld

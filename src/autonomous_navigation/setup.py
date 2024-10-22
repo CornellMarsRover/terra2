@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/navigation.launch.py']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
+        ('share/' + package_name + '/config', ['config/waypoints_real.yaml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,7 +25,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'waypoint_controller = autonomous_navigation.waypoint_controller:main',
+            'control_methods_demo = autonomous_navigation.nav_control_methods_demo:main',
+            'ackerman = autonomous_navigation.nav_ackerman:main',
+            'ackerman_real = autonomous_navigation.nav_ackerman_real:main',
         ],
     },
 )

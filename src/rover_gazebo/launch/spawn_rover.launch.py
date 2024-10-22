@@ -31,9 +31,10 @@ description_launch_path = os.path.join(
     LAUNCH_DIR,
     DESCRIPTON_LAUNCH_FILE,
 )
-swerve_controller_launch_path = os.path.join(
+controller_launch_path = os.path.join(
     get_package_share_directory(SWERVE_CONTROLLER_PKG), LAUNCH_DIR, CONTROL_LAUNCH_FILE
 )
+
 
 # Launch Arguments
 ARGUMENTS: Final[List[DeclareLaunchArgument]] = []
@@ -245,7 +246,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     swerve_control_odom_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([swerve_controller_launch_path]),
+        PythonLaunchDescriptionSource([controller_launch_path]),
     )
 
     ld = LaunchDescription(ARGUMENTS)

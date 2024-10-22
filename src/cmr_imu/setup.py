@@ -6,12 +6,13 @@ setup(
     name=package_name,
     version="0.0.0",
     packages=find_packages(),  # This will include 'cmr_imu' and 'cmr_imu.lib' and subpackages
-    package_data={'': ['*.py', '*.yaml', '*.json', '*.launch.py']},  # Include necessary data files
+    package_data={'': ['*.py', '*.yaml', '*.json', '*.launch.py', '*.toml']},  # Include necessary data files
     include_package_data=True,
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         ('share/' + package_name + '/launch', ['launch/imu.launch.py']),
+        ('share/' + package_name + '/config', ['config/imu.toml']),
     ],
     install_requires=["setuptools"],
     zip_safe=True,

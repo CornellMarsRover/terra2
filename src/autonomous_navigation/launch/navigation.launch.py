@@ -12,9 +12,10 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     # Declare launch arguments
+    # Changed default_value to false for test
     declare_use_sim_time = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='true',
+        default_value='false',
         description='Use simulation (Gazebo) clock if true'
     )
 
@@ -24,30 +25,68 @@ def generate_launch_description():
         description='Path to the waypoints YAML file'
     )
 
+    declare_waypoints_file_real = DeclareLaunchArgument(
+        'waypoints_file_real',
+        default_value='config/waypoints_real.yaml',
+        description='Path to the waypoints YAML file'
+    )
+
     # Get the launch directory
     package_share = get_package_share_directory('autonomous_navigation')
 
-    # Node: Waypoint Controller
-    waypoint_controller_node = Node(
+    # Different control nodes
+    nav_control_methods_demo = Node(
         package='autonomous_navigation',
-        executable='waypoint_controller',
-        name='waypoint_controller',
+        executable='control_methods_demo',
+        name='nav_control_methods_demo',
         output='screen',
         parameters=[
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
             {'waypoints_file': LaunchConfiguration('waypoints_file')},
-            {'max_linear_vel': 0.3},
-            {'max_angular_vel': 0.3},
-            {'waypoint_tolerance': 3.0},
-            {'angle_threshold_deg': 13.0},
+            {'max_angular_vel': 0.55},
+            {'max_linear_vel': 0.5},
+            {'angle_threshold_deg': 10.0},
+            {'waypoint_tolerance': 2.0},
+            {'proportional_gain': 0.5},
         ]
     )
+
+    nav_ackerman = Node(
+        package='autonomous_navigation',
+        executable='ackerman',
+        name='nav_ackerman',
+        output='screen',
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            {'waypoints_file': LaunchConfiguration('waypoints_file')},
+            {'max_linear_vel': 0.5},
+            {'waypoint_tolerance': 2.0},
+        ]
+    )
+
+    nav_ackerman_real = Node(
+        package='autonomous_navigation',
+        executable='ackerman_real',
+        name='nav_ackerman_real',
+        output='screen',
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            {'waypoints_file': LaunchConfiguration('waypoints_file_real')},
+            {'max_linear_vel': 0.5},
+            {'waypoint_tolerance': 100.0},
+        ]
+    )
+
+    # Assign desired control node to be launched
+    #waypoint_controller_node = nav_ackerman
+    #waypoint_controller_node = nav_control_methods_demo
+    waypoint_controller_node = nav_ackerman_real
 
     ld = LaunchDescription()
 
     # Add the declared launch arguments
     ld.add_action(declare_use_sim_time)
-    ld.add_action(declare_waypoints_file)
+    ld.add_action(declare_waypoints_file_real)
 
     # Add the waypoint controller node
     ld.add_action(waypoint_controller_node)

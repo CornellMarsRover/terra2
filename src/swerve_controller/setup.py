@@ -13,6 +13,8 @@ license = "Apache2.0"
 scripts = [
     "wheel_cmd_publisher = swerve_controller.swerve_commander:main",
     "wheel_odometry = swerve_controller.swerve_odometer:main",
+    "general_wheel_cmd_publisher = swerve_controller.controller:main",
+    "real_rover_controller = swerve_controller.controller_real:main",
 ]
 
 # only touch this for special cases

@@ -36,8 +36,9 @@ def generate_launch_description():
 
     # Randomly select one world file from the list
     empty_world_file = os.path.join(worlds_dir, 'emptyworld.world')
-    selected_world_file = random.choice(randworld_files)
-    #selected_world_file = empty_world_file
+    #selected_world_file = os.path.join(worlds_dir, 'robotperceptionproj.world')
+    #selected_world_file = random.choice(randworld_files)
+    selected_world_file = empty_world_file
     log_message = f"Randomly selected world file {selected_world_file}"
 
     # Log the selected world file
@@ -50,7 +51,7 @@ def generate_launch_description():
     # Include the Gazebo launch file, specifying the selected world
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(gazebo_launch),
-        launch_arguments={'world': selected_world_file, 'verbose': 'true'}.items(),
+        launch_arguments={'world': selected_world_file, 'verbose': 'false'}.items(),
     )
 
     return LaunchDescription([

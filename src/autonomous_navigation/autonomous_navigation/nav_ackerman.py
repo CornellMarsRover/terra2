@@ -1,10 +1,24 @@
-# autonomous_navigation/waypoint_controller.py
+#!/usr/bin/env python3
+
+"""
+NavAckerman ROS2 Node
+
+This node autonomously navigates the robot to predefined GPS waypoints using Ackermann steering.
+It interfaces with the combined `controller` node by:
+- Publishing `ackerman` to `/control_mode` to activate Ackermann control mode.
+- Publishing linear velocity commands to `/cmd_vel`.
+- Publishing yaw error to `/angle_error`.
+
+The node processes GPS and IMU data to determine the robot's current position and orientation,
+calculates the necessary heading towards each waypoint, and issues movement commands accordingly.
+Yaw corrections are handled by the `controller` node's PID controller.
+"""
 
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix, Imu
 from geometry_msgs.msg import Twist
-from rclpy.parameter import Parameter
+from std_msgs.msg import Bool, String
 import yaml
 import math
 import os
@@ -12,24 +26,22 @@ from ament_index_python.packages import get_package_share_directory
 from tf_transformations import euler_from_quaternion
 import time
 
-class WaypointController(Node):
+
+class NavAckerman(Node):
     def __init__(self):
-        super().__init__('waypoint_controller')
+        super().__init__('nav_ackerman')
 
         # Declare parameters
         self.declare_parameter('waypoints_file', 'config/waypoints.yaml')
-        self.declare_parameter('max_linear_vel', 0.4)  # m/s
-        self.declare_parameter('max_angular_vel', 0.6)  # rad/s
-        self.declare_parameter('waypoint_tolerance', 1.0)  # meters
-        self.declare_parameter('angle_threshold_deg', 5.0)  # degrees
+        self.declare_parameter('max_linear_vel', 0.6)  # m/s
+        self.declare_parameter('waypoint_tolerance', 2.0)  # meters
+        self.declare_parameter('proportional_gain', 0.5)  # Proportional gain for linear velocity
 
         # Get parameters
         waypoints_file = self.get_parameter('waypoints_file').get_parameter_value().string_value
         self.max_linear_vel = self.get_parameter('max_linear_vel').get_parameter_value().double_value
-        self.max_angular_vel = self.get_parameter('max_angular_vel').get_parameter_value().double_value
         self.waypoint_tolerance = self.get_parameter('waypoint_tolerance').get_parameter_value().double_value
-        angle_threshold_deg = self.get_parameter('angle_threshold_deg').get_parameter_value().double_value
-        self.angle_threshold_rad = math.radians(angle_threshold_deg)  # Convert to radians
+        self.proportional_gain = self.get_parameter('proportional_gain').get_parameter_value().double_value
 
         # Load waypoints
         self.waypoints = self.load_waypoints(waypoints_file)
@@ -38,8 +50,21 @@ class WaypointController(Node):
         if not self.waypoints:
             self.get_logger().error('No waypoints loaded. Shutting down.')
             rclpy.shutdown()
+            return
 
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints.')
+
+        # Publisher to /control_mode to activate Ackermann mode
+        self.control_mode_publisher = self.create_publisher(String, '/control_mode', 10)
+        self.publish_ackerman_true()
+
+        # Publisher for desired (x), current (y), and error (z) yaw angles
+        self.angle_publisher = self.create_publisher(Twist, '/angle_error', 10)
+        self.get_logger().info("Publishing to /angle_error")
+
+        # Publisher for linear velocity
+        self.cmd_vel_publisher = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.get_logger().info("Publishing to /cmd_vel")
 
         # Subscriber to GPS
         self.gps_subscriber = self.create_subscription(
@@ -48,6 +73,7 @@ class WaypointController(Node):
             self.gps_callback,
             10
         )
+        self.get_logger().info("Subscribed to /gps/fix")
 
         # Subscriber to IMU
         self.imu_subscriber = self.create_subscription(
@@ -56,25 +82,27 @@ class WaypointController(Node):
             self.imu_callback,
             10
         )
-
-        # Publisher for Twist
-        self.cmd_vel_publisher = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.get_logger().info("Subscribed to /demo/imu")
 
         # Current position and orientation
         self.current_position = None
         self.current_yaw = None  # In radians
 
-        # Bool for waiting in between turning and driving
-        self.turned_last = False
-
-        #other params
-        self.max_dist = None
-        self.threshold_adjustment = math.radians(10.0)
-
         # Timer for publishing commands
         self.timer = self.create_timer(0.1, self.control_loop)  # 10 Hz
 
     def load_waypoints(self, waypoints_file):
+        """
+        Loads waypoints from a YAML file.
+
+        Expected YAML format:
+        waypoints:
+          - latitude: <float>
+            longitude: <float>
+          - latitude: <float>
+            longitude: <float>
+          ...
+        """
         # Resolve the full path
         package_share = get_package_share_directory('autonomous_navigation')
         full_path = os.path.join(package_share, waypoints_file)
@@ -94,26 +122,42 @@ class WaypointController(Node):
         waypoints = data.get('waypoints', [])
         return waypoints
 
+    def publish_ackerman_true(self):
+        """
+        Publishes ackerman to /control_mode to activate Ackermann control mode.
+        This is published once at startup.
+        """
+        msg = String()
+        msg.data = "ackerman"
+        self.control_mode_publisher.publish(msg)
+        self.get_logger().info("Published ackerman to /control_mode to activate Ackermann mode.")
+
     def gps_callback(self, msg):
+        """
+        Callback for /gps/fix subscriber.
+        Updates the current GPS position.
+        """
         self.current_position = msg
+        self.get_logger().debug(f"Updated GPS Position: lat={msg.latitude}, lon={msg.longitude}")
 
     def imu_callback(self, msg):
+        """
+        Callback for /demo/imu subscriber.
+        Extracts and updates the current yaw angle from IMU data.
+        """
         # Extract orientation quaternion
         q = msg.orientation
         quaternion = [q.x, q.y, q.z, q.w]
         # Convert quaternion to Euler angles (roll, pitch, yaw)
         euler = euler_from_quaternion(quaternion)
         self.current_yaw = euler[2]  # Yaw is the third element
-
-        # Store angular velocity magnitude
-        av = msg.angular_velocity
-        self.current_angular_velocity_magnitude = math.sqrt(av.x**2 + av.y**2 + av.z**2)
-
-        # Store linear acceleration magnitude
-        la = msg.linear_acceleration
-        self.current_linear_acceleration_magnitude = math.sqrt(la.x**2 + la.y**2 + la.z**2)
+        self.get_logger().debug(f"Updated Yaw Angle: {math.degrees(self.current_yaw):.2f} degrees")
 
     def control_loop(self):
+        """
+        Main control loop running at 10 Hz.
+        Determines movement commands based on current position and waypoints.
+        """
         if self.current_position is None:
             self.get_logger().debug('Waiting for GPS data...')
             return  # No GPS data received yet
@@ -122,49 +166,46 @@ class WaypointController(Node):
             self.get_logger().debug('Waiting for IMU data...')
             return  # No IMU data received yet
 
-        if self.current_angular_velocity_magnitude is None or self.current_linear_acceleration_magnitude is None:
-            self.get_logger().debug('Waiting for IMU angular velocity and linear acceleration data...')
-            return  # No angular velocity or linear acceleration data yet
-
         if self.current_waypoint_index >= len(self.waypoints):
-            self.get_logger().info('All waypoints reached. Stopping rover.')
-            twist = Twist()  # Stop the rover
-            self.cmd_vel_publisher.publish(twist)
+            self.get_logger().info('All waypoints reached. Stopping robot.')
+            self.stop_robot()
             return
 
         # Current waypoint
         waypoint = self.waypoints[self.current_waypoint_index]
         target_lat = waypoint['latitude']
         target_lon = waypoint['longitude']
-        target_alt = waypoint['altitude']
+        # Optionally, handle altitude if needed
+        # target_alt = waypoint.get('altitude', self.current_position.altitude)
 
         # Current position
         current_lat = self.current_position.latitude
         current_lon = self.current_position.longitude
-        current_alt = self.current_position.altitude
+        # current_alt = self.current_position.altitude  # Not used in 2D navigation
 
+        # Calculate north and east distances to the target
         x, y = self.get_north_west_meters(current_lat, current_lon, target_lat, target_lon)
 
         distance = math.sqrt(x**2 + y**2)
-        temp = 0.0
-        if not self.max_dist:
-            self.max_dist = distance
-        else:
-            temp = math.ceil(self.threshold_adjustment * (distance/self.max_dist))
-
-        angle_to_target = math.atan2(y, x)
-
-        self.get_logger().info(f'x to target: {x:.5f}, y to target: {y:.5f}')
-
-        twist = Twist()
-
+        angle_to_target = math.atan2(y, x)  # Desired heading in radians
 
         if distance < self.waypoint_tolerance:
             self.get_logger().info(f'Reached waypoint {self.current_waypoint_index + 1}')
             self.current_waypoint_index += 1
-            twist = Twist()  # Stop the rover
-            time.sleep(1)
-            self.max_dist = None
+            if self.current_waypoint_index >= len(self.waypoints):
+                self.stop_robot()
+                return
+            self.stop_robot()
+            next_waypoint = self.waypoints[self.current_waypoint_index]
+            next_lat = next_waypoint['latitude']
+            next_lon = next_waypoint['longitude']
+            # Calculate north and east distances to the next target
+            x, y = self.get_north_west_meters(current_lat, current_lon, next_lat, next_lon)
+            self.get_logger().info('Next waypoint')
+            self.get_logger().info(f'delta north = {x:.3f} meters')
+            self.get_logger().info(f'delta west = {y:.3f} meters')
+            # Pause briefly before moving to the next waypoint
+            time.sleep(2)
         else:
             # Calculate angle error between desired angle and current yaw
             angle_error = angle_to_target - self.current_yaw
@@ -172,56 +213,24 @@ class WaypointController(Node):
             # Normalize the angle error to [-pi, pi]
             angle_error = (angle_error + math.pi) % (2 * math.pi) - math.pi
 
-            self.get_logger().info(f'Angle Error: {math.degrees(angle_error):.2f} degrees')
+            #self.get_logger().info(f'Angle Error: {math.degrees(angle_error):.2f} degrees')
 
-            # Determine if the angular error exceeds the threshold
-            #if abs(angle_error) > (self.angle_threshold_rad + min(math.radians(10.0), math.radians(1.0) * (self.max_dist/distance))):
-            if abs(angle_error) > self.angle_threshold_rad:
-                # **Publish only angular velocity**
+            # Publish yaw error to /angle_error
+            angle_msg = Twist()
+            angle_msg.angular.x = self.current_yaw
+            angle_msg.angular.y = angle_to_target
+            angle_msg.angular.z = angle_error
+            self.angle_publisher.publish(angle_msg)
+            self.get_logger().debug('Published yaw error to /angle_error')
 
-                if self.turned_last:
-                    # Proportional controller for angular velocity
-                    #angular_vel = -0.5 * angle_error
-                    if angle_error < 0: angular_vel = 0.3
-                    else: angular_vel = -0.3
-                    # Clamp angular velocity
-                    #angular_vel = max(-self.max_angular_vel, min(self.max_angular_vel, angular_vel))
-
-                    twist.linear.x = 0.0  # No linear movement
-                    twist.angular.z = angular_vel  # Only rotate
-
-                    self.get_logger().info(f'Publishing Twist: linear.x={twist.linear.x:.2f}, angular.z={twist.angular.z:.2f} (Angular Correction)')
-                    # implement wait if switching actions
-                else:
-                    self.turned_last = True
-                    self.cmd_vel_publisher.publish(Twist())
-                    self.get_logger().info('Pausing')
-                    time.sleep(0.5)
-            else:
-                # **Publish only linear velocity**
-
-                
-                if not self.turned_last:
-
-                    if distance < 6:
-                        linear_vel = -0.15
-                    else:
-                        linear_vel = -0.29
-
-                    # Clamp linear velocity
-                    linear_vel = max(-self.max_linear_vel, min(self.max_linear_vel, linear_vel))
-
-                    twist.linear.x = linear_vel  # Move forward
-                    twist.angular.z = 0.0  # No rotation
-
-                    self.get_logger().info(f'Publishing Twist: linear.x={twist.linear.x:.2f}, angular.z={twist.angular.z:.2f}')
-                # implement wait if switching actions
-                else:
-                    self.turned_last = False
-                    self.cmd_vel_publisher.publish(Twist())
-                    time.sleep(0.5)
-
-        self.cmd_vel_publisher.publish(twist)
+            # Publish linear velocity to /cmd_vel
+            cmd_vel_msg = Twist()
+            # Simple proportional control for linear velocity based on distance
+            proportional_linear = self.proportional_gain * distance
+            cmd_vel_msg.linear.x = max(0.3, min(self.max_linear_vel, proportional_linear))
+            cmd_vel_msg.angular.z = 0.0  # No angular velocity; controller handles yaw
+            self.cmd_vel_publisher.publish(cmd_vel_msg)
+            #self.get_logger().info(f'Moving forward: linear.x = {cmd_vel_msg.linear.x:.2f} m/s')
 
     def get_north_west_meters(self, start_lat, start_lon, target_lat, target_lon):
         """
@@ -265,16 +274,35 @@ class WaypointController(Node):
 
         return delta_north, delta_west
 
+    def stop_robot(self):
+        """
+        Stop the robot by setting all wheel velocities and steering angles to zero.
+        """
+        stop_cmd = Twist()
+        stop_cmd.linear.x = 0.0
+        stop_cmd.angular.z = 0.0
+        self.cmd_vel_publisher.publish(stop_cmd)
+        #self.get_logger().info("Robot stopped.")
+
+    def destroy_node(self):
+        """
+        Cleanup before shutting down the node.
+        """
+        self.stop_robot()
+        super().destroy_node()
+
+
 def main(args=None):
     rclpy.init(args=args)
-    node = WaypointController()
+    node = NavAckerman()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        node.get_logger().info('Shutting down NavAckerman node.')
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

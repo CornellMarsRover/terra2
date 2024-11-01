@@ -67,13 +67,13 @@ class NavAckermanReal(Node):
         self.get_logger().info("Publishing to /cmd_vel")
 
         # Subscriber to GPS
-        self.gps_subscriber = self.create_subscription(
+        '''self.gps_subscriber = self.create_subscription(
             NavSatFix,
             'navsatfixdata',
             self.gps_callback,
             10
         )
-        self.get_logger().info("Subscribed to navsatfixdata")
+        self.get_logger().info("Subscribed to navsatfixdata")'''
 
         # Subscriber to IMU
         self.imu_subscriber = self.create_subscription(
@@ -131,7 +131,8 @@ class NavAckermanReal(Node):
         msg.data = "ackerman"
         self.control_mode_publisher.publish(msg)
         self.get_logger().info("Published ackerman to /control_mode to activate Ackermann mode.")
-
+    
+    '''
     def gps_callback(self, msg):
         """
         Callback for /gps/fix subscriber.
@@ -139,6 +140,7 @@ class NavAckermanReal(Node):
         """
         self.current_position = msg
         self.get_logger().debug(f"Updated GPS Position: lat={msg.latitude}, lon={msg.longitude}")
+    '''
 
     def imu_callback(self, msg):
         """
@@ -153,9 +155,10 @@ class NavAckermanReal(Node):
         Main control loop running at 10 Hz.
         Determines movement commands based on current position and waypoints.
         """
-        if self.current_position is None:
+
+        '''if self.current_position is None:
             self.get_logger().debug('Waiting for GPS data...')
-            return  # No GPS data received yet
+            return  # No GPS data received yet'''
 
         if self.current_yaw is None:
             self.get_logger().debug('Waiting for IMU data...')
@@ -174,8 +177,11 @@ class NavAckermanReal(Node):
         # target_alt = waypoint.get('altitude', self.current_position.altitude)
 
         # Current position
-        current_lat = self.current_position.latitude
-        current_lon = self.current_position.longitude
+        '''current_lat = self.current_position.latitude
+        current_lon = self.current_position.longitude'''
+        # SET TO CONSTANT TO TEST IF ACKERMAN GOES IN RIGHT DIRECTION
+        current_lat = 42.443916
+        current_lon = -76.482784
         # current_alt = self.current_position.altitude  # Not used in 2D navigation
 
         # Calculate north and east distances to the target

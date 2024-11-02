@@ -14,7 +14,7 @@ scripts = [
     "wheel_cmd_publisher = swerve_controller.swerve_commander:main",
     "wheel_odometry = swerve_controller.swerve_odometer:main",
     "general_wheel_cmd_publisher = swerve_controller.controller:main",
-    "real_rover_controller = swerve_controller.controller_real:main",
+    "real_drive_compatible_controller = swerve_controller.compatible_controller.main"
 ]
 
 # only touch this for special cases

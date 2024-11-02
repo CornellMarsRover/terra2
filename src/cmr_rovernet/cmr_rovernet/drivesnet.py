@@ -42,7 +42,7 @@ class CmdVelSubscriber(Node):
         self.controller_command_rx = 0
         self.last_time_left = time.time()
         self.last_time_right = time.time()
-        self.port = "/dev/ttyTHS0"
+        self.port = "/dev/ttyTHS1"
         self.baud_rate = 115200
         self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
         self.feed_forward_torque = 0.0

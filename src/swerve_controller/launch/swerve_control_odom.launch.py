@@ -28,6 +28,12 @@ def generate_launch_description():
         parameters=[config],
     )
 
+    node_compatible_controller = Node(
+        package="swerve_controller",
+        name="compatible_controller",
+        executable="real_drive_compatible_controller",
+    )
+
     node_swerve_odom = Node(
         package="swerve_controller",
         name="swerve_odometer",
@@ -35,8 +41,10 @@ def generate_launch_description():
         parameters=[config],
     )
 
+
     #commander = node_swerve_commander
-    commander = node_commander
+    #commander = node_commander
+    commander = node_compatible_controller
 
     ld.add_action(commander)
     ld.add_action(node_swerve_odom)

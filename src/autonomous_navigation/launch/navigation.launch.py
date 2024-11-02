@@ -31,6 +31,7 @@ def generate_launch_description():
         description='Path to the waypoints YAML file'
     )
 
+
     # Get the launch directory
     package_share = get_package_share_directory('autonomous_navigation')
 
@@ -70,10 +71,9 @@ def generate_launch_description():
         name='nav_ackerman_real',
         output='screen',
         parameters=[
-            {'use_sim_time': LaunchConfiguration('use_sim_time')},
             {'waypoints_file': LaunchConfiguration('waypoints_file_real')},
             {'max_linear_vel': 0.5},
-            {'waypoint_tolerance': 100.0},
+            {'waypoint_tolerance': 10.0},
         ]
     )
 

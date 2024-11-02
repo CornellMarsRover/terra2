@@ -21,12 +21,91 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool, String
 import yaml
 import math
+from typing import Dict, Tuple, Optional
 import os
 from ament_index_python.packages import get_package_share_directory
 from tf_transformations import euler_from_quaternion
 import time
-from cmr_msgs.msg import IMUSensorData
+from cmr_msgs.msg import IMUSensorData, AutonomyDrive
+from rclpy.callback_groups import ReentrantCallbackGroup
 
+
+class PIDController:
+    """
+    Simple PID Controller
+    """
+
+    def __init__(
+        self,
+        Kp: float,
+        Ki: float,
+        Kd: float,
+        correcting: bool,
+        output_limits: Tuple[Optional[float], Optional[float]] = (None, None),
+    ):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.integral = 0.0
+        self.previous_error = 0.0
+        self.previous_steer_angle = 0.0
+        self.max_d = 0.1
+        self.output_limits = output_limits
+        self.last_time: Optional[rclpy.time.Time] = None
+        self.correcting = correcting
+
+    def reset(self):
+        self.integral = 0.0
+        self.previous_error = 0.0
+        self.last_time = None
+
+    def compute(self, error: float, current_time: rclpy.time.Time) -> float:
+        """
+        Compute the PID controller output.
+
+        :param error: The current error value.
+        :param current_time: The current time (rclpy Time object).
+        :return: The control output.
+        """
+
+        if self.last_time is None:
+            delta_time = 0.0
+        else:
+            delta_time = (current_time - self.last_time).nanoseconds * 1e-9
+
+        self.last_time = current_time
+
+        # Proportional term
+        P = self.Kp * error
+
+        # Integral term
+        self.integral += error * delta_time
+        I = self.Ki * self.integral
+
+        # Derivative term
+        derivative = (
+            (error - self.previous_error) / delta_time if delta_time > 0 else 0.0
+        )
+        D = self.Kd * derivative
+
+        # Save error for next derivative calculation
+        self.previous_error = error
+
+        # Compute the output
+        output = P + I + D
+
+        # Apply output limits
+        lower, upper = self.output_limits
+        lower = max(lower, self.previous_steer_angle - self.max_d)
+        upper = min(upper, self.previous_steer_angle + self.max_d)
+        if lower is not None:
+            output = max(lower, output)
+        if upper is not None:
+            output = min(upper, output)
+        self.previous_steer_angle = output
+        
+        return output
+    
 class NavAckermanReal(Node):
     def __init__(self):
         super().__init__('nav_ackerman_real')
@@ -43,6 +122,25 @@ class NavAckermanReal(Node):
         self.waypoint_tolerance = self.get_parameter('waypoint_tolerance').get_parameter_value().double_value
         self.proportional_gain = self.get_parameter('proportional_gain').get_parameter_value().double_value
 
+        # SET TO FALSE IF TESTING IN SIM
+        self.real = True
+
+        if self.real:
+            waypoints_file = 'config/waypoints_real.yaml'
+
+        # Initialize PID controller for ackerman
+        self.pid = PIDController(
+            Kp=0.5,
+            Ki=0.0,
+            Kd=0.1,
+            correcting=False,
+            output_limits=(-math.radians(30), math.radians(30)),
+        )
+        self.get_logger().info("Initialized PID controller for ackerman control")
+        
+        # Offset to account for IMU offset from North = 0 deg heading
+        self.imu_offset = math.radians(14.7)
+
         # Load waypoints
         self.waypoints = self.load_waypoints(waypoints_file)
         self.current_waypoint_index = 0
@@ -54,18 +152,6 @@ class NavAckermanReal(Node):
 
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints.')
 
-        # Publisher to /control_mode to activate Ackermann mode
-        self.control_mode_publisher = self.create_publisher(String, '/control_mode', 10)
-        self.publish_ackerman_true()
-
-        # Publisher for desired (x), current (y), and error (z) yaw angles
-        self.angle_publisher = self.create_publisher(Twist, '/angle_error', 10)
-        self.get_logger().info("Publishing to /angle_error")
-
-        # Publisher for linear velocity
-        self.cmd_vel_publisher = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.get_logger().info("Publishing to /cmd_vel")
-
         # Subscriber to GPS
         '''self.gps_subscriber = self.create_subscription(
             NavSatFix,
@@ -76,13 +162,22 @@ class NavAckermanReal(Node):
         self.get_logger().info("Subscribed to navsatfixdata")'''
 
         # Subscriber to IMU
-        self.imu_subscriber = self.create_subscription(
-            IMUSensorData,
-            '/imu',
-            self.imu_callback,
-            10
-        )
-        self.get_logger().info("Subscribed to /imu")
+        self.imu_subscriber = None
+        if self.real:
+            self.imu_subscriber = self.create_subscription(
+                IMUSensorData,
+                '/imu',
+                self.real_imu_callback,
+                10
+            )
+            self.get_logger().info("Subscribed to /imu")
+        else:
+            self.imu_subscriber = self.create_subscription(
+                Imu,
+                '/imu',
+                self.sim_imu_callback,
+                10
+            )
 
         # Current position and orientation
         self.current_position = None
@@ -90,6 +185,13 @@ class NavAckermanReal(Node):
 
         # Timer for publishing commands
         self.timer = self.create_timer(0.1, self.control_loop)  # 10 Hz
+
+        # Autonomy Drive Publisher
+        self.drive_publisher = self.create_publisher(AutonomyDrive, '/autonomy_move', 10)
+
+        # Control Mode to determine what the robot is doing in the control loop
+        self.current_action = "drive_to_coord"
+
 
     def load_waypoints(self, waypoints_file):
         """
@@ -121,33 +223,35 @@ class NavAckermanReal(Node):
 
         waypoints = data.get('waypoints', [])
         return waypoints
-
-    def publish_ackerman_true(self):
-        """
-        Publishes ackerman to /control_mode to activate Ackermann control mode.
-        This is published once at startup.
-        """
-        msg = String()
-        msg.data = "ackerman"
-        self.control_mode_publisher.publish(msg)
-        self.get_logger().info("Published ackerman to /control_mode to activate Ackermann mode.")
     
     '''
     def gps_callback(self, msg):
         """
-        Callback for /gps/fix subscriber.
+        Callback for navsatfixdata subscriber.
         Updates the current GPS position.
         """
         self.current_position = msg
         self.get_logger().debug(f"Updated GPS Position: lat={msg.latitude}, lon={msg.longitude}")
     '''
 
-    def imu_callback(self, msg):
+    def real_imu_callback(self, msg):
         """
-        Callback for /demo/imu subscriber.
+        Callback for /imu subscriber for real robot.
         Extracts and updates the current yaw angle from IMU data.
         """
-        self.current_yaw = msg.anglez
+        self.current_yaw = math.radians(msg.anglez) - self.imu_offset
+        self.get_logger().debug(f"Updated Yaw Angle: {math.degrees(self.current_yaw):.2f} degrees")
+
+    def sim_imu_callback(self, msg):
+        """
+        Callback for /imu subscriber for sim.
+        Extracts and updates the current yaw angle from IMU data.
+        """
+        q = msg.orientation
+        quaternion = [q.x, q.y, q.z, q.w]
+        # Convert quaternion to Euler angles (roll, pitch, yaw)
+        euler = euler_from_quaternion(quaternion)
+        self.current_yaw = euler[2]  # Yaw is the third element
         self.get_logger().debug(f"Updated Yaw Angle: {math.degrees(self.current_yaw):.2f} degrees")
 
     def control_loop(self):
@@ -168,6 +272,16 @@ class NavAckermanReal(Node):
             self.get_logger().info('All waypoints reached. Stopping robot.')
             self.stop_robot()
             return
+        
+        # Which function to call based off what mode is
+        # Once we implement other stuff (obstacle avoidance, AR tag detection, etc.)
+        # Can switch control modes based off 
+        if self.current_action == "drive_to_coord":
+            self.drive_to_coord()
+
+
+
+    def drive_to_coord(self):
 
         # Current waypoint
         waypoint = self.waypoints[self.current_waypoint_index]
@@ -189,14 +303,18 @@ class NavAckermanReal(Node):
 
         distance = math.sqrt(x**2 + y**2)
         angle_to_target = math.atan2(y, x)  # Desired heading in radians
-
+        #self.get_logger.info(f"Angle to target{math.degrees(angle_to_target)}")
         if distance < self.waypoint_tolerance:
             self.get_logger().info(f'Reached waypoint {self.current_waypoint_index + 1}')
             self.current_waypoint_index += 1
-            if self.current_waypoint_index >= len(self.waypoints):
-                self.stop_robot()
-                return
             self.stop_robot()
+            if self.current_waypoint_index >= len(self.waypoints):
+                return
+
+            # We would set the current action to the AR tag detection algo here
+            # For example:
+            # self.current_action == "detect_ar_tag"
+
             next_waypoint = self.waypoints[self.current_waypoint_index]
             next_lat = next_waypoint['latitude']
             next_lon = next_waypoint['longitude']
@@ -214,24 +332,27 @@ class NavAckermanReal(Node):
             # Normalize the angle error to [-pi, pi]
             angle_error = (angle_error + math.pi) % (2 * math.pi) - math.pi
 
-            #self.get_logger().info(f'Angle Error: {math.degrees(angle_error):.2f} degrees')
+            self.get_logger().info(f'Angle Error: {math.degrees(angle_error):.2f} degrees')
 
-            # Publish yaw error to /angle_error
-            angle_msg = Twist()
-            angle_msg.angular.x = self.current_yaw
-            angle_msg.angular.y = angle_to_target
-            angle_msg.angular.z = angle_error
-            self.angle_publisher.publish(angle_msg)
-            self.get_logger().debug('Published yaw error to /angle_error')
-
-            # Publish linear velocity to /cmd_vel
-            cmd_vel_msg = Twist()
-            # Simple proportional control for linear velocity based on distance
+            # Compute PID controller output
             proportional_linear = self.proportional_gain * distance
-            cmd_vel_msg.linear.x = max(0.3, min(self.max_linear_vel, proportional_linear))
-            cmd_vel_msg.angular.z = 0.0  # No angular velocity; controller handles yaw
-            self.cmd_vel_publisher.publish(cmd_vel_msg)
-            #self.get_logger().info(f'Moving forward: linear.x = {cmd_vel_msg.linear.x:.2f} m/s')
+            current_time = self.get_clock().now()
+            steer_angle = math.degrees(self.pid.compute(angle_error, current_time))
+            vel = max(0.3, min(self.max_linear_vel, proportional_linear))
+            self.publish_ackerman(vel,steer_angle)
+
+
+    def publish_ackerman(self, vel, steer_angle):
+        
+        drive_msg = AutonomyDrive()
+        drive_msg.vel = vel
+        drive_msg.fl_angle = -steer_angle
+        drive_msg.fr_angle = -steer_angle
+        drive_msg.bl_angle = 0.0
+        drive_msg.br_angle = 0.0
+
+        self.drive_publisher.publish(drive_msg)
+
 
     def get_north_west_meters(self, start_lat, start_lon, target_lat, target_lon):
         """
@@ -279,11 +400,8 @@ class NavAckermanReal(Node):
         """
         Stop the robot by setting all wheel velocities and steering angles to zero.
         """
-        stop_cmd = Twist()
-        stop_cmd.linear.x = 0.0
-        stop_cmd.angular.z = 0.0
-        self.cmd_vel_publisher.publish(stop_cmd)
-        #self.get_logger().info("Robot stopped.")
+        self.publish_ackerman(0.0,0.0)
+        self.get_logger().info("Robot stopped.")
 
     def destroy_node(self):
         """
@@ -294,6 +412,7 @@ class NavAckermanReal(Node):
 
 
 def main(args=None):
+
     rclpy.init(args=args)
     node = NavAckermanReal()
     try:
@@ -307,3 +426,8 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+######## STOP COMMAND #########
+# ros2 topic pub /autonomy_move cmr_msgs/msg/AutonomyDrive '{vel: 0.0, fl_angle: 0.0, fr_angle: 0.0, bl_angle: 0.0, br_angle: 0.0}'
+

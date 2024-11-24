@@ -1,0 +1,16 @@
+package = "cmr_rovernet"
+executable = "drivesnet_node"
+name = "drivesnet"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
+
+[node]
+motor_max_speed = 1
+gradual_increase_rate = 10
+base_dynamic_ratio = 0.5
+acceleration_limit = 1.0
+torque_limit = 8.0
+feed_forward_torque_limit = 5.0

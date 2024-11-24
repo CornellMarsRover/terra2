@@ -1,0 +1,14 @@
+package = "cmr_fabric_wrappers"
+executable = "subprocess_node"
+name = "arm_fk"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 3
+restart_delay = 10
+
+[node]
+command = "ros2 launch cmr_control forward_k_arm.launch.py"
+started_indicator = "Loaded arm_controller"
+expects_output = true
+indicator_timeout = 20

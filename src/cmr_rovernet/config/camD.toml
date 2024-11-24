@@ -1,0 +1,14 @@
+package = "cmr_cv"
+executable = "camera_node"
+name = "camD"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
+
+[node]
+camera_id = "/dev/cmr/camD"
+fps = 1
+image_width = 1280 
+image_height = 720

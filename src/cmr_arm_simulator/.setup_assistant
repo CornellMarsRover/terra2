@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: cmr_arm_sim
+    relative_path: urdf/arm_2024.urdf
+  srdf:
+    relative_path: config/Arm.srdf
+  package_settings:
+    author_name: Aaron Babu
+    author_email: ab2458@cornell.edu
+    generated_timestamp: 1707512454
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

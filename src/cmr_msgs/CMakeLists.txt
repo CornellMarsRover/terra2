@@ -16,11 +16,17 @@ rosidl_generate_interfaces(
   msg/State.msg
   msg/ArucoMarkers.msg
   msg/JoystickReading.msg
+  msg/ControllerReading.msg
+  msg/AutonomyDrive.msg
   msg/ArmJointEffort.msg
   msg/Error.msg
   msg/MotorWriteBatch.msg
+  msg/MiniArmDegree.msg
+  msg/MotorData.msg
+  msg/MotorReadData.msg
   msg/Power.msg
   msg/SensorReadBatch.msg
+  msg/IMUSensorData.msg
   msg/Int16ArrayStamped.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv

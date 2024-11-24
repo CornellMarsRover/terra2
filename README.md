@@ -43,6 +43,7 @@ Terra contains all the code that is part of a ROS codebase and implements the br
 ## TODO Functionality
 
 - **Autonomous Navigation:** [cmr_navigation](./src/cmr_navigation/)
+- **GPS Functionality** (inside of cmr_navigation in old main, gps.py)
 - **Arm Autonomy**
 - **ArUco Tag Detection**
 - **Bird's Eye View**

@@ -51,3 +51,4 @@ Terra contains all the code that is part of a ROS codebase and implements the br
 - **Bird's Eye View**
 - **Obstacle Detection:** [cmr_obstacle_data](./src/cmr_obstacle_data/)
 - **Drives GUI:** [cmr_param_gui](./src/cmr_param_gui/)
+- **Improved camera integration**

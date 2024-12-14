@@ -31,12 +31,12 @@ class ArmControllerNode(Node):
 
         # Dictionary with motor controller constants
         self.joint_motor_info = {
-            0: (0x09, 100, 1),
-            1: (0x0B, 100, -1),
-            2: (0x0A, 100, 1),
-            3: (0x0C, 50, 1),
-            4: (0x0D, 50, 1),
-            5: (0x0E, 50, 1)
+            0: (0x09, 100, 1, 0.0),
+            1: (0x0B, 100, -1, 0.0),
+            2: (0x0A, 100, 1, 0.0),
+            3: (0x0C, 50, 1, 0.0),
+            4: (0x0D, 50, 1, 0.0),
+            5: (0x0E, 50, 1, 0.0)
         }
 
         # Create a subscription to the desired joint angles topic
@@ -44,6 +44,12 @@ class ArmControllerNode(Node):
             Float32MultiArray,
             '/joint_angles/desired',
             self.arm_control_callback,
+            10)
+
+        self.calibration_callback = self.create_subscription(
+            Float32MultiArray,
+            '/joint_angles/offsets',
+            self.arm_offset_callback,
             10)
 
         # Create a subscription to the joint increment topic
@@ -67,12 +73,27 @@ class ArmControllerNode(Node):
     def angle_to_motor_position(self, joint_num, angle):
         ratio = self.joint_motor_info[joint_num][1]
         swap = self.joint_motor_info[joint_num][2]
-        return (angle * (ratio/360) * swap)
+        offset = self.joint_motor_info[joint_num][3]
+        return ((angle+offset) * (ratio/360) * swap)
 
     def motor_position_to_angle(self, joint_num, position):
         ratio = self.joint_motor_info[joint_num][1]
         swap = self.joint_motor_info[joint_num][2]
         return (position * (360/ratio) * swap)
+
+    def arm_offset_callback(self,msg):
+        i = int(msg.data[0])
+        offset = msg.data[1]
+        curr = self.joint_motor_info[i]
+        new = (curr[0], curr[1], curr[2], offset)
+        self.joint_motor_info[i] = new
+        positions = []
+        for i in range(6):
+            position = self.angle_to_motor_position(i, 0.0)
+            positions.append(position)
+
+        self.curr_positions = np.array(positions)
+        self.set_joints(*positions)
 
     def arm_control_callback(self, msg):
         positions = []
@@ -164,7 +185,9 @@ class ArmControllerNode(Node):
                 maximum_torque=self.max_torque 
             )
         ]
-        
+
+
+
         result = await self.transport.cycle(commands)
         #angles = []
         curr_positions = []

@@ -12,6 +12,10 @@ from scipy.spatial.transform import Rotation as R
 class IKNode(Node):
     def __init__(self):
         super().__init__('ik_node')
+        
+        # End effector pose publisher
+        self.ee_pose_publisher = self.create_publisher(Float32MultiArray, '/arm/end_effector/pose', 10)
+
         # Create the robot model
         self.robot = rtb.ERobot.URDF('arm_simplified_description/urdf/arm2.urdf')
 
@@ -55,9 +59,8 @@ class IKNode(Node):
             10)
         
         # Create a publisher for joint angles
-        self.publisher_ = self.create_publisher(Float32MultiArray, '/joint_angles/desired', 10)
+        self.joint_angle_publisher = self.create_publisher(Float32MultiArray, '/joint_angles/desired', 10)
 
-        
         self.intended_position = np.array([0.0, 0.0, 0.0])
         self.intended_orientation = np.array([0.0, 0.0, 0.0])
 
@@ -81,6 +84,7 @@ class IKNode(Node):
 
         self.joint_transforms = self.robot.fkine_all(self.robot.q)
         self.joint_positions = np.array([transform.t for transform in self.joint_transforms])
+        self.ee_pose_publish()
 
         joint_positions = self.joint_positions
         #self.get_logger().info("Joint Angles:")
@@ -148,6 +152,16 @@ class IKNode(Node):
 
         solution = self.robot.ikine_LM(T_pos, q0=q0, ilimit=i, tol=t, end=e)
         return solution
+
+    def ee_pose_publish(self):
+        
+        self.current_ee_vector = np.array(self.joint_positions[-1] - self.joint_positions[-2])
+        v = self.current_ee_vector / np.linalg.norm(self.current_ee_vector)
+        p = self.joint_positions[-1]
+        
+        ee_pose_msg = Float32MultiArray()
+        ee_pose_msg.data = [p[0], p[1], p[2], v[0], v[1], v[2]]
+        self.ee_pose_publisher.publish(ee_pose_msg)
 
     def set_target_pose_ee(self, delta_p=[0,0,0], delta_o=[0, 0, 0]):
 
@@ -404,7 +418,7 @@ class IKNode(Node):
         joint_angles_msg = Float32MultiArray()
         joint_angles_msg.data = joint_angles_degrees.tolist()
 
-        self.publisher_.publish(joint_angles_msg)
+        self.joint_angle_publisher.publish(joint_angles_msg)
 
 
     def modify_deltas(self, delta_position, delta_euler_angles):

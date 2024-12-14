@@ -32,18 +32,18 @@ class KeyToTwistNode(Node):
             'a': ('linear.x', -0.003),
             's': ('linear.y', -0.006),
             'd': ('linear.z', -0.003),
-            'i': ('angular.x', 0.01),
             'o': ('angular.y', 0.01),
             'p': ('angular.z', 0.01),
-            'j': ('angular.x', -0.01),
             'k': ('angular.y', -0.01),
             'l': ('angular.z', -0.01),
         }
 
         # Key mappings for joint increments
         self.increment_key_mappings = {
-            'z': [-0.03, 0.0, 0.0, 0.0, 0.0, 0.0],
-            'x': [0.03, 0.0, 0.0, 0.0, 0.0, 0.0],
+            'z': [-0.01, 0.0, 0.0, 0.0, 0.0, 0.0],
+            'x': [0.01, 0.0, 0.0, 0.0, 0.0, 0.0],
+            'i': [0.0, 0.0, 0.0, 0.0, 0.0, -0.05],
+            'j': [0.0, 0.0, 0.0, 0.0, 0.0, 0.05]
         }
 
         # Start listening for key presses

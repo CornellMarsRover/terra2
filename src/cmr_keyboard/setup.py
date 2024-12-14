@@ -1,4 +1,7 @@
 from setuptools import setup
+import os
+from glob import glob
+
 
 package_name = "cmr_keyboard"
 
@@ -10,6 +13,10 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + '/config', ['config/yolov8n.pt']),
+        (
+            os.path.join("share", package_name, "templates"),
+            glob(os.path.join("templates", "*.png")),
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -21,7 +28,8 @@ setup(
         "console_scripts": [
             # PHOBOS_APPEND
             'keyboard_detection = cmr_keyboard.keyboard_detector:main',
-            'computer_camera_publisher = cmr_keyboard.computer_cam_publisher_node:main'
+            'computer_camera_publisher = cmr_keyboard.computer_cam_publisher_node:main',
+            'keyboard_edges = cmr_keyboard.keyboard_edges:main',
         ],
     },
 )

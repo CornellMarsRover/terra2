@@ -111,19 +111,19 @@ class NavAckermanReal(Node):
         super().__init__('nav_ackerman_real')
 
         # Declare parameters
-        self.declare_parameter('waypoints_file', 'config/waypoints.yaml')
+        self.declare_parameter('real', False)
         self.declare_parameter('max_linear_vel', 0.6)  # m/s
         self.declare_parameter('waypoint_tolerance', 2.0)  # meters
         self.declare_parameter('proportional_gain', 0.5)  # Proportional gain for linear velocity
 
         # Get parameters
-        waypoints_file = self.get_parameter('waypoints_file').get_parameter_value().string_value
+        self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.max_linear_vel = self.get_parameter('max_linear_vel').get_parameter_value().double_value
         self.waypoint_tolerance = self.get_parameter('waypoint_tolerance').get_parameter_value().double_value
         self.proportional_gain = self.get_parameter('proportional_gain').get_parameter_value().double_value
 
-        # SET TO FALSE IF TESTING IN SIM
-        self.real = True
+        # FALSE IF TESTING IN SIM
+        self.real = False
 
         if self.real:
             waypoints_file = 'config/waypoints_real.yaml'
@@ -153,13 +153,13 @@ class NavAckermanReal(Node):
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints.')
 
         # Subscriber to GPS
-        '''self.gps_subscriber = self.create_subscription(
+        self.gps_subscriber = self.create_subscription(
             NavSatFix,
             'navsatfixdata',
             self.gps_callback,
             10
         )
-        self.get_logger().info("Subscribed to navsatfixdata")'''
+        self.get_logger().info("Subscribed to navsatfixdata")
 
         # Subscriber to IMU
         self.imu_subscriber = None
@@ -224,7 +224,7 @@ class NavAckermanReal(Node):
         waypoints = data.get('waypoints', [])
         return waypoints
     
-    '''
+    
     def gps_callback(self, msg):
         """
         Callback for navsatfixdata subscriber.
@@ -232,7 +232,7 @@ class NavAckermanReal(Node):
         """
         self.current_position = msg
         self.get_logger().debug(f"Updated GPS Position: lat={msg.latitude}, lon={msg.longitude}")
-    '''
+    
 
     def real_imu_callback(self, msg):
         """
@@ -260,7 +260,7 @@ class NavAckermanReal(Node):
         Determines movement commands based on current position and waypoints.
         """
 
-        '''if self.current_position is None:
+        if self.current_position is None:
             self.get_logger().debug('Waiting for GPS data...')
             return  # No GPS data received yet'''
 
@@ -291,11 +291,8 @@ class NavAckermanReal(Node):
         # target_alt = waypoint.get('altitude', self.current_position.altitude)
 
         # Current position
-        '''current_lat = self.current_position.latitude
-        current_lon = self.current_position.longitude'''
-        # SET TO CONSTANT TO TEST IF ACKERMAN GOES IN RIGHT DIRECTION
-        current_lat = 42.443916
-        current_lon = -76.482784
+        current_lat = self.current_position.latitude
+        current_lon = self.current_position.longitude
         # current_alt = self.current_position.altitude  # Not used in 2D navigation
 
         # Calculate north and east distances to the target

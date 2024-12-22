@@ -19,51 +19,8 @@ def generate_launch_description():
         description='Use simulation (Gazebo) clock if true'
     )
 
-    declare_waypoints_file = DeclareLaunchArgument(
-        'waypoints_file',
-        default_value='config/waypoints.yaml',
-        description='Path to the waypoints YAML file'
-    )
-
-    declare_waypoints_file_real = DeclareLaunchArgument(
-        'waypoints_file_real',
-        default_value='config/waypoints_real.yaml',
-        description='Path to the waypoints YAML file'
-    )
-
-
     # Get the launch directory
     package_share = get_package_share_directory('autonomous_navigation')
-
-    # Different control nodes
-    nav_control_methods_demo = Node(
-        package='autonomous_navigation',
-        executable='control_methods_demo',
-        name='nav_control_methods_demo',
-        output='screen',
-        parameters=[
-            {'use_sim_time': LaunchConfiguration('use_sim_time')},
-            {'waypoints_file': LaunchConfiguration('waypoints_file')},
-            {'max_angular_vel': 0.55},
-            {'max_linear_vel': 0.5},
-            {'angle_threshold_deg': 10.0},
-            {'waypoint_tolerance': 2.0},
-            {'proportional_gain': 0.5},
-        ]
-    )
-
-    nav_ackerman = Node(
-        package='autonomous_navigation',
-        executable='ackerman',
-        name='nav_ackerman',
-        output='screen',
-        parameters=[
-            {'use_sim_time': LaunchConfiguration('use_sim_time')},
-            {'waypoints_file': LaunchConfiguration('waypoints_file')},
-            {'max_linear_vel': 0.5},
-            {'waypoint_tolerance': 2.0},
-        ]
-    )
 
     nav_ackerman_real = Node(
         package='autonomous_navigation',
@@ -71,7 +28,7 @@ def generate_launch_description():
         name='nav_ackerman_real',
         output='screen',
         parameters=[
-            {'waypoints_file': LaunchConfiguration('waypoints_file_real')},
+            {'real': False},
             {'max_linear_vel': 0.5},
             {'waypoint_tolerance': 10.0},
         ]
@@ -86,7 +43,6 @@ def generate_launch_description():
 
     # Add the declared launch arguments
     ld.add_action(declare_use_sim_time)
-    ld.add_action(declare_waypoints_file_real)
 
     # Add the waypoint controller node
     ld.add_action(waypoint_controller_node)

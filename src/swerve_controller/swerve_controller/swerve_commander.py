@@ -9,6 +9,7 @@ from rclpy.node import Node
 from rclpy.publisher import Publisher
 from std_msgs.msg import Float64MultiArray
 from cmr_msgs.msg import AutonomyDrive
+import math
 
 from .swerve_joints import (
     JointEnd,
@@ -91,7 +92,32 @@ class SwerveCommander(Node):
         )
 
     def ackerman(self, msg: AutonomyDrive) -> None:
-        return
+        v: float = -1.0 * msg.vel/self.wheel_radius
+        fr: float = math.radians(msg.fr_angle)
+        fl: float = math.radians(msg.fl_angle)
+        br: float = math.radians(msg.br_angle)
+        bl: float = math.radians(msg.bl_angle)
+
+        for end, side in joint_positions():
+            steering_angle = 0.0
+            if (end, side) == (JointEnd.FRONT, JointSide.RIGHT):
+                steering_angle = fr
+            elif (end, side) == (JointEnd.FRONT, JointSide.LEFT):
+                steering_angle = fl
+            elif (end, side) == (JointEnd.REAR, JointSide.RIGHT):
+                steering_angle = br
+            elif (end, side) == (JointEnd.REAR, JointSide.LEFT):
+                steering_angle = bl
+            # publish steering angle and wheel velocity
+            for kind, value in (
+                (JointKind.STEERING, steering_angle),
+                (JointKind.WHEEL, v),
+            ):
+                joint_msg: Float64MultiArray = Float64MultiArray()
+                joint_msg.data = [value]
+                key: JointKey = (kind, end, side)
+                self.joint_publisher[key].publish(joint_msg)
+
 
     def point_turn(self, msg: Twist) -> None:
         """

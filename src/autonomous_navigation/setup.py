@@ -26,8 +26,6 @@ setup(
     entry_points={
         'console_scripts': [
             # PHOBOS APPEND
-            'control_methods_demo = autonomous_navigation.nav_control_methods_demo:main',
-            'ackerman = autonomous_navigation.nav_ackerman:main',
             'ackerman_real = autonomous_navigation.nav_ackerman_real:main',
             'detect_ground = autonomous_navigation.ground_plane_detection:main'
         ],

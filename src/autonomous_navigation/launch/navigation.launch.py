@@ -30,7 +30,7 @@ def generate_launch_description():
         parameters=[
             {'real': False},
             {'max_linear_vel': 0.5},
-            {'waypoint_tolerance': 10.0},
+            {'waypoint_tolerance': 2.0},
         ]
     )
 

@@ -8,6 +8,7 @@ from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from std_msgs.msg import Float64MultiArray
+from cmr_msgs.msg import AutonomyDrive
 
 from .swerve_joints import (
     JointEnd,
@@ -80,6 +81,76 @@ class SwerveCommander(Node):
         self.cmd_vel_sub = self.create_subscription(
             Twist, "/cmd_vel", self.twist_to_swerve, 10
         )
+
+        # register subscribers for autonomy movements
+        self.ackerman_sub = self.create_subscription(
+            AutonomyDrive, '/autonomy/move/ackerman', self.ackerman, 10
+        )
+        self.point_turn_sub = self.create_subscription(
+            Twist, 'autonomy/move/point_turn', self.point_turn, 10
+        )
+
+    def ackerman(self, msg: AutonomyDrive) -> None:
+        return
+
+    def point_turn(self, msg: Twist) -> None:
+        """
+        generates steering angle and wheel velocity for 8 swerve joints
+        from input twist message on /cmd_vel and publishes it on respective
+        controller topics.
+        """
+        vx: float = 0.0
+        vy: float = 0.0
+        wz: float = msg.angular.z
+
+        # To prevent wheels from changing direction when stopping
+        # if (wz == 0 and vx == 0 and vy == 0):
+        # wheel position remains same
+        if np.allclose([0, 0, 0], [wz, vx, vy]):
+            self.stop()
+            return
+
+        # iterate over wheels
+        # * calculate linear velocity components in cartesian plane
+        # * calculate joint angle and direction given limited joint angles
+        # * publish steering angle and wheel velocity for each wheel
+        for end, side in joint_positions():
+            # calculate linear velocity components in cartesian plane
+            # for individual wheels
+            kx = 1.0 if side is JointSide.RIGHT else -1.0
+            ky = 1.0 if end is JointEnd.FRONT else -1.0
+            wheel_vel_x = vx + (kx * self.wheelbase * wz / 2)
+            wheel_vel_y = vy + (ky * self.wheel_track * wz / 2)
+
+            # limit steering angle to +/- 90 degrees
+            steering_angle: float = np.arctan2(wheel_vel_y, wheel_vel_x)
+            rot_dir: float = 1.0
+
+            if steering_angle > np.pi / 2.0:
+                steering_angle -= np.pi
+                rot_dir *= -1.0
+
+            elif steering_angle < -np.pi / 2.0:
+                steering_angle += np.pi
+                rot_dir *= -1.0
+
+            # calculate angular velocity of wheel
+            wheel_angular_velocity = (
+                rot_dir
+                * np.sqrt(wheel_vel_x**2 + wheel_vel_y**2)
+                / self.wheel_radius
+            )
+
+            # publish steering angle and wheel velocity
+            for kind, value in (
+                (JointKind.STEERING, steering_angle),
+                (JointKind.WHEEL, wheel_angular_velocity),
+            ):
+                joint_msg: Float64MultiArray = Float64MultiArray()
+                joint_msg.data = [value]
+                key: JointKey = (kind, end, side)
+                self.joint_publisher[key].publish(joint_msg)
+
 
     def twist_to_swerve(self, msg: Twist) -> None:
         """

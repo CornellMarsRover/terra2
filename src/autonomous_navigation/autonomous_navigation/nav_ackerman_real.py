@@ -111,7 +111,7 @@ class NavAckermanReal(Node):
         super().__init__('nav_ackerman_real')
 
         # Declare parameters
-        self.declare_parameter('real', False)
+        self.declare_parameter('real', False) # FALSE IF TESTING IN SIM
         self.declare_parameter('max_linear_vel', 0.6)  # m/s
         self.declare_parameter('waypoint_tolerance', 2.0)  # meters
         self.declare_parameter('proportional_gain', 0.5)  # Proportional gain for linear velocity
@@ -122,11 +122,10 @@ class NavAckermanReal(Node):
         self.waypoint_tolerance = self.get_parameter('waypoint_tolerance').get_parameter_value().double_value
         self.proportional_gain = self.get_parameter('proportional_gain').get_parameter_value().double_value
 
-        # FALSE IF TESTING IN SIM
-        self.real = False
-
         if self.real:
             waypoints_file = 'config/waypoints_real.yaml'
+        else:
+            waypoints_file = 'config/waypoints.yaml'
 
         # Initialize PID controller for ackerman
         self.pid = PIDController(
@@ -153,15 +152,10 @@ class NavAckermanReal(Node):
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints.')
 
         # Subscriber to GPS
-        self.gps_subscriber = self.create_subscription(
-            NavSatFix,
-            'navsatfixdata',
-            self.gps_callback,
-            10
-        )
+
         self.get_logger().info("Subscribed to navsatfixdata")
 
-        # Subscriber to IMU
+        # Subscriber to IMU and GPS
         self.imu_subscriber = None
         if self.real:
             self.imu_subscriber = self.create_subscription(
@@ -170,7 +164,12 @@ class NavAckermanReal(Node):
                 self.real_imu_callback,
                 10
             )
-            self.get_logger().info("Subscribed to /imu")
+            self.gps_subscriber = self.create_subscription(
+                NavSatFix,
+                'navsatfixdata',
+                self.gps_callback,
+                10
+            )
         else:
             self.imu_subscriber = self.create_subscription(
                 Imu,
@@ -178,7 +177,14 @@ class NavAckermanReal(Node):
                 self.sim_imu_callback,
                 10
             )
+            self.gps_subscriber = self.create_subscription(
+                NavSatFix,
+                '/navsatfix',
+                self.gps_callback,
+                10
+            )
 
+        self.get_logger().info("Subscribed to imu and gps")
         # Current position and orientation
         self.current_position = None
         self.current_yaw = None  # In radians
@@ -186,8 +192,9 @@ class NavAckermanReal(Node):
         # Timer for publishing commands
         self.timer = self.create_timer(0.1, self.control_loop)  # 10 Hz
 
-        # Autonomy Drive Publisher
-        self.drive_publisher = self.create_publisher(AutonomyDrive, '/autonomy_move', 10)
+        # Autonomy Movement Publishers
+        self.ackerman_publisher = self.create_publisher(AutonomyDrive, '/autonomy/move/ackerman', 10)
+        self.point_turn_publisher = self.create_publisher(Twist, '/autonomy/move/point_turn', 10)
 
         # Control Mode to determine what the robot is doing in the control loop
         self.current_action = "drive_to_coord"
@@ -227,7 +234,7 @@ class NavAckermanReal(Node):
     
     def gps_callback(self, msg):
         """
-        Callback for navsatfixdata subscriber.
+        Callback for gps subscriber.
         Updates the current GPS position.
         """
         self.current_position = msg
@@ -343,12 +350,16 @@ class NavAckermanReal(Node):
         
         drive_msg = AutonomyDrive()
         drive_msg.vel = vel
-        drive_msg.fl_angle = -steer_angle
-        drive_msg.fr_angle = -steer_angle
+        if self.real:
+            drive_msg.fl_angle = -steer_angle
+            drive_msg.fr_angle = -steer_angle
+        else:
+            drive_msg.fl_angle = steer_angle
+            drive_msg.fr_angle = steer_angle
         drive_msg.bl_angle = 0.0
         drive_msg.br_angle = 0.0
 
-        self.drive_publisher.publish(drive_msg)
+        self.ackerman_publisher.publish(drive_msg)
 
 
     def get_north_west_meters(self, start_lat, start_lon, target_lat, target_lon):

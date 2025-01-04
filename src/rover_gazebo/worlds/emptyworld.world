@@ -2,12 +2,19 @@
 <sdf version="1.6">
   <world name="default">
 
-    <physics type="ode">
+    <physics name="default_physics" type="ode">
+        <max_step_size>0.001</max_step_size>
+        <real_time_update_rate>1000</real_time_update_rate>
         <ode>
             <solver>
                 <type>quick</type>
-                <iters>150</iters>
+                <iters>50</iters>
+                <sor>1.0</sor>
             </solver>
+            <constraints>
+                <cfm>0.0</cfm>
+                <erp>0.2</erp>
+            </constraints>
         </ode>
     </physics>
 

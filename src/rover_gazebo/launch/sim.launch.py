@@ -68,6 +68,6 @@ def generate_launch_description() -> LaunchDescription:
     ld = LaunchDescription(ARGUMENTS)
     ld.add_action(world_launch)
     ld.add_action(swerve_robot_spawn)
-    ld.add_action(rviz_launch)
+    #ld.add_action(rviz_launch)
 
     return ld

@@ -127,14 +127,10 @@ class SwerveCommander(Node):
         """
         vx: float = 0.0
         vy: float = 0.0
-        wz: float = msg.angular.z
-
-        # To prevent wheels from changing direction when stopping
-        # if (wz == 0 and vx == 0 and vy == 0):
-        # wheel position remains same
-        if np.allclose([0, 0, 0], [wz, vx, vy]):
-            self.stop()
-            return
+        theta_z: float = msg.angular.z
+        wz = 0.07
+        if theta_z < 0:
+            wz = -0.07
 
         # iterate over wheels
         # * calculate linear velocity components in cartesian plane

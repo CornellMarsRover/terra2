@@ -26,8 +26,8 @@ setup(
     entry_points={
         'console_scripts': [
             # PHOBOS APPEND
-            'ackerman_real = autonomous_navigation.nav_ackerman_real:main',
-            'detect_ground = autonomous_navigation.ground_plane_detection:main'
+            'nav_control_loop = autonomous_navigation.nav_control_loop:main',
+            'path_planner = autonomous_navigation.path_planner:main'
         ],
     },
 )

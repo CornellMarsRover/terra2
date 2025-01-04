@@ -22,10 +22,10 @@ def generate_launch_description():
     # Get the launch directory
     package_share = get_package_share_directory('autonomous_navigation')
 
-    nav_ackerman_real = Node(
+    control_loop = Node(
         package='autonomous_navigation',
-        executable='ackerman_real',
-        name='nav_ackerman_real',
+        executable='nav_control_loop',
+        name='nav_control_loop',
         output='screen',
         parameters=[
             {'real': False},
@@ -34,17 +34,26 @@ def generate_launch_description():
         ]
     )
 
-    # Assign desired control node to be launched
-    #waypoint_controller_node = nav_ackerman
-    #waypoint_controller_node = nav_control_methods_demo
-    waypoint_controller_node = nav_ackerman_real
+    path_planner = Node(
+        package='autonomous_navigation',
+        executable='path_planner',
+        name='path_planner',
+        output='screen',
+        parameters=[
+            {'visualize': True},
+            {'real': False},
+        ]
+    )
 
     ld = LaunchDescription()
 
-    # Add the declared launch arguments
+    # Add launch arguments
     ld.add_action(declare_use_sim_time)
 
-    # Add the waypoint controller node
-    ld.add_action(waypoint_controller_node)
+    # Add the control loop node
+    ld.add_action(control_loop)
+
+    # Add the path planner node
+    ld.add_action(path_planner)
 
     return ld

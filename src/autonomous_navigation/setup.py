@@ -33,6 +33,7 @@ setup(
             'localization_sim = autonomous_navigation.localization_sim:main',
             'object_recognition_sim = autonomous_navigation.object_recognition:main',
             'costmap_sim = autonomous_navigation.costmap_sim:main',
+            'controller = autonomous_navigation.controller:main',
         ],
     },
 )

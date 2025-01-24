@@ -61,8 +61,8 @@ class StateMachineNode(Node):
         self.next_target_lon = self.next_waypoint['longitude']
 
         # Change from initial pose
-        self.d_north = 0.0 # meters
-        self.d_west = 0.0 # meters
+        self.north = 0.0 # meters
+        self.west = 0.0 # meters
         self.yaw = 0.0 # radians
 
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints.')
@@ -95,16 +95,28 @@ class StateMachineNode(Node):
         self.previous_target = [0.0, 0.0]
         n, w = self.get_north_west_meters(self.next_target_lat, self.next_target_lon)
         self.next_target = [n, w]
+        self.target_threshold = 2.0
 
         # Timer for control loop (10 Hz)
         self.timer = self.create_timer(0.1, self.control_loop)
+
+    def update_gps_target(self):
+        """
+        Updates targets from gps coordinate
+        """
+        self.previous_target = self.next_target
+        self.next_waypoint = self.waypoints[self.current_waypoint_index]
+        self.next_target_lat = self.next_waypoint['latitude']
+        self.next_target_lon = self.next_waypoint['longitude']
+        n, w = self.get_north_west_meters(self.next_target_lat, self.next_target_lon)
+        self.next_target = [n, w]
 
     def pose_callback(self, msg):
         """
         Updates the current pose of the robot (north, west, yaw).
         """
-        self.d_north = msg.data[0]
-        self.d_west = msg.data[1]
+        self.north = msg.data[0]
+        self.west = msg.data[1]
         self.yaw = msg.data[2]
 
     def velocity_callback(self, msg):
@@ -125,10 +137,21 @@ class StateMachineNode(Node):
             return
 
         if self.current_state == 'drive_to_coord':
-            waypoint = self.waypoints[self.current_waypoint_index]
-            lat = waypoint['latitude']
-            lon = waypoint['longitude']
+            self.check_goal_reached()
             self.publish_targets()
+
+    def check_goal_reached(self):
+        """
+        Check if the robot has reached the next target and update if necessary
+        """
+        dx = self.next_target[0] - self.north
+        dy = self.next_target[1] - self.west
+        dist = math.sqrt(dx**2 + dy**2)
+        self.get_logger().info(f"Distance to target: {dist}")
+        if dist < self.target_threshold:
+            self.get_logger().info("Target reached!")
+            self.current_waypoint_index += 1
+            self.update_gps_target()
 
     def publish_targets(self):
         """
@@ -196,36 +219,6 @@ class StateMachineNode(Node):
     def destroy_node(self):
         super().destroy_node()
 
-    '''
-    def drive_to_coord(self):
-        """
-        Drives the robot toward the current waypoint using Ackermann steering.
-        """
-        waypoint = self.waypoints[self.current_waypoint_index]
-        target_lat = waypoint['latitude']
-        target_lon = waypoint['longitude']
-
-        # Convert target GPS waypoint to displacement in the north/west directions
-        target_north, target_west = self.get_north_west_meters(
-            target_lat, target_lon
-        )
-        distance = math.sqrt((target_north - self.current_north)**2 + (target_west - self.current_west)**2)
-        angle_to_target = math.atan2(target_west - self.current_west, target_north - self.current_north)
-
-        # Calculate angle error
-        angle_error = angle_to_target - self.current_yaw
-        angle_error = (angle_error + math.pi) % (2 * math.pi) - math.pi
-
-        if distance < self.waypoint_tolerance:
-            self.get_logger().info(f'Reached waypoint {self.current_waypoint_index + 1}')
-            waypoint_reached = Bool()
-            waypoint_reached.data = True
-            self.waypoint_reached_publisher.publish(waypoint_reached)
-            self.current_waypoint_index += 1
-            time.sleep(2)  # Optional pause
-        else:
-            self.publish_gps_offset(target_north - self.current_north, target_west - self.current_west, angle_error)
-    '''
 
 def main(args=None):
     rclpy.init(args=args)

@@ -88,7 +88,7 @@ class SwerveCommander(Node):
             AutonomyDrive, '/autonomy/move/ackerman', self.ackerman, 10
         )
         self.point_turn_sub = self.create_subscription(
-            Twist, 'autonomy/move/point_turn', self.point_turn, 10
+            Twist, '/autonomy/move/point_turn', self.point_turn, 10
         )
 
     def ackerman(self, msg: AutonomyDrive) -> None:
@@ -128,9 +128,9 @@ class SwerveCommander(Node):
         vx: float = 0.0
         vy: float = 0.0
         theta_z: float = msg.angular.z
-        wz = 0.07
+        wz = 0.06
         if theta_z < 0:
-            wz = -0.07
+            wz = -0.06
 
         # iterate over wheels
         # * calculate linear velocity components in cartesian plane

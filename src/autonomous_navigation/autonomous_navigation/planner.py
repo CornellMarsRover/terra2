@@ -26,13 +26,13 @@ class PlannerNode(Node):
         # Create a subscription to the costmap and costmap position topic
         self.costmap_subscription = self.create_subscription(
             Image,
-            '/autonomy/costmap',
+            '/autonomy/costmap/image_grid',
             self.costmap_callback,
             10
         )
         self.costmap_pose_subscription = self.create_subscription(
             Image,
-            '/autonomy/pose/costmap',
+            '/autonomy/costmap/shift',
             self.costmap_centerpoint_callback,
             10
         )
@@ -83,12 +83,13 @@ class PlannerNode(Node):
 
         # Cache of detected obstacles
         self.obstacles = set()
-        self.threshold = 3 # minimum cell cost to be classified as obstacle
+        self.threshold = 5 # minimum cell cost to be classified as obstacle
 
         # Current path (sequence of waypoints)
         self.current_path = deque()
         self.previous_points = deque()
         self.next_waypoint = None
+        self.waypoint_threshold = 0.6
 
         # Check the current path at a frequency of 2 Hz
         self.path_check_timer = self.create_timer(0.5, self.validate_path)
@@ -98,7 +99,7 @@ class PlannerNode(Node):
             self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
 
         self.get_logger().info("PlannerNode initialized and subscribed to costmap and target pose topics.")
-
+    
     def validate_path(self):
         """
         Validate the current path, running on a timer.
@@ -106,12 +107,23 @@ class PlannerNode(Node):
         """
         if self.next_waypoint is None:
             return
-        valid = self.check_path_segment(self.robot_position, self.next_waypoint)
+        valid = self.check_path_segment(self.robot_position, self.next_waypoint, narrow=True)
         if not valid:
-            self.get_logger().info("Replanning path")
+            #self.get_logger().info("Replanning path")
             self.compute_path()
-        else:
-            self.get_logger().info("Current path valid")
+            self.smooth_path()
+
+        self.publish_waypoint()
+
+    def publish_waypoint(self):
+        """
+        Publish next waypoint in path
+        """
+        if self.next_waypoint is None:
+            return
+        waypoint_msg = Float32MultiArray()
+        waypoint_msg.data = [float(self.next_waypoint[0]), float(self.next_waypoint[1])]
+        self.next_waypoint_publisher.publish(waypoint_msg)
 
     def costmap_callback(self, msg):
         """
@@ -135,11 +147,12 @@ class PlannerNode(Node):
         for x, row in enumerate(self.costmap):
             for y, cost in enumerate(row):
                 if cost >= self.threshold:
-                    x_coord = self.costmap_center[0] + ((x - self.costmap_center_index[0]) * self.cell_size)
-                    y_coord = self.costmap_center[1] + ((y - self.costmap_center_index[1]) * self.cell_size)
-                    # Round coords to nearest 0.5
-                    x_coord = round(x_coord * 2) / 2
-                    y_coord = round(y_coord * 2) / 2
+                    x_coord = self.robot_position[0] + ((x - self.costmap_center_index[0]) * self.cell_size)
+                    y_coord = self.robot_position[1] + ((y - self.costmap_center_index[1]) * self.cell_size)
+                    #self.get_logger().info(f"{x_coord}   {y_coord}")
+                    # Round coords to nearest 0.25
+                    x_coord = round(x_coord * 4) / 4
+                    y_coord = round(y_coord * 4) / 4
                     self.obstacles.add((x_coord, y_coord))
 
     def costmap_centerpoint_callback(self, msg):
@@ -158,23 +171,39 @@ class PlannerNode(Node):
         """
         Callback function to update the target pose.
         """
-        self.next_target = [msg.data[0], msg.data[1]]
+        
         if len(msg.data) == 3:
             self.target_yaw = msg.data[2]
 
-        # If there's no "active" next_waypoint, set it now
-        if self.next_waypoint is None:
+        # If new target received, set it to next target
+        if self.next_target != (msg.data[0], msg.data[1]):
+            self.next_target = (msg.data[0], msg.data[1])
+            self.current_path = deque()
+            self.current_path.append(self.next_target)
             self.next_waypoint = self.next_target
-            self.get_logger().info(f"Next waypoint: {self.next_waypoint}")
+            self.get_logger().info(f"Next target: {self.next_target}")
 
     def update_pose(self, msg):
         """
         Callback function to update the robot position and yaw
+        Checks if the robot is within proximity of next path waypoint
         """
         self.robot_position = (msg.data[0], msg.data[1])
         self.yaw = msg.data[2]
+        if self.next_waypoint is not None:
+            dx = self.next_waypoint[0] - self.robot_position[0]
+            dy = self.next_waypoint[1] - self.robot_position[1]
+            distance = math.sqrt(dx**2 + dy**2)
+            #self.get_logger().info(f"Distance to path waypoint: {distance}")
+            if distance < self.waypoint_threshold:
+                self.get_logger().info("Reached next path waypoint")
+                self.previous_points.append(self.current_path.popleft())
+                if len(self.current_path) == 0:
+                    self.next_waypoint = None
+                else:
+                    self.next_waypoint = self.current_path[0]
 
-    def check_path_segment(self, start, end):
+    def check_path_segment(self, start, end, narrow=False):
         """
         Checks if segment to next waypoint does not run through any obstacles.
 
@@ -210,11 +239,16 @@ class PlannerNode(Node):
             sampled_points.append((rounded_x, rounded_y))
 
         # Check each sampled point's neighborhood at 0.5m increments
+        # Check a smaller range if validating
+        if narrow:
+            d = (-0.25, 0, -0.25)
+        else:
+            d = (-0.5, -0.25, 0, 0.25, 0.5)
         for (sx, sy) in sampled_points:
             neighbors = [
                 (sx + dx_, sy + dy_)
-                for dx_ in (-1, -0.5, 0, 0.5, 1)
-                for dy_ in (-1, -0.5, 0, 0.5, 1)
+                for dx_ in d
+                for dy_ in d
             ]
             for nbr in neighbors:
                 if nbr in point_set:
@@ -222,10 +256,10 @@ class PlannerNode(Node):
 
         return True  # No obstacle found in the line segment
     
-    def compute_path(self):
+    def compute_path(self, narrow=False):
         """
-        Implement an A* planning algorithm to plan a path within a 25x25m
-        local region (±12.5m from the robot's current position in both x and y).
+        Implement an A* planning algorithm to plan a path within a 50x50m
+        local region (±25.0m from the robot's current position in both x and y).
         The map is discretized at 0.5m steps, and each step's validity is checked
         with check_path_segment().
         """
@@ -236,7 +270,7 @@ class PlannerNode(Node):
         goal = tuple(self.next_target)
 
         # Define local search region around the robot
-        half_width = 12.5
+        half_width = 25.0
         step_size = 1.0
         min_x = start[0] - half_width
         max_x = start[0] + half_width
@@ -274,10 +308,10 @@ class PlannerNode(Node):
 
         # Basic check in case start or goal is out of bounds of the discrete array
         if not (0 <= start_idx[0] < len(x_vals) and 0 <= start_idx[1] < len(y_vals)):
-            self.get_logger().warn("Start position is out of local 25x25 grid. Cannot plan.")
+            self.get_logger().warn("Start position is out of local 50x50 grid. Cannot plan.")
             return
         if not (0 <= goal_idx[0] < len(x_vals) and 0 <= goal_idx[1] < len(y_vals)):
-            self.get_logger().warn("Goal position is out of local 25x25 grid. Clamping did not help. Cannot plan.")
+            self.get_logger().warn("Goal position is out of local 50x50 grid. Clamping did not help. Cannot plan.")
             return
 
         # A* setup
@@ -318,7 +352,7 @@ class PlannerNode(Node):
                 # Check if path segment is valid using check_path_segment
                 cur_coords = get_coords(current[0], current[1])
                 nbr_coords = get_coords(ni, nj)
-                if not self.check_path_segment(cur_coords, nbr_coords):
+                if not self.check_path_segment(cur_coords, nbr_coords, narrow=narrow):
                     continue
 
                 # Cost from current to neighbor (cardinal vs diagonal)
@@ -332,8 +366,11 @@ class PlannerNode(Node):
                     heapq.heappush(open_set, (f_score, neighbor))
 
         if not found_path:
-            self.get_logger().info("No path found with A* in the local 25x25 region.")
+            if not narrow:
+                self.get_logger().info("No path found with A* in the local 50x50 region.\nReducing obstacle padding")
+                self.compute_path(narrow=True)
             return
+
 
         # Reconstruct path
         path_indices = []
@@ -358,15 +395,54 @@ class PlannerNode(Node):
         # Set the next waypoint to the first step beyond the robot's current position (if it exists)
         if len(self.current_path) > 1:
             # The first in the list is effectively the current position, so we skip to the next
-            self.next_waypoint = self.current_path[1]
-        elif len(self.current_path) == 1:
-            # The path only has one point (start==goal), so it's effectively done
-            self.next_waypoint = self.current_path[0]
-        
+            self.current_path.popleft()
 
-        self.get_logger().info(f"A* path computed. Path length: {len(self.current_path)} waypoints.")
-        if self.next_waypoint:
-            self.get_logger().info(f"Next waypoint after planning: {self.next_waypoint}")
+        self.get_logger().info(f"A* path: {self.current_path} waypoints.")
+
+    def smooth_path(self):
+        """
+        Smooth the current path by removing intermediate waypoints that are part of a straight line segment.
+        This keeps the first and last points and removes points that represent unnecessary corners.
+
+        Modifies:
+        - self.current_path: Updates with the smoothed version of the path.
+        """
+        if len(self.current_path) <= 2:
+            # Path is already smooth if it has two or fewer points
+            return
+
+        smoothed_path = deque()
+
+        for i in range(1, len(self.current_path) - 1):
+            # Get three consecutive points: previous, current, and next
+            prev_point = self.current_path[i - 1]
+            current_point = self.current_path[i]
+            next_point = self.current_path[i + 1]
+
+            # Calculate vectors
+            v1 = (current_point[0] - prev_point[0], current_point[1] - prev_point[1])
+            v2 = (next_point[0] - current_point[0], next_point[1] - current_point[1])
+
+            # Normalize vectors
+            v1_magnitude = math.sqrt(v1[0]**2 + v1[1]**2)
+            v2_magnitude = math.sqrt(v2[0]**2 + v2[1]**2)
+            if v1_magnitude + v2_magnitude < 0.001:
+                continue
+            v1_normalized = (v1[0] / v1_magnitude, v1[1] / v1_magnitude)
+            v2_normalized = (v2[0] / v2_magnitude, v2[1] / v2_magnitude)
+
+            # Check if vectors are aligned (dot product close to 1 or -1)
+            dot_product = v1_normalized[0] * v2_normalized[0] + v1_normalized[1] * v2_normalized[1]
+
+            if abs(dot_product) < 0.999:
+                # Not a straight line: keep this point as it represents a corner
+                smoothed_path.append(current_point)
+
+        smoothed_path.append(self.current_path[-1])  # Always keep the last point
+        smoothed_path.append(self.next_target)
+        self.current_path = smoothed_path
+        self.next_waypoint = self.current_path[0]
+        self.get_logger().info(f"Smoothed path: {list(self.current_path)}")
 
     def plot_grid_rerun(self):
         """

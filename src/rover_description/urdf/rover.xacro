@@ -12,4 +12,7 @@
   <xacro:include filename="$(find rover_description)/urdf/include/sensors/gps_sensor.xacro" />
   <xacro:include filename="$(find rover_description)/urdf/include/sensors/imu_sensor.xacro" />
 
+  <!--Including exact GPS so don't have to worry about localization in sim-->
+  <xacro:include filename="$(find rover_description)/urdf/include/sensors/gps_exact.xacro" />
+
 </robot>

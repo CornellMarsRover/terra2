@@ -31,6 +31,6 @@ def generate_launch_description():
 
 
     ld.add_action(node_swerve_commander)
-    ld.add_action(node_swerve_odom)
+    #ld.add_action(node_swerve_odom)
 
     return ld

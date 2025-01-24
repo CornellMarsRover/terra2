@@ -18,14 +18,18 @@ class ArucoDetectionNode(Node):
         self.plane_subscription = self.create_subscription(
             Float32MultiArray, '/zed/plane/angles', self.plane_callback, 10
         )
+        
         self.bridge = CvBridge()
+        
         self.plane_requester = self.create_publisher(
             Int32MultiArray, '/zed/plane/pixel', 10
         )
+
         self.detected_publisher = self.create_publisher(
             Image, '/zed/aruco_annotation', qos_profile_sensor_data)
         
         self.offset_publisher = self.create_publisher(Float32MultiArray, '/joint_angles/offsets', 10)
+        
         # Intrinsic parameters (from left camera calibration)
         self.camera_matrix = np.array([[657.70933821, 0.0, 605.53598505],
                                        [0.0, 657.27652417, 343.9524918],

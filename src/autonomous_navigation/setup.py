@@ -13,6 +13,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/navigation.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/costmap.launch.py']),
+        ('share/' + package_name + '/config', ['config/nav2_costmap_params.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_real.yaml']),
     ],
@@ -26,8 +28,11 @@ setup(
     entry_points={
         'console_scripts': [
             # PHOBOS APPEND
-            'nav_control_loop = autonomous_navigation.nav_control_loop:main',
-            'path_planner = autonomous_navigation.path_planner:main'
+            'state_machine = autonomous_navigation.state_machine:main',
+            'planner = autonomous_navigation.planner:main',
+            'localization_sim = autonomous_navigation.localization_sim:main',
+            'object_recognition_sim = autonomous_navigation.object_recognition:main',
+            'costmap_sim = autonomous_navigation.costmap_sim:main',
         ],
     },
 )

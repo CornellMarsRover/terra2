@@ -5,7 +5,7 @@ from rclpy.node import Node
 
 from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Float32MultiArray
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TwistStamped
 
 from tf2_ros import TransformBroadcaster
 from tf_transformations import euler_from_quaternion
@@ -43,7 +43,8 @@ class LocalizationSim(Node):
         self.last_imu_time = None
 
         # Publishers
-        self.pose_publisher = self.create_publisher(Float32MultiArray, '/autonomy/pose/robot/global', 10)  # Pose in format [d_north (m), d_west(m), yaw (rad)]
+        # Pose in format [linear.x = d_north (m), linear.y = d_west(m), angular.z = yaw (rad)]
+        self.pose_publisher = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
         self.velocity_publisher = self.create_publisher(Float32MultiArray, '/autonomy/velocity', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
@@ -173,8 +174,11 @@ class LocalizationSim(Node):
         """
         Publishes the fused pose and velocity.
         """
-        pose_msg = Float32MultiArray()
-        pose_msg.data = [self.state[0], self.state[1], self.yaw]  # North, West, Yaw
+        pose_msg = TwistStamped()
+        pose_msg.twist.linear.x = self.state[0]
+        pose_msg.twist.linear.y = self.state[1]
+        pose_msg.twist.angular.z = self.yaw
+        pose_msg.header.stamp = self.get_clock().now().to_msg()  # Get current time
         self.pose_publisher.publish(pose_msg)
 
         velocity_msg = Float32MultiArray()

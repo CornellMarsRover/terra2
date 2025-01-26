@@ -12,6 +12,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import Bool, Int16, Float32MultiArray, String
+from geometry_msgs.msg import TwistStamped
 import yaml
 import math
 import os
@@ -78,7 +79,7 @@ class StateMachineNode(Node):
 
         # Subscriptions to localization and movement data
         self.pose_subscription = self.create_subscription(
-            Float32MultiArray, '/autonomy/pose/robot/global', self.pose_callback, 10
+            TwistStamped, '/autonomy/pose/robot/global', self.pose_callback, 10
         )
         self.velocity_subscription = self.create_subscription(
             Float32MultiArray, '/autonomy/velocity', self.velocity_callback, 10
@@ -104,6 +105,9 @@ class StateMachineNode(Node):
         """
         Updates targets from gps coordinate
         """
+        if self.current_waypoint_index >= len(self.waypoints):
+            self.current_waypoint_index -= 1
+            
         self.previous_target = self.next_target
         self.next_waypoint = self.waypoints[self.current_waypoint_index]
         self.next_target_lat = self.next_waypoint['latitude']
@@ -115,9 +119,9 @@ class StateMachineNode(Node):
         """
         Updates the current pose of the robot (north, west, yaw).
         """
-        self.north = msg.data[0]
-        self.west = msg.data[1]
-        self.yaw = msg.data[2]
+        self.north = msg.twist.linear.x
+        self.west = msg.twist.linear.y
+        self.yaw = msg.twist.angular.z
 
     def velocity_callback(self, msg):
         """
@@ -137,7 +141,12 @@ class StateMachineNode(Node):
             return
 
         if self.current_state == 'drive_to_coord':
-            self.check_goal_reached()
+            reached = self.check_goal_reached()
+            if reached:
+                self.get_logger().info("Target reached!")
+                self.current_waypoint_index += 1
+                self.update_gps_target()
+
             self.publish_targets()
 
     def check_goal_reached(self):
@@ -148,10 +157,8 @@ class StateMachineNode(Node):
         dy = self.next_target[1] - self.west
         dist = math.sqrt(dx**2 + dy**2)
         self.get_logger().info(f"Distance to target: {dist}")
-        if dist < self.target_threshold:
-            self.get_logger().info("Target reached!")
-            self.current_waypoint_index += 1
-            self.update_gps_target()
+        return dist < self.target_threshold
+
 
     def publish_targets(self):
         """

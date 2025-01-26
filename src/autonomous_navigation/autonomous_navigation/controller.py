@@ -10,7 +10,7 @@ to reach the waypoints.
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
 from std_msgs.msg import Float32MultiArray
 import time
 import math
@@ -27,7 +27,7 @@ class ControllerNode(Node):
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
-            Float32MultiArray,
+            TwistStamped,
             '/autonomy/pose/robot/global',
             self.update_pose,
             10
@@ -106,8 +106,8 @@ class ControllerNode(Node):
         """
         Callback function to update the robot position and yaw
         """
-        self.robot_position = (msg.data[0], msg.data[1])
-        self.yaw = msg.data[2]
+        self.robot_position = (msg.twist.linear.x, msg.twist.linear.y)
+        self.yaw = msg.twist.angular.z
     
     def update_waypoint(self, msg):
         """

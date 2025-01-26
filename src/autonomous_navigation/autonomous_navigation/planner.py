@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float32MultiArray
+from geometry_msgs.msg import TwistStamped
 
 from cv_bridge import CvBridge
 import numpy as np
@@ -53,7 +54,7 @@ class PlannerNode(Node):
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
-            Float32MultiArray,
+            TwistStamped,
             '/autonomy/pose/robot/global',
             self.update_pose,
             10
@@ -83,7 +84,7 @@ class PlannerNode(Node):
 
         # Cache of detected obstacles
         self.obstacles = set()
-        self.threshold = 5 # minimum cell cost to be classified as obstacle
+        self.threshold = 15 # minimum cell cost to be classified as obstacle
 
         # Current path (sequence of waypoints)
         self.current_path = deque()
@@ -188,8 +189,8 @@ class PlannerNode(Node):
         Callback function to update the robot position and yaw
         Checks if the robot is within proximity of next path waypoint
         """
-        self.robot_position = (msg.data[0], msg.data[1])
-        self.yaw = msg.data[2]
+        self.robot_position = (msg.twist.linear.x, msg.twist.linear.y)
+        self.yaw = msg.twist.angular.z
         if self.next_waypoint is not None:
             dx = self.next_waypoint[0] - self.robot_position[0]
             dy = self.next_waypoint[1] - self.robot_position[1]
@@ -238,12 +239,12 @@ class PlannerNode(Node):
             rounded_x, rounded_y = round(sampled_x), round(sampled_y)
             sampled_points.append((rounded_x, rounded_y))
 
-        # Check each sampled point's neighborhood at 0.5m increments
+        # Check each sampled point's neighborhood at 0.25m increments
         # Check a smaller range if validating
         if narrow:
-            d = (-0.25, 0, -0.25)
+            d = (-0.5, -0.25, 0, -0.25, 0.5)
         else:
-            d = (-0.5, -0.25, 0, 0.25, 0.5)
+            d = (-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)
         for (sx, sy) in sampled_points:
             neighbors = [
                 (sx + dx_, sy + dy_)
@@ -389,6 +390,8 @@ class PlannerNode(Node):
 
         # Store path in self.current_path
         self.current_path.clear()
+        if len(planned_path) <= 1:
+            return
         for wp in planned_path:
             self.current_path.append(wp)
 
@@ -426,7 +429,7 @@ class PlannerNode(Node):
             # Normalize vectors
             v1_magnitude = math.sqrt(v1[0]**2 + v1[1]**2)
             v2_magnitude = math.sqrt(v2[0]**2 + v2[1]**2)
-            if v1_magnitude + v2_magnitude < 0.001:
+            if v1_magnitude < 0.01 or v2_magnitude < 0.01:
                 continue
             v1_normalized = (v1[0] / v1_magnitude, v1[1] / v1_magnitude)
             v2_normalized = (v2[0] / v2_magnitude, v2[1] / v2_magnitude)

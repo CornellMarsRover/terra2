@@ -2,11 +2,13 @@
 
 import rclpy
 from rclpy.node import Node
+from message_filters import Subscriber, ApproximateTimeSynchronizer
 
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import Image
+from geometry_msgs.msg import TwistStamped
 from cv_bridge import CvBridge
 
 import numpy as np
@@ -21,22 +23,17 @@ class CostmapNode(Node):
         self.declare_parameter('real', False) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value 
 
-        # Subscribe to the point cloud topic
-        self.subscription = self.create_subscription(
-            PointCloud2,
-            '/camera/points',
-            self.pointcloud_callback,
-            10
-        )
+        # Create synchronized subscribers
+        self.pointcloud_sub = Subscriber(self, PointCloud2, '/camera/points')
+        self.pose_sub = Subscriber(self, TwistStamped, '/autonomy/pose/robot/global')
 
-        # Subscribe to the robot pose topic
-        self.pose_subscription = self.create_subscription(
-            Float32MultiArray,
-            '/autonomy/pose/robot/global',
-            self.update_pose,
-            10
+        # Synchronizer with a time tolerance (slop) of 0.1 seconds
+        self.sync = ApproximateTimeSynchronizer(
+            [self.pointcloud_sub, self.pose_sub],
+            queue_size=100,
+            slop=1.0
         )
-
+        self.sync.registerCallback(self.synchronized_callback)
         # 2D costmap publisher that publishes grid encoded as an image
         self.costmap_publisher = self.create_publisher(Image, '/autonomy/costmap/image_grid', 10)
         # Current robot position in the costmap grid
@@ -71,7 +68,7 @@ class CostmapNode(Node):
         self.obstacle_cost_threshold = 5
 
         # Maximum cost for occupied cells in the costmap
-        self.max_cost = 10
+        self.max_cost = 20
 
         # Ground detection thresholds
         self.height_threshold = 0.2
@@ -105,6 +102,15 @@ class CostmapNode(Node):
         self.shift_timer = self.create_timer(0.2, self.shift_grid)
 
         self.new_obstacle_publisher = self.create_publisher(Float32MultiArray, '/autonomy/costmap/new_obstacles', 10)
+
+    def synchronized_callback(self, pointcloud_msg, pose_msg):
+        """
+        Callback to handle synchronized PointCloud2 and TwistStamped messages.
+        """
+        self.get_logger().info("Synchronized callback")
+        self.update_pose(pose_msg)
+        self.pointcloud_callback(pointcloud_msg)
+
 
     def publish_costmap(self):
         '''
@@ -215,10 +221,7 @@ class CostmapNode(Node):
 
         for pt in point_cloud2.read_points(msg, skip_nans=True):
             obstacle = self.point_cloud_point_to_grid(pt)
-            #if obstacle[0]:
-            #    new_obstacles.add(obstacle[1])
-        
-        #self.publish_new_obstacles(new_obstacles)
+
         self.decay_cost()
 
     def publish_new_obstacles(self, new_obstacles):
@@ -295,9 +298,9 @@ class CostmapNode(Node):
         """
         Update the pose of the robot using message from localization node
         """
-        self.north = msg.data[0]
-        self.west = msg.data[1]
-        self.yaw = msg.data[2]
+        self.north = msg.twist.linear.x
+        self.west = msg.twist.linear.y
+        self.yaw = msg.twist.angular.z
         self.R = np.array([
             [np.cos(-1.0 * self.yaw), -np.sin(-1.0 * self.yaw)],
             [np.sin(-1.0 * self.yaw),  np.cos(-1.0 * self.yaw)]

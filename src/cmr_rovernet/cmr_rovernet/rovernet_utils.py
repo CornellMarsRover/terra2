@@ -3,6 +3,10 @@ from toml import load
 from os import path
 import time
 import math
+import logging
+import moteus
+import asyncio
+import threading
 
 #VALID SUBTEAMS
 DRIVES = 0x01
@@ -50,6 +54,144 @@ ROVER_LENGTH = 39
 ROVER_WIDTH = 20
 R = math.sqrt(ROVER_LENGTH**2 + ROVER_WIDTH**2)
 maxWheelVelocity = 12
+
+
+# Create a global event loop that will run in another thread
+_moteus_loop = None
+_moteus_loop_thread = None
+
+def init_moteus_loop():
+    """
+    Initializes a dedicated asyncio event loop in a separate thread.
+    Call this once at the start of your node.
+    """
+    global _moteus_loop, _moteus_loop_thread
+    if _moteus_loop is None:
+        _moteus_loop = asyncio.new_event_loop()
+        _moteus_loop_thread = threading.Thread(
+            target=_moteus_loop.run_forever, 
+            daemon=True
+        )
+        _moteus_loop_thread.start()
+
+async def _send_moteus_stop_async(
+    controller: moteus.Controller,
+    motor: int,
+    logger: logging.Logger | None = None
+):
+    """
+    The actual async version of stopping the servo.
+    """
+    if logger:
+        logger.info(f"[motor={motor}] calling set_stop()")
+    # This tells the moteus servo to stop actively controlling 
+    # (this is the 'stop' mode on the servo).
+    await controller.set_stop()  # By default, query=False
+
+def send_moteus_stop_sync(
+    controller: moteus.Controller,
+    motor: int,
+    logger: logging.Logger | None = None
+):
+    """
+    Synchronous wrapper that schedules an async stop call on our single
+    global event loop thread, then waits for completion.
+    """
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        _send_moteus_stop_async(
+            controller=controller,
+            motor=motor,
+            logger=logger
+        ),
+        _moteus_loop
+    )
+    return future.result()  # block until done (or raise exception on error)
+
+async def _send_moteus_command_async(
+    controller: moteus.Controller,
+    motor: int,
+    position: float | None,
+    drives_velocity: float | None,
+    maximum_torque: float | None,
+    velocity_limit: float | None,
+    accel_limit: float | None,
+    ff_torque: float | None,
+    logger: logging.Logger | None = None
+):
+    """
+    The actual async version of sending commands to moteus.
+    (Adapt the parameter names to match the current moteus library.)
+    """
+    # fallback defaults
+    if position is None:
+        position = math.nan
+    if drives_velocity is None:
+        drives_velocity = math.nan
+    if maximum_torque is None:
+        maximum_torque = 1.0
+    if velocity_limit is None:
+        velocity_limit = 10.0
+    if accel_limit is None:
+        accel_limit = 10.0
+    if ff_torque is None:
+        ff_torque = 0.0
+
+    # Optional logging
+    if logger:
+        logger.info(f"[motor={motor}] position={position}, velocity={drives_velocity}, "
+                    f"maximum_torque={maximum_torque}, velocity_limit={velocity_limit}, "
+                    f"accel_limit={accel_limit}, feedforward_torque={ff_torque}")
+
+    # Use moteus "official" parameter names
+    await controller.set_position(
+        position=position,
+        velocity=drives_velocity,
+        maximum_torque=maximum_torque,
+        velocity_limit=velocity_limit,
+        accel_limit=accel_limit,
+        feedforward_torque=ff_torque
+    )
+
+def send_moteus_command_sync(
+    controller: moteus.Controller,
+    motor: int,
+    position: float | None,
+    drives_velocity: float | None,
+    maximum_torque: float | None,
+    velocity_limit: float | None,
+    accel_limit: float | None,
+    ff_torque: float | None,
+    logger: logging.Logger | None = None
+):
+    """
+    Synchronous wrapper that schedules an async call on the single
+    global event loop thread, then waits for completion.
+    """
+    # Make sure our loop is initialized
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        _send_moteus_command_async(
+            controller=controller,
+            motor=motor,
+            position=position,
+            drives_velocity=drives_velocity,
+            maximum_torque=maximum_torque,
+            velocity_limit=velocity_limit,
+            accel_limit=accel_limit,
+            ff_torque=ff_torque,
+            logger=logger
+        ),
+        _moteus_loop
+    )
+    # Block until done (or raise exception if error)
+    return future.result()
 
 def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, ff_torque, logger):
     """

@@ -42,9 +42,9 @@ class CmdVelSubscriber(Node):
         self.controller_command_rx = 0
         self.last_time_left = time.time()
         self.last_time_right = time.time()
-        self.port = "/dev/ttyTHS0"
+        # self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
-        self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
         self.feed_forward_torque = 0.0
         self.velocity = 0
         # self.serial_port = None
@@ -207,23 +207,45 @@ class CmdVelSubscriber(Node):
         self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)
         self.logger.info(f'VEL: {self.velocity}')
-        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, -self.velocity*ws1,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.velocity*ws4,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, self.velocity*ws2, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        # back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, -self.velocity*ws1,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        # front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.velocity*ws4,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        # front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, self.velocity*ws2, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        # back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        logger = logging.getLogger("DrivesLogger")
+        logger.setLevel(logging.INFO)
         
-        br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, wa4, None, 5, 120, 120, None, self.logger)
-        fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, wa1, None, 5, 120, 120, None, self.logger)
-        fl_swerve = byte_command_converter(ARM, FRONT_LEFT_SWERVE, wa2, None, 5, 120, 120, None, self.logger)
-        bl_swerve = byte_command_converter(ARM, BACK_LEFT_SWERVE, wa3, None, 5, 120, 120, None, self.logger)
-        send_number(self.serial_port, back_right)
-        send_number(self.serial_port, front_right)
-        send_number(self.serial_port, front_left)
-        send_number(self.serial_port, back_left)
-        send_number(self.serial_port, br_swerve)
-        send_number(self.serial_port, fr_swerve)
-        send_number(self.serial_port, fl_swerve)
-        send_number(self.serial_port, bl_swerve)
+        front_left = moteus.Controller(id=1)
+        back_left = moteus.Controller(id=2)
+        front_right = moteus.Controller(id=3)
+        back_right = moteus.Controller(id=4)
+
+        send_moteus_command_sync(controller=front_left, motor=1, position=math.nan, drives_velocity=self.velocity*ws2, maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=logger)
+        send_moteus_command_sync(controller=back_left, motor=2, position=math.nan, drives_velocity=self.velocity*ws3, maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=logger)
+        send_moteus_command_sync(controller=front_right, motor=3, position=math.nan, drives_velocity=(-self.velocity*ws4), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=logger)
+        send_moteus_command_sync(controller=back_right, motor=4, position=math.nan, drives_velocity=(-self.velocity*ws1), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=logger)
+        # br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, wa4, None, 5, 120, 120, None, self.logger)
+        # fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, wa1, None, 5, 120, 120, None, self.logger)
+        # fl_swerve = byte_command_converter(ARM, FRONT_LEFT_SWERVE, wa2, None, 5, 120, 120, None, self.logger)
+        # bl_swerve = byte_command_converter(ARM, BACK_LEFT_SWERVE, wa3, None, 5, 120, 120, None, self.logger)
+        
+        fr_swerve = moteus.Controller(id=16)
+        br_swerve = moteus.Controller(id=17)
+        bl_swerve = moteus.Controller(id=18)
+        fl_swerve = moteus.Controller(id=19)
+
+        send_moteus_command_sync(controller=fr_swerve, motor=16, position=wa1, drives_velocity=None, maximum_torque=5, velocity_limit=120, accel_limit=120, ff_torque=None, logger=logger)
+        send_moteus_command_sync(controller=br_swerve, motor=17, position=wa4, drives_velocity=None, maximum_torque=5, velocity_limit=120, accel_limit=120, ff_torque=None, logger=logger)
+        send_moteus_command_sync(controller=bl_swerve, motor=18, position=wa3, drives_velocity=None, maximum_torque=5, velocity_limit=120, accel_limit=120, ff_torque=None, logger=logger)
+        send_moteus_command_sync(controller=fl_swerve, motor=19, position=wa2, drives_velocity=None, maximum_torque=5, velocity_limit=120, accel_limit=120, ff_torque=None, logger=logger)
+
+        # send_number(self.serial_port, back_right)
+        # send_number(self.serial_port, front_right)
+        # send_number(self.serial_port, front_left)
+        # send_number(self.serial_port, back_left)
+        # send_number(self.serial_port, br_swerve)
+        # send_number(self.serial_port, fr_swerve)
+        # send_number(self.serial_port, fl_swerve)
+        # send_number(self.serial_port, bl_swerve)
         
     def autonomy_callback(self, msg):
         vel = msg.vel
@@ -242,14 +264,14 @@ class CmdVelSubscriber(Node):
         fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, fr_angle, None, 5, 120, 120, None, self.logger)
         fl_swerve = byte_command_converter(ARM, FRONT_LEFT_SWERVE, fl_angle, None, 5, 120, 120, None, self.logger)
         bl_swerve = byte_command_converter(ARM, BACK_LEFT_SWERVE, bl_angle, None, 5, 120, 120, None, self.logger)
-        send_number(self.serial_port, back_right)
-        send_number(self.serial_port, front_right)
-        send_number(self.serial_port, front_left)
-        send_number(self.serial_port, back_left)
-        send_number(self.serial_port, br_swerve)
-        send_number(self.serial_port, fr_swerve)
-        send_number(self.serial_port, fl_swerve)
-        send_number(self.serial_port, bl_swerve)
+    #     send_number(self.serial_port, back_right)
+    #     send_number(self.serial_port, front_right)
+    #     send_number(self.serial_port, front_left)
+    #     send_number(self.serial_port, back_left)
+    #     send_number(self.serial_port, br_swerve)
+    #     send_number(self.serial_port, fr_swerve)
+    #     send_number(self.serial_port, fl_swerve)
+    #     send_number(self.serial_port, bl_swerve)
 
 
     def r2TriggerConverter(self, val):
@@ -273,26 +295,32 @@ class CmdVelSubscriber(Node):
             vel = scale_value(trigger_val, L2_MIN, L2, 0, self.MOTOR_MAX_SPEED)
             self.velocity = -vel
             # self.logger.info(f'R2: {r2val}')
+            
         if trigger_val == L1 and button_val == TRIANGLE: 
             self.current_speed = 0
             self.current_speed_angular = 0
+
+            logger = self.get_logger()
+
             back_right_stop = byte_command_converter(DRIVES, BACK_RIGHT, None, None, None, None, None, None, self.logger)
             front_right_stop = byte_command_converter(DRIVES, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
             front_left_stop = byte_command_converter(DRIVES, FRONT_LEFT, None, None, None, None, None, None, self.logger)
             back_left_stop = byte_command_converter(DRIVES, BACK_LEFT, None, None, None, None, None, None, self.logger)
-            send_number(self.serial_port, back_right_stop)
-            send_number(self.serial_port, front_right_stop)
-            send_number(self.serial_port, front_left_stop)
-            send_number(self.serial_port, back_left_stop)
-        # if trigger_val == L1 and button_val == SQUARE: 
-        #     back_right_brake = byte_command_converter(BRAKE, BACK_RIGHT, None, None, None, None, None, None, self.logger)
-        #     front_right_brake = byte_command_converter(BRAKE, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
-        #     front_left_brake = byte_command_converter(BRAKE, FRONT_LEFT, None, None, None, None, None, None, self.logger)
-        #     back_left_brake = byte_command_converter(BRAKE, BACK_LEFT, None, None, None, None, None, None, self.logger)
-        #     send_number(self.serial_port, back_right_brake)
-        #     send_number(self.serial_port, front_right_brake)
-        #     send_number(self.serial_port, front_left_brake)
-        #     send_number(self.serial_port, back_left_brake)
+            # send_number(self.serial_port, back_right_stop)
+            # send_number(self.serial_port, front_right_stop)
+            # send_number(self.serial_port, front_left_stop)
+            # send_number(self.serial_port, back_left_stop)
+
+            front_left  = moteus.Controller(id=1)
+            back_left   = moteus.Controller(id=2)
+            front_right = moteus.Controller(id=3)
+            back_right  = moteus.Controller(id=4)
+
+            send_moteus_stop_sync(front_left,  motor=1, logger=logger)
+            send_moteus_stop_sync(back_left,   motor=2, logger=logger)
+            send_moteus_stop_sync(front_right, motor=3, logger=logger)
+            send_moteus_stop_sync(back_right,  motor=4, logger=logger)
+
         if trigger_val == L1 and button_val == CIRCLE: 
             self.turn_thread_lock = not self.turn_thread_lock
             if self.turn_thread_lock == False:
@@ -302,6 +330,7 @@ class CmdVelSubscriber(Node):
 
 def main(args=None):
     rclpy.init(args=args)
+    init_moteus_loop()
     cmd_vel_subscriber = CmdVelSubscriber()
     rclpy.spin(cmd_vel_subscriber)
 

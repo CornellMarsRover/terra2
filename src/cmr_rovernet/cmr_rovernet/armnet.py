@@ -10,6 +10,9 @@ from cmr_rovernet.rovernet_utils import *
 MAX_TORQUE = 0.7
 MAX_ACCEL = 5.0
 
+logger = logging.getLogger("ArmLogger")
+logger.setLevel(logging.INFO)
+
 class JSInputSubscriber(Node):
     """
     This node subscribes to the /js_input topic output by the 
@@ -38,9 +41,9 @@ class JSInputSubscriber(Node):
         self.current_speed = 0
         self.current_speed_angular = 0
         self.last_time = time.time()
-        self.port = "/dev/ttyTHS0"
+        # self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
-        self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
         self.moveit_mode = 1
         # self.serial_port = None
         self.logger = self.get_logger()
@@ -84,12 +87,12 @@ class JSInputSubscriber(Node):
 
     
     def translate_to_electrical(self, positions, velocities):
-        output_pos = [self.convert_angle_to_custom_range(positions[0], 100), 
+        output_pos = [-self.convert_angle_to_custom_range(positions[0], 100), 
                       self.convert_angle_to_custom_range(positions[1], 100), 
                       -self.convert_angle_to_custom_range(positions[2], 100), 
                       self.convert_angle_to_custom_range(positions[3], 50), 
                       self.convert_angle_to_custom_range(positions[4], 50), 
-                      -self.convert_angle_to_custom_range(positions[5], 50), 
+                      self.convert_angle_to_custom_range(positions[5], 50), 
                       ]
         # output_vels = [self.convert_radians_to_motor_rotation(velocities[0], 100), 
         #                self.convert_radians_to_motor_rotation(velocities[1], 100), 
@@ -107,35 +110,66 @@ class JSInputSubscriber(Node):
         if self.moveit_mode:
             positions, velocities = self.translate_to_electrical(msg.points[0].positions, msg.points[0].velocities)
             print(positions)
-            base = byte_command_converter(ARM, ARM_BASE, positions[0], None, MAX_TORQUE, velocities[0], MAX_ACCEL, None, self.get_logger())
-            shoulder = byte_command_converter(ARM, ARM_SHOULDER, positions[1], None, MAX_TORQUE, velocities[1], MAX_ACCEL, None, self.get_logger())
-            elbow = byte_command_converter(ARM, ARM_ELBOW, positions[2], None, MAX_TORQUE, velocities[2], MAX_ACCEL, None, self.get_logger())
-            wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, positions[3], None, MAX_TORQUE, velocities[3], MAX_ACCEL, None, self.get_logger())
-            wrist_tilt = byte_command_converter(ARM, WRIST_TILT, positions[4], None, MAX_TORQUE, velocities[4], MAX_ACCEL, None, self.get_logger())
-            wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, positions[5], None, MAX_TORQUE, velocities[5], MAX_ACCEL, None, self.get_logger())
-            send_number(self.serial_port, base)
-            send_number(self.serial_port, shoulder)
-            send_number(self.serial_port, elbow)
-            send_number(self.serial_port, wrist_rotate_1)
-            send_number(self.serial_port, wrist_tilt)
-            send_number(self.serial_port, wrist_rotate_2)
+            # base = byte_command_converter(ARM, ARM_BASE, positions[0], None, MAX_TORQUE, velocities[0], MAX_ACCEL, None, self.get_logger())
+            # shoulder = byte_command_converter(ARM, ARM_SHOULDER, positions[1], None, MAX_TORQUE, velocities[1], MAX_ACCEL, None, self.get_logger())
+            # elbow = byte_command_converter(ARM, ARM_ELBOW, positions[2], None, MAX_TORQUE, velocities[2], MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, positions[3], None, MAX_TORQUE, velocities[3], MAX_ACCEL, None, self.get_logger())
+            # wrist_tilt = byte_command_converter(ARM, WRIST_TILT, positions[4], None, MAX_TORQUE, velocities[4], MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, positions[5], None, MAX_TORQUE, velocities[5], MAX_ACCEL, None, self.get_logger())
+            # send_number(self.serial_port, base)
+            # send_number(self.serial_port, shoulder)
+            # send_number(self.serial_port, elbow)
+            # send_number(self.serial_port, wrist_rotate_1)
+            # send_number(self.serial_port, wrist_tilt)
+            # send_number(self.serial_port, wrist_rotate_2)
+
+            base = moteus.Controller(id=9)
+            shoulder = moteus.Controller(id=11)
+            elbow = moteus.Controller(id=10)
+            wrist_rotate_1 = moteus.Controller(id=12)
+            wrist_tilt = moteus.Controller(id=13)
+            wrist_rotate_2 = moteus.Controller(id=14)
+
+            send_moteus_command_sync(controller=base, motor=9, position=positions[0], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[0],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=shoulder, motor=11, position=positions[1], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[1],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=elbow, motor=10, position=positions[2], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[2],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=positions[3], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[3],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_tilt, motor=13, position=positions[4], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[4],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=positions[5], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[5],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+
+
 
     def listener_callback_mini(self, msg):  
         if not self.moveit_mode:
             max_velocity = 3
             print([msg.base_angle, msg.shoulder_angle, msg.elbow_angle, msg.first_rotate_angle, msg.tilt_angle, msg.second_rotate_angle])
-            base = byte_command_converter(ARM, ARM_BASE, msg.base_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            shoulder = byte_command_converter(ARM, ARM_SHOULDER, msg.shoulder_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            elbow = byte_command_converter(ARM, ARM_ELBOW, msg.elbow_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, msg.first_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            wrist_tilt = byte_command_converter(ARM, WRIST_TILT, msg.tilt_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, msg.second_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            send_number(self.serial_port, base)
-            send_number(self.serial_port, shoulder)
-            send_number(self.serial_port, elbow)
-            send_number(self.serial_port, wrist_rotate_1)
-            send_number(self.serial_port, wrist_tilt)
-            send_number(self.serial_port, wrist_rotate_2)
+            # base = byte_command_converter(ARM, ARM_BASE, msg.base_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # shoulder = byte_command_converter(ARM, ARM_SHOULDER, msg.shoulder_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # elbow = byte_command_converter(ARM, ARM_ELBOW, msg.elbow_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, msg.first_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # wrist_tilt = byte_command_converter(ARM, WRIST_TILT, msg.tilt_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, msg.second_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # send_number(self.serial_port, base)
+            # send_number(self.serial_port, shoulder)
+            # send_number(self.serial_port, elbow)
+            # send_number(self.serial_port, wrist_rotate_1)
+            # send_number(self.serial_port, wrist_tilt)
+            # send_number(self.serial_port, wrist_rotate_2)
+
+            base = moteus.Controller(id=9)
+            shoulder = moteus.Controller(id=11)
+            elbow = moteus.Controller(id=10)
+            wrist_rotate_1 = moteus.Controller(id=12)
+            wrist_tilt = moteus.Controller(id=13)
+            wrist_rotate_2 = moteus.Controller(id=14)
+
+            send_moteus_command_sync(controller=base, motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=shoulder, motor=11, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=elbow, motor=10, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_tilt, motor=13, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+
 
 
     def listener_button_callback(self, msg):
@@ -161,6 +195,7 @@ class JSInputSubscriber(Node):
 
 def main(args=None):
     rclpy.init(args=args)
+    init_moteus_loop()
     cmd_vel_subscriber = JSInputSubscriber()
     rclpy.spin(cmd_vel_subscriber)
 

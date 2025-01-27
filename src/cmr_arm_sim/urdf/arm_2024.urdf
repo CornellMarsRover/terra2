@@ -9,7 +9,7 @@
     <inertia ixx="0.0002408366428192344" iyy="0.0001965672947454995" izz="0.0002424930780899016" ixy="-7.00575013293154e-16" iyz="7.933863408177614e-06" ixz="-6.01067807617016e-17"/>
   </inertial>
   <visual>
-    <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+    <origin xyz="0 0 2" rpy="1.57079632679 0 0"/>
     <geometry>
       <mesh filename="package://cmr_arm_sim/meshes/base_link.stl" scale="0.1 0.1 0.1"/>
     </geometry>
@@ -233,7 +233,7 @@
   <origin xyz="-.385 0 -.42" rpy="0 0 0"/>
   <parent link="wrist_twist_rotate"/>
   <child link="end_effector"/>
-  <axis xyz="1 0 0"/>
+  <axis xyz="0 1 0"/>
 </joint>
 <transmission name="wrist_rotate_two_transmission">
   <type>transmission_interface/SimpleTransmission</type>

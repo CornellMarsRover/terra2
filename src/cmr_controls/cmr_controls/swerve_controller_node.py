@@ -1,6 +1,9 @@
 import rclpy
 from rclpy.node import Node
+
 from geometry_msgs.msg import Twist
+from cmr_msgs.msg import AutonomyDrive
+
 import asyncio
 import math
 import moteus
@@ -43,6 +46,20 @@ class SwerveControllerNode(Node):
             self.cmd_vel_callback,
             10)
         
+        # Autonomy drive command subscriptions
+        self.subscription = self.create_subscription(
+            Twist,
+            '/autonomy/move/point_turn',
+            self.cmd_vel_callback,
+            10
+        )
+        self.subscription = self.create_subscription(
+            AutonomyDrive,
+            '/autonomy/move/ackerman',
+            self.ackerman_callback,
+            10
+        )
+        
         self.transport = None
         self.servos = None
 
@@ -62,7 +79,18 @@ class SwerveControllerNode(Node):
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(Vx, Vy, omega, self.L, self.W)
         self.set_drive(ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4)
 
-
+    def ackerman_callback(self, msg):
+        '''
+        Ackerman drive command that sets wheel positions directly
+        Values are reversed so the rover drives backwards
+        '''
+        s = -1.0 * msg.vel
+        wa3 = (msg.fl_angle / 360) * 100
+        wa4 = (msg.fr_angle / 360) * 100
+        wa2 = 0.0
+        wa1 = 0.0
+        self.set_drive(s, s, s, s, wa1, wa2, wa3, wa4)
+        
     #Script to calculate swerve speed and angles
     def wheelAnglesAndSpeeds(self, Vx, Vy, omega, L, W):
         """calculates the wheel angles and speeds for a swerve module

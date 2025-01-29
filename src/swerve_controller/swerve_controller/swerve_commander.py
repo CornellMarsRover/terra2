@@ -127,10 +127,7 @@ class SwerveCommander(Node):
         """
         vx: float = 0.0
         vy: float = 0.0
-        theta_z: float = msg.angular.z
-        wz = 0.06
-        if theta_z < 0:
-            wz = -0.06
+        wz: float = msg.angular.z
 
         # iterate over wheels
         # * calculate linear velocity components in cartesian plane

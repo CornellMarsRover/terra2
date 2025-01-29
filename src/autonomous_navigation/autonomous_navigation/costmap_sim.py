@@ -54,14 +54,19 @@ class CostmapNode(Node):
         self.obstacles_global = set()
 
         # Maximum cost for occupied cells in the costmap
-        self.max_cost = 10
+        self.max_cost = 100
 
         # Ground detection thresholds
-        self.height_threshold = 0.2
-        self.gradient_threshold = 0.2
-        self.expected_height = -1.0
+        self.obstacle_threshold = 0.2
+        self.ground_threshold = -0.3
+        # Mounting height of camera
+        self.camera_height = 1.0
+        if self.real:
+            self.camera_height = 1.6
+
+        self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0
-        self.max_depth = 10.0
+        self.max_depth = 15.0
         self.min_depth = 0.3
         self.cell_size = 0.25
         self.k = 4
@@ -78,6 +83,8 @@ class CostmapNode(Node):
             [np.sin(-1.0 * self.yaw),  np.cos(-1.0 * self.yaw)]
         ])
 
+        # Timer to decay cell costs
+        #self.decay_timer = self.create_timer(1.0, self.decay_cost)
 
     def synchronized_callback(self, pointcloud_msg, pose_msg):
         """
@@ -98,7 +105,6 @@ class CostmapNode(Node):
         self.grid_init = True
         curr_obstacles = set()
         curr_free_space = set()
-
         R = np.array([
             [np.cos(-1.0 * pose[2]), -np.sin(-1.0 * pose[2])],
             [np.sin(-1.0 * pose[2]),  np.cos(-1.0 * pose[2])]
@@ -116,10 +122,13 @@ class CostmapNode(Node):
         the left (west), same as global coordinates in gazebo. Returns True if 
         new obstacle detected, False if not
         '''
-        height = -1.0 * pt[1]
+        # Y points downwards in camera coordinate frame
+        height = self.camera_height - pt[1]
         x, y = pt[2], pt[0]
-        if x > self.max_depth - 0.5 or x < self.min_depth:
+        #self.get_logger().info(f"x:  {x}  y:  {y}  height: {height}")
+        if x > self.max_depth or x < self.min_depth:
             return
+        
         rotated_pt = R.dot(np.array([x, y]))
         x_rot = rotated_pt[0] + pose[0]
         y_rot = (-1.0 * rotated_pt[1]) + pose[1]
@@ -134,12 +143,13 @@ class CostmapNode(Node):
         if (x_new, y_new) not in self.grid_dict:
             self.grid_dict[(x_new, y_new)] = 0
         # Store traversable cells to decay
-        if (self.expected_height - self.height_threshold < height < self.expected_height + self.height_threshold) or height > self.clearance_height:
+        if (self.ground_threshold < height < self.obstacle_threshold) or height > self.clearance_height:
             curr_free_space.add((x_new, y_new))
             return
         # increment cell cost if height seems to represent obstacle
         else:
             self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+1)
+            #self.grid_dict[(x_new, y_new)] = max(height, self.grid_dict[(x_new, y_new)])
             if (x_new, y_new) not in curr_obstacles:
                 curr_obstacles.add((x_new, y_new))
         return
@@ -161,10 +171,10 @@ class CostmapNode(Node):
         Linearly decay cost of grid cells if an 
         obstacle not actively detected in that region
         """
+
         for (x, y) in self.grid_dict.keys():
-            if (x, y) not in curr_free_space or (x, y) in curr_obstacles:
-                continue
-            self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
+            if (x, y) in curr_free_space and (x, y) not in curr_obstacles:
+                self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
     
     def update_last_movement(self, msg):
         """

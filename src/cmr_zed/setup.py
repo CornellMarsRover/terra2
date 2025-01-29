@@ -22,7 +22,8 @@ setup(
     entry_points={
         'console_scripts': [
             # PHOBOS_APPEND
-            'zed_publisher_node = cmr_zed.zed_camera_publisher:main'
+            'zed_publisher_node = cmr_zed.zed_camera_publisher:main',
+            'zed_pointcloud = cmr_zed.zed_pointcloud_publisher:main',
         ],
     },
 )

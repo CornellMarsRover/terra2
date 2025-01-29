@@ -11,7 +11,7 @@ to reach the waypoints.
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TwistStamped
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, String
 import time
 import math
 from ament_index_python.packages import get_package_share_directory
@@ -39,6 +39,7 @@ class ControllerNode(Node):
             self.update_waypoint,
             10
         )
+
         # Store current robot position
         self.robot_position = (0.0, 0.0)
         self.yaw = 0.0
@@ -46,6 +47,7 @@ class ControllerNode(Node):
         # Drive command publishers
         self.ackerman_publisher = self.create_publisher(AutonomyDrive, '/autonomy/move/ackerman', 10)
         self.point_turn_publisher = self.create_publisher(Twist, '/autonomy/move/point_turn', 10)
+        self.movement_id_publisher = self.create_publisher(String, '/autonomy/move/move_type', 10)
         self.point_turn_velocity = 0.06
         self.ackerman_velocity = 0.05
 
@@ -80,6 +82,16 @@ class ControllerNode(Node):
         else:
             self.publish_ackerman(self.ackerman_velocity, angle_error)
             self.last_movement = 'ackerman'
+            
+        self.publish_movement(self.last_movement)
+
+    def publish_movement(self, movement):
+        """
+        Publishes id of last movement
+        """
+        msg = String()
+        msg.data = movement
+        self.movement_id_publisher.publish(msg)
 
     def publish_point_turn(self, point_turn_velocity):
         """

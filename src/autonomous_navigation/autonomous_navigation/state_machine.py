@@ -37,7 +37,7 @@ class StateMachineNode(Node):
         if self.real:
             waypoints_file = 'config/waypoints_real.yaml'
         else:
-            waypoints_file = 'config/waypoints.yaml'
+            waypoints_file = 'config/sim_waypoints_condensed.yaml'
 
         # Load waypoints
         # NOTE first coordinate is precise starting point

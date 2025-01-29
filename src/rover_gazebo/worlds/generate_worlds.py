@@ -46,10 +46,10 @@ def generate_world_file(file_index):
     # Cylinder positions
     cylinder_positions = [
         (10, 0),
-        (200, 100),
-        (500, 50),
-        (1000, -300),
-        (1500, -400)
+        (20, 20),
+        (40, -10),
+        (60, 0),
+        (80, 10)
     ]
 
     rock_models = ""
@@ -92,7 +92,7 @@ def generate_world_file(file_index):
     base_content += "  </world>\n</sdf>"
 
     # Write the content to a file
-    filename = os.path.join(output_dir, f"randworld{file_index}.world")
+    filename = os.path.join(output_dir, f"randworld_condensed{file_index}.world")
     with open(filename, "w") as f:
         f.write(base_content)
 

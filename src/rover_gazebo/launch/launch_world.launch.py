@@ -29,7 +29,7 @@ def generate_launch_description():
     worlds_dir = os.path.join(package, 'worlds')
 
     # Pattern to match random world files
-    randworld_pattern = os.path.join(worlds_dir, 'randworld*.world')
+    randworld_pattern = os.path.join(worlds_dir, 'randworld_condensed*.world')
 
     # Use glob to find all matching world files
     randworld_files = glob.glob(randworld_pattern)

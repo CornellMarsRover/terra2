@@ -18,6 +18,10 @@ class LocalizationSim(Node):
     def __init__(self):
         super().__init__('localization_sim')
 
+        # Check if 'use_sim_time' is already set
+        use_sim_time = self.get_parameter_or('use_sim_time', True).value
+        self.get_logger().info(f"Simulation time enabled: {use_sim_time}")
+
         # State for the Kalman filter: [north_position, west_position, north_velocity, west_velocity]
         self.state = np.zeros(4)  # Initial state: [n, w, vn, vw]
         self.P = np.eye(4) * 0.1  # State covariance matrix
@@ -107,6 +111,8 @@ class LocalizationSim(Node):
         current_time = self.get_clock().now()
         dt = (current_time - self.last_imu_time).nanoseconds * 1e-9  # Convert to seconds
         self.last_imu_time = current_time
+        if dt == 0:
+            return
 
         # Update angular velocity
         omega_z = (self.yaw - last_yaw)/dt

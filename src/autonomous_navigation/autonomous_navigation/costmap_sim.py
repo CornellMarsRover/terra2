@@ -101,7 +101,7 @@ class CostmapNode(Node):
         """
         if self.last_movement == "point_turn":
             return
-        self.get_logger().info("Synchronized callback")
+        #self.get_logger().info("Synchronized callback")
         pose = self.update_pose(pose_msg)
         self.pointcloud_callback(pointcloud_msg, pose)
 

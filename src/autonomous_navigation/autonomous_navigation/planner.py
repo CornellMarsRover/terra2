@@ -91,7 +91,7 @@ class PlannerNode(Node):
         self.path_check_timer = self.create_timer(0.5, self.validate_path)
 
         self.costs = dict()
-
+        self.use_stanley = False  # We'll set this dynamically
         # Timer to redraw visualization
         if self.visualize:
             self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
@@ -134,13 +134,50 @@ class PlannerNode(Node):
 
     def publish_waypoint(self):
         """
-        Publish next waypoint in path
+        Publish next waypoint in path with an added flag for using Stanley.
         """
         if self.next_waypoint is None:
             return
+        
+        # Decide whether this portion of the path is "dense" based on distance 
+        # between consecutive waypoints or the total number of waypoints 
+        # clustered in a small area.  Customize as desired.
+        self.use_stanley = self.is_path_segment_dense()
+
         waypoint_msg = Float32MultiArray()
-        waypoint_msg.data = [float(self.next_waypoint[0]), float(self.next_waypoint[1])]
+
+        # Add third element: 1.0 if we want to use Stanley, else 0.0
+        use_stanley_flag = 1.0 if self.use_stanley else 0.0
+        waypoint_msg.data = [
+            float(self.next_waypoint[0]),
+            float(self.next_waypoint[1]),
+            use_stanley_flag
+        ]
         self.next_waypoint_publisher.publish(waypoint_msg)
+
+    def is_path_segment_dense(self):
+        """
+        Returns True if the path around the current waypoint is "dense."
+        Simple heuristic example: if at least 3 consecutive waypoints 
+        are within 1.0m of each other. Adjust to your liking.
+        """
+        path_list = list(self.current_path)
+
+        if len(path_list) < 3:
+            return False
+
+        # Look at next 3 (or more) consecutive waypoints
+        # If they are all within e.g. 1.0 meter, call it dense.
+        distance_threshold = 1.0
+        for i in range(len(path_list) - 2):
+            p1 = path_list[i]
+            p2 = path_list[i + 1]
+            p3 = path_list[i + 2]
+            d12 = math.dist(p1, p2)
+            d23 = math.dist(p2, p3)
+            if d12 < distance_threshold and d23 < distance_threshold:
+                return True
+        return False
 
     def previous_target_callback(self, msg):
         """
@@ -177,7 +214,7 @@ class PlannerNode(Node):
             distance = math.sqrt(dx**2 + dy**2)
             #self.get_logger().info(f"Distance to path waypoint: {distance}")
             if distance < self.waypoint_threshold:
-                self.get_logger().info("Reached next path waypoint")
+                #self.get_logger().info("Reached next path waypoint")
                 self.previous_points.append(self.current_path.popleft())
                 if len(self.current_path) == 0:
                     self.next_waypoint = None

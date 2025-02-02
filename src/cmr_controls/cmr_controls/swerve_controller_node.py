@@ -50,7 +50,7 @@ class SwerveControllerNode(Node):
         self.subscription = self.create_subscription(
             Twist,
             '/autonomy/move/point_turn',
-            self.cmd_vel_callback,
+            self.point_turn_callback,
             10
         )
         self.subscription = self.create_subscription(
@@ -59,6 +59,13 @@ class SwerveControllerNode(Node):
             self.ackerman_callback,
             10
         )
+
+        self.pt_turn_constants = {
+            'wa1': (-62.85)/3.6,
+            'wa2': (62.85)/3.6,
+            'wa3': (-62.85)/3.6,
+            'wa4': (62.85)/3.6
+        }
         
         self.transport = None
         self.servos = None
@@ -79,17 +86,26 @@ class SwerveControllerNode(Node):
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(Vx, Vy, omega, self.L, self.W)
         self.set_drive(ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4)
 
+    def point_turn_callback(self, msg):
+        v = msg.angular.z
+        
+        self.set_drive(v,v,v,v,
+                       self.pt_turn_constants['wa1'],
+                       self.pt_turn_constants['wa2'],
+                       self.pt_turn_constants['wa3'],
+                       self.pt_turn_constants['wa4'])
+
     def ackerman_callback(self, msg):
         '''
         Ackerman drive command that sets wheel positions directly
         Values are reversed so the rover drives backwards
         '''
         s = -1.0 * msg.vel
-        wa3 = (msg.fl_angle / 360) * 100
-        wa4 = (msg.fr_angle / 360) * 100
+        wa3 = -1.0 * (msg.fl_angle / 360) * 100
+        wa4 = -1.0 * (msg.fr_angle / 360) * 100
         wa2 = 0.0
         wa1 = 0.0
-        self.set_drive(s, s, s, s, wa1, wa2, wa3, wa4)
+        self.set_drive(-1 * s, s, s, -1 *  s, wa1, wa2, wa3, wa4)
         
     #Script to calculate swerve speed and angles
     def wheelAnglesAndSpeeds(self, Vx, Vy, omega, L, W):
@@ -126,6 +142,7 @@ class SwerveControllerNode(Node):
         wa3 = math.atan2(A,D) * 180 / math.pi
         wa4 = math.atan2(A,C) * 180 / math.pi
 
+        
         #normalize wheel speeds
         max = ws1
         if(ws2 > max): max = ws2
@@ -136,13 +153,15 @@ class SwerveControllerNode(Node):
         ws1 = round(ws1, 3) 
         ws2 = round(ws2, 3) 
         ws3 = round(ws3, 3)
-        ws4 = round(ws4, 3) 
+        ws4 = round(ws4, 3)
         
         wa1 = (round(wa1, 3)) / 360 * 100
         wa2 = (round(wa2, 3)) / 360 * 100
         wa3 = (round(wa3, 3)) / 360 * 100
         wa4 = (round(wa4, 3)) / 360 * 100
-        
+        k=3.6
+        self.get_logger().info(f"FL: {wa2*k} FR: {wa1*k}\nBL: {wa3*k} BR: {wa4*k}")
+
         return -1 * ws1, ws2, ws3, -1 * ws4, wa1, wa2, wa3, wa4
     
 

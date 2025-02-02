@@ -13,18 +13,27 @@ from cv_bridge import CvBridge
 
 import numpy as np
 import math
+from shapely.geometry import Point, Polygon
 
 
 class CostmapNode(Node):
     def __init__(self):
         super().__init__('costmap_node')
 
-        self.declare_parameter('real', False) # FALSE IF RUNNING IN SIMULATION
-        self.real = self.get_parameter('real').get_parameter_value().bool_value 
+        self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
+        self.real = self.get_parameter('real').get_parameter_value().bool_value
 
         # Create synchronized subscribers
         self.pointcloud_sub = Subscriber(self, PointCloud2, '/camera/points')
         self.pose_sub = Subscriber(self, TwistStamped, '/autonomy/pose/robot/global')
+
+        if self.real:
+            self.ground_plane_sub = self.create_subscription(
+                Float32MultiArray,
+                '/camera/ground_plane',
+                self.ground_plane_callback,
+                10
+            )
 
         # Synchronizer with a time tolerance (slop) of 0.1 seconds
         self.sync = ApproximateTimeSynchronizer(
@@ -62,7 +71,7 @@ class CostmapNode(Node):
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
-            self.camera_height = 1.6
+            self.camera_height = 1.45
 
         self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0
@@ -153,7 +162,23 @@ class CostmapNode(Node):
             if (x_new, y_new) not in curr_obstacles:
                 curr_obstacles.add((x_new, y_new))
         return
-    
+
+    def ground_plane_callback(self, msg):
+        """
+        Update costmap from vertices surrounding ground plane from ZED camera.
+        """
+        if self.last_movement == "point_turn":
+            return
+        #self.get_logger().info(f"{self.grid_dict}")
+        points = [(msg.data[i], msg.data[i+1]) for i in range(0, len(msg.data), 2)]
+        ground_polygon = Polygon(points)
+        
+        # Iterate over grid cells and set cost to 0 if inside the ground polygon
+        for (x, y) in list(self.grid_dict.keys()):
+            if ground_polygon.contains(Point(x, y)):
+                self.grid_dict[(x, y)] = 0
+
+
     def publish_obstacles(self):
         """
         Publish newly detected obstacles from point cloud

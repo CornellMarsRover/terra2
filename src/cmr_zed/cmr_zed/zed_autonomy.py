@@ -9,7 +9,7 @@ import math
 
 from sensor_msgs.msg import PointCloud2, PointField, NavSatFix
 from geometry_msgs.msg import TwistStamped, TransformStamped
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Float32MultiArray, MultiArrayDimension
 from tf_transformations import euler_from_quaternion
 import tf2_ros
 
@@ -20,8 +20,10 @@ class ZedAutonomy(Node):
 
         # Publishers
         self.pointcloud_publisher = self.create_publisher(PointCloud2, '/camera/points', 10)
-        # NOTE: For now just publish zed pose to the localization topic
-        self.pose_publisher = self.create_publisher(TwistStamped, '/zed/pose', 10)
+        self.ground_publisher = self.create_publisher(Float32MultiArray, '/camera/ground_plane', 10)
+        # NOTE: swapped pose pub topic to just the general autonomy pose topic for now
+        self.pose_publisher = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
+        self.velocity_publisher = self.create_publisher(TwistStamped, '/autonomy/velocity', 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
         # Initialize and open the ZED camera
@@ -37,23 +39,49 @@ class ZedAutonomy(Node):
 
         # Enable positional tracking
         tracking_params = sl.PositionalTrackingParameters()
-        tracking_params.mode = sl.POSITIONAL_TRACKING_MODE.GEN_1
+        tracking_params.mode = sl.POSITIONAL_TRACKING_MODE.GEN_2
+        tracking_params.enable_pose_smoothing = True
         status = self.zed.enable_positional_tracking(tracking_params)
         if status != sl.ERROR_CODE.SUCCESS:
             self.get_logger().error(f'Failed to enable positional tracking: {status}')
             self.zed.close()
             raise RuntimeError("Positional tracking initialization failed.")
         
-        # Timer for publishing data (10 Hz)
-        self.timer_ = self.create_timer(0.1, self.publish_data)
+        # Resolution for retrieving the point cloud
+        self.res = sl.Resolution(width=720, height=404)
+        self.point_cloud = sl.Mat(self.res.width, self.res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
+        self.current_pose = sl.Pose()
+        self.current_xy = [0.0, 0.0]
+        self.current_yaw = 0.0 # Current camera yaw for ground plane rotation
+        self.ground_plane = sl.Plane()  # detected ground plane
+
+        # Timers for publishing data (10 Hz)
+        self.pointcloud_timer = self.create_timer(0.1, self.publish_pointcloud)
+        self.pose_timer = self.create_timer(0.1, self.publish_pose_data)
         self.get_logger().info('ZedAutonomy node has been started.')
 
 
-    def publish_data(self):
+    def publish_pose_data(self):
         """Publishes the point cloud, pose, and transform."""
-        #self.publish_pointcloud()
         self.publish_pose()
         self.publish_transform()
+
+    def publish_ground_plane(self):
+        """Publishes the current ground plane detection"""
+        #reset_tracking_floor_frame = sl.Transform()
+        rotation_vec = self.current_pose.pose_data().get_rotation_matrix().get_rotation_vector()
+        plane_transform = sl.Transform()
+        plane_transform.init_transform(self.current_pose.pose_data())
+        plane_transform.set_rotation_vector(rotation_vec[0], 0, rotation_vec[2])
+        #self.get_logger().info(f"rotation vector: {self.current_pose.pose_data().get_rotation_matrix().get_rotation_vector()}")
+        self.get_logger().info(f"translation vector: {plane_transform.get_translation().get()}")
+        #find_plane_status = self.zed.find_floor_plane(self.ground_plane, reset_tracking_floor_frame)
+        find_plane_status = self.zed.find_floor_plane(self.ground_plane, plane_transform)
+        if find_plane_status == sl.ERROR_CODE.SUCCESS:
+            pts = self.ground_plane_to_msg(self.ground_plane.get_bounds())
+            ground_plane_msg = Float32MultiArray()
+            ground_plane_msg.data = pts
+            self.ground_publisher.publish(ground_plane_msg)
 
     def publish_pointcloud(self):
         """Captures the point cloud and publishes it."""
@@ -61,18 +89,18 @@ class ZedAutonomy(Node):
             self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, self.res)
             pc2_msg = self.convert_sl_mat_to_pointcloud2(self.point_cloud)
             self.pointcloud_publisher.publish(pc2_msg)
+            self.publish_ground_plane()
 
     def publish_pose(self):
         """Publishes the camera's relative pose as a TwistStamped message."""
-        current_pose = sl.Pose()
-        if self.zed.get_position(current_pose, sl.REFERENCE_FRAME.WORLD) == sl.POSITIONAL_TRACKING_STATE.OK:
+        if self.zed.get_position(self.current_pose, sl.REFERENCE_FRAME.WORLD) == sl.POSITIONAL_TRACKING_STATE.OK:
 
             # Extract translation
-            translation = current_pose.get_translation(sl.Translation())
+            translation = self.current_pose.get_translation(sl.Translation())
             translation = translation.get()
 
             # Extract rotation
-            rotation = current_pose.get_rotation_vector()
+            rotation = self.current_pose.get_rotation_vector()
             #self.get_logger().info(f"Translation: {translation}")
             #self.get_logger().info(f"Rotation: {rotation}")
 
@@ -83,11 +111,14 @@ class ZedAutonomy(Node):
             pose_msg.header.frame_id = "map"  # World frame
 
             # Translations
-            pose_msg.twist.linear.x = translation[2]
-            pose_msg.twist.linear.y = -1.0 * translation[0]
+            self.current_xy = (translation[2], -1.0 * translation[0])
+            pose_msg.twist.linear.x = self.current_xy[0]
+            pose_msg.twist.linear.y = self.current_xy[1]
 
             # Rotations
-            pose_msg.twist.angular.z = -1.0 * rotation[1]
+            self.current_yaw = -1.0 * rotation[1]
+            pose_msg.twist.angular.z = self.current_yaw
+            
 
             self.pose_publisher.publish(pose_msg)
 
@@ -101,10 +132,10 @@ class ZedAutonomy(Node):
         t.header.frame_id = "map"  # Parent frame
         t.child_frame_id = "zed_camera_frame"  # Camera frame
 
-        # Static translation (camera is 1.395m above the ground)
+        # Static translation (camera is z m above the ground)
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 1.6
+        t.transform.translation.z = 1.45
 
         # Quaternion rotation
         t.transform.rotation.x = 0.0
@@ -142,10 +173,29 @@ class ZedAutonomy(Node):
 
         return msg
     
+    def ground_plane_to_msg(self, ground_plane):
+        """
+        Convert ground plane np array to list of floats to publish
+        """
+        R = np.array([
+            [np.cos(self.current_yaw), -np.sin(self.current_yaw)],
+            [np.sin(self.current_yaw),  np.cos(self.current_yaw)]
+        ])
+        x_vals = ground_plane[:, 2]
+        y_vals = -ground_plane[:, 0]
+        
+        result = []
+        for x, y in zip(x_vals, y_vals):
+            rotated_pt = R.dot(np.array([x, y]))
+            rotated_pt[0] += self.current_xy[0]
+            rotated_pt[1] += self.current_xy[1]
+            result.extend(rotated_pt)
+
+        return result
+
     def destroy_node(self):
         self.zed.close()
         super().destroy_node()
-
 
 def main(args=None):
     rclpy.init(args=args)

@@ -53,7 +53,12 @@ class PlannerNode(Node):
             self.new_obstacle_callback,
             10
         )
-
+        self.ground_plane_sub = self.create_subscription(
+            Float32MultiArray,
+            '/camera/ground_plane',
+            self.ground_plane_callback,
+            10
+        )
         # Publisher for the next waypoint for waypoint following in controller node
         self.next_waypoint_publisher = self.create_publisher(Float32MultiArray, '/autonomy/path/next_waypoint', 10)
 
@@ -92,7 +97,13 @@ class PlannerNode(Node):
             self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
 
         self.get_logger().info("PlannerNode initialized and subscribed to costmap and target pose topics.")
+        self.ground_plane = []
     
+    def ground_plane_callback(self, msg):
+        self.ground_plane = []
+        for i in range(0, len(msg.data), 2):
+            self.ground_plane.append([msg.data[i]-self.robot_position[0], msg.data[i+1]-self.robot_position[1], 0])
+
     def new_obstacle_callback(self, msg):
         """
         Costmap callback
@@ -441,7 +452,16 @@ class PlannerNode(Node):
             points.append([x-self.robot_position[0], y-self.robot_position[1], 0])
             colors.append([0,255,0])
             radii.append(0.1)
-
+        if len(self.ground_plane) > 1:
+            ground_pts = []
+            for pt in self.ground_plane:
+                ground_pts.append(pt)
+            ground_pts.append(self.ground_plane[0])
+            rr.log("ground_plane", rr.LineStrips3D(
+                np.array(ground_pts),
+                radii=0.05,
+                colors=[255,255,255]
+            ))
         rr.log("path_planning_visualization", rr.Points3D(np.array(points, dtype=np.float32), colors=colors, radii=radii))
 
         # Robot orientation

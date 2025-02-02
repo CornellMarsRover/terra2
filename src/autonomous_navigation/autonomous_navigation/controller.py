@@ -23,7 +23,8 @@ class ControllerNode(Node):
     def __init__(self):
         super().__init__('controller_node')
 
-
+        self.declare_parameter('real', False) # FALSE IF RUNNING IN SIMULATION
+        self.real = self.get_parameter('real').get_parameter_value().bool_value
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -54,7 +55,7 @@ class ControllerNode(Node):
         # Store last movement for pausing before and after point turns
         self.last_movement = 'ackerman'
         self.last_command_time = self.get_clock().now().to_msg()
-        self.min_wait = 5.0 # Minimum wait between different movement commands to allow wheel repositioning
+        self.min_wait = 2.0 # Minimum wait between different movement commands to allow wheel repositioning
 
         # Next waypoint in path
         self.waypoint = None
@@ -75,9 +76,9 @@ class ControllerNode(Node):
         angle_error = math.degrees(angle_to_target - self.yaw)
         self.get_logger().info(f"Angle error to next waypoint: {angle_error}")
         if self.last_movement == 'ackerman':
-            error_threshold = 10.0
+            error_threshold = 20.0
         else:
-            error_threshold = 5.0
+            error_threshold = 10.0
         
         curr_time = self.get_clock().now().to_msg()
         dt = self.compute_time_delta(curr_time, self.last_command_time)

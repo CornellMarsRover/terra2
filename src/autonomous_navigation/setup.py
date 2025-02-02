@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/navigation.launch.py']),
         ('share/' + package_name + '/launch', ['launch/costmap.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/sim_autonomy.launch.py']),
         ('share/' + package_name + '/config', ['config/nav2_costmap_params.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_real.yaml']),

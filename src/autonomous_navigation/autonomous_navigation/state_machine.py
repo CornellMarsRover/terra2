@@ -156,7 +156,7 @@ class StateMachineNode(Node):
         dx = self.next_target[0] - self.north
         dy = self.next_target[1] - self.west
         dist = math.sqrt(dx**2 + dy**2)
-        self.get_logger().info(f"Distance to target: {dist}")
+        #self.get_logger().info(f"Distance to target: {dist}")
         return dist < self.target_threshold
 
 

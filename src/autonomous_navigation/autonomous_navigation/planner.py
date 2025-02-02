@@ -381,7 +381,7 @@ class PlannerNode(Node):
             # The first in the list is effectively the current position, so we skip to the next
             self.current_path.popleft()
 
-        self.get_logger().info(f"A* path: {self.current_path} waypoints.")
+        #self.get_logger().info(f"A* path: {self.current_path} waypoints.")
 
     def smooth_path(self):
         """
@@ -426,7 +426,7 @@ class PlannerNode(Node):
         smoothed_path.append(self.next_target)
         self.current_path = smoothed_path
         self.next_waypoint = self.current_path[0]
-        self.get_logger().info(f"Smoothed path: {list(self.current_path)}")
+        #self.get_logger().info(f"Smoothed path: {list(self.current_path)}")
 
     def plot_grid_rerun(self):
         """

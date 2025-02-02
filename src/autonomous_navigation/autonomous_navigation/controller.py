@@ -56,7 +56,8 @@ class ControllerNode(Node):
         self.last_movement = 'ackerman'
         self.last_command_time = self.get_clock().now().to_msg()
         self.min_wait = 2.0 # Minimum wait between different movement commands to allow wheel repositioning
-
+        if not self.real:
+            self.min_wait = 0.0
         # Next waypoint in path
         self.waypoint = None
 
@@ -74,7 +75,7 @@ class ControllerNode(Node):
         y = self.waypoint[1] - self.robot_position[1]
         angle_to_target = math.atan2(y, x)
         angle_error = math.degrees(angle_to_target - self.yaw)
-        self.get_logger().info(f"Angle error to next waypoint: {angle_error}")
+        #self.get_logger().info(f"Angle error to next waypoint: {angle_error}")
         if self.last_movement == 'ackerman':
             error_threshold = 20.0
         else:

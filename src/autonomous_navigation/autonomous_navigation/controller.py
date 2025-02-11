@@ -14,7 +14,7 @@ class ControllerNode(Node):
     def __init__(self):
         super().__init__('controller_node')
 
-        self.declare_parameter('real', False) # FALSE IF RUNNING IN SIMULATION
+        self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
 
         # Subscribe to the robot pose topic
@@ -94,7 +94,7 @@ class ControllerNode(Node):
             # Possibly wait for wheels to re-position
             curr_time = self.get_clock().now().to_msg()
             dt = self.compute_time_delta(curr_time, self.last_command_time)
-
+            self.get_logger().info(f"dt: {dt}")
             if self.last_movement == "ackerman" and dt < self.min_wait:
                 # Just publish a tiny turn command
                 self.publish_point_turn(0.00001)

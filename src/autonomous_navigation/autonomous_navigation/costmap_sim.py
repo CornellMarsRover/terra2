@@ -131,16 +131,25 @@ class CostmapNode(Node):
         the left (west), same as global coordinates in gazebo. Returns True if 
         new obstacle detected, False if not
         '''
-        # Y points downwards in camera coordinate frame
-        height = self.camera_height - pt[1]
-        x, y = pt[2], pt[0]
+        if self.real:
+            height = self.camera_height - pt[2]
+            x, y = pt[0], pt[1]
+        else:
+            # Y points downwards in camera coordinate frame in Gazebo
+            height = self.camera_height - pt[1]
+            x, y = pt[2], pt[0]
         #self.get_logger().info(f"x:  {x}  y:  {y}  height: {height}")
         if x > self.max_depth or x < self.min_depth:
             return
         
         rotated_pt = R.dot(np.array([x, y]))
-        x_rot = rotated_pt[0] + pose[0]
-        y_rot = (-1.0 * rotated_pt[1]) + pose[1]
+        if self.real:
+            x_rot = rotated_pt[0] + pose[0]
+            y_rot = rotated_pt[1] + pose[1]
+        else:
+            x_rot = rotated_pt[0] + pose[0]
+            y_rot = (-1.0 * rotated_pt[1]) + pose[1]
+            
         if x_rot is None or y_rot is None:
             return
         # discretize to 0.25 m

@@ -9,6 +9,7 @@ import cmr_imu.device_model as deviceModel
 from cmr_imu.jy901s_dataProcessor import JY901SDataProcessor
 from cmr_imu.protocol_485_resolver import Protocol485Resolver
 from queue import Queue
+import math
 
 data_queue = Queue()
 
@@ -26,13 +27,16 @@ class IMUPublisher(Node):
         if not data_queue.empty():
             data_list = data_queue.get()
             msg = IMUSensorData()
+            msg.header.stamp = self.get_clock().now().to_msg()
             msg.temp = data_list[0]
-            msg.accx = data_list[1]
-            msg.accy = data_list[2]
-            msg.accz = data_list[3]
-            msg.gyrox = data_list[4]
-            msg.gyroy = data_list[5]
-            msg.gyroz = data_list[6]
+            # Adjust acceleration from g's to m/s^2
+            msg.accx = data_list[1] * 9.81
+            msg.accy = data_list[2] * 9.81
+            msg.accz = data_list[3] * 9.81
+            # Adjust angular velocity from deg/s to rad/s
+            msg.gyrox = math.radians(data_list[4])
+            msg.gyroy = math.radians(data_list[5])
+            msg.gyroz = math.radians(data_list[6])
             msg.anglex = data_list[7]
             msg.angley = data_list[8]
             msg.anglez = data_list[9]

@@ -156,13 +156,13 @@ class ZedAutonomy(Node):
         # Static translation (camera is z m above the ground)
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 1.45
+        t.transform.translation.z = 1.9
 
         # Quaternion rotation
         t.transform.rotation.x = 0.0
-        t.transform.rotation.y = 0.70710678
-        t.transform.rotation.z = -0.70710678
-        t.transform.rotation.w = 0.0
+        t.transform.rotation.y = 0.0
+        t.transform.rotation.z = 0.0
+        t.transform.rotation.w = 1.0
 
         # Publish transform
         self.tf_broadcaster.sendTransform(t)

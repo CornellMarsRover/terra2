@@ -132,7 +132,9 @@ class CostmapNode(Node):
         new obstacle detected, False if not
         '''
         if self.real:
-            height = self.camera_height - pt[2]
+            # ZED coordinate system is same as Gazebo, and coord system we are using
+            # X forward, Y left, Z up
+            height = self.camera_height + pt[2]
             x, y = pt[0], pt[1]
         else:
             # Y points downwards in camera coordinate frame in Gazebo

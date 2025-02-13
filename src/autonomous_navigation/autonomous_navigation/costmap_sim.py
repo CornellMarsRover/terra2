@@ -24,8 +24,8 @@ class CostmapNode(Node):
         self.real = self.get_parameter('real').get_parameter_value().bool_value
 
         # Create synchronized subscribers
-        self.pointcloud_sub = Subscriber(self, PointCloud2, '/camera/points')
-        self.pose_sub = Subscriber(self, TwistStamped, '/autonomy/pose/robot/global')
+        '''self.pointcloud_sub = Subscriber(self, PointCloud2, '/camera/points')
+        self.pose_sub = Subscriber(self, TwistStamped, '/autonomy/pose/robot/global')'''
 
         if self.real:
             self.ground_plane_sub = self.create_subscription(
@@ -36,12 +36,25 @@ class CostmapNode(Node):
             )
 
         # Synchronizer with a time tolerance (slop) of 0.1 seconds
-        self.sync = ApproximateTimeSynchronizer(
+        '''self.sync = ApproximateTimeSynchronizer(
             [self.pointcloud_sub, self.pose_sub],
             queue_size=30,
             slop=0.1
         )
-        self.sync.registerCallback(self.synchronized_callback)
+        self.sync.registerCallback(self.synchronized_callback)'''
+        self.pc_sub = self.create_subscription(
+            PointCloud2,
+            '/camera/points',
+            self.pc_callback,
+            10
+        )
+        self.pose_sub = self.create_subscription(
+            TwistStamped,
+            '/autonomy/pose/robot/global',
+            self.update_pose,
+            10
+        )
+        
 
         # Subscriber to know last movement
         self.movement_sub = self.create_subscription(
@@ -68,14 +81,15 @@ class CostmapNode(Node):
         # Ground detection thresholds
         self.obstacle_threshold = 0.2
         self.ground_threshold = -0.3
+
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
-            self.camera_height = 1.45
+            self.camera_height = 1.3
 
         self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0
-        self.max_depth = 15.0
+        self.max_depth = 5.0
         self.min_depth = 0.3
         self.cell_size = 0.25
         self.k = 4
@@ -93,9 +107,9 @@ class CostmapNode(Node):
         ])
 
         # Timer to decay cell costs
-        #self.decay_timer = self.create_timer(1.0, self.decay_cost)
+        self.pub_timer = self.create_timer(1.0, self.publish_obstacles)
 
-    def synchronized_callback(self, pointcloud_msg, pose_msg):
+    '''def synchronized_callback(self, pointcloud_msg, pose_msg):
         """
         Callback to handle synchronized PointCloud2 and TwistStamped messages.
         """
@@ -105,7 +119,10 @@ class CostmapNode(Node):
         pose = self.update_pose(pose_msg)
         self.pointcloud_callback(pointcloud_msg, pose)
 
-        self.publish_obstacles()
+        self.publish_obstacles()'''
+
+    def pc_callback(self, msg):
+        self.pointcloud_callback(msg, [self.north, self.west, self.yaw])
 
     def pointcloud_callback(self, msg, pose):
         """
@@ -136,13 +153,16 @@ class CostmapNode(Node):
             # X forward, Y left, Z up
             height = self.camera_height + pt[2]
             x, y = pt[0], pt[1]
+            dist = math.sqrt((x**2) + (y**2))
+            if dist > self.max_depth or dist < self.min_depth:
+                return
         else:
             # Y points downwards in camera coordinate frame in Gazebo
             height = self.camera_height - pt[1]
             x, y = pt[2], pt[0]
-        #self.get_logger().info(f"x:  {x}  y:  {y}  height: {height}")
-        if x > self.max_depth or x < self.min_depth:
-            return
+            #self.get_logger().info(f"x:  {x}  y:  {y}  height: {height}")
+            if x > self.max_depth or x < self.min_depth:
+                return
         
         rotated_pt = R.dot(np.array([x, y]))
         if self.real:
@@ -151,7 +171,7 @@ class CostmapNode(Node):
         else:
             x_rot = rotated_pt[0] + pose[0]
             y_rot = (-1.0 * rotated_pt[1]) + pose[1]
-            
+        
         if x_rot is None or y_rot is None:
             return
         # discretize to 0.25 m
@@ -187,7 +207,7 @@ class CostmapNode(Node):
         # Iterate over grid cells and set cost to 0 if inside the ground polygon
         for (x, y) in list(self.grid_dict.keys()):
             if ground_polygon.contains(Point(x, y)):
-                self.grid_dict[(x, y)] = 0
+                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 2, 0)
 
 
     def publish_obstacles(self):

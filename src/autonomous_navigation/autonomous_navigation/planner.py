@@ -72,13 +72,13 @@ class PlannerNode(Node):
 
         # Store next and previous mission targets
         self.previous_target = (0.0, 0.0) # [north (meters), west (meters)]
-        self.next_target = (0.0, 0.0)
+        self.next_target = (0,0, 0.0)
         self.target_yaw = None  # radians
 
         # Cache of detected obstacles
         self.obstacles = set()
         self.max_cost = 100 # Maximum cost of a cell (defined in costmap node)
-        self.threshold = 3 # minimum cell cost to be classified as obstacle
+        self.threshold = 4 # minimum cell cost to be classified as obstacle
         self.cell_size = 0.25
         self.k = 4
         # Current path (sequence of waypoints)
@@ -86,10 +86,10 @@ class PlannerNode(Node):
         self.previous_points = deque()
         self.next_waypoint = None
         self.waypoint_threshold = 0.6
-
+        
         # Check the current path at a frequency of 2 Hz
         self.path_check_timer = self.create_timer(0.5, self.validate_path)
-
+        self.invalidation_count = 0 # counter to be tolerant to faulty path invalidations
         self.costs = dict()
         self.use_stanley = False  # We'll set this dynamically
         # Timer to redraw visualization
@@ -126,6 +126,11 @@ class PlannerNode(Node):
             return
         valid = self.check_path_segment(self.robot_position, self.next_waypoint, gap=3)
         if not valid:
+            self.invalidation_count += 1
+        else:
+            self.invalidation_count = max(0, self.invalidation_count-1)
+
+        if self.invalidation_count >= 3:
             #self.get_logger().info("Replanning path")
             self.compute_path()
             self.smooth_path()
@@ -216,6 +221,7 @@ class PlannerNode(Node):
             if distance < self.waypoint_threshold:
                 #self.get_logger().info("Reached next path waypoint")
                 self.previous_points.append(self.current_path.popleft())
+                self.invalidation_count = 0
                 if len(self.current_path) == 0:
                     self.next_waypoint = None
                 else:
@@ -275,7 +281,7 @@ class PlannerNode(Node):
 
         return True  # No obstacle found in the line segment
     
-    def compute_path(self, gap=4):
+    def compute_path(self, gap=3):
         """
         Implement an A* planning algorithm to plan a path within a 50x50m
         local region (±25.0m from the robot's current position in both x and y).
@@ -290,7 +296,7 @@ class PlannerNode(Node):
 
         # Define local search region around the robot
         half_width = 20.0
-        step_size = 0.5
+        step_size = 0.25
         min_x = start[0] - half_width
         max_x = start[0] + half_width
         min_y = start[1] - half_width

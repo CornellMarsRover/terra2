@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/navigation.launch.py']),
         ('share/' + package_name + '/launch', ['launch/costmap.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/localization_real.launch.py']),
         ('share/' + package_name + '/launch', ['launch/sim_autonomy.launch.py']),
         ('share/' + package_name + '/config', ['config/nav2_costmap_params.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
@@ -39,6 +40,7 @@ setup(
             'ekf_localization = autonomous_navigation.ekf_localization:main',
             'kalman_localization = autonomous_navigation.kalman_localization:main',
             'imu_calibration = autonomous_navigation.imu_calibration:main',
+            'ekf = autonomous_navigation.ekf_node:main',
         ],
     },
 )

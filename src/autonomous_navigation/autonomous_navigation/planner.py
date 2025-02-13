@@ -22,9 +22,6 @@ class PlannerNode(Node):
 
         self.declare_parameter('visualize', True) # Shows rerun visualization if true
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
-        if self.visualize:
-            # Initialize Rerun visualization
-            rr.init("ground_plane_grid", spawn=True)
 
         # Subscription to the next and previous target topics
         self.previous_target_subscription = self.create_subscription(
@@ -92,13 +89,67 @@ class PlannerNode(Node):
         self.invalidation_count = 0 # counter to be tolerant to faulty path invalidations
         self.costs = dict()
         self.use_stanley = False  # We'll set this dynamically
-        # Timer to redraw visualization
-        if self.visualize:
-            self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
 
         self.get_logger().info("PlannerNode initialized and subscribed to costmap and target pose topics.")
         self.ground_plane = []
-    
+
+        '''if self.visualize:
+            # Initialize Rerun visualization
+            rr.init("ground_plane_grid", spawn=True)
+        if self.visualize:
+            self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
+
+    def plot_grid_rerun(self):
+        """
+        Visualize the local state and path
+        """
+        points = []
+        colors = []
+        radii = []
+        
+        # Obstacles
+        for (x,y) in self.obstacles:
+            points.append([x-self.robot_position[0], y-self.robot_position[1], 0])
+            colors.append([255,0,0])
+            radii.append(0.1)
+
+        # Robot position
+        points.append([0, 0, 0])
+        colors.append([0, 0, 255])
+        radii.append(0.25)
+
+        # Path
+        for (x,y) in self.current_path:
+            points.append([x-self.robot_position[0], y-self.robot_position[1], 0])
+            colors.append([0,255,0])
+            radii.append(0.1)
+        if len(self.ground_plane) > 1:
+            ground_pts = []
+            for pt in self.ground_plane:
+                ground_pts.append(pt)
+            ground_pts.append(self.ground_plane[0])
+            rr.log("ground_plane", rr.LineStrips3D(
+                np.array(ground_pts),
+                radii=0.05,
+                colors=[255,255,255]
+            ))
+        rr.log("path_planning_visualization", rr.Points3D(np.array(points, dtype=np.float32), colors=colors, radii=radii))
+
+        # Robot orientation
+        reverseR = np.array([
+            [np.cos(self.yaw), -np.sin(self.yaw)],
+            [np.sin(self.yaw),  np.cos(self.yaw)]
+        ])
+        x_vec = reverseR.dot(np.array([2.0, 0]))
+        x_end = [x_vec[0], x_vec[1], 0]
+
+        # Draw the orientation
+        rr.log("robot_direction", rr.LineStrips3D(
+            np.array([[0, 0, 0], x_end]),
+            radii=0.1,
+            colors=[255,0,255]
+        ))'''
+
     def ground_plane_callback(self, msg):
         self.ground_plane = []
         for i in range(0, len(msg.data), 2):
@@ -227,7 +278,7 @@ class PlannerNode(Node):
                 else:
                     self.next_waypoint = self.current_path[0]
 
-    def check_path_segment(self, start, end, gap=2):
+    def check_path_segment(self, start, end, gap=1):
         """
         Checks if segment to next waypoint does not run through any obstacles.
 
@@ -281,12 +332,19 @@ class PlannerNode(Node):
 
         return True  # No obstacle found in the line segment
     
-    def compute_path(self, gap=3):
+    def compute_path(self, gap=2):
         """
         Implement an A* planning algorithm to plan a path within a 50x50m
         local region (±25.0m from the robot's current position in both x and y).
         The map is discretized at 0.5m steps, and each step's validity is checked
         with check_path_segment().
+
+        This version includes a *hierarchy* in the order neighbors are explored:
+          1) (1, 0)
+          2) (1, 1), (1, 1)  [as provided]
+          3) (1, 0), (-1, 0)
+          4) (1, -1), (-1, -1)
+          5) (0, 1)
         """
         if self.next_target is None:
             return
@@ -345,10 +403,13 @@ class PlannerNode(Node):
         came_from = dict()  # (i, j) -> (parent_i, parent_j)
         g_score = {start_idx: 0.0}
 
-        # 8-connected movement offsets (up, down, left, right, diagonals)
-        neighbors_8 = [
-            (1, 0), (-1, 0), (0, 1), (0, -1),  # cardinals
-            (1, 1), (1, -1), (-1, 1), (-1, -1) # diagonals
+        # Use the requested neighbor expansion hierarchy
+        neighbors_hierarchy = [
+            (1, 0),            # 1
+            (1, 1), (1, 1),    # 2
+            (1, 0), (-1, 0),   # 3
+            (1, -1), (-1, -1), # 4
+            (0, 1)             # 5
         ]
 
         def heuristic(a, b):
@@ -365,7 +426,7 @@ class PlannerNode(Node):
                 found_path = True
                 break
 
-            for dn in neighbors_8:
+            for dn in neighbors_hierarchy:
                 ni = current[0] + dn[0]
                 nj = current[1] + dn[1]
                 neighbor = (ni, nj)
@@ -391,11 +452,10 @@ class PlannerNode(Node):
                     heapq.heappush(open_set, (f_score, neighbor))
 
         if not found_path:
-            if gap > 2:
+            if gap > 1:
                 self.get_logger().info("No path found with A* in the local 50x50 region.\nReducing obstacle padding")
                 self.compute_path(gap=gap-1)
             return
-
 
         # Reconstruct path
         path_indices = []
@@ -423,8 +483,6 @@ class PlannerNode(Node):
         if len(self.current_path) > 1:
             # The first in the list is effectively the current position, so we skip to the next
             self.current_path.popleft()
-
-        #self.get_logger().info(f"A* path: {self.current_path} waypoints.")
 
     def smooth_path(self):
         """
@@ -470,57 +528,6 @@ class PlannerNode(Node):
         self.current_path = smoothed_path
         self.next_waypoint = self.current_path[0]
         #self.get_logger().info(f"Smoothed path: {list(self.current_path)}")
-
-    def plot_grid_rerun(self):
-        """
-        Visualize the local state and path
-        """
-        points = []
-        colors = []
-        radii = []
-        
-        # Obstacles
-        for (x,y) in self.obstacles:
-            points.append([x-self.robot_position[0], y-self.robot_position[1], 0])
-            colors.append([255,0,0])
-            radii.append(0.1)
-
-        # Robot position
-        points.append([0, 0, 0])
-        colors.append([0, 0, 255])
-        radii.append(0.25)
-
-        # Path
-        for (x,y) in self.current_path:
-            points.append([x-self.robot_position[0], y-self.robot_position[1], 0])
-            colors.append([0,255,0])
-            radii.append(0.1)
-        if len(self.ground_plane) > 1:
-            ground_pts = []
-            for pt in self.ground_plane:
-                ground_pts.append(pt)
-            ground_pts.append(self.ground_plane[0])
-            rr.log("ground_plane", rr.LineStrips3D(
-                np.array(ground_pts),
-                radii=0.05,
-                colors=[255,255,255]
-            ))
-        rr.log("path_planning_visualization", rr.Points3D(np.array(points, dtype=np.float32), colors=colors, radii=radii))
-
-        # Robot orientation
-        reverseR = np.array([
-            [np.cos(self.yaw), -np.sin(self.yaw)],
-            [np.sin(self.yaw),  np.cos(self.yaw)]
-        ])
-        x_vec = reverseR.dot(np.array([2.0, 0]))
-        x_end = [x_vec[0], x_vec[1], 0]
-
-        # Draw the orientation
-        rr.log("robot_direction", rr.LineStrips3D(
-            np.array([[0, 0, 0], x_end]),
-            radii=0.1,
-            colors=[255,0,255]
-        ))
 
 
 def main(args=None):

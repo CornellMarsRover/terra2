@@ -42,13 +42,13 @@ class ControllerNode(Node):
         self.yaw = 0.0
 
         # Movement parameters
-        self.point_turn_velocity = 0.062
-        self.ackerman_velocity = 0.055
+        self.point_turn_velocity = 0.1
+        self.ackerman_velocity = 0.1
 
         # Timers and state
         self.last_movement = 'ackerman'
         self.last_command_time = self.get_clock().now().to_msg()
-        self.min_wait = 2.0 if self.real else 0.0
+        self.min_wait = 2.5 if self.real else 0.0
 
         # Next waypoint in path
         self.waypoint = None

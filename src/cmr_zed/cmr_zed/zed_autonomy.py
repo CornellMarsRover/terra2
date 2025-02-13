@@ -38,7 +38,7 @@ class ZedAutonomy(Node):
 
         # Enable positional tracking
         tracking_params = sl.PositionalTrackingParameters()
-        tracking_params.mode = sl.POSITIONAL_TRACKING_MODE.GEN_2
+        tracking_params.mode = sl.POSITIONAL_TRACKING_MODE.GEN_1
         status = self.zed.enable_positional_tracking(tracking_params)
         if status != sl.ERROR_CODE.SUCCESS:
             self.get_logger().error(f'Failed to enable positional tracking: {status}')

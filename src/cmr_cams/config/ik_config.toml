@@ -1,0 +1,14 @@
+package = "cmr_arm"
+executable = "inverse_kinematics"
+name = "ik_config"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
+
+[node]
+buffer_size = 100
+
+arm_planning_group = "rover_arm"
+ee_planning_group = "end_effector"

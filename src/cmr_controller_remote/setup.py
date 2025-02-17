@@ -21,7 +21,8 @@ setup(
     entry_points={
         "console_scripts": [
             # PHOBOS_APPEND
-            'connect_node = cmr_controller_remote.connect:main'
+            'connect_node = cmr_controller_remote.connect:main',
+            'send_miniarm = cmr_controller_remote.miniarm_udp:main',
         ],
     },
 )

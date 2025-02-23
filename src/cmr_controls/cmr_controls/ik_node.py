@@ -162,19 +162,6 @@ class IKNode(Node):
         ee_pose_msg = Float32MultiArray()
         ee_pose_msg.data = [p[0], p[1], p[2], v[0], v[1], v[2]]
         self.ee_pose_publisher.publish(ee_pose_msg)
-
-    def set_target_pose_ee(self, delta_p=[0,0,0], delta_o=[0, 0, 0]):
-
-        self.current_ee_vector = np.array(self.joint_positions[-1] - self.joint_positions[-2])
-        if not self.initialized_ee_vec:
-            self.initial_ee_vector = np.array(self.joint_positions[-1] - self.joint_positions[-2])
-            self.initialized_ee_vec = True
-        dp, do = delta_p, delta_o
-        if not np.array_equal(self.initial_ee_vector, self.current_ee_vector):
-            self.get_logger().info(f"Initial EE vector: {self.initial_ee_vector}")
-            self.get_logger().info(f"Current EE vector: {self.current_ee_vector}")
-            dp, do = self.modify_deltas(np.array(delta_p),np.array(delta_o))
-        return self.set_target_pose(delta_position=dp,delta_orientation=do)
     
 
     def set_target_position_via_second_last_link(self, delta_p):
@@ -328,62 +315,6 @@ class IKNode(Node):
         o_success = self.set_target_orientation_via_second_last_link(delta_o)
         return (p_success and o_success)
 
-    def set_target_pose(self, delta_position=[0,0,0], delta_orientation=[0, 0, 0], end=None):
-        """
-        Adjusts the end-effector position and orientation by a delta, ensuring
-        joint angles do not change by more than 0.2 radians.
-
-        Parameters:
-            delta_position: A list or array [dx, dy, dz] representing the desired change in position.
-            delta_orientation: A list or array [d_roll, d_pitch, d_yaw] representing the desired change in orientation (default is [0, 0, 0]).
-
-        Returns:
-            success (bool): True if IK solution is found and within constraints, False otherwise.
-        """
-        
-        '''# Get the current end-effector pose
-        current_pose = self.robot.fkine(self.robot.q)
-
-        # Extract the current position and rotation
-        current_position = current_pose.t
-        current_orientation = current_pose.rpy(order='xyz', unit='rad')
-        self.get_logger().info(f"curr p: {current_position} curr o: {current_orientation}")'''
-
-        pos_solution = self.compute_ik(dp=delta_position,i=1000,e=end)
-        if pos_solution.success:
-            q_new = pos_solution.q
-            delta_q = np.abs(q_new - self.robot.q)
-
-            if np.all(delta_q <= 0.3):
-                solution = self.compute_ik(dp=delta_position,do=delta_orientation,i=2000,t=1e-5,q0=q_new,q_flag=True, e=end)
-                if solution.success:
-                    q_new = solution.q
-                    delta_q = np.abs(q_new - self.robot.q)
-                    if np.all(delta_q <= 0.3):
-                        self.intended_position += delta_position
-                        self.intended_orientation += delta_orientation
-
-                        q_new[-1] = self.intended_orientation[1]
-                        q_new[-2] = self.intended_orientation[1]
-                        self.robot.q = q_new
-                        self.visualize_robot()
-
-                        current_pose = self.robot.fkine(self.robot.q)
-                        orientation_error = self.intended_orientation - np.array(current_pose.rpy(order='xyz', unit='rad')) + self.o_start
-                        position_error = self.intended_position - np.array(current_pose.t) + self.p_start
-
-                        
-                        self.get_logger().info(f"Intended Position: {self.intended_position}")
-                        self.get_logger().info(f"Intended Orientation: {self.intended_orientation}")
-                        self.get_logger().info(f"Position Error: {position_error}")
-                        self.get_logger().info(f"Orientation Error: {orientation_error}")
-                        return True
-                    
-                self.get_logger().info("Orientation solution failed")
-        self.get_logger().info("Position solution failed")
-                
-        return False
-
 
     def cmd_vel_callback(self, msg):
         """
@@ -419,61 +350,6 @@ class IKNode(Node):
         joint_angles_msg.data = joint_angles_degrees.tolist()
 
         self.joint_angle_publisher.publish(joint_angles_msg)
-
-
-    def modify_deltas(self, delta_position, delta_euler_angles):
-        """
-        Modifies delta position and delta Euler angles based on the rotation between the initial and current vectors.
-
-        Parameters:
-            initial_vector (np.array): The initial vector of form [x, y, z].
-            current_vector (np.array): The current vector of form [x, y, z].
-            delta_position (np.array): Desired delta position of form [dx, dy, dz].
-            delta_euler_angles (np.array): Desired change in Euler angles [d_roll, d_pitch, d_yaw] (in radians).
-
-        Returns:
-            modified_delta_position (np.array): Modified delta position after applying the rotation.
-            modified_delta_euler_angles (np.array): Modified delta Euler angles after applying the rotation.
-        """
-        initial_vector = np.asarray(self.initial_ee_vector).reshape(3)
-        current_vector = np.asarray(self.current_ee_vector).reshape(3)
-        delta_position = np.asarray(delta_position).reshape(3)
-        delta_euler_angles = np.asarray(delta_euler_angles).reshape(3)
-
-        # Normalize the initial and current vectors
-        initial_vector = initial_vector / np.linalg.norm(initial_vector)
-        current_vector = current_vector / np.linalg.norm(current_vector)
-
-        # Compute the rotation axis and angle
-        rotation_axis = np.cross(initial_vector, current_vector)
-        rotation_angle = np.arccos(np.clip(np.dot(initial_vector, current_vector), -1.0, 1.0))
-
-        # Handle case where vectors are parallel (no rotation needed)
-        if np.linalg.norm(rotation_axis) < 1e-6:
-            rotation_matrix = np.eye(3)
-        else:
-            # Normalize the rotation axis
-            rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)
-
-            # Create a rotation matrix using scipy's Rotation class
-            rotation_matrix = R.from_rotvec(rotation_angle * rotation_axis).as_matrix()
-
-        eur = R.from_matrix(rotation_matrix).as_euler('xyz')
-        self.get_logger().info(f"Euler angle rotation of EE: {eur}")
-
-        # Apply the rotation to the delta position vector
-        modified_delta_position = np.dot(rotation_matrix, delta_position)
-
-        # Convert delta Euler angles to a rotation matrix
-        delta_rotation_matrix = R.from_euler('xyz', delta_euler_angles).as_matrix()
-
-        # Apply the rotation to the delta rotation matrix
-        modified_delta_rotation_matrix = np.dot(rotation_matrix, delta_rotation_matrix)
-
-        # Convert the modified rotation matrix back to Euler angles
-        modified_delta_euler_angles = R.from_matrix(modified_delta_rotation_matrix).as_euler('xyz')
-
-        return modified_delta_position, modified_delta_euler_angles
 
 def main(args=None):
     rclpy.init(args=args)

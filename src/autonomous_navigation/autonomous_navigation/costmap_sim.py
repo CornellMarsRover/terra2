@@ -55,7 +55,6 @@ class CostmapNode(Node):
             10
         )
         
-
         # Subscriber to know last movement
         self.movement_sub = self.create_subscription(
             String,

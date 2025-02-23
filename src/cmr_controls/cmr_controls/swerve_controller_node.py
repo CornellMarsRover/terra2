@@ -17,7 +17,7 @@ class SwerveControllerNode(Node):
 
         # Constants
         self.L = 39
-        self.W = 20
+        self.W = 39
         self.swerve_motor_ids = None
         self.drive_motor_ids = None
         self.swerves_max_torque = 5
@@ -30,10 +30,10 @@ class SwerveControllerNode(Node):
 
         self.angles = {"FRONTLEFT" : 0, "BACKLEFT" : 0, "FRONTRIGHT" : 0, "BACKRIGHT" : 0}
         self.velocities = {"FRONTLEFT" : 0, "BACKLEFT" : 0, "FRONTRIGHT" : 0, "BACKRIGHT" : 0}
-        self._id_to_wheel = {19 : "FRONTLEFT",
-                             18 : "BACKLEFT",
-                          16 : "FRONTRIGHT",
-                          17 : "BACKRIGHT",
+        self._id_to_wheel = {5 : "FRONTLEFT", #19
+                             6 : "BACKLEFT", #18
+                          7 : "FRONTRIGHT", 
+                          8 : "BACKRIGHT",
                           1 : "FRONTLEFT",
                           2 : "BACKLEFT",
                           3 : "FRONTRIGHT",
@@ -81,7 +81,7 @@ class SwerveControllerNode(Node):
         Vx = msg.linear.x
         Vy = msg.linear.y
         omega = msg.angular.z
-
+        self.get_logger().info("balls")
         # Compute wheel speeds and angles
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(Vx, Vy, omega, self.L, self.W)
         self.set_drive(ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4)
@@ -101,8 +101,8 @@ class SwerveControllerNode(Node):
         Values are reversed so the rover drives backwards
         '''
         s = -1.0 * msg.vel
-        wa3 = -1.0 * (msg.fl_angle / 360) * 100
-        wa4 = -1.0 * (msg.fr_angle / 360) * 100
+        wa3 = -1.0 * (msg.fl_angle / 360) * 50
+        wa4 = -1.0 * (msg.fr_angle / 360) * 50
         wa2 = 0.0
         wa1 = 0.0
         self.set_drive(-1 * s, s, s, -1 *  s, wa1, wa2, wa3, wa4)
@@ -150,16 +150,16 @@ class SwerveControllerNode(Node):
         if(ws4 > max): max = ws4
         if(max > 1): ws1 /= max; ws2 /= max; ws3 /= max; ws4 /= max
 
-        ws1 = round(ws1, 3) 
-        ws2 = round(ws2, 3) 
+        ws1 = round(ws1, 3)
+        ws2 = round(ws2, 3)
         ws3 = round(ws3, 3)
         ws4 = round(ws4, 3)
         
-        wa1 = (round(wa1, 3)) / 360 * 100
-        wa2 = (round(wa2, 3)) / 360 * 100
-        wa3 = (round(wa3, 3)) / 360 * 100
-        wa4 = (round(wa4, 3)) / 360 * 100
-        k=3.6
+        wa1 = (round(wa1, 3)) / 360 * 50
+        wa2 = (round(wa2, 3)) / 360 * 50
+        wa3 = (round(wa3, 3)) / 360 * 50
+        wa4 = (round(wa4, 3)) / 360 * 50
+        k=7.2
         self.get_logger().info(f"FL: {wa2*k} FR: {wa1*k}\nBL: {wa3*k} BR: {wa4*k}")
 
         return -1 * ws1, ws2, ws3, -1 * ws4, wa1, wa2, wa3, wa4
@@ -169,8 +169,11 @@ class SwerveControllerNode(Node):
         self.transport = moteus.Fdcanusb()
         # 1,  2,  3,  4  = drives: front left, back left, front right, back right
         # 16, 17, 18, 19 = swerves: front right, back right, back left, front left
-        self.servos = {
+        '''self.servos = {
             servo_id : moteus.Controller(id=servo_id, transport=self.transport) for servo_id in [1,2,3,4,16,17,18,19]
+        }'''
+        self.servos = {
+            servo_id : moteus.Controller(id=servo_id, transport=self.transport) for servo_id in [1,2,3,4,5,6,7,8]
         }
 
         # reset servo positions
@@ -183,18 +186,20 @@ class SwerveControllerNode(Node):
     async def __async_set_drive(self, ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4):
         self.swerves_max_torque = 5
         self.swerves_max_vel = 120
-        self.swerves_max_acc = 120
+        self.swerves_max_acc = 10
         self.drives_max_torque = 8
         self.drives_max_vel = 1
         self.drives_max_acc = 1
+        self.get_logger().info(f"{ws1} {ws2} {ws3} {ws4}")
 
         # Initialize Moteus transport and controllers
 
         now = time.time()
+
         commands = [
             self.servos[1].make_position(
                 position = math.nan,
-                query=True,
+                query=False,
                 velocity = ws2,
                 accel_limit=self.drives_max_acc,
                 velocity_limit=self.drives_max_vel,
@@ -202,7 +207,7 @@ class SwerveControllerNode(Node):
             ),
             self.servos[2].make_position(
                 position = math.nan,
-                query=True,
+                query=False,
                 velocity = ws3,
                 accel_limit=self.drives_max_acc,
                 velocity_limit=self.drives_max_vel,
@@ -210,7 +215,7 @@ class SwerveControllerNode(Node):
             ),
             self.servos[3].make_position(
                 position = math.nan,
-                query=True,
+                query=False,
                 velocity = ws4,
                 accel_limit=self.drives_max_acc,
                 velocity_limit=self.drives_max_vel,
@@ -218,36 +223,36 @@ class SwerveControllerNode(Node):
             ),
             self.servos[4].make_position(
                 position = math.nan,
-                query=True,
+                query=False,
                 velocity = ws1,
                 accel_limit=self.drives_max_acc,
                 velocity_limit=self.drives_max_vel,
                 maximum_torque=self.drives_max_torque
             ),
-            self.servos[16].make_position(
+            self.servos[5].make_position(
+                position = wa2,
+                query=False,
+                accel_limit=self.swerves_max_acc,
+                velocity_limit=self.swerves_max_vel,
+                maximum_torque=self.swerves_max_torque
+            ),
+            self.servos[6].make_position(
+                position = wa3,
+                query=False,
+                accel_limit=self.swerves_max_acc,
+                velocity_limit=self.swerves_max_vel,
+                maximum_torque=self.swerves_max_torque
+            ),
+            self.servos[7].make_position(
                 position = wa1,
-                query=True,
+                query=False,
                 accel_limit=self.swerves_max_acc,
                 velocity_limit=self.swerves_max_vel,
                 maximum_torque=self.swerves_max_torque 
             ),
-            self.servos[17].make_position(
+            self.servos[8].make_position(
                 position = wa4,
-                query=True,
-                accel_limit=self.swerves_max_acc,
-                velocity_limit=self.swerves_max_vel,
-                maximum_torque=self.swerves_max_torque
-            ),
-            self.servos[18].make_position(
-                position = wa3,
-                query=True,
-                accel_limit=self.swerves_max_acc,
-                velocity_limit=self.swerves_max_vel,
-                maximum_torque=self.swerves_max_torque
-            ),
-            self.servos[19].make_position(
-                position = wa2,
-                query=True,
+                query=False,
                 accel_limit=self.swerves_max_acc,
                 velocity_limit=self.swerves_max_vel,
                 maximum_torque=self.swerves_max_torque

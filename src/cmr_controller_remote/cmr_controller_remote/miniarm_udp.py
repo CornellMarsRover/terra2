@@ -4,9 +4,9 @@ import serial
 import socket
 import struct
 
-SERIAL_PORT = "/dev/ttyACM0"  # Change this to match your system
+SERIAL_PORT = "/dev/ttyACM1"  # Change this to match your system
 BAUD_RATE = 115200
-UDP_IP = "127.0.0.1"  # Localhost or target UDP address
+UDP_IP = "10.49.15.204"  # Localhost or target UDP address
 UDP_PORT = 5030
 
 class MiniArmUDPNode(Node):

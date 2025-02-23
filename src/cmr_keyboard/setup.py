@@ -30,6 +30,8 @@ setup(
             'keyboard_detection = cmr_keyboard.keyboard_detector:main',
             'computer_camera_publisher = cmr_keyboard.computer_cam_publisher_node:main',
             'keyboard_edges = cmr_keyboard.keyboard_edges:main',
+            'roi_selection = cmr_keyboard.roi_selection:main',
+            'key_selector = cmr_keyboard.key_selector:main',
         ],
     },
 )

@@ -21,6 +21,7 @@ class GPSDataSubscriber(Node):
         self.get_logger().info("GPS node initialized")
 
     def parse_nmea_sentence(self, sentence):
+        self.get_logger().info(f"{sentence}")
         if sentence.startswith('$GPGGA'):
             try:
                 msg = pynmea2.parse(sentence)
@@ -77,7 +78,7 @@ class GPSDataSubscriber(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    gps_port = '/dev/ttyUSB1'  # Replace with your GPS device port
+    gps_port = '/dev/ttyACM0'  # Replace with your GPS device port
     baud_rate = 4800  # Common baud rate for GPS
     gps_data_subscriber = GPSDataSubscriber(gps_port, baud_rate)
 

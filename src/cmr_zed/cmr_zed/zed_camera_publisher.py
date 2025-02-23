@@ -15,25 +15,35 @@ class ZEDCameraPublisher(Node):
         # Create publishers for left and right images
         self.publisher_left = self.create_publisher(Image, '/zed/image_left', 10)
         self.publisher_right = self.create_publisher(Image, '/zed/image_right', 10)
-        self.plane_publisher = self.create_publisher(Float32MultiArray, '/zed/plane/angles', 10)
+        #self.plane_publisher = self.create_publisher(Float32MultiArray, '/zed/plane/angles', 10)
+        self.plane_publisher = self.create_publisher(Float32MultiArray, '/zed/plane/equation', 10)
         self.plane_request = self.create_subscription(
             Int32MultiArray,
             '/zed/plane/pixel',
             self.plane_request_callback,
             10
         )
-        
+
+        self.coordinate_publisher = self.create_publisher(Float32MultiArray, '/zed/point/coordinate', 10)
+        self.coordinate_request = self.create_subscription(
+            Int32MultiArray,
+            '/zed/point/pixel',
+            self.point_request_callback,
+            10
+        )
+
         # Create a CvBridge object
         self.bridge = CvBridge()
 
         # Initialize ZED camera
         self.zed = sl.Camera()
         init_params = sl.InitParameters()
-        init_params.camera_resolution = sl.RESOLUTION.AUTO  # Automatic resolution
-        init_params.depth_mode = sl.DEPTH_MODE.ULTRA  # Use ULTRA depth mode
+        init_params.camera_resolution = sl.RESOLUTION.HD1080  # resolution
+        init_params.depth_mode = sl.DEPTH_MODE.NEURAL  # Use ULTRA depth mode
         # Use a right-handed Z-up coordinate system
-        init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP
-        init_params.camera_fps = 30  # Set fps to 30
+        init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
+        init_params.coordinate_units = sl.UNIT.METER
+        init_params.camera_fps = 5  # Set fps
 
         # Open the camera
         if self.zed.open(init_params) != sl.ERROR_CODE.SUCCESS:
@@ -112,15 +122,40 @@ class ZEDCameraPublisher(Node):
                 find_plane_status = self.zed.find_plane_at_hit(coord, plane, plane_parameters)
                 if find_plane_status == sl.ERROR_CODE.SUCCESS:
                     normal = plane.get_normal() # Get the normal vector of the detected plane
-                    #plane_equation = plane.get_plane_equation() # Get (a,b,c,d) where ax+by+cz=d
-                    #self.get_logger().info(f"Plane normal: {normal}")
+                    plane_equation = plane.get_plane_equation() # Get (a,b,c,d) where ax+by+cz=d
                     roll, pitch, yaw = self.compute_roll_pitch_yaw(normal)
-                    self.get_logger().info(f"ARUCO ID: {index}   Yaw: {yaw}, Pitch: {pitch}, Roll: {roll}")
-                    message_data.extend([index, yaw, pitch, roll])
+                    #message_data.extend([index, yaw, pitch, roll])
+                    message_data.append(index)
+                    message_data.extend(plane_equation)
                     
         if message_data != []:
             message.data = message_data
             self.plane_publisher.publish(message)
+
+    def point_request_callback(self,msg):
+        
+        message_data = []
+        message = Float32MultiArray()
+
+        for i in range(0, len(msg.data), 3):
+            index = float(msg.data[i]) # Aruco marker index
+            pc = sl.Mat() # Structure that stores the pointcloud
+
+            if self.zed.grab() == sl.ERROR_CODE.SUCCESS:
+                self.zed.retrieve_measure(pc, sl.MEASURE.XYZ)
+                point = pc.get_value(msg.data[i+1], msg.data[i+2])
+                if(len(point[1]) < 3):
+                    self.get_logger().info(f"{point[1]}")
+                    continue
+                x, y, z = point[1][0], point[1][1], point[1][2]
+                self.get_logger().info(f"X={x:.3f} m, Y={y:.3f} m, Z={z:.3f} m")
+                message_data.append(index)
+                message_data.extend([float(x), float(y), float(z)])
+
+        if message_data != []:
+            message.data = message_data
+            self.coordinate_publisher.publish(message)
+    
 
 
     def compute_roll_pitch_yaw(self, normal):
@@ -148,38 +183,6 @@ class ZEDCameraPublisher(Node):
 
         return math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
 
-
-
-    '''def depth_request_callback(self,msg):
-        depth = sl.Mat()
-        point_cloud = sl.Mat()
-        self.zed.retrieve_measure(depth, sl.MEASURE.DEPTH)
-        # Retrieve colored point cloud. Point cloud is aligned on the left image.
-        self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
-
-        # Get and print distance value in mm at the center of the image
-        # We measure the distance camera - object using Euclidean distance
-        x = msg.data[0]
-        y = msg.data[1]
-        dx = [1, -1, 0, 0]
-        dy = [0, 0, 1, -1]
-        for i in range(4):
-            err, point_cloud_value = point_cloud.get_value(x, y)
-            
-            if math.isfinite(point_cloud_value[2]):
-                self.get_logger().info(f"Publishing cartesian point: {point_cloud_value}")
-                coords = [point_cloud_value[0], point_cloud_value[1], point_cloud_value[2], float(msg.data[0]), float(msg.data[1])]
-                cartesian_msg = Float32MultiArray()
-                cartesian_msg.data = coords
-                self.depth_publisher.publish(cartesian_msg)
-                return
-            x += dx[i]
-            y += dy[i]
-
-        message = Float32MultiArray()
-        message.data = None
-        self.depth_publisher.publish(message)
-        self.get_logger().info("Unable to retrieve point cloud data for requested point")'''
 
     def destroy_node(self):
         # Close the ZED camera when the node is destroyed

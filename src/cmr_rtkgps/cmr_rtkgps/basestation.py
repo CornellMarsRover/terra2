@@ -15,7 +15,7 @@ class GPSBasestation(Node):
         # ------------------------
         try:
             self.ser = serial.Serial('/dev/ttyACM0', baudrate=115200, timeout=1)
-            self.ubr = UBXReader(self.ser, ubxonly=False) 
+            self.ubr = UBXReader(self.ser) 
             # ubxonly=False allows RTCM messages to be identified as well
             self.get_logger().info("Serial port /dev/ttyACM0 opened successfully.")
         except Exception as e:
@@ -35,7 +35,7 @@ class GPSBasestation(Node):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         # Adjust broadcast address/port to match your network
-        self.broadcast_address = ('10.49.15.255', 4990)
+        self.broadcast_address = ('10.49.15.204', 4990)
 
         # ------------------------
         # 4. Start reading & sending RTCM in a background thread
@@ -53,37 +53,37 @@ class GPSBasestation(Node):
         """
         # NOTE: If your device is truly on UART1, replace the USB references with UART1 equivalents.
         # We are using CFG-VALSET with transaction = "SET". You can either keep them in volatile RAM
-        # or save to flash (layer=7). For demonstration, we do layer=1 (RAM).
-        SET = "SET"
+        # or save to flash (layer=7).
+        transaction = 0 
+        layers = 1 # RAM
         cfgData = []
         
         # (A) Enable Survey-In Mode: CFG-TMODE-MODE = 1 (Survey-In)
         #     Also set minimum duration, accuracy limit, etc.
-        cfgData.append(("CFG-TMODE-MODE", 1))                # 1 = Survey-In, 2 = Fixed, 0 = Disabled
-        cfgData.append(("CFG-TMODE-SVIN_MIN_DUR", 60))       # Minimum survey in time (seconds). Adjust to suit.
-        cfgData.append(("CFG-TMODE-SVIN_ACC_LIMIT", 100000)) # Position accuracy limit (0.1 m = 100000 = 1e5 units in mm)
+        cfgData.append(("CFG_TMODE_MODE", 1))                # 1 = Survey-In, 2 = Fixed, 0 = Disabled
+        cfgData.append(("CFG_TMODE_SVIN_MIN_DUR", 60))       # Minimum survey in time (seconds). Adjust to suit.
+        cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", 50)) # Position accuracy limit mm
 
         # (B) Enable RTCM output on USB
-        cfgData.append(("CFG-USBOUTPROT-RTCM3X", 1))  # Turn on RTCM output over USB
+        cfgData.append(("CFG_USBOUTPROT_UBX", 0))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
+        cfgData.append(("CFG_USBOUTPROT_RTCM3X", 1))  # Turn on RTCM output over USB
 
         # (C) Enable the recommended RTCM messages at e.g. 1 Hz
         #     1005, 1074, 1084, 1094, 1124, 1230
-        #     Each key is: CFG-MSGOUT-RTCM_3X_TYPExxxx_USB
+        #     Each key is: CFG_MSGOUT_RTCM_3X_TYPExxxx_USB
         #     Setting the value to 1 means 1 message per navigation cycle (by default 1 Hz).
-        cfgData.append(("CFG-MSGOUT-RTCM_3X_TYPE1005_USB", 1))
-        cfgData.append(("CFG-MSGOUT-RTCM_3X_TYPE1074_USB", 1))
-        cfgData.append(("CFG-MSGOUT-RTCM_3X_TYPE1084_USB", 1))
-        cfgData.append(("CFG-MSGOUT-RTCM_3X_TYPE1094_USB", 1))
-        cfgData.append(("CFG-MSGOUT-RTCM_3X_TYPE1124_USB", 1))
-        cfgData.append(("CFG-MSGOUT-RTCM_3X_TYPE1230_USB", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1005_USB", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1074_USB", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1084_USB", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1094_USB", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1124_USB", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1230_USB", 1))
 
         # Build the UBX message. 
         # layer 1 = RAM, layer 2 = BBR, layer 4 = Flash. 7 = BBR+Flash+RAM. 
         # For demonstration, set to layer=1 (RAM) so these take effect immediately
-        msg = UBXMessage.config_set(
-            cfgData,
-            layer=2  # 2 = BBR
-        )
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
         
         # Send message to the receiver
         self.ser.write(msg.serialize())
@@ -96,15 +96,10 @@ class GPSBasestation(Node):
         """
         while rclpy.ok():
             try:
-                # read() returns a tuple (parsed_data, raw_data) by default
-                parsed_data, raw_data = self.ubr.read()
-                if parsed_data:
-                    # If it's an RTCM message, broadcast it
-                    if parsed_data.identity.startswith("RTCM"):
-                        self.sock.sendto(raw_data, self.broadcast_address)
-                        self.get_logger().debug(
-                            f"Broadcasting RTCM ({parsed_data.identity}), len={len(raw_data)} bytes."
-                        )
+                msg = self.ubr.read()
+                if msg[0]:
+                    self.sock.sendto(msg[0], self.broadcast_address)
+                    self.get_logger().info(f"Sending RTCM Correction")
             except Exception as e:
                 self.get_logger().error(f"Error reading/streaming GPS data: {e}")
 

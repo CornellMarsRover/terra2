@@ -17,7 +17,7 @@ class GPSRover(Node):
             self.ser = serial.Serial('/dev/ttyACM0', baudrate=115200, timeout=1)
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
-            self.ubr = UBXReader(self.ser, ubxonly=False)  
+            self.ubr = UBXReader(self.ser)  
             self.get_logger().info("Rover serial port /dev/ttyACM0 opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
@@ -64,27 +64,27 @@ class GPSRover(Node):
         # 3) Rover is by default in 'RTK Fix' mode if corrections are valid 
         #    (CFG-NAVHPG-DGNSSMODE=2). That is usually the default.
 
-        SET = "SET"
+        transaction = 0 
+        layers = 1 # RAM
         cfgData = []
 
         # (A) Enable RTCM input on USB
-        cfgData.append(("CFG-USBINPROT-RTCM3X", 1))   # 1 = enable
+        cfgData.append(("CFG_USBINPROT_RTCM3X", 1))   # 1 = enable
 
-        # (B) Enable UBX output on USB, so we get NAV-PVT
-        cfgData.append(("CFG-USBOUTPROT-UBX", 1))
+        # (B) Enable UBX output on USB, so we get NAV_PVT
+        cfgData.append(("CFG_USBOUTPROT_UBX", 1))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
+        cfgData.append(("CFG_USBOUTPROT_RTCM3X", 0))
 
-        # (C) Make sure we are outputting NAV-PVT at 1 Hz:
-        # CFG-MSGOUT-UBX_NAV_PVT_USB
-        cfgData.append(("CFG-MSGOUT-UBX_NAV_PVT_USB", 1))
+        # (C) Make sure we are outputting NAV_PVT at 1 Hz:
+        # CFG_MSGOUT_UBX_NAV_PVT_USB
+        cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
 
         # Build the config message
-        msg = UBXMessage.config_set(
-            cfgData,
-            layer=1  # set to RAM only for demonstration
-        )
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
         # Send
         self.ser.write(msg.serialize())
-        self.get_logger().info("Configured rover for RTCM input + UBX NAV-PVT output.")
+        self.get_logger().info("Configured rover for RTCM input + UBX NAV_PVT output.")
 
     def listen_for_corrections(self):
         """
@@ -95,35 +95,28 @@ class GPSRover(Node):
             try:
                 data, addr = self.sock.recvfrom(2048)  # Might need bigger than 1024
                 with self.lock:
-                    self.latest_correction = data
-                self.get_logger().debug(f"Received {len(data)} bytes of RTCM from {addr}")
+                    try:
+                        self.ser.write(data)
+                    except Exception as e:
+                        self.get_logger().error(f"Error writing RTCM data to GNSS: {e}")
+                self.get_logger().info("Received RTCM Correction")
             except Exception as e:
                 self.get_logger().error(f"Error receiving UDP data: {e}")
 
     def timer_callback(self):
         """
         Periodic tasks (10 Hz):
-          - If new RTCM corrections arrived, write them to the local GNSS module.
-          - Read any new UBX messages (especially NAV-PVT) and log the position.
+          - Read any new UBX messages and log the position.
         """
-        # 1) Write any newly arrived RTCM corrections
-        with self.lock:
-            if self.latest_correction:
-                try:
-                    self.ser.write(self.latest_correction)
-                    self.latest_correction = None
-                except Exception as e:
-                    self.get_logger().error(f"Error writing RTCM data to GNSS: {e}")
 
-        # 2) Read any local messages from the ZED-F9P
+        # Read any local messages from the ZED-F9P
         try:
-            (parsed_data, raw_data) = self.ubr.read()
+            (raw_data, parsed_data) = self.ubr.read()
             if parsed_data:
-                # If it is a NAV-PVT message, extract lat/lon
-                if parsed_data.identity == "NAV-PVT":
+                    #self.get_logger().info(f"{parsed_data}")
                     # lat, lon are in degrees * 1e-7
-                    lat_deg = parsed_data.lat / 1e7
-                    lon_deg = parsed_data.lon / 1e7
+                    lat_deg = parsed_data.lat
+                    lon_deg = parsed_data.lon
                     # Print or log the position
                     self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")
         except Exception as e:

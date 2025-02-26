@@ -4,7 +4,7 @@ import serial
 import socket
 import struct
 
-SERIAL_PORT = "/dev/ttyACM1"  # Change this to match your system
+SERIAL_PORT = "/dev/ttyACM0"  # Change this to match your system
 BAUD_RATE = 115200
 UDP_IP = "10.49.15.204"  # Localhost or target UDP address
 UDP_PORT = 5030
@@ -16,7 +16,7 @@ class MiniArmUDPNode(Node):
         self.udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.get_logger().info("Mini Arm Serial-to-UDP Node Started")
-        self.timer = self.create_timer(0.05, self.read_and_send)
+        self.timer = self.create_timer(0.1, self.read_and_send)
         self.offsets = [0.0, 0.0, 0.0, 12.8, 12.6, 0.0]
 
     def read_and_send(self):

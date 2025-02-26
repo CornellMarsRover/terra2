@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import String
 import serial
 import socket
 import threading
@@ -9,25 +10,32 @@ from pyubx2 import UBXReader, UBXMessage
 class GPSBasestation(Node):
     def __init__(self):
         super().__init__('gps_basestation')
-
+        self.fixed_mode = False  # Flag to indicate if fixed mode has been set
+        self.rover_ready = False # Flag to indicate if rover gps node started
+        self.ready_sub = self.create_subscription(
+            String,
+            '/rtk/rover_ready',
+            self.ready_callback,
+            10
+        )
         # ------------------------
         # 1. Open serial port
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM0', baudrate=115200, timeout=1)
-            self.ubr = UBXReader(self.ser) 
-            # ubxonly=False allows RTCM messages to be identified as well
+            self.ser = serial.Serial('/dev/ttyACM0', baudrate=38400, timeout=1)
+            # Allow all protocol messages (UBX, RTCM, NMEA) to be decoded
+            self.ubr = UBXReader(self.ser)
             self.get_logger().info("Serial port /dev/ttyACM0 opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
             return
 
         # ------------------------
-        # 2. Configure the ZED-F9P for Survey-In RTK base
-        #    a) Enable Survey-In
-        #    b) Enable RTCM output messages
+        # 2. Configure the ZED-F9P for Survey-In mode
         # ------------------------
-        self.configure_base_station()
+        accuracy = 20000
+        self.accuracy_limit = accuracy*10
+        self.survey_base_station()
 
         # ------------------------
         # 3. Set up UDP socket for broadcast
@@ -38,70 +46,116 @@ class GPSBasestation(Node):
         self.broadcast_address = ('10.49.15.204', 4990)
 
         # ------------------------
-        # 4. Start reading & sending RTCM in a background thread
+        # 4. Start reading and processing GPS messages in a background thread
         # ------------------------
         self.read_thread = threading.Thread(target=self.read_gps_loop, daemon=True)
         self.read_thread.start()
 
-        self.get_logger().info("GPS Basestation node started.")
+        self.get_logger().info("GPS Basestation node started in Survey-In mode.")
+    
+    def ready_callback(self, msg):
+        if msg.data == 'ready':
+            self.rover_ready = True
 
-    def configure_base_station(self):
+    def survey_base_station(self):
         """
-        Configure the local ZED-F9P for:
-          - Survey-In Mode
-          - Output recommended RTCM messages over USB
+        Configure the ZED-F9P for Survey-In mode:
+          - Set Survey-In mode (CFG_TMODE_MODE = 1)
+          - Set survey duration and accuracy limit
+          - Enable UBX output over USB
         """
-        # NOTE: If your device is truly on UART1, replace the USB references with UART1 equivalents.
-        # We are using CFG-VALSET with transaction = "SET". You can either keep them in volatile RAM
-        # or save to flash (layer=7).
         transaction = 0 
-        layers = 1 # RAM
+        layers = 1  # Configure in volatile RAM for immediate effect
+        clear_keys = ["CFG_UART1_BAUDRATE", "CFG_TMODE_MODE", "CFG_TMODE_POS_TYPE"]
+        msg = UBXMessage.config_del(layers, transaction, clear_keys)
+        self.ser.write(msg.serialize())
+
         cfgData = []
+        cfgData.append(("CFG_UART1_BAUDRATE", 38400)) 
         
-        # (A) Enable Survey-In Mode: CFG-TMODE-MODE = 1 (Survey-In)
-        #     Also set minimum duration, accuracy limit, etc.
-        cfgData.append(("CFG_TMODE_MODE", 1))                # 1 = Survey-In, 2 = Fixed, 0 = Disabled
-        cfgData.append(("CFG_TMODE_SVIN_MIN_DUR", 60))       # Minimum survey in time (seconds). Adjust to suit.
-        cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", 100)) # Position accuracy limit mm
 
-        # (B) Enable RTCM output on USB
-        cfgData.append(("CFG_USBOUTPROT_UBX", 0))
+        # (A) Survey-In mode settings
+        cfgData.append(("CFG_TMODE_MODE", 1))                # 1 = Survey-In
+        cfgData.append(("CFG_TMODE_SVIN_MIN_DUR", 60))         # Minimum survey duration in seconds
+        cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", self.accuracy_limit))     # Accuracy limit (1000 * 0.1 mm = 10cm)
+        #cfgData.append(("CFG_TMODE_POS_TYPE", 1))
+
+        # (B) Enable NAV-SVIN output on USB
+        cfgData.append(("CFG_USBOUTPROT_UBX", 1))
         cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
-        cfgData.append(("CFG_USBOUTPROT_RTCM3X", 1))  # Turn on RTCM output over USB
+        cfgData.append(("CFG_USBOUTPROT_RTCM3X", 0))
+        cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 1))
 
-        # (C) Enable the recommended RTCM messages at e.g. 1 Hz
-        #     1005, 1074, 1084, 1094, 1124, 1230
-        #     Each key is: CFG_MSGOUT_RTCM_3X_TYPExxxx_USB
-        #     Setting the value to 1 means 1 message per navigation cycle (by default 1 Hz).
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
+        self.ser.write(msg.serialize())
+        self.get_logger().info("Configured Survey-In mode and enabled RTCM output.")
+
+
+    def configure_fixed_mode(self, svin_msg):
+        """
+        Once survey-in conditions are met, reconfigure the module to Fixed mode using the
+        coordinates obtained from the survey.
+        """
+        transaction = 0
+        layers = 1  # Use volatile RAM for immediate effect
+        cfgData = []
+        # (A) Switch to Fixed mode
+        cfgData.append(("CFG_TMODE_MODE", 2))         # 2 = Fixed mode
+        cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 0 = ECEF
+
+        # (B) Set the base station's position using the survey results.
+        #     The survey message (NAV-SVIN) provides the ECEF coords.
+        cfgData.append(("CFG_TMODE_ECEF_X", svin_msg.meanX))
+        cfgData.append(("CFG_TMODE_ECEF_Y", svin_msg.meanY))
+        cfgData.append(("CFG_TMODE_ECEF_Z", svin_msg.meanZ))
+
+        cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 0))
+        cfgData.append(("CFG_USBOUTPROT_RTCM3X", 1))           # Enable RTCM output
+
+        # (C) Enable the recommended RTCM messages (output at 1 Hz)
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1005_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1074_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1084_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1094_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1124_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1230_USB", 1))
-
-        # Build the UBX message. 
-        # layer 1 = RAM, layer 2 = BBR, layer 4 = Flash. 7 = BBR+Flash+RAM. 
-        # For demonstration, set to layer=1 (RAM) so these take effect immediately
-        msg = UBXMessage.config_set(layers, transaction, cfgData)
         
-        # Send message to the receiver
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
-        self.get_logger().info("Sent Survey-In + RTCM output config to the ZED-F9P.")
+        self.get_logger().info(f"Configured Fixed mode with coordinates: "
+                               f"Lat: {svin_msg.lat}, Lon: {svin_msg.lon}, Height: {svin_msg.height}")
+        self.fixed_mode = True
 
     def read_gps_loop(self):
         """
-        Continuously read from the ZED-F9P, filter for RTCM messages,
-        and broadcast them over UDP for the rover.
+        Continuously read from the ZED-F9P. While in Survey-In mode, display survey info
+        and check if the accuracy criteria are met. Once fixed mode is enabled, forward RTCM
+        messages over UDP.
         """
         while rclpy.ok():
             try:
                 msg = self.ubr.read()
-                if msg[0]:
-                    self.sock.sendto(msg[0], self.broadcast_address)
-                    self.get_logger().info(f"Sending RTCM Correction")
+                self.get_logger().info(f"{msg}")
+                if msg[0] is None:
+                    continue
+                raw, parsed = msg[0], msg[1]
+                self.get_logger().info(f"{parsed}")
+                # Check for survey-in status messages (NAV-SVIN)
+                if not self.fixed_mode and parsed.identity == "NAV-SVIN":
+                    self.get_logger().info(
+                        f"Survey-In: Duration = {parsed.dur}s, Accuracy = {parsed.meanAcc * 10}mm"
+                    )
+                    # If both the survey duration and accuracy criteria are met, switch to Fixed mode.
+                    if (parsed.meanAcc <= self.accuracy_limit) and (parsed.dur >= 60):
+                        if not self.fixed_mode:
+                            self.get_logger().info("Survey complete. Switching to Fixed mode...")
+                            self.configure_fixed_mode(parsed)
+                # Once in Fixed mode, forward RTCM messages (e.g., RTCM 1005, etc.)
+                elif self.fixed_mode and self.rover_ready and parsed.identity.startswith("RTCM"):
+                    self.sock.sendto(raw, self.broadcast_address)
+                    self.get_logger().info("Broadcasting RTCM Correction")
             except Exception as e:
-                self.get_logger().error(f"Error reading/streaming GPS data: {e}")
+                self.get_logger().error(f"Error processing GPS data: {e}")
 
 def main(args=None):
     rclpy.init(args=args)

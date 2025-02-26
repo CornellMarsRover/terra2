@@ -73,6 +73,7 @@ class GPSRover(Node):
         transaction = 0 
         layers = 1 # RAM
         cfgData = []
+        cfgData.append(("CFG_UART1_BAUDRATE", 115200))
 
         # (A) Enable RTCM input on USB
         cfgData.append(("CFG_USBINPROT_RTCM3X", 1))   # 1 = enable

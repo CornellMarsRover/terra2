@@ -41,6 +41,8 @@ setup(
             'kalman_localization = autonomous_navigation.kalman_localization:main',
             'imu_calibration = autonomous_navigation.imu_calibration:main',
             'ekf = autonomous_navigation.ekf_node:main',
+            'rtk_localization = autonomous_navigation.rtk_localization:main',
+            'costmap_real = autonomous_navigation.costmap_real:main',
         ],
     },
 )

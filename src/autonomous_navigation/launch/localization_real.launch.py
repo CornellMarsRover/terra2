@@ -1,24 +1,6 @@
 import launch
 import launch_ros.actions
 
-
-'''
-        # Start localization_sim after state_machine starts
-        launch.actions.TimerAction(
-            period=5.0,
-            actions=[
-                launch_ros.actions.Node(
-                    package='autonomous_navigation',
-                    executable='ekf',
-                    name='ekf_node',
-                    output='screen',
-                    parameters=[{}]
-                ),
-            ],
-        ),
-
-'''
-
 def generate_launch_description():
     return launch.LaunchDescription([
         # Start imu node first

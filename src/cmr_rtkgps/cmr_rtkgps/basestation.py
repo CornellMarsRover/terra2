@@ -62,7 +62,7 @@ class GPSBasestation(Node):
         #     Also set minimum duration, accuracy limit, etc.
         cfgData.append(("CFG_TMODE_MODE", 1))                # 1 = Survey-In, 2 = Fixed, 0 = Disabled
         cfgData.append(("CFG_TMODE_SVIN_MIN_DUR", 60))       # Minimum survey in time (seconds). Adjust to suit.
-        cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", 50)) # Position accuracy limit mm
+        cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", 100)) # Position accuracy limit mm
 
         # (B) Enable RTCM output on USB
         cfgData.append(("CFG_USBOUTPROT_UBX", 0))

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+
+from sensor_msgs.msg import NavSatFix
+
 import serial
 import socket
 import threading
@@ -9,6 +12,9 @@ from pyubx2 import UBXReader, UBXMessage
 class GPSRover(Node):
     def __init__(self):
         super().__init__('gps_rover')
+
+        # Navsatfix data publisher
+        self.pub = self.create_publisher(NavSatFix, '/rtk/navsatfix_data', 10)
 
         # ------------------------
         # 1. Open local serial port for the rover’s ZED-F9P
@@ -113,12 +119,19 @@ class GPSRover(Node):
         try:
             (raw_data, parsed_data) = self.ubr.read()
             if parsed_data:
-                    #self.get_logger().info(f"{parsed_data}")
-                    # lat, lon are in degrees * 1e-7
-                    lat_deg = parsed_data.lat
-                    lon_deg = parsed_data.lon
-                    # Print or log the position
-                    self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")
+                #self.get_logger().info(f"{parsed_data}")
+                # lat, lon are in degrees * 1e-7
+                lat_deg = parsed_data.lat
+                lon_deg = parsed_data.lon
+                
+                msg = NavSatFix()
+                msg.latitude = lat_deg
+                msg.longitude = lon_deg
+                msg.header.stamp = self.get_clock().now().to_msg()
+
+                self.pub.publish(msg)
+                # Print or log the position
+                self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")
         except Exception as e:
             self.get_logger().error(f"Error reading local GPS data: {e}")
 

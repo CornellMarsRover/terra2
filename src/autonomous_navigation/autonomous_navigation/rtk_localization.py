@@ -46,7 +46,7 @@ class RTKLocalizationNode(Node):
         # GPS subscriber:
         self.create_subscription(
             NavSatFix,
-            '/navsatfix_data',
+            '/rtk/navsatfix_data',
             self.gps_callback,
             10
         )
@@ -103,7 +103,7 @@ class RTKLocalizationNode(Node):
         pose_msg.twist.linear.x = float(self.x)
         pose_msg.twist.linear.y = float(self.y)
         pose_msg.twist.angular.z = float(math.degrees(self.current_yaw))
-        self.pub_estimate.publish(pose_msg)
+        self.pose_estimate.publish(pose_msg)
 
     # Update yaw with IMU message
     def update_yaw(self, msg):

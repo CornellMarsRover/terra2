@@ -6,6 +6,7 @@ import serial
 import socket
 import threading
 from pyubx2 import UBXReader, UBXMessage
+import time
 
 class GPSBasestation(Node):
     def __init__(self):
@@ -22,7 +23,7 @@ class GPSBasestation(Node):
         # 1. Open serial port
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM0', baudrate=38400, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM1', baudrate=230400, timeout=1)
             # Allow all protocol messages (UBX, RTCM, NMEA) to be decoded
             self.ubr = UBXReader(self.ser)
             self.get_logger().info("Serial port /dev/ttyACM0 opened successfully.")
@@ -33,7 +34,7 @@ class GPSBasestation(Node):
         # ------------------------
         # 2. Configure the ZED-F9P for Survey-In mode
         # ------------------------
-        accuracy = 20000
+        accuracy = 2000
         self.accuracy_limit = accuracy*10
         self.survey_base_station()
 
@@ -66,19 +67,27 @@ class GPSBasestation(Node):
         """
         transaction = 0 
         layers = 1  # Configure in volatile RAM for immediate effect
-        clear_keys = ["CFG_UART1_BAUDRATE", "CFG_TMODE_MODE", "CFG_TMODE_POS_TYPE"]
+        clear_keys = ["CFG_UART1_BAUDRATE", "CFG_TMODE_MODE", "CFG_TMODE_POS_TYPE",]
         msg = UBXMessage.config_del(layers, transaction, clear_keys)
         self.ser.write(msg.serialize())
 
         cfgData = []
-        cfgData.append(("CFG_UART1_BAUDRATE", 38400)) 
-        
+        cfgData.append(("CFG_UART1_BAUDRATE", 230400))
+        #cfgData.append(("CFG_TMODE_POS_TYPE", 1))       # 1 = LLH
+        cfgData.append(("CFG_TMODE_MODE", 2))  
+        cfgData.append(("CFG_TMODE_ECEF_X", 110195027))
+        cfgData.append(("CFG_TMODE_ECEF_Y", -458347320))
+        cfgData.append(("CFG_TMODE_ECEF_Z", 428227540))
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
+        self.ser.write(msg.serialize())
 
+        time.sleep(2)
         # (A) Survey-In mode settings
         cfgData.append(("CFG_TMODE_MODE", 1))                # 1 = Survey-In
         cfgData.append(("CFG_TMODE_SVIN_MIN_DUR", 60))         # Minimum survey duration in seconds
         cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", self.accuracy_limit))     # Accuracy limit (1000 * 0.1 mm = 10cm)
-        #cfgData.append(("CFG_TMODE_POS_TYPE", 1))
+        cfgData.append(("CFG_RATE_MEAS", 200))  # 5 Hz (200 ms)
+
 
         # (B) Enable NAV-SVIN output on USB
         cfgData.append(("CFG_USBOUTPROT_UBX", 1))
@@ -123,7 +132,7 @@ class GPSBasestation(Node):
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
         self.get_logger().info(f"Configured Fixed mode with coordinates: "
-                               f"Lat: {svin_msg.lat}, Lon: {svin_msg.lon}, Height: {svin_msg.height}")
+                               f"meanX: {svin_msg.meanX}, Lon: {svin_msg.meanY}, Height: {svin_msg.meanZ}")
         self.fixed_mode = True
 
     def read_gps_loop(self):
@@ -135,15 +144,16 @@ class GPSBasestation(Node):
         while rclpy.ok():
             try:
                 msg = self.ubr.read()
-                self.get_logger().info(f"{msg}")
+                #self.get_logger().info(f"{msg}")
                 if msg[0] is None:
+                    self.survey_base_station()
                     continue
                 raw, parsed = msg[0], msg[1]
                 self.get_logger().info(f"{parsed}")
                 # Check for survey-in status messages (NAV-SVIN)
                 if not self.fixed_mode and parsed.identity == "NAV-SVIN":
                     self.get_logger().info(
-                        f"Survey-In: Duration = {parsed.dur}s, Accuracy = {parsed.meanAcc * 10}mm"
+                        f"Survey-In: Duration = {parsed.dur}s, Accuracy = {parsed.meanAcc / 1e4}m"
                     )
                     # If both the survey duration and accuracy criteria are met, switch to Fixed mode.
                     if (parsed.meanAcc <= self.accuracy_limit) and (parsed.dur >= 60):

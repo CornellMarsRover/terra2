@@ -44,14 +44,14 @@ CIRCLE = 65536 #0x010101
 TRIANGLE = 16777216 #0x01010101
 
 #SWERVE MOTORS
-FRONT_LEFT_SWERVE = 0x13
-BACK_RIGHT_SWERVE = 0x11
-FRONT_RIGHT_SWERVE = 0x10
-BACK_LEFT_SWERVE = 0x12
+FRONT_LEFT_SWERVE = 0x05
+BACK_RIGHT_SWERVE = 0x06
+FRONT_RIGHT_SWERVE = 0x07
+BACK_LEFT_SWERVE = 0x06
 
 #WHEEL BASE IN METERS
 ROVER_LENGTH = 39
-ROVER_WIDTH = 20
+ROVER_WIDTH = 39
 R = math.sqrt(ROVER_LENGTH**2 + ROVER_WIDTH**2)
 maxWheelVelocity = 12
 
@@ -287,7 +287,7 @@ def parse_toml(toml_name):
     Helper function to parse a toml file from the "config" directory given a [toml_name]
     """
     
-    folder_path = "/cmr/terra/src/cmr_rovernet/config"
+    folder_path = "/home/cmr/cmr/terra/src/cmr_rovernet/config"
     toml_file_path = path.join(folder_path, f"{toml_name}.toml")
     
     try:

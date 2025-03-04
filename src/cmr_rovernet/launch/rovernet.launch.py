@@ -22,7 +22,7 @@ def generate_launch_description():
                 executable="lifecycle_manager",
                 namespace=composition_ns,
             ),
-            *fabric_composition("/cmr/terra/src/cmr_rovernet/config"),
+            *fabric_composition("/home/cmr/cmr/terra/src/cmr_rovernet/config"),
         ]
     )
 

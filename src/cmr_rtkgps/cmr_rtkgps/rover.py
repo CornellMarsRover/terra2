@@ -7,7 +7,7 @@ from sensor_msgs.msg import NavSatFix
 import serial
 import socket
 import threading
-from pyubx2 import UBXReader, UBXMessage
+from pyubx2 import UBXReader, UBXMessage, llh2ecef
 import time
 
 class GPSRover(Node):
@@ -21,7 +21,7 @@ class GPSRover(Node):
         # 1. Open local serial port for the rover’s ZED-F9P
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM0', baudrate=115200, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM0', baudrate=230400, timeout=1)
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
@@ -35,6 +35,16 @@ class GPSRover(Node):
         #    a) Enable RTCM input over USB
         #    b) Output UBX-NAV-PVT so we can read lat/lon
         # ------------------------
+        # LLH coordinates (lat/lon in decimal, height in meters) - 'LAT', 'LON', 'ALT'
+        # ECEF coordinates (all in meters) - 'X', 'Y', 'Z' 
+        self.fix = {
+            'LLH': True,  # Boolean to indicate if using LLH or ECEF
+            'LAT': 42.444893,  # decimals
+            'LON': -76.483619,  # decimals
+            'ALT': 240.0,      # meters
+        }
+        self.north_offset = -1.7 # north offset from known start in meters
+        self.east_offset = -2.1 # east offset from known start in meters
         self.configure_rover()
 
         # ------------------------
@@ -81,17 +91,34 @@ class GPSRover(Node):
         transaction = 0 
         layers = 1 # RAM
         cfgData = []
-        cfgData.append(("CFG_UART1_BAUDRATE", 115200))
+        cfgData.append(("CFG_UART1_BAUDRATE", 230400))
+        # (A) Switch to Fixed mode
+        cfgData.append(("CFG_TMODE_MODE", 2))         # 2 = Fixed mode
+        cfgData.append(("CFG_TMODE_POS_TYPE", 1))       # 1 = ECF
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
+        self.ser.write(msg.serialize())
+        cfgData = []
 
-        # (A) Enable RTCM input on USB
+        # (B) Set initial fix position
+        lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
+        x, y, z = llh2ecef(lat, lon, h)
+        x = int((x+self.north_offset)*100)
+        y = int((y+self.east_offset)*100)
+        z = int(z*100)
+        self.get_logger().info(f"{x}  {y}   {z}")
+        cfgData.append(("CFG_TMODE_ECEF_X", x))
+        cfgData.append(("CFG_TMODE_ECEF_Y", y))
+        cfgData.append(("CFG_TMODE_ECEF_Z", z))
+
+        # (C) Enable RTCM input on USB
         cfgData.append(("CFG_USBINPROT_RTCM3X", 1))   # 1 = enable
 
-        # (B) Enable UBX output on USB, so we get NAV_PVT
+        # (D) Enable UBX output on USB, so we get NAV_PVT
         cfgData.append(("CFG_USBOUTPROT_UBX", 1))
         cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
         cfgData.append(("CFG_USBOUTPROT_RTCM3X", 0))
 
-        # (C) Make sure we are outputting NAV_PVT at 1 Hz:
+        # (E) Make sure we are outputting NAV_PVT at 1 Hz:
         # CFG_MSGOUT_UBX_NAV_PVT_USB
         cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
 
@@ -108,7 +135,7 @@ class GPSRover(Node):
         """
         while rclpy.ok():
             try:
-                data, addr = self.sock.recvfrom(2048)  # Might need bigger than 1024
+                data = self.sock.recv(2048)
                 with self.lock:
                     try:
                         self.ser.write(data)

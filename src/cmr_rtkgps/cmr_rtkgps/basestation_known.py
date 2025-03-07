@@ -31,11 +31,13 @@ class GPSBasestation(Node):
         # LLH coordinates (lat/lon in decimal, height in meters) - 'LAT', 'LON', 'ALT'
         # ECEF coordinates (all in meters) - 'X', 'Y', 'Z' 
         self.fix = {
-            'LLH': True,  # Boolean to indicate if using lat/lon or ECEF
-            'LAT': 42.444886,  # decimals
-            'LON': 76.483653,  # decimals
+            'LLH': True,  # Boolean to indicate if using LLH or ECEF
+            'LAT': 42.444893,  # decimals
+            'LON': -76.483619,  # decimals
             'ALT': 240.0,      # meters
         }
+        self.north_offset = -1.7 # north offset from known start in meters
+        self.east_offset = -2.1 # east offset from known start in meters
         self.configure_fixed_mode()
 
         # ------------------------
@@ -43,7 +45,7 @@ class GPSBasestation(Node):
         # ------------------------
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.server_address = ('10.49.89.182', 4990)  # Rover IP
+        self.server_address = ('0.0.0.0', 4990)  # All IPs
         self.server_socket.bind(self.server_address)
         self.server_socket.listen(1)  # Only one connection (rover)
         self.get_logger().info(f"Waiting for rover to connect on {self.server_address}...")
@@ -72,19 +74,24 @@ class GPSBasestation(Node):
 
         # (A) Switch to Fixed mode
         cfgData.append(("CFG_TMODE_MODE", 2))         # 2 = Fixed mode
-        cfgData.append(("CFG_TMODE_POS_TYPE", 1))       # 1 = LLH
+        cfgData.append(("CFG_TMODE_POS_TYPE", 1))       # 1 = ECF
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
+        self.ser.write(msg.serialize())
 
+        cfgData = []
         # (B) Set the base station's position using the known starting point
-        if self.fix['LLH']:
-            lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['HEIGHT']
-        else:
-            lat, lon, h = ecef2llh(self.fix['X'], self.fix['Y'], self.fix['Z'])
+        lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
+        x, y, z = llh2ecef(lat, lon, h)
+        x = int((x+self.north_offset)*100)
+        y = int((y+self.east_offset)*100)
+        z = int(z*100)
+        self.get_logger().info(f"{x}  {y}   {z}")
+        cfgData.append(("CFG_TMODE_ECEF_X", x))
+        cfgData.append(("CFG_TMODE_ECEF_Y", y))
+        cfgData.append(("CFG_TMODE_ECEF_Z", z))
 
-        cfgData.append(("CFG_TMODE_LAT", lat))
-        cfgData.append(("CFG_TMODE_LON", lon))
-        cfgData.append(("CFG_TMODE_HEIGHT", h))
-
-        cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 0))
+        cfgData.append(("CFG_USBOUTPROT_UBX", 0))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
         cfgData.append(("CFG_USBOUTPROT_RTCM3X", 1))
 
         # (C) Enable the recommended RTCM messages (output at 1 Hz)
@@ -94,7 +101,13 @@ class GPSBasestation(Node):
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1094_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1124_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1230_USB", 1))
-        
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1005_UART1", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1074_UART1", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1084_UART1", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1094_UART1", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1124_UART1", 1))
+        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1230_UART1", 1))
+
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
         self.get_logger().info(f"Configured Fixed mode with coordinates: "
@@ -112,11 +125,11 @@ class GPSBasestation(Node):
                 if msg[0] is None:
                     continue
                 raw, parsed = msg[0], msg[1]
-                self.get_logger().info(f"{parsed}")
+                #self.get_logger().info(f"{parsed}")
                 # Check for RTCM correction messages
-                if parsed.identity.startswith("RTCM"):
-                    self.sock.sendall(raw, self.broadcast_address)
-                    self.get_logger().info("Broadcasting RTCM correction")
+                #if parsed.identity == ("RTCM"):
+                self.client_socket.sendall(raw)
+                self.get_logger().info("Broadcasting RTCM correction")
             except Exception as e:
                 self.get_logger().error(f"Error processing GPS data: {e}")
 

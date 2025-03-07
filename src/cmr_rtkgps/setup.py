@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             # PHOBOS APPEND
             'gps_basestation = cmr_rtkgps.basestation:main',
+            'basestation_known = cmr_rtkgps.basestation_known:main',
             'gps_rover = cmr_rtkgps.rover:main',
         ],
     },

@@ -8,6 +8,7 @@ import serial
 import socket
 import threading
 from pyubx2 import UBXReader, UBXMessage
+import time
 
 class GPSRover(Node):
     def __init__(self):
@@ -37,13 +38,20 @@ class GPSRover(Node):
         self.configure_rover()
 
         # ------------------------
-        # 3. Set up UDP socket to receive RTCM corrections
+        # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(('0.0.0.0', 4990))
+        self.server_ip = '10.49.89.182'  # Basestation IP
+        self.server_port = 4990          # Same port as the basestation
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        try:
+            self.sock.connect((self.server_ip, self.server_port))
+            self.get_logger().info(f"Connected to basestation at {self.server_ip}:{self.server_port}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to connect to basestation: {e}")
+            return
 
         # Use a lock for the incoming RTCM data
-        self.latest_correction = None
         self.lock = threading.Lock()
 
         # Start a background thread to listen for corrections

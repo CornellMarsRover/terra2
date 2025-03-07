@@ -118,7 +118,8 @@ class GPSBasestation(Node):
         cfgData.append(("CFG_TMODE_ECEF_Y", svin_msg.meanY))
         cfgData.append(("CFG_TMODE_ECEF_Z", svin_msg.meanZ))
 
-        cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 0))
+        cfgData.append(("CFG_USBOUTPROT_UBX", 0))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
         cfgData.append(("CFG_USBOUTPROT_RTCM3X", 1))           # Enable RTCM output
 
         # (C) Enable the recommended RTCM messages (output at 1 Hz)

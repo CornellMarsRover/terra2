@@ -93,9 +93,9 @@ class GPSRover(Node):
         cfgData = []
         cfgData.append(("CFG_UART1_BAUDRATE", 230400))
         # (A) Switch to Fixed mode
-        cfgData.append(("CFG_TMODE_MODE", 2))         # 2 = Fixed mode
-        cfgData.append(("CFG_TMODE_POS_TYPE", 1))       # 1 = ECF
-        msg = UBXMessage.config_set(layers, transaction, cfgData)
+        cfgData.append(("CFG_TMODE_MODE", 0))         # 0 = Rover mode
+        cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 0 = LLH
+        '''msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
         cfgData = []
 
@@ -108,7 +108,7 @@ class GPSRover(Node):
         self.get_logger().info(f"{x}  {y}   {z}")
         cfgData.append(("CFG_TMODE_ECEF_X", x))
         cfgData.append(("CFG_TMODE_ECEF_Y", y))
-        cfgData.append(("CFG_TMODE_ECEF_Z", z))
+        cfgData.append(("CFG_TMODE_ECEF_Z", z))'''
 
         # (C) Enable RTCM input on USB
         cfgData.append(("CFG_USBINPROT_RTCM3X", 1))   # 1 = enable

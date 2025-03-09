@@ -64,8 +64,7 @@ class GPSBasestation(Node):
 
     def configure_fixed_mode(self):
         """
-        Once survey-in conditions are met, reconfigure the module to Fixed mode using the
-        coordinates obtained from the survey.
+        Configure the module to Fixed mode using the known coordinates
         """
         transaction = 0
         layers = 1  # Use volatile RAM for immediate effect
@@ -74,7 +73,7 @@ class GPSBasestation(Node):
 
         # (A) Switch to Fixed mode
         cfgData.append(("CFG_TMODE_MODE", 2))         # 2 = Fixed mode
-        cfgData.append(("CFG_TMODE_POS_TYPE", 1))       # 1 = ECF
+        cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 0 = LLH (necessary for RTCM 1005)
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
 
@@ -101,12 +100,6 @@ class GPSBasestation(Node):
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1094_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1124_USB", 1))
         cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1230_USB", 1))
-        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1005_UART1", 1))
-        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1074_UART1", 1))
-        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1084_UART1", 1))
-        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1094_UART1", 1))
-        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1124_UART1", 1))
-        cfgData.append(("CFG_MSGOUT_RTCM_3X_TYPE1230_UART1", 1))
 
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())

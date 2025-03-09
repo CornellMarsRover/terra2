@@ -32,12 +32,12 @@ class GPSBasestation(Node):
         # ECEF coordinates (all in meters) - 'X', 'Y', 'Z' 
         self.fix = {
             'LLH': True,  # Boolean to indicate if using LLH or ECEF
-            'LAT': 42.444893,  # decimals
-            'LON': -76.483619,  # decimals
+            'LAT': 42.443955,  # decimals
+            'LON': -76.482982,  # decimals
             'ALT': 240.0,      # meters
         }
-        self.north_offset = -1.7 # north offset from known start in meters
-        self.east_offset = -2.1 # east offset from known start in meters
+        self.north_offset = 0.0 # north offset from known start in meters
+        self.east_offset = 0.0 # east offset from known start in meters
         self.configure_fixed_mode()
 
         # ------------------------
@@ -125,7 +125,8 @@ class GPSBasestation(Node):
                 if msg[0] is None:
                     continue
                 raw, parsed = msg[0], msg[1]
-                #self.get_logger().info(f"{parsed}")
+                self.get_logger().info(f"{parsed}")
+                self.get_logger().info(f"{parsed.identity}")
                 # Check for RTCM correction messages
                 #if parsed.identity == ("RTCM"):
                 self.client_socket.sendall(raw)

@@ -66,7 +66,7 @@ class RTKLocalizationNode(Node):
 
         self.get_logger().info("Localization node has been started.")
 
-
+        self.max_d = 0.0
     # --------------------------------------------------------------------------
     # GPS Callback: Processes NavSatFix Data
     # --------------------------------------------------------------------------
@@ -85,7 +85,9 @@ class RTKLocalizationNode(Node):
         north, west = self.get_north_west_meters(msg.latitude, msg.longitude)
         self.x = north
         self.y = west
-        
+        d = math.sqrt((north**2) + (west**2))
+        self.max_d = max(d, self.max_d)
+        self.get_logger().info(f"Max deviation in meters: {self.max_d}")
 
     # --------------------------------------------------------------------------
     # Publish the pose

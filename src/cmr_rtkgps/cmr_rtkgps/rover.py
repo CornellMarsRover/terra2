@@ -50,7 +50,7 @@ class GPSRover(Node):
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '10.49.89.182'  # Basestation IP
+        self.server_ip = '10.49.49.190'  # Basestation IP
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -120,7 +120,8 @@ class GPSRover(Node):
 
         # (E) Make sure we are outputting NAV_PVT at 1 Hz:
         # CFG_MSGOUT_UBX_NAV_PVT_USB
-        cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
+        #cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
+        cfgData.append(("CFG_RATE_MEAS", 200))  # 5 Hz (200 ms)
 
         # Build the config message
         msg = UBXMessage.config_set(layers, transaction, cfgData)

@@ -22,7 +22,7 @@ class CostmapNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
-
+        self.real = True
         # Create synchronized subscribers
         '''self.pointcloud_sub = Subscriber(self, PointCloud2, '/camera/points')
         self.pose_sub = Subscriber(self, TwistStamped, '/autonomy/pose/robot/global')'''
@@ -84,7 +84,7 @@ class CostmapNode(Node):
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
-            self.camera_height = 1.3
+            self.camera_height = 1.1
 
         self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0
@@ -195,18 +195,18 @@ class CostmapNode(Node):
 
     def ground_plane_callback(self, msg):
         """
-        Update costmap from vertices surrounding ground plane from ZED camera.
+        Update costmap from vertices surrounding grounself.publish_transform()d plane from ZED camera.
         """
         if self.last_movement == "point_turn":
             return
         #self.get_logger().info(f"{self.grid_dict}")
-        points = [(msg.data[i], msg.data[i+1]) for i in range(0, len(msg.data), 2)]
+        points = [self.R.dot(np.array([msg.data[i], msg.data[i+1]])) for i in range(0, len(msg.data), 2)]
         ground_polygon = Polygon(points)
         
         # Iterate over grid cells and set cost to 0 if inside the ground polygon
         for (x, y) in list(self.grid_dict.keys()):
             if ground_polygon.contains(Point(x, y)):
-                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 2, 0)
+                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 4, 0)
 
 
     def publish_obstacles(self):

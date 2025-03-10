@@ -22,7 +22,7 @@ class PlannerNode(Node):
 
         self.declare_parameter('visualize', True) # Shows rerun visualization if true
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
-
+        self.visualize = True
         # Subscription to the next and previous target topics
         self.previous_target_subscription = self.create_subscription(
             Float32MultiArray,
@@ -50,12 +50,12 @@ class PlannerNode(Node):
             self.new_obstacle_callback,
             10
         )
-        self.ground_plane_sub = self.create_subscription(
+        '''self.ground_plane_sub = self.create_subscription(
             Float32MultiArray,
             '/camera/ground_plane',
             self.ground_plane_callback,
             10
-        )
+        )'''
         # Publisher for the next waypoint for waypoint following in controller node
         self.next_waypoint_publisher = self.create_publisher(Float32MultiArray, '/autonomy/path/next_waypoint', 10)
 
@@ -93,10 +93,9 @@ class PlannerNode(Node):
         self.get_logger().info("PlannerNode initialized and subscribed to costmap and target pose topics.")
         self.ground_plane = []
 
-        '''if self.visualize:
+        if self.visualize:
             # Initialize Rerun visualization
             rr.init("ground_plane_grid", spawn=True)
-        if self.visualize:
             self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
 
     def plot_grid_rerun(self):
@@ -123,16 +122,16 @@ class PlannerNode(Node):
             points.append([x-self.robot_position[0], y-self.robot_position[1], 0])
             colors.append([0,255,0])
             radii.append(0.1)
-        if len(self.ground_plane) > 1:
+        '''if len(self.ground_plane) > 1:
             ground_pts = []
-            for pt in self.ground_plane:
+            for pt in self.ground_plself.R.dot(np.array(pt))ane:
                 ground_pts.append(pt)
             ground_pts.append(self.ground_plane[0])
             rr.log("ground_plane", rr.LineStrips3D(
                 np.array(ground_pts),
                 radii=0.05,
                 colors=[255,255,255]
-            ))
+            ))'''
         rr.log("path_planning_visualization", rr.Points3D(np.array(points, dtype=np.float32), colors=colors, radii=radii))
 
         # Robot orientation
@@ -148,7 +147,7 @@ class PlannerNode(Node):
             np.array([[0, 0, 0], x_end]),
             radii=0.1,
             colors=[255,0,255]
-        ))'''
+        ))
 
     def ground_plane_callback(self, msg):
         self.ground_plane = []

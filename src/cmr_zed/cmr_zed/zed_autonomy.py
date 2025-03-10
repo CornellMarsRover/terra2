@@ -23,9 +23,9 @@ class ZedAutonomy(Node):
         self.ground_publisher = self.create_publisher(Float32MultiArray, '/camera/ground_plane', 10)
         '''
         self.pose_publisher = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
-        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+        
         '''
-
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         # Initialize and open the ZED camera
         self.zed = sl.Camera()
         init_params = sl.InitParameters()
@@ -80,6 +80,7 @@ class ZedAutonomy(Node):
 
     def publish_pointcloud(self):
         """Captures the point cloud and publishes it."""
+        #self.publish_transform()
         if self.zed.grab() == sl.ERROR_CODE.SUCCESS:
             self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, self.res)
             pc2_msg = self.convert_sl_mat_to_pointcloud2(self.point_cloud)
@@ -91,7 +92,7 @@ class ZedAutonomy(Node):
         pc_data = sl_mat.get_data()
         height, width, channels = pc_data.shape
         assert channels == 4, "Expecting 4 channels (X, Y, Z, RGBA)."
-
+        
         msg = PointCloud2()
         msg.header = Header()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -197,21 +198,26 @@ class ZedAutonomy(Node):
             # Update last global pose
             self.last_pose[0:3] = np.array(translation)
             self.last_pose[3:6] = np.array(rotation)
-
+    '''
     def publish_transform(self):
         """
         Publishes a static transform from `map` to `zed_camera_frame`
         for visualization in RVIZ
         """
+        stamp = self.get_clock().now().to_msg()
+        w = TransformStamped()
+        w.header.stamp = stamp
+        w.header.frame_id = "world"
+        w.child_frame_id = "map"
         t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.stamp = stamp
         t.header.frame_id = "map"  # Parent frame
         t.child_frame_id = "zed_camera_frame"  # Camera frame
 
         # Static translation (camera is z m above the ground)
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 1.3
+        t.transform.translation.z = 1.1
 
         # Quaternion rotation
         t.transform.rotation.x = 0.0
@@ -220,8 +226,9 @@ class ZedAutonomy(Node):
         t.transform.rotation.w = 1.0
 
         # Publish transform
+        #self.tf_broadcaster.sendTransform(w)
         self.tf_broadcaster.sendTransform(t)
-    '''
+    
 
     def destroy_node(self):
         self.zed.close()

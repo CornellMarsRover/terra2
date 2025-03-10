@@ -32,8 +32,8 @@ class RTKLocalizationNode(Node):
         self.initial_lat = None
         self.initial_lon = None
 
-        self.x = None
-        self.y = None
+        self.x = 0.0
+        self.y = 0.0
 
         # Current direction rover is facing (0 deg is north)
         self.current_yaw = 0.0

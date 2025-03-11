@@ -120,7 +120,7 @@ class GPSRover(Node):
 
         # (E) Make sure we are outputting NAV_PVT at 1 Hz:
         # CFG_MSGOUT_UBX_NAV_PVT_USB
-        #cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
+        cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
         cfgData.append(("CFG_RATE_MEAS", 200))  # 5 Hz (200 ms)
 
         # Build the config message
@@ -156,8 +156,6 @@ class GPSRover(Node):
         try:
             (raw_data, parsed_data) = self.ubr.read()
             if parsed_data:
-                #self.get_logger().info(f"{parsed_data}")
-                # lat, lon are in degrees * 1e-7
                 lat_deg = parsed_data.lat
                 lon_deg = parsed_data.lon
                 

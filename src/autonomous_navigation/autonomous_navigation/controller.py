@@ -42,13 +42,14 @@ class ControllerNode(Node):
         self.yaw = 0.0
 
         # Movement parameters
-        self.point_turn_velocity = 0.1
-        self.ackerman_velocity = 0.1
-
+        self.point_turn_velocity = 1.0
+        self.ackerman_velocity = 1.0
+        if not self.real:
+            self.ackerman_velocity = 0.05
         # Timers and state
         self.last_movement = 'ackerman'
         self.last_command_time = self.get_clock().now().to_msg()
-        self.min_wait = 2.5 if self.real else 0.0
+        self.min_wait = 1.5 if self.real else 0.0
 
         # Next waypoint in path
         self.waypoint = None
@@ -222,10 +223,10 @@ class ControllerNode(Node):
         return dt
 
     def stop_robot(self):
-        """If you need a function to send zero velocity."""
-        pass
+        self.publish_ackerman(0.0, 0.0)
 
     def destroy_node(self):
+        self.stop_robot()
         super().destroy_node()
 
 def main(args=None):

@@ -21,15 +21,6 @@ def generate_launch_description():
             parameters=[{}]
         ),
 
-        # Start RTK GPS rover node
-        launch_ros.actions.Node(
-            package='cmr_rtkgps',
-            executable='gps_rover',
-            name='gps_rover',
-            output='screen',
-            parameters=[{}]
-        ),
-
         # Start localization node
         launch.actions.TimerAction(
             period=2.0,

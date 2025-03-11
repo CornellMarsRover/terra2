@@ -76,7 +76,7 @@ class CostmapNode(Node):
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
-            self.camera_height = 1.1
+            self.camera_height = 1.2
 
         self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0

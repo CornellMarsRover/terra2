@@ -19,14 +19,14 @@ import os
 import time
 from typing import Dict, Tuple, Optional
 from ament_index_python.packages import get_package_share_directory
-
+from pyubx2 import llh2ecef
 
 class StateMachineNode(Node):
     def __init__(self):
         super().__init__('state_machine_node')
 
         # Declare parameters
-        self.declare_parameter('real', False)  # FALSE IF TESTING IN SIM
+        self.declare_parameter('real', True)  # FALSE IF TESTING IN SIM
         self.declare_parameter('waypoint_tolerance', 2.0)  # meters
 
         # Get parameters
@@ -35,7 +35,7 @@ class StateMachineNode(Node):
 
         # Choose which waypoints file to load
         if self.real:
-            waypoints_file = 'config/waypoints_real.yaml'
+            waypoints_file = 'config/waypoints_engquad.yaml'
         else:
             waypoints_file = 'config/sim_waypoints_condensed.yaml'
 
@@ -180,17 +180,13 @@ class StateMachineNode(Node):
         Publishes to the target pose topic
         """
         R = 6378137.0
-        lat1_rad = math.radians(target_lat)
-        lat2_rad = math.radians(self.initial_lat)
-        lon1_rad = math.radians(target_lon)
-        lon2_rad = math.radians(self.initial_lon)
-        delta_lat = lat2_rad - lat1_rad
-        delta_lon = lon2_rad - lon1_rad
-        mean_lat = (lat1_rad + lat2_rad) / 2.0
+        x1, y1, _ = llh2ecef(self.initial_lat, self.initial_lon, 0.0)
+        x2, y2, _ = llh2ecef(target_lat, target_lon, 0.0)
+
 
         # Compute north west distances
-        north = -1.0 * delta_lat * R
-        west = delta_lon * R * math.cos(mean_lat)
+        north = y2-y1
+        west = x1-x2
         return north, west
 
     def publish_state(self):

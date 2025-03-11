@@ -19,6 +19,7 @@ setup(
         ('share/' + package_name + '/config', ['config/nav2_costmap_params.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_real.yaml']),
+        ('share/' + package_name + '/config', ['config/waypoints_engquad.yaml']),
         ('share/' + package_name + '/config', ['config/sim_waypoints_condensed.yaml']),
     ],
     install_requires=['setuptools'],
@@ -43,6 +44,7 @@ setup(
             'ekf = autonomous_navigation.ekf_node:main',
             'rtk_localization = autonomous_navigation.rtk_localization:main',
             'costmap_real = autonomous_navigation.costmap_real:main',
+            'rtk_filter = autonomous_navigation.rtk_filtered:main',
         ],
     },
 )

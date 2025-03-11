@@ -2,8 +2,10 @@
 
 import rclpy
 from rclpy.node import Node
+from rclpy.time import Time
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 
+from cmr_msgs.msg import GroundPlaneStamped
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Float32MultiArray, String
@@ -23,29 +25,19 @@ class CostmapNode(Node):
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.real = True
-        # Create synchronized subscribers
-        '''self.pointcloud_sub = Subscriber(self, PointCloud2, '/camera/points')
-        self.pose_sub = Subscriber(self, TwistStamped, '/autonomy/pose/robot/global')'''
 
         if self.real:
             self.ground_plane_sub = self.create_subscription(
-                Float32MultiArray,
+                GroundPlaneStamped,
                 '/camera/ground_plane',
                 self.ground_plane_callback,
                 10
             )
-
-        # Synchronizer with a time tolerance (slop) of 0.1 seconds
-        '''self.sync = ApproximateTimeSynchronizer(
-            [self.pointcloud_sub, self.pose_sub],
-            queue_size=30,
-            slop=0.1
-        )
-        self.sync.registerCallback(self.synchronized_callback)'''
+        
         self.pc_sub = self.create_subscription(
             PointCloud2,
             '/camera/points',
-            self.pc_callback,
+            self.pointcloud_callback,
             10
         )
         self.pose_sub = self.create_subscription(
@@ -97,45 +89,31 @@ class CostmapNode(Node):
         self.north = 0.0 # meters
         self.west = 0.0 # meters
         self.yaw = 0.0 # radians
-
+        # Store last pose timestamp to compute current velocity [v_n, v_w, omega]
+        self.last_pose_timestamp = None
+        self.velocity = None
         # Rotation matrix, continually updated, to convert point cloud points from
         # rotated frame back to global
         self.R = np.array([
-            [np.cos(-1.0 * self.yaw), -np.sin(-1.0 * self.yaw)],
-            [np.sin(-1.0 * self.yaw),  np.cos(-1.0 * self.yaw)]
+            [np.cos(self.yaw), -np.sin(self.yaw)],
+            [np.sin(self.yaw),  np.cos(self.yaw)]
         ])
 
         # Timer to decay cell costs
         self.pub_timer = self.create_timer(1.0, self.publish_obstacles)
 
-    '''def synchronized_callback(self, pointcloud_msg, pose_msg):
-        """
-        Callback to handle synchronized PointCloud2 and TwistStamped messages.
-        """
-        if self.last_movement == "point_turn":
-            return
-        #self.get_logger().info("Synchronized callback")
-        pose = self.update_pose(pose_msg)
-        self.pointcloud_callback(pointcloud_msg, pose)
-
-        self.publish_obstacles()'''
-
-    def pc_callback(self, msg):
-        self.pointcloud_callback(msg, [self.north, self.west, self.yaw])
-
-    def pointcloud_callback(self, msg, pose):
+    def pointcloud_callback(self, msg):
         """
         Process incoming PointCloud2 messages
         """
+        if self.last_movement == "point_turn":
+            return
         self.grid_init = True
         curr_obstacles = set()
         curr_free_space = set()
-        R = np.array([
-            [np.cos(-1.0 * pose[2]), -np.sin(-1.0 * pose[2])],
-            [np.sin(-1.0 * pose[2]),  np.cos(-1.0 * pose[2])]
-        ])
+        north, west, R = self.interpolate_pose(msg.header.stamp)
         for pt in point_cloud2.read_points(msg, skip_nans=True):
-            self.point_cloud_point_to_grid(pt, pose, R, curr_obstacles, curr_free_space)
+            self.point_cloud_point_to_grid(pt, [north, west], R, curr_obstacles, curr_free_space)
 
         self.decay_cost(curr_obstacles, curr_free_space)
 
@@ -169,7 +147,7 @@ class CostmapNode(Node):
             y_rot = rotated_pt[1] + pose[1]
         else:
             x_rot = rotated_pt[0] + pose[0]
-            y_rot = (-1.0 * rotated_pt[1]) + pose[1]
+            y_rot = (-1.0 * rotated_pt[1]) + -1.0 * pose[1]
         
         if x_rot is None or y_rot is None:
             return
@@ -195,19 +173,23 @@ class CostmapNode(Node):
 
     def ground_plane_callback(self, msg):
         """
-        Update costmap from vertices surrounding grounself.publish_transform()d plane from ZED camera.
+        Update costmap from vertices surrounding ground plane from ZED camera.
         """
         if self.last_movement == "point_turn":
             return
-        #self.get_logger().info(f"{self.grid_dict}")
-        points = [self.R.dot(np.array([msg.data[i], msg.data[i+1]])) for i in range(0, len(msg.data), 2)]
-        ground_polygon = Polygon(points)
+        pts = []
+        north, west, R = self.interpolate_pose(msg.header.stamp)
+        x = msg.x
+        y = msg.y
+        for i in range(len(x)):
+            p = R.dot(np.array([x[i], y[i]]))
+            pts.append([p[0]+north,p[1]+west])
+        ground_polygon = Polygon(pts)
         
-        # Iterate over grid cells and set cost to 0 if inside the ground polygon
+        # Iterate over grid cells and reduce cost if inside the ground polygon
         for (x, y) in list(self.grid_dict.keys()):
             if ground_polygon.contains(Point(x, y)):
-                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 4, 0)
-
+                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 3, 0)
 
     def publish_obstacles(self):
         """
@@ -226,7 +208,6 @@ class CostmapNode(Node):
         Linearly decay cost of grid cells if an 
         obstacle not actively detected in that region
         """
-
         for (x, y) in self.grid_dict.keys():
             if (x, y) in curr_free_space and (x, y) not in curr_obstacles:
                 self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
@@ -241,15 +222,41 @@ class CostmapNode(Node):
         """
         Update the pose of the robot using message from localization node
         """
+
         self.north = msg.twist.linear.x
         self.west = msg.twist.linear.y
         self.yaw = msg.twist.angular.z
         self.R = np.array([
-            [np.cos(-1.0 * self.yaw), -np.sin(-1.0 * self.yaw)],
-            [np.sin(-1.0 * self.yaw),  np.cos(-1.0 * self.yaw)]
+            [np.cos(self.yaw), -np.sin(self.yaw)],
+            [np.sin(self.yaw),  np.cos(self.yaw)]
         ])
         
         return [msg.twist.linear.x, msg.twist.linear.y, msg.twist.angular.z]
+
+    def interpolate_pose(self, ts):
+        """
+        Returns a linear interpolation of the most accurate north, west
+        and rotation matrix R based on current position, velocity, and 
+        time delta between time measurement was received
+        """
+        return self.north, self.west, self.R
+
+
+    def timestamp_difference(self, timestamp1, timestamp2):
+        """
+        Calculate the time difference in seconds between two ROS 2 timestamps.
+
+        Args:
+            timestamp1 (builtin_interfaces.msg.Time): The first timestamp.
+            timestamp2 (builtin_interfaces.msg.Time): The second timestamp.
+
+        Returns:
+            float: The time difference in seconds from timestamp1 to timestamp2.
+        """
+        time1 = Time.from_msg(timestamp1)
+        time2 = Time.from_msg(timestamp2)
+        return (time2 - time1).nanoseconds / 1e9
+
 
 def main(args=None):
     rclpy.init(args=args)

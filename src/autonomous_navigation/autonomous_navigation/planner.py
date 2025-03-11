@@ -7,7 +7,7 @@ from message_filters import Subscriber, ApproximateTimeSynchronizer
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import TwistStamped
-
+from cmr_msgs.msg import GroundPlaneStamped
 from cv_bridge import CvBridge
 import numpy as np
 import math
@@ -36,7 +36,7 @@ class PlannerNode(Node):
             self.next_target_callback,
             10
         )
-        # Subscribe to the robot pose topic
+        # Subscribe to the robot pose topicpoints
         self.pose_subscription = self.create_subscription(
             TwistStamped,
             '/autonomy/pose/robot/global',
@@ -50,12 +50,12 @@ class PlannerNode(Node):
             self.new_obstacle_callback,
             10
         )
-        '''self.ground_plane_sub = self.create_subscription(
-            Float32MultiArray,
+        self.ground_plane_sub = self.create_subscription(
+            GroundPlaneStamped,
             '/camera/ground_plane',
             self.ground_plane_callback,
             10
-        )'''
+        )
         # Publisher for the next waypoint for waypoint following in controller node
         self.next_waypoint_publisher = self.create_publisher(Float32MultiArray, '/autonomy/path/next_waypoint', 10)
 
@@ -122,16 +122,16 @@ class PlannerNode(Node):
             points.append([x-self.robot_position[0], y-self.robot_position[1], 0])
             colors.append([0,255,0])
             radii.append(0.1)
-        '''if len(self.ground_plane) > 1:
+        if len(self.ground_plane) > 1:
             ground_pts = []
-            for pt in self.ground_plself.R.dot(np.array(pt))ane:
+            for pt in self.ground_plane:
                 ground_pts.append(pt)
             ground_pts.append(self.ground_plane[0])
             rr.log("ground_plane", rr.LineStrips3D(
                 np.array(ground_pts),
                 radii=0.05,
                 colors=[255,255,255]
-            ))'''
+            ))
         rr.log("path_planning_visualization", rr.Points3D(np.array(points, dtype=np.float32), colors=colors, radii=radii))
 
         # Robot orientation
@@ -151,8 +151,16 @@ class PlannerNode(Node):
 
     def ground_plane_callback(self, msg):
         self.ground_plane = []
-        for i in range(0, len(msg.data), 2):
-            self.ground_plane.append([msg.data[i]-self.robot_position[0], msg.data[i+1]-self.robot_position[1], 0])
+        R = np.array([
+            [np.cos(self.yaw), -np.sin(self.yaw)],
+            [np.sin(self.yaw),  np.cos(self.yaw)]
+        ])
+        #R = np.array([[1.0, 0.0], [0.0, 1.0]])
+        x = msg.x
+        y = msg.y
+        for i in range(len(x)):
+            pt = R.dot(np.array([x[i], y[i]]))
+            self.ground_plane.append([pt[0]-self.robot_position[0], pt[1]-self.robot_position[1], 0])
 
     def new_obstacle_callback(self, msg):
         """

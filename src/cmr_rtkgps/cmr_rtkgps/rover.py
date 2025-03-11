@@ -88,7 +88,7 @@ class GPSRover(Node):
         # 3) Rover is by default in 'RTK Fix' mode if corrections are valid 
         #    (CFG-NAVHPG-DGNSSMODE=2). That is usually the default.
 
-        transaction = 0 
+        transaction = 0
         layers = 1 # RAM
         cfgData = []
         cfgData.append(("CFG_UART1_BAUDRATE", 230400))
@@ -164,6 +164,8 @@ class GPSRover(Node):
                 msg = NavSatFix()
                 msg.latitude = lat_deg
                 msg.longitude = lon_deg
+                # Store the standard deviation in altitude field for ease (meters)
+                msg.altitude = float(parsed_data.hAcc)/1000 
                 msg.header.stamp = self.get_clock().now().to_msg()
 
                 self.pub.publish(msg)

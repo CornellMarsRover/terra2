@@ -21,9 +21,32 @@ def generate_launch_description():
             parameters=[{}]
         ),
 
-        # Start costmap after localization starts
+        # Start RTK GPS rover node
+        launch_ros.actions.Node(
+            package='cmr_rtkgps',
+            executable='gps_rover',
+            name='gps_rover',
+            output='screen',
+            parameters=[{}]
+        ),
+
+        # Start localization node
         launch.actions.TimerAction(
-            period=8.0,
+            period=2.0,
+            actions=[
+                launch_ros.actions.Node(
+                    package='autonomous_navigation',
+                    executable='rtk_localization',
+                    name='rtk_localization',
+                    output='screen',
+                    parameters=[{}]
+                ),
+            ],
+        ),
+
+        # Start costmap
+        launch.actions.TimerAction(
+            period=4.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
@@ -35,9 +58,9 @@ def generate_launch_description():
             ],
         ),
 
-        # Start planner after costmap_sim starts
+        # Start planner
         launch.actions.TimerAction(
-            period=9.0,
+            period=4.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',

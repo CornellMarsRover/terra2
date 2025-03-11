@@ -7,6 +7,7 @@ import pyzed.sl as sl
 import numpy as np
 import math
 
+from cmr_msgs.msg import GroundPlaneStamped
 from sensor_msgs.msg import PointCloud2, PointField, NavSatFix
 from geometry_msgs.msg import TwistWithCovarianceStamped, TransformStamped, TwistStamped
 from std_msgs.msg import Header, Float32MultiArray, MultiArrayDimension
@@ -20,16 +21,15 @@ class ZedAutonomy(Node):
 
         # Publishers
         self.pointcloud_publisher = self.create_publisher(PointCloud2, '/camera/points', 10)
-        self.ground_publisher = self.create_publisher(Float32MultiArray, '/camera/ground_plane', 10)
-        '''
-        self.pose_publisher = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
-        
-        '''
+        self.ground_publisher = self.create_publisher(GroundPlaneStamped, '/camera/ground_plane', 10)
+
+        self.pose_publisher = self.create_publisher(TwistStamped, '/zed/pose', 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+
         # Initialize and open the ZED camera
         self.zed = sl.Camera()
         init_params = sl.InitParameters()
-        init_params.depth_mode = sl.DEPTH_MODE.QUALITY
+        init_params.depth_mode = sl.DEPTH_MODE.NEURAL
         init_params.coordinate_units = sl.UNIT.METER
         init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
         status = self.zed.open(init_params)
@@ -37,9 +37,8 @@ class ZedAutonomy(Node):
             self.get_logger().error(f'Cannot open ZED camera: {status}')
             raise RuntimeError("ZED Camera open failed.")
         
-        '''
         # Enable positional tracking
-        tracking_params = sl.PositionalTrackingParameters()
+        '''tracking_params = sl.PositionalTrackingParameters()
         tracking_params.mode = sl.POSITIONAL_TRACKING_MODE.GEN_1
         status = self.zed.enable_positional_tracking(tracking_params)
         if status != sl.ERROR_CODE.SUCCESS:
@@ -50,8 +49,7 @@ class ZedAutonomy(Node):
         self.last_pose = np.zeros(6)
         self.last_covariance = np.zeros(36)
         self.current_xy = [0.0, 0.0]
-        self.current_yaw = 0.0  # Current camera yaw for ground plane rotation
-        '''
+        self.current_yaw = 0.0  '''
 
         # Resolution for retrieving the point cloud
         self.res = sl.Resolution(width=720, height=404)
@@ -62,6 +60,7 @@ class ZedAutonomy(Node):
         # Timers for publishing data
         self.pointcloud_timer = self.create_timer(0.2, self.publish_pointcloud)
         self.get_logger().info('ZedAutonomy node has been started.')
+    
 
     def publish_ground_plane(self):
         """Publishes the current ground plane detection"""
@@ -73,10 +72,13 @@ class ZedAutonomy(Node):
         '''
         find_plane_status = self.zed.find_floor_plane(self.ground_plane, plane_transform)
         if find_plane_status == sl.ERROR_CODE.SUCCESS:
-            pts = self.ground_plane_to_msg(self.ground_plane.get_bounds())
-            ground_plane_msg = Float32MultiArray()
-            ground_plane_msg.data = pts
-            self.ground_publisher.publish(ground_plane_msg)
+            msg = GroundPlaneStamped()
+            ground_plane = self.ground_plane.get_bounds()
+            msg.x = [float(x) for x in ground_plane[:, 0]]
+            msg.y = [float(y) for y in ground_plane[:, 1]]
+            #self.get_logger().info(f"{msg.x}")
+            msg.header.stamp = self.get_clock().now().to_msg()
+            self.ground_publisher.publish(msg)
 
     def publish_pointcloud(self):
         """Captures the point cloud and publishes it."""
@@ -116,8 +118,7 @@ class ZedAutonomy(Node):
     
     def ground_plane_to_msg(self, ground_plane):
         """
-        Convert ground plane np array to list of floats to publish,
-        applying same yaw + XY transform as in the node.
+        Convert ground plane np array to list of points
         """
         x_vals = ground_plane[:, 0]
         y_vals = ground_plane[:, 1]
@@ -127,22 +128,6 @@ class ZedAutonomy(Node):
         result.extend(y_vals)
 
         return result
-    
-        '''R = np.array([
-            [np.cos(self.current_yaw), -np.sin(self.current_yaw)],
-            [np.sin(self.current_yaw),  np.cos(self.current_yaw)]
-        ])
-        x_vals = ground_plane[:, 0]
-        y_vals = ground_plane[:, 1]
-        
-        result = []
-        for x, y in zip(x_vals, y_vals):
-            rotated_pt = R.dot(np.array([x, y]))
-            rotated_pt[0] += self.current_xy[0]
-            rotated_pt[1] += self.current_xy[1]
-            result.extend(rotated_pt)
-
-        return result'''
 
     def nanosec_to_ros_header(self, ns):
         """
@@ -156,7 +141,6 @@ class ZedAutonomy(Node):
         return header
 
 
-    '''
     def publish_pose_data(self):
         """Publishes the point cloud, pose, and transform."""
         self.publish_pose()
@@ -181,24 +165,22 @@ class ZedAutonomy(Node):
             # Translations
             self.current_xy = (translation[0], translation[1])
 
-
             pose_msg.twist.linear.x = translation[0]
             pose_msg.twist.linear.y = translation[1]
             pose_msg.twist.linear.z = translation[2]
-            self.get_logger().info(f"xy: {self.current_xy}")
+            #self.get_logger().info(f"xy: {self.current_xy}")
             # Rotations
-            self.current_yaw = rotation[2]
+            #self.current_yaw = rotation[2]
             pose_msg.twist.angular.x = rotation[0]
             pose_msg.twist.angular.y = rotation[1]
             pose_msg.twist.angular.z = rotation[2]
-
 
             self.pose_publisher.publish(pose_msg)
 
             # Update last global pose
             self.last_pose[0:3] = np.array(translation)
             self.last_pose[3:6] = np.array(rotation)
-    '''
+    
     def publish_transform(self):
         """
         Publishes a static transform from `map` to `zed_camera_frame`
@@ -226,7 +208,6 @@ class ZedAutonomy(Node):
         t.transform.rotation.w = 1.0
 
         # Publish transform
-        #self.tf_broadcaster.sendTransform(w)
         self.tf_broadcaster.sendTransform(t)
     
 

@@ -155,8 +155,6 @@ class ZEDCameraPublisher(Node):
         if message_data != []:
             message.data = message_data
             self.coordinate_publisher.publish(message)
-    
-
 
     def compute_roll_pitch_yaw(self, normal):
         """
@@ -182,7 +180,6 @@ class ZEDCameraPublisher(Node):
         roll = 0.0
 
         return math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
-
 
     def destroy_node(self):
         # Close the ZED camera when the node is destroyed

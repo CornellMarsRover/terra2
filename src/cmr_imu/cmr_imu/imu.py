@@ -22,6 +22,7 @@ class IMUPublisher(Node):
         self.publisher_ = self.create_publisher(IMUSensorData, '/imu', 10)
         self.timer_period = 0.1  # seconds
         self.timer = self.create_timer(self.timer_period, self.publish_msg)
+        self.yaw_offset = 47.0 # yaw offset (z-angle reading when facing north)
 
     def publish_msg(self):
         if not data_queue.empty():
@@ -39,7 +40,7 @@ class IMUPublisher(Node):
             msg.gyroz = math.radians(data_list[6])
             msg.anglex = data_list[7]
             msg.angley = data_list[8]
-            msg.anglez = data_list[9]
+            msg.anglez = data_list[9]-self.yaw_offset
             msg.magx = data_list[10]
             msg.magy = data_list[11]
             msg.magz = data_list[12]

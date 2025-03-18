@@ -14,7 +14,7 @@ def generate_launch_description():
 
         # Start localization_sim after state_machine starts
         launch.actions.TimerAction(
-            period=3.0,
+            period=1.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
@@ -28,7 +28,7 @@ def generate_launch_description():
 
         # Start costmap_sim after localization_sim starts
         launch.actions.TimerAction(
-            period=6.0,
+            period=2.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
@@ -42,7 +42,7 @@ def generate_launch_description():
 
         # Start planner after costmap_sim starts
         launch.actions.TimerAction(
-            period=9.0,
+            period=4.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
@@ -56,14 +56,14 @@ def generate_launch_description():
 
         # Start controller after planner starts
         launch.actions.TimerAction(
-            period=12.0,
+            period=5.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
                     executable='controller',
                     name='controller',
                     output='screen',
-                    parameters=[{'real': True}]
+                    parameters=[{'real': False}]
                 ),
             ],
         ),

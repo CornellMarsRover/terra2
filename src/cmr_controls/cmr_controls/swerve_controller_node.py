@@ -14,7 +14,8 @@ import math
 
 L = 0.83 # wheelbase, distance between front and back wheels (m)
 W = 0.83 # wheeltrack, width/distance between left and right wheels (m)
-WHEEL_RADIUS = 0.12 # m
+WHEEL_RADIUS = 0.127 # m
+WHEEL_CIRCUMFERENCE = WHEEL_RADIUS*2*math.pi
 SWERVE_RATIO = 50 # Swerve gearbox ratio **DOUBLE CHECK**
 DRIVE_RATIO = 26 # Drive gearbox ratio **DOUBLE CHECK**
 
@@ -25,12 +26,12 @@ class SwerveControllerNode(Node):
         # Drive constants
         self.swerve_motor_ids = None
         self.drive_motor_ids = None
-        self.swerves_max_torque = 5
+        self.swerves_max_torque = 2
         self.swerves_max_vel = 120
         self.swerves_max_acc = 120
-        self.drives_max_torque = 8
-        self.drives_max_vel = 1
-        self.drives_max_acc = 1
+        self.drives_max_torque = 4
+        self.drives_max_vel = 300
+        self.drives_max_acc = 150
 
         self.angles = {"FRONTLEFT" : 0, "BACKLEFT" : 0, "FRONTRIGHT" : 0, "BACKRIGHT" : 0}
         self.velocities = {"FRONTLEFT" : 0, "BACKLEFT" : 0, "FRONTRIGHT" : 0, "BACKRIGHT" : 0}
@@ -75,20 +76,20 @@ class SwerveControllerNode(Node):
 
 
     def point_turn_callback(self, msg):
-        v = (msg.angular.z/WHEEL_RADIUS)*DRIVE_RATIO
-        
+        v = (msg.angular.z/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
         self.set_drive(v,v,v,v,
                        self.pt_turn_constants['wa1'],
                        self.pt_turn_constants['wa2'],
                        self.pt_turn_constants['wa3'],
                        self.pt_turn_constants['wa4'])
 
+
     def ackerman_callback(self, msg):
         '''
         Ackerman drive command that sets wheel positions directly
         Values are reversed so the rover drives backwards
         '''
-        s = (msg.vel/WHEEL_RADIUS)*DRIVE_RATIO
+        s = (msg.vel/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
         
         if msg.fl_angle != 0:
             t = math.tan(math.radians(msg.fl_angle)) 
@@ -109,7 +110,7 @@ class SwerveControllerNode(Node):
         wa4 = -1.0 * (theta_r / 360) * SWERVE_RATIO
         wa2 = 0.0
         wa1 = 0.0
-        self.set_drive(-1 * s, vl, s, -1 *  vr, wa1, wa2, wa3, wa4)
+        self.set_drive(-1* vl, s, vr, -1 * s, wa1, wa2, wa3, wa4)
     
 
     async def __async_initialize_moteus(self):
@@ -128,12 +129,6 @@ class SwerveControllerNode(Node):
     
 
     async def __async_set_drive(self, ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4):
-        self.swerves_max_torque = 5
-        self.swerves_max_vel = 120
-        self.swerves_max_acc = 10
-        self.drives_max_torque = 8
-        self.drives_max_vel = 10
-        self.drives_max_acc = 1
         self.get_logger().info(f"{ws1} {ws2} {ws3} {ws4}")
 
         # Initialize Moteus transport and controllers

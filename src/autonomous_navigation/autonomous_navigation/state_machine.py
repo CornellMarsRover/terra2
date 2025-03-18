@@ -39,6 +39,7 @@ class StateMachineNode(Node):
         else:
             waypoints_file = 'config/sim_waypoints_condensed.yaml'
 
+        self.get_logger().info(f"Waypoints file: {waypoints_file}")
         # Load waypoints
         # NOTE first coordinate is precise starting point
         self.waypoints = self.load_waypoints(waypoints_file)
@@ -180,13 +181,17 @@ class StateMachineNode(Node):
         Publishes to the target pose topic
         """
         R = 6378137.0
-        x1, y1, _ = llh2ecef(self.initial_lat, self.initial_lon, 0.0)
-        x2, y2, _ = llh2ecef(target_lat, target_lon, 0.0)
-
+        lat1_rad = math.radians(target_lat)
+        lat2_rad = math.radians(self.initial_lat)
+        lon1_rad = math.radians(target_lon)
+        lon2_rad = math.radians(self.initial_lon)
+        delta_lat = lat2_rad - lat1_rad
+        delta_lon = lon2_rad - lon1_rad
+        mean_lat = (lat1_rad + lat2_rad) / 2.0
 
         # Compute north west distances
-        north = y2-y1
-        west = x1-x2
+        north = -1.0 * delta_lat * R
+        west = delta_lon * R * math.cos(mean_lat)
         return north, west
 
     def publish_state(self):

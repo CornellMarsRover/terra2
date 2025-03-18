@@ -360,7 +360,7 @@ class PlannerNode(Node):
         goal = tuple(self.next_target)
 
         # Define local search region around the robot
-        half_width = 20.0
+        half_width = 50.0
         step_size = 0.25
         min_x = start[0] - half_width
         max_x = start[0] + half_width
@@ -410,7 +410,7 @@ class PlannerNode(Node):
         came_from = dict()  # (i, j) -> (parent_i, parent_j)
         g_score = {start_idx: 0.0}
 
-        # Use the requested neighbor expansion hierarchy
+        # Use neighbor expansion hierarchy
         neighbors_hierarchy = [
             (1, 0),            # 1
             (1, 1), (1, 1),    # 2
@@ -462,6 +462,8 @@ class PlannerNode(Node):
             if gap > 1:
                 self.get_logger().info("No path found with A* in the local 50x50 region.\nReducing obstacle padding")
                 self.compute_path(gap=gap-1)
+            else:
+                self.get_logger().info("planner got mega fucked")
             return
 
         # Reconstruct path

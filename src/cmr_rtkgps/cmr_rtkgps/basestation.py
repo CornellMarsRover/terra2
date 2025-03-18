@@ -23,7 +23,7 @@ class GPSBasestation(Node):
         # 1. Open serial port
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM1', baudrate=230400, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM0', baudrate=230400, timeout=1)
             # Allow all protocol messages (UBX, RTCM, NMEA) to be decoded
             self.ubr = UBXReader(self.ser)
             self.get_logger().info("Serial port /dev/ttyACM0 opened successfully.")
@@ -34,7 +34,7 @@ class GPSBasestation(Node):
         # ------------------------
         # 2. Configure the ZED-F9P for Survey-In mode
         # ------------------------
-        accuracy = 2000
+        accuracy = 10
         self.accuracy_limit = accuracy*10
         self.survey_base_station()
 
@@ -66,18 +66,19 @@ class GPSBasestation(Node):
           - Enable UBX output over USB
         """
         transaction = 0 
-        layers = 1  # Configure in volatile RAM for immediate effect
+        layers = 2  # Configure in volatile RAM for immediate effect
         clear_keys = ["CFG_UART1_BAUDRATE", "CFG_TMODE_MODE", "CFG_TMODE_POS_TYPE",]
         msg = UBXMessage.config_del(layers, transaction, clear_keys)
         self.ser.write(msg.serialize())
 
         cfgData = []
         cfgData.append(("CFG_UART1_BAUDRATE", 230400))
-        #cfgData.append(("CFG_TMODE_POS_TYPE", 1))       # 1 = LLH
-        cfgData.append(("CFG_TMODE_MODE", 2))  
+        cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 1 = LLH
+        cfgData.append(("CFG_TMODE_MODE", 2))
+        '''cfgData.append(("CFG_TMODE_MODE", 2))  
         cfgData.append(("CFG_TMODE_ECEF_X", 110195027))
         cfgData.append(("CFG_TMODE_ECEF_Y", -458347320))
-        cfgData.append(("CFG_TMODE_ECEF_Z", 428227540))
+        cfgData.append(("CFG_TMODE_ECEF_Z", 428227540))'''
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
 
@@ -147,7 +148,7 @@ class GPSBasestation(Node):
                 msg = self.ubr.read()
                 #self.get_logger().info(f"{msg}")
                 if msg[0] is None:
-                    self.survey_base_station()
+                    #self.survey_base_station()
                     continue
                 raw, parsed = msg[0], msg[1]
                 self.get_logger().info(f"{parsed}")

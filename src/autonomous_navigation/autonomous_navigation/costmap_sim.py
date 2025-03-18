@@ -24,7 +24,7 @@ class CostmapNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
-        self.real = True
+        #self.real = True
 
         if self.real:
             self.ground_plane_sub = self.create_subscription(
@@ -147,7 +147,7 @@ class CostmapNode(Node):
             y_rot = rotated_pt[1] + pose[1]
         else:
             x_rot = rotated_pt[0] + pose[0]
-            y_rot = (-1.0 * rotated_pt[1]) + -1.0 * pose[1]
+            y_rot = (-1.0*rotated_pt[1]) + pose[1]
         
         if x_rot is None or y_rot is None:
             return
@@ -239,8 +239,13 @@ class CostmapNode(Node):
         and rotation matrix R based on current position, velocity, and 
         time delta between time measurement was received
         """
-        return self.north, self.west, self.R
-
+        if self.real:
+            return self.north, self.west, self.R
+        R = np.array([
+            [np.cos(-1.0*self.yaw), -np.sin(-1.0*self.yaw)],
+            [np.sin(-1.0*self.yaw),  np.cos(-1.0*self.yaw)]
+        ])
+        return self.north, self.west, R
 
     def timestamp_difference(self, timestamp1, timestamp2):
         """

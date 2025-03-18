@@ -52,6 +52,8 @@ class ControllerNode(Node):
         self.last_command_time = self.get_clock().now().to_msg()
         self.min_wait = 1.5 if self.real else 0.0
 
+        self.point_turn_threshold = 45
+
         # Next waypoint in path
         self.waypoint = None
         self.use_stanley = False   # Will be set by the 3rd element in the waypoint array
@@ -69,7 +71,7 @@ class ControllerNode(Node):
         Logic for sending drive commands:
           1. If no waypoint, do nothing.
           2. Compute heading error to next waypoint.
-          3. If heading error is large (> ~ 45 deg), do a point turn.
+          3. If heading error is above threshold, do a point turn.
           4. Otherwise, if 'use_stanley' is True, run Stanley logic for steering angle.
           5. If 'use_stanley' is False, use your original "ackerman" approach.
         """
@@ -90,13 +92,12 @@ class ControllerNode(Node):
         heading_error = math.atan2(math.sin(heading_error), math.cos(heading_error))
         angle_error_deg = math.degrees(heading_error)
 
-        # If the next waypoint is "far away" or angle is large, use point-turn
-        # 'Far away' is up to you; let's say if angle > 45 deg:
-        if abs(angle_error_deg) > 45:
+        # If large angle error to next waypoint, use point-turn
+        if abs(angle_error_deg) > self.point_turn_threshold:
             # Possibly wait for wheels to re-position
             curr_time = self.get_clock().now().to_msg()
             dt = self.compute_time_delta(curr_time, self.last_command_time)
-            self.get_logger().info(f"dt: {dt}")
+            #self.get_logger().info(f"dt: {dt}")
             if self.last_movement == "ackerman" and dt < self.min_wait:
                 # Just publish a tiny turn command
                 self.publish_point_turn(0.00001)

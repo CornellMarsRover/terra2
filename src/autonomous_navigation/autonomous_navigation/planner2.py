@@ -23,14 +23,9 @@ class PlannerNode(Node):
         # ------------------------------------
         # Tunable parameters for cost-based path planning
         # ------------------------------------
-        self.declare_parameter('threshold_cost_per_meter', 25.0)  
-        self.declare_parameter('distance_weight', 1.0)  
-        self.declare_parameter('cost_weight', 1.0)  
-
-        # Pull from ROS parameters (or just set them directly if you like)
-        self.threshold_cost_per_meter = self.get_parameter('threshold_cost_per_meter').value
-        self.distance_weight = self.get_parameter('distance_weight').value
-        self.cost_weight = self.get_parameter('cost_weight').value
+        self.max_cell_threshold = 2.0
+        self.distance_weight = 0.1
+        self.cost_weight = 1.0
 
         # If we want to visualize with Rerun
         self.declare_parameter('visualize', True)  # Shows rerun visualization if true
@@ -103,12 +98,12 @@ class PlannerNode(Node):
         self.invalidation_count = 0
 
         # Timers
-        self.path_check_timer = self.create_timer(0.5, self.validate_path)
+        self.path_check_timer = self.create_timer(0.2, self.validate_path)
         
         self.use_stanley = False
         
         # For demonstration
-        self.get_logger().info("PlannerNode initialized with cost-based path planning.")
+        self.get_logger().info("Planner Node initialized")
         self.ground_plane = []
 
         if self.visualize:
@@ -127,9 +122,10 @@ class PlannerNode(Node):
         radii = []
         
         # Obstacles
-        for (x, y) in self.obstacles:
+        for (x, y) in self.costs.keys():
             points.append([x - self.robot_position[0], y - self.robot_position[1], 0])
-            colors.append([255, 0, 0])
+            color = min(255, int(255*self.costs[(x,y)]/10))
+            colors.append([color, 0, 0])
             radii.append(0.1)
 
         # Robot position
@@ -177,7 +173,7 @@ class PlannerNode(Node):
         ))
 
     # -------------------------------------------------------------------------
-    # ROS Callbacks
+    # Callbacks
     # -------------------------------------------------------------------------
     def ground_plane_callback(self, msg):
         """
@@ -204,6 +200,7 @@ class PlannerNode(Node):
         """
         if len(msg.data) == 0:
             return
+        self.costs = dict()
         for i in range(0, len(msg.data), 3):
             xx = msg.data[i]
             yy = msg.data[i+1]
@@ -271,8 +268,9 @@ class PlannerNode(Node):
         if self.next_waypoint is None:
             return
 
-        seg_cost = self.compute_segment_cost(self.robot_position, self.next_waypoint)
-        if seg_cost is None:
+        max_cell, total = self.compute_segment_cost(self.robot_position, self.next_waypoint)
+        self.get_logger().info(f"Total segment cost: {total}\nmax cell cost: {max_cell}")
+        if max_cell > self.max_cell_threshold:
             self.invalidation_count += 1
         else:
             # Segment is valid
@@ -325,6 +323,23 @@ class PlannerNode(Node):
     # -------------------------------------------------------------------------
     # Cost-Based Segment Check
     # -------------------------------------------------------------------------
+    def get_neighbor_costs(self, rx, ry, weight=1, n=1):
+        """
+        Get cost of neighboring diagonals
+        n - int for grid cell expansion in each direction
+        """
+        cost = 0
+        for x in range(-n, n, 1):
+            for y in range(-n, n, 1):
+                if x == 0 and y == 0:
+                    continue
+                x1 = rx + (x*0.25)
+                y1 = ry + (y*0.25)
+                d = math.sqrt(((x*0.25)**2) + ((y*0.25)**2))
+                c = self.costs.get((x1, y1), 0.0) * (weight/d)
+                cost += c
+        return cost
+    
     def compute_segment_cost(self, start, end, gap=1):
         """
         Sample points along the line segment from `start` to `end` and compute
@@ -343,8 +358,8 @@ class PlannerNode(Node):
 
         # Number of sample points ~ distance in meters (or scale as needed)
         n = max(1, int(round(distance / self.cell_size * gap)))
-
         total_cost = 0.0
+        max_cost = 0.0
         for i in range(n + 1):
             t = i / n
             sx = start[0] + t * dx
@@ -357,19 +372,17 @@ class PlannerNode(Node):
 
             # Retrieve cost
             c = self.costs.get((rx, ry), 0.0)
+            c2 = self.get_neighbor_costs(rx, ry, 1, 3)
             total_cost += c
+            total_cost += c2
+            max_cost = max(max_cost, c+c2)
 
         avg_cost = total_cost / (n + 1)
-
-        # Compute "average cost per meter"
+        #self.get_logger().info(f"Total cost: {total_cost}  Average cost: {avg_cost}")
+        self.get_logger().info(f"max cell cost on path: {max_cost}")
+        # Compute and return "average cost per meter"
         avg_cost_per_meter = avg_cost / distance
-
-        # If above threshold, consider it invalid
-        if avg_cost_per_meter > self.threshold_cost_per_meter:
-            return None
-
-        # Otherwise return the raw average cost (or you could return avg_cost_per_meter)
-        return avg_cost_per_meter
+        return max_cost, total_cost
 
     # -------------------------------------------------------------------------
     # A* Path Planning (with length + cost)
@@ -435,7 +448,7 @@ class PlannerNode(Node):
         came_from = {}
         g_score = {start_idx: 0.0}
 
-        # 8-direction neighbors (or as you wish). The "hierarchy" from before
+        # 8-direction neighbors
         neighbors_deltas = [
             (1, 0), (1, 1), (0, 1), (-1, 1),
             (-1, 0), (-1, -1), (0, -1), (1, -1)
@@ -449,8 +462,11 @@ class PlannerNode(Node):
             ax, ay = get_coords(a[0], a[1])
             bx, by = get_coords(b[0], b[1])
             dist = math.dist((ax, ay), (bx, by))
-            return dist * self.distance_weight
-            # Could add some cost guess: dist * self.distance_weight + cost_guess * self.cost_weight
+            cost = self.get_neighbor_costs(ax, ay, weight=1, n=3)
+            if cost > 1.0:
+                self.get_logger().info(f"heuristic for point ({ax},{ay})  cost: {cost}")
+            h = (dist * self.distance_weight) - (cost * self.cost_weight)
+            return h
 
         found_path = False
         while open_set:
@@ -470,7 +486,7 @@ class PlannerNode(Node):
                     continue
 
                 nbr_coords = get_coords(ni, nj)
-                seg_cost = self.compute_segment_cost(cur_coords, nbr_coords, gap=gap)
+                seg_cost, _ = self.compute_segment_cost(cur_coords, nbr_coords, gap=gap)
                 if seg_cost is None:
                     # segment invalid
                     continue

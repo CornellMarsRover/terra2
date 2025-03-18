@@ -41,13 +41,14 @@ def generate_launch_description():
         ),
 
         # Start planner after costmap_sim starts
+        # TESTING OUT NEW PLANNER FOR NOW
         launch.actions.TimerAction(
             period=4.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='planner',
-                    name='planner',
+                    executable='p2',
+                    name='p2',
                     output='screen',
                     parameters=[{'visualize': True}]
                 ),

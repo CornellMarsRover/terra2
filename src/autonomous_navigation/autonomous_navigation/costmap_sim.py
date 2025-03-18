@@ -80,7 +80,7 @@ class CostmapNode(Node):
 
         self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0
-        self.max_depth = 5.0
+        self.max_depth = 10.0
         self.min_depth = 0.3
         self.cell_size = 0.25
         self.k = 4
@@ -100,7 +100,10 @@ class CostmapNode(Node):
         ])
 
         # Timer to decay cell costs
-        self.pub_timer = self.create_timer(1.0, self.publish_obstacles)
+        self.decay_timer = self.create_timer(10.0, self.decay_cost)
+
+        # Timer to publish costmap
+        self.pub_timer = self.create_timer(0.2, self.publish_obstacles)
 
     def pointcloud_callback(self, msg):
         """
@@ -115,7 +118,7 @@ class CostmapNode(Node):
         for pt in point_cloud2.read_points(msg, skip_nans=True):
             self.point_cloud_point_to_grid(pt, [north, west], R, curr_obstacles, curr_free_space)
 
-        self.decay_cost(curr_obstacles, curr_free_space)
+        #self.decay_cost(curr_obstacles, curr_free_space)
 
     def point_cloud_point_to_grid(self, pt, pose, R, curr_obstacles, curr_free_space):
         '''
@@ -203,15 +206,24 @@ class CostmapNode(Node):
         msg.data = data
         self.new_obstacle_publisher.publish(msg)
 
-    def decay_cost(self, curr_obstacles, curr_free_space):
+    def decay_cost(self):
         """
         Linearly decay cost of grid cells if an 
         obstacle not actively detected in that region
         """
         for (x, y) in self.grid_dict.keys():
-            if (x, y) in curr_free_space and (x, y) not in curr_obstacles:
-                self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
+            self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
     
+    '''def decay_cost(self, curr_obstacles, curr_free_space):
+        """
+        Linearly decay cost of grid cells if an 
+        obstacle not actively detected in that region
+        """
+        for (x, y) in self.grid_dict.keys():
+            #if (x, y) in curr_free_space and (x, y) not in curr_obstacles:
+            if (x, y) not in curr_obstacles:
+                self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)'''
+
     def update_last_movement(self, msg):
         """
         Update last movement to avoid point cloud data while turning

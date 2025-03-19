@@ -16,8 +16,8 @@ L = 0.83 # wheelbase, distance between front and back wheels (m)
 W = 0.83 # wheeltrack, width/distance between left and right wheels (m)
 WHEEL_RADIUS = 0.127 # m
 WHEEL_CIRCUMFERENCE = WHEEL_RADIUS*2*math.pi
-SWERVE_RATIO = 50 # Swerve gearbox ratio **DOUBLE CHECK**
-DRIVE_RATIO = 26 # Drive gearbox ratio **DOUBLE CHECK**
+SWERVE_RATIO = 50 # Swerve gearbox ratio
+DRIVE_RATIO = 26 # Drive gearbox ratio
 
 class SwerveControllerNode(Node):
     def __init__(self):
@@ -76,7 +76,13 @@ class SwerveControllerNode(Node):
 
 
     def point_turn_callback(self, msg):
-        v = (msg.angular.z/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
+        """
+        Point turn drive command, sets wheel angles to 45 degrees
+        and computes velocities to achieve desired rate of rotation
+        """
+        r = math.sqrt(((L/2)**2)+((W/2)**2))
+        v = ((msg.angular.z*r)/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
+        
         self.set_drive(v,v,v,v,
                        self.pt_turn_constants['wa1'],
                        self.pt_turn_constants['wa2'],

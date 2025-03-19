@@ -29,15 +29,11 @@ class GPSBasestation(Node):
         # 2. Configure fixed mode for basestation
         # ------------------------
         # LLH coordinates (lat/lon in decimal, height in meters) - 'LAT', 'LON', 'ALT'
-        # ECEF coordinates (all in meters) - 'X', 'Y', 'Z' 
         self.fix = {
-            'LLH': True,  # Boolean to indicate if using LLH or ECEF
             'LAT': 42.4449177,  # decimals
             'LON': -76.4836309,  # decimals
             'ALT': 245.0,      # meters
         }
-        self.north_offset = 0.0 # north offset from known start in meters
-        self.east_offset = 0.0 # east offset from known start in meters
         self.configure_fixed_mode()
 
         # ------------------------
@@ -81,10 +77,10 @@ class GPSBasestation(Node):
         # (B) Set the base station's position using the known starting point
         lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
         x, y, z = llh2ecef(lat, lon, h)
-        x = int((x+self.north_offset)*100)
-        y = int((y+self.east_offset)*100)
+        x = int(x*100)
+        y = int(y*100)
         z = int(z*100)
-        self.get_logger().info(f"{x}  {y}   {z}")
+        self.get_logger().info(f"ECEF coordinates: {x}  {y}  {z}")
         cfgData.append(("CFG_TMODE_ECEF_X", x))
         cfgData.append(("CFG_TMODE_ECEF_Y", y))
         cfgData.append(("CFG_TMODE_ECEF_Z", z))
@@ -104,7 +100,8 @@ class GPSBasestation(Node):
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
         self.get_logger().info(f"Configured Fixed mode with coordinates: "
-                               f"Lat: {lat}, Lon: {lon}, Height: {h}")
+                               f"Lat: {lat}, Lon: {lon}, Height: {h}m"
+                               f"ECEF: ({x}m, {y}m, {z}m)")
 
     def read_gps_loop(self):
         """
@@ -120,8 +117,6 @@ class GPSBasestation(Node):
                 raw, parsed = msg[0], msg[1]
                 self.get_logger().info(f"{parsed}")
                 self.get_logger().info(f"{parsed.identity}")
-                # Check for RTCM correction messages
-                #if parsed.identity == ("RTCM"):
                 self.client_socket.sendall(raw)
                 self.get_logger().info("Broadcasting RTCM correction")
             except Exception as e:

@@ -21,7 +21,7 @@ class GPSRover(Node):
         # 1. Open local serial port for the rover’s ZED-F9P
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM1', baudrate=115200, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM0', baudrate=115200, timeout=1)
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
@@ -35,16 +35,6 @@ class GPSRover(Node):
         #    a) Enable RTCM input over USB
         #    b) Output UBX-NAV-PVT so we can read lat/lon
         # ------------------------
-        # LLH coordinates (lat/lon in decimal, height in meters) - 'LAT', 'LON', 'ALT'
-        # ECEF coordinates (all in meters) - 'X', 'Y', 'Z' 
-        self.fix = {
-            'LLH': True,  # Boolean to indicate if using LLH or ECEF
-            'LAT': 42.443962,  # decimals
-            'LON': -76.482985,  # decimals
-            'ALT': 240.0,      # meters
-        }
-        self.north_offset = 0.0 # north offset from known start in meters
-        self.east_offset = 0.0 # east offset from known start in meters
         self.configure_rover()
 
         # ------------------------
@@ -95,20 +85,6 @@ class GPSRover(Node):
         # (A) Switch to Fixed mode
         cfgData.append(("CFG_TMODE_MODE", 0))         # 0 = Rover mode
         cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 0 = LLH
-        '''msg = UBXMessage.config_set(layers, transaction, cfgData)
-        self.ser.write(msg.serialize())
-        cfgData = []
-
-        # (B) Set initial fix position
-        lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
-        x, y, z = llh2ecef(lat, lon, h)
-        x = int((x+self.north_offset)*100)
-        y = int((y+self.east_offset)*100)
-        z = int(z*100)
-        self.get_logger().info(f"{x}  {y}   {z}")
-        cfgData.append(("CFG_TMODE_ECEF_X", x))
-        cfgData.append(("CFG_TMODE_ECEF_Y", y))
-        cfgData.append(("CFG_TMODE_ECEF_Z", z))'''
 
         # (C) Enable RTCM input on USB
         cfgData.append(("CFG_USBINPROT_RTCM3X", 1))   # 1 = enable

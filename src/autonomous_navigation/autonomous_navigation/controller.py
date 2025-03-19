@@ -42,8 +42,8 @@ class ControllerNode(Node):
         self.yaw = 0.0
 
         # Movement parameters
-        self.point_turn_velocity = 1.0
-        self.ackerman_velocity = 1.0
+        self.point_turn_velocity = 0.5
+        self.ackerman_velocity = 0.5
         if not self.real:
             self.ackerman_velocity = 0.055
             self.point_turn_velocity = 0.08

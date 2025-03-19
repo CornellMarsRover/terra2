@@ -32,8 +32,8 @@ class GPSBasestation(Node):
         # ECEF coordinates (all in meters) - 'X', 'Y', 'Z' 
         self.fix = {
             'LLH': True,  # Boolean to indicate if using LLH or ECEF
-            'LAT': 42.44421,  # decimals
-            'LON': -76.482817,  # decimals
+            'LAT': 42.4449177,  # decimals
+            'LON': -76.4836309,  # decimals
             'ALT': 245.0,      # meters
         }
         self.north_offset = 0.0 # north offset from known start in meters

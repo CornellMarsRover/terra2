@@ -21,7 +21,7 @@ class GPSRover(Node):
         # 1. Open local serial port for the rover’s ZED-F9P
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM0', baudrate=230400, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM1', baudrate=115200, timeout=1)
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
@@ -50,7 +50,7 @@ class GPSRover(Node):
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '10.49.49.190'  # Basestation IP
+        self.server_ip = '10.49.89.182'  # Basestation IP
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -91,7 +91,7 @@ class GPSRover(Node):
         transaction = 0
         layers = 1 # RAM
         cfgData = []
-        cfgData.append(("CFG_UART1_BAUDRATE", 230400))
+        cfgData.append(("CFG_UART1_BAUDRATE", 115200))
         # (A) Switch to Fixed mode
         cfgData.append(("CFG_TMODE_MODE", 0))         # 0 = Rover mode
         cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 0 = LLH
@@ -115,12 +115,13 @@ class GPSRover(Node):
 
         # (D) Enable UBX output on USB, so we get NAV_PVT
         cfgData.append(("CFG_USBOUTPROT_UBX", 1))
-        cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 1))
         cfgData.append(("CFG_USBOUTPROT_RTCM3X", 0))
 
         # (E) Make sure we are outputting NAV_PVT at 1 Hz:
         # CFG_MSGOUT_UBX_NAV_PVT_USB
         cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
+        cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 0))
         cfgData.append(("CFG_RATE_MEAS", 200))  # 5 Hz (200 ms)
 
         # Build the config message
@@ -156,7 +157,8 @@ class GPSRover(Node):
         try:
             (raw_data, parsed_data) = self.ubr.read()
             if parsed_data:
-                lat_deg = parsed_data.lat
+                self.get_logger().info(f"{parsed_data}")
+                '''lat_deg = parsed_data.lat
                 lon_deg = parsed_data.lon
                 
                 msg = NavSatFix()
@@ -168,7 +170,7 @@ class GPSRover(Node):
 
                 self.pub.publish(msg)
                 # Print or log the position
-                self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")
+                self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")'''
         except Exception as e:
             self.get_logger().error(f"Error reading local GPS data: {e}")
 

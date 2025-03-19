@@ -211,19 +211,16 @@ class CostmapNode(Node):
         Linearly decay cost of grid cells if an 
         obstacle not actively detected in that region
         """
+        d = set()
         for (x, y) in self.grid_dict.keys():
             self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
-    
-    '''def decay_cost(self, curr_obstacles, curr_free_space):
-        """
-        Linearly decay cost of grid cells if an 
-        obstacle not actively detected in that region
-        """
-        for (x, y) in self.grid_dict.keys():
-            #if (x, y) in curr_free_space and (x, y) not in curr_obstacles:
-            if (x, y) not in curr_obstacles:
-                self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)'''
-
+            if self.grid_dict[(x, y)] == 0:
+                d.add((x,y))
+        # Delete all 0-cost cells
+        for c in d:
+            if c in self.grid_dict:
+                del self.grid_dict[c]
+                
     def update_last_movement(self, msg):
         """
         Update last movement to avoid point cloud data while turning

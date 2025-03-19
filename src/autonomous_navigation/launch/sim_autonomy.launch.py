@@ -12,16 +12,16 @@ def generate_launch_description():
             parameters=[{'real': False, 'use_sim_time': True}]
         ),
 
-        # Start localization_sim after state_machine starts
+        # Start localization after state_machine starts
         launch.actions.TimerAction(
             period=1.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='localization_sim',
-                    name='localization_sim',
+                    executable='ukf',
+                    name='ukf',
                     output='screen',
-                    parameters=[{'use_sim_time': True}]
+                    parameters=[{'real': False}]
                 ),
             ],
         ),

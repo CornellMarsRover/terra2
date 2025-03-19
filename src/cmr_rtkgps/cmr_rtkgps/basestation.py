@@ -66,7 +66,7 @@ class GPSBasestation(Node):
           - Enable UBX output over USB
         """
         transaction = 0 
-        layers = 2  # Configure in volatile RAM for immediate effect
+        layers = 1  # Configure in volatile RAM for immediate effect
         clear_keys = ["CFG_UART1_BAUDRATE", "CFG_TMODE_MODE", "CFG_TMODE_POS_TYPE",]
         msg = UBXMessage.config_del(layers, transaction, clear_keys)
         self.ser.write(msg.serialize())
@@ -74,11 +74,6 @@ class GPSBasestation(Node):
         cfgData = []
         cfgData.append(("CFG_UART1_BAUDRATE", 230400))
         cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 1 = LLH
-        cfgData.append(("CFG_TMODE_MODE", 2))
-        '''cfgData.append(("CFG_TMODE_MODE", 2))  
-        cfgData.append(("CFG_TMODE_ECEF_X", 110195027))
-        cfgData.append(("CFG_TMODE_ECEF_Y", -458347320))
-        cfgData.append(("CFG_TMODE_ECEF_Z", 428227540))'''
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
 
@@ -89,10 +84,9 @@ class GPSBasestation(Node):
         cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", self.accuracy_limit))     # Accuracy limit (1000 * 0.1 mm = 10cm)
         cfgData.append(("CFG_RATE_MEAS", 200))  # 5 Hz (200 ms)
 
-
         # (B) Enable NAV-SVIN output on USB
         cfgData.append(("CFG_USBOUTPROT_UBX", 1))
-        cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 1))
         cfgData.append(("CFG_USBOUTPROT_RTCM3X", 0))
         cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 1))
 

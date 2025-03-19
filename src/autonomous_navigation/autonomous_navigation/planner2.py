@@ -84,7 +84,7 @@ class PlannerNode(Node):
         self.costs = dict()   # (x, y) -> cost in [0..100]
 
         # If cost above 4 is "obstacle" in old approach; we still fill self.obstacles
-        # to keep old references, but not used in the same way
+        # to keep old references, but not used the same way
         self.threshold = 4  
         
         self.cell_size = 0.25
@@ -121,7 +121,7 @@ class PlannerNode(Node):
         colors = []
         radii = []
         
-        # Obstacles
+        # Color cells based on their cost for a rough visualization
         for (x, y) in self.costs.keys():
             points.append([x - self.robot_position[0], y - self.robot_position[1], 0])
             color = min(255, int(255*self.costs[(x,y)]/10))
@@ -206,14 +206,12 @@ class PlannerNode(Node):
             yy = msg.data[i+1]
             cost_val = msg.data[i+2]
 
-            # Keep old obstacle set for reference
             if cost_val > self.threshold:
                 self.obstacles.add((xx, yy))
             else:
                 if (xx, yy) in self.obstacles:
                     self.obstacles.discard((xx, yy))
 
-            # Store cost in dictionary
             self.costs[(xx, yy)] = cost_val
 
     def previous_target_callback(self, msg):
@@ -262,23 +260,57 @@ class PlannerNode(Node):
     # -------------------------------------------------------------------------
     def validate_path(self):
         """
-        Periodically validate the path segment from the robot's position
-        to the next waypoint. If invalid, re-plan.
+        Periodically validate *every segment* of the current path. This includes
+        (robot_position -> first waypoint) and then each consecutive pair of waypoints.
+
+        If any segment has a cost above self.max_cell_threshold, we will re-plan
+        from that segment's start, preserving the valid prior segments.
         """
-        if self.next_waypoint is None:
+        if not self.current_path:
             return
 
-        max_cell, total = self.compute_segment_cost(self.robot_position, self.next_waypoint)
-        self.get_logger().info(f"Total segment cost: {total}\nmax cell cost: {max_cell}")
-        if max_cell > self.max_cell_threshold:
-            self.invalidation_count += 1
-        else:
-            # Segment is valid
-            self.invalidation_count = max(0, self.invalidation_count - 1)
+        # Build a list of points including the robot position at front
+        path_points = [self.robot_position] + list(self.current_path)
 
-        if self.invalidation_count >= 3:
-            self.compute_path()
-            self.smooth_path()
+        # Check every segment in the path
+        for i in range(len(path_points) - 1):
+            start_pt = path_points[i]
+            end_pt = path_points[i + 1]
+            max_cell, total = self.compute_segment_cost(start_pt, end_pt)
+
+            self.get_logger().info(
+                f"Segment {i}: start={start_pt}, end={end_pt}, max_cell={max_cell}, total={total}"
+            )
+
+            if max_cell > self.max_cell_threshold:
+                self.get_logger().info(
+                    f"Segment from {start_pt} to {end_pt} above threshold ({self.max_cell_threshold}). "
+                    f"Re-planning from {start_pt} to final target."
+                )
+                # Keep the valid path portion up to 'i'
+                valid_portion = deque(path_points[1 : i + 1]) 
+                # i+1 not inclusive, so that means up to point_points[i]
+
+                # Temporarily override self.robot_position so compute_path()
+                # starts from start_pt
+                old_robot_position = self.robot_position
+                self.robot_position = start_pt
+
+                # Recompute the rest of the path from start_pt to the final target
+                self.compute_path()
+                self.smooth_path()  # Optionally smooth newly computed path
+
+                # Restore old position
+                self.robot_position = old_robot_position
+
+                # Now self.current_path is the newly computed path from start_pt to self.next_target
+                # Prepend the valid portion to the front
+                self.current_path = deque(list(valid_portion) + list(self.current_path))
+
+                # Make sure next_waypoint is set
+                if len(self.current_path) > 0:
+                    self.next_waypoint = self.current_path[0]
+                break  # We only re-plan once per validation cycle
 
         self.publish_waypoint()
 
@@ -325,28 +357,28 @@ class PlannerNode(Node):
     # -------------------------------------------------------------------------
     def get_neighbor_costs(self, rx, ry, weight=1, n=1):
         """
-        Get cost of neighboring diagonals
-        n - int for grid cell expansion in each direction
+        Get cost of neighboring diagonals. 
+        'n' is the expansion in each direction, in 0.25m steps.
         """
         cost = 0
         for x in range(-n, n, 1):
             for y in range(-n, n, 1):
                 if x == 0 and y == 0:
                     continue
-                x1 = rx + (x*0.25)
-                y1 = ry + (y*0.25)
-                d = math.sqrt(((x*0.25)**2) + ((y*0.25)**2))
-                c = self.costs.get((x1, y1), 0.0) * (weight/d)
+                x1 = rx + (x * 0.25)
+                y1 = ry + (y * 0.25)
+                d = math.sqrt(((x * 0.25) ** 2) + ((y * 0.25) ** 2))
+                if d < 1e-6:
+                    continue
+                c = self.costs.get((x1, y1), 0.0) * (weight / d)
                 cost += c
         return cost
     
     def compute_segment_cost(self, start, end, gap=1):
         """
         Sample points along the line segment from `start` to `end` and compute
-        an average cost per meter. If the average cost per meter exceeds
-        `self.threshold_cost_per_meter`, return None (invalid).
-        
-        Otherwise, return the average cost (float).
+        the maximum local cost among all sample points plus neighbors, 
+        and also sum the total cost for logging/analysis.
         """
         dx = end[0] - start[0]
         dy = end[1] - start[1]
@@ -354,9 +386,9 @@ class PlannerNode(Node):
 
         # If there's effectively no length, treat as zero cost
         if distance < 1e-6:
-            return 0.0
+            return (0.0, 0.0)
 
-        # Number of sample points ~ distance in meters (or scale as needed)
+        # Number of sample points
         n = max(1, int(round(distance / self.cell_size * gap)))
         total_cost = 0.0
         max_cost = 0.0
@@ -365,23 +397,18 @@ class PlannerNode(Node):
             sx = start[0] + t * dx
             sy = start[1] + t * dy
             
-            # Snap to nearest cost cell in self.costs
-            # Round to nearest 0.25 for the dictionary key if needed
+            # Snap to nearest 0.25 for dictionary lookup
             rx = round(sx * 4) / 4.0
             ry = round(sy * 4) / 4.0
 
             # Retrieve cost
             c = self.costs.get((rx, ry), 0.0)
             c2 = self.get_neighbor_costs(rx, ry, 1, 3)
-            total_cost += c
-            total_cost += c2
-            max_cost = max(max_cost, c+c2)
+            total_here = c + c2
 
-        avg_cost = total_cost / (n + 1)
-        #self.get_logger().info(f"Total cost: {total_cost}  Average cost: {avg_cost}")
-        self.get_logger().info(f"max cell cost on path: {max_cost}")
-        # Compute and return "average cost per meter"
-        avg_cost_per_meter = avg_cost / distance
+            total_cost += total_here
+            max_cost = max(max_cost, total_here)
+
         return max_cost, total_cost
 
     # -------------------------------------------------------------------------
@@ -393,7 +420,7 @@ class PlannerNode(Node):
         Each neighbor transition cost is a weighted combination of 
         (physical distance) and (average cost of segment).
 
-        If the average cost of a segment > threshold, we skip it entirely.
+        If the segment's cost is None or invalid, skip it.
         """
         if self.next_target is None:
             return
@@ -409,7 +436,6 @@ class PlannerNode(Node):
         min_y = start[1] - half_width
         max_y = start[1] + half_width
 
-        # Build discrete grids in x, y
         x_vals = np.arange(min_x, max_x + step_size, step_size)
         y_vals = np.arange(min_y, max_y + step_size, step_size)
 
@@ -434,7 +460,6 @@ class PlannerNode(Node):
         start_idx = get_index(start[0], start[1])
         goal_idx = get_index(goal_clamped[0], goal_clamped[1])
 
-        # Basic bound checks
         if not (0 <= start_idx[0] < len(x_vals) and 0 <= start_idx[1] < len(y_vals)):
             self.get_logger().warn("Start out of local region. Cannot plan.")
             return
@@ -442,31 +467,22 @@ class PlannerNode(Node):
             self.get_logger().warn("Goal out of local region. Cannot plan.")
             return
 
-        # A* structures
         open_set = []
-        heapq.heappush(open_set, (0.0, start_idx))  # (f_score, grid_index)
+        heapq.heappush(open_set, (0.0, start_idx))
         came_from = {}
         g_score = {start_idx: 0.0}
 
-        # 8-direction neighbors
         neighbors_deltas = [
             (1, 0), (1, 1), (0, 1), (-1, 1),
             (-1, 0), (-1, -1), (0, -1), (1, -1)
         ]
 
         def heuristic(a, b):
-            """
-            Combine distance and (optionally) cost for an admissible or near-admissible heuristic.
-            For simplicity, we just do distance-based. You can add cost weighting as well.
-            """
             ax, ay = get_coords(a[0], a[1])
             bx, by = get_coords(b[0], b[1])
             dist = math.dist((ax, ay), (bx, by))
-            cost = self.get_neighbor_costs(ax, ay, weight=1, n=3)
-            if cost > 1.0:
-                self.get_logger().info(f"heuristic for point ({ax},{ay})  cost: {cost}")
-            h = (dist * self.distance_weight) - (cost * self.cost_weight)
-            return h
+            # Simple distance-based heuristic
+            return dist * self.distance_weight
 
         found_path = False
         while open_set:
@@ -487,14 +503,9 @@ class PlannerNode(Node):
 
                 nbr_coords = get_coords(ni, nj)
                 seg_cost, _ = self.compute_segment_cost(cur_coords, nbr_coords, gap=gap)
-                if seg_cost is None:
-                    # segment invalid
-                    continue
-
-                # step_distance is the Euclidean distance in XY
+                # If segment is "invalid", skip – in this example, if seg_cost is None, or we can skip
+                # if seg_cost > some threshold, depending on your usage. We'll just incorporate seg_cost directly:
                 step_distance = math.dist(cur_coords, nbr_coords)
-
-                # Weighted cost of traveling from current -> neighbor
                 travel_cost = (self.distance_weight * step_distance) \
                               + (self.cost_weight * seg_cost)
 
@@ -528,60 +539,86 @@ class PlannerNode(Node):
             planned_path.append(get_coords(pi, pj))
 
         self.current_path.clear()
-        # Typically we want to skip the first index if it is essentially at the start
-        # because it's basically the robot's current position. But either approach is fine.
         if len(planned_path) < 2:
             return
-
         for wp in planned_path:
             self.current_path.append(wp)
-        # pop off the first if it's basically the current position:
+        # pop off the first if it's basically the current robot position
         self.current_path.popleft()
-
-        # set next waypoint to first in the new path
         if len(self.current_path) > 0:
             self.next_waypoint = self.current_path[0]
 
+    # -------------------------------------------------------------------------
+    # Improved Smoothing
+    # -------------------------------------------------------------------------
     def smooth_path(self):
         """
-        Simple collinearity smoothing: remove unnecessary vertices in a path.
+        Smooth the current path to handle both collinearity and dense clusters.
+        Uses a simplified Ramer-Douglas-Peucker approach to fit lines through
+        path segments and remove excess intermediate points.
         """
-        if len(self.current_path) <= 2:
-            return
-        
-        smoothed_path = deque()
+        # Convert deque to list for easier manipulation
         path_list = list(self.current_path)
+        if len(path_list) <= 2:
+            return
 
-        # Keep the very first point
-        smoothed_path.append(path_list[0])
+        # We'll do RDP with a chosen epsilon (tunable)
+        epsilon = 0.3
+        smoothed = self.rdp_simplify(path_list, epsilon)
+        self.current_path = deque(smoothed)
 
-        for i in range(1, len(path_list) - 1):
-            prev_point = path_list[i - 1]
-            current_point = path_list[i]
-            next_point = path_list[i + 1]
+        if len(self.current_path) > 0:
+            self.next_waypoint = self.current_path[0]
 
-            v1 = (current_point[0] - prev_point[0], current_point[1] - prev_point[1])
-            v2 = (next_point[0] - current_point[0], next_point[1] - current_point[1])
+    def rdp_simplify(self, points, epsilon):
+        """
+        A basic Ramer-Douglas-Peucker line simplification.
+        'points' is a list of (x, y).
+        'epsilon' is distance threshold. Smaller -> keep more points.
+        """
+        if len(points) < 3:
+            return points
 
-            mag1 = math.hypot(*v1)
-            mag2 = math.hypot(*v2)
-            if mag1 < 1e-6 or mag2 < 1e-6:
-                # extremely close, skip
-                continue
+        # Find the farthest point from the line formed by first and last
+        first = points[0]
+        last = points[-1]
 
-            v1_normalized = (v1[0] / mag1, v1[1] / mag1)
-            v2_normalized = (v2[0] / mag2, v2[1] / mag2)
-            dot = v1_normalized[0]*v2_normalized[0] + v1_normalized[1]*v2_normalized[1]
+        max_dist = 0.0
+        index = 0
+        for i in range(1, len(points) - 1):
+            dist = self.perp_dist(points[i], first, last)
+            if dist > max_dist:
+                index = i
+                max_dist = dist
 
-            # If the dot product is close to ±1, the points are nearly collinear
-            if abs(dot) < 0.999:
-                smoothed_path.append(current_point)
+        # If max distance is greater than epsilon, recursively simplify
+        if max_dist > epsilon:
+            left_part = self.rdp_simplify(points[: index+1], epsilon)
+            right_part = self.rdp_simplify(points[index:], epsilon)
 
-        # Always keep the last point
-        smoothed_path.append(path_list[-1])
+            # Combine, removing the repeated middle point
+            return left_part[:-1] + right_part
+        else:
+            # All points are close to a straight line from first to last
+            return [first, last]
 
-        self.current_path = smoothed_path
-        self.next_waypoint = self.current_path[0]
+    @staticmethod
+    def perp_dist(point, line_start, line_end):
+        """
+        Perpendicular distance of `point` to the line formed by `line_start -> line_end`.
+        """
+        (x0, y0) = point
+        (x1, y1) = line_start
+        (x2, y2) = line_end
+
+        if (x1, y1) == (x2, y2):
+            # line_start and line_end are the same
+            return math.dist(point, line_start)
+
+        # Formula for distance from point to line
+        num = abs((y2 - y1)*x0 - (x2 - x1)*y0 + x2*y1 - y2*x1)
+        den = math.sqrt((y2 - y1)**2 + (x2 - x1)**2)
+        return num / den
 
 def main(args=None):
     rclpy.init(args=args)

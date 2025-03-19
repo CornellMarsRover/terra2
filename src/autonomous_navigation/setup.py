@@ -45,7 +45,7 @@ setup(
             'rtk_localization = autonomous_navigation.rtk_localization:main',
             'costmap_real = autonomous_navigation.costmap_real:main',
             'rtk_filter = autonomous_navigation.rtk_filtered:main',
-            'ukf = autonomous_navigation.ukf_sim:main',
+            'ukf = autonomous_navigation.ukf:main',
             'p2 = autonomous_navigation.planner2:main',
         ],
     },

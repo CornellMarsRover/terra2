@@ -33,6 +33,9 @@ class GPSBasestation(Node):
             'LAT': 42.4449177,  # decimals
             'LON': -76.4836309,  # decimals
             'ALT': 245.0,      # meters
+            'x': 110183650,
+            'y': -458341884,
+            'z': 428228837
         }
         self.configure_fixed_mode()
 
@@ -75,12 +78,13 @@ class GPSBasestation(Node):
 
         cfgData = []
         # (B) Set the base station's position using the known starting point
-        lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
+        '''lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
         x, y, z = llh2ecef(lat, lon, h)
         x = int(x*100)
         y = int(y*100)
         z = int(z*100)
-        self.get_logger().info(f"ECEF coordinates: {x}  {y}  {z}")
+        self.get_logger().info(f"ECEF coordinates: {x}  {y}  {z}")'''
+        x, y, z = self.fix['x'], self.fix['y'], self.fix['z']
         cfgData.append(("CFG_TMODE_ECEF_X", x))
         cfgData.append(("CFG_TMODE_ECEF_Y", y))
         cfgData.append(("CFG_TMODE_ECEF_Z", z))

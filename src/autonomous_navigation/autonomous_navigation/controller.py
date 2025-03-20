@@ -50,7 +50,7 @@ class ControllerNode(Node):
         # Timers and state
         self.last_movement = 'ackerman'
         self.last_command_time = self.get_clock().now().to_msg()
-        self.min_wait = 1.5 if self.real else 0.0
+        self.min_wait = 0.5 if self.real else 0.5
 
         self.point_turn_threshold = 45
 
@@ -91,7 +91,8 @@ class ControllerNode(Node):
         # Normalize heading error to [-pi, pi]
         heading_error = math.atan2(math.sin(heading_error), math.cos(heading_error))
         angle_error_deg = math.degrees(heading_error)
-
+        self.get_logger().info(f"Heading error: {angle_error_deg}")
+        
         # If large angle error to next waypoint, use point-turn
         if abs(angle_error_deg) > self.point_turn_threshold:
             # Possibly wait for wheels to re-position
@@ -104,6 +105,8 @@ class ControllerNode(Node):
             else:
                 # Actual point turn
                 turn_sign = 1.0 if angle_error_deg < 0 else -1.0
+                if self.real:
+                    turn_sign *= -1.0
                 self.publish_point_turn(turn_sign * self.point_turn_velocity)
                 self.last_movement = 'point_turn'
                 self.last_command_time = curr_time
@@ -140,7 +143,11 @@ class ControllerNode(Node):
             stanley_steer = heading_error + math.atan2(self.k_stanley * cross_track_error, speed)
             # Convert to degrees
             steer_angle_deg = math.degrees(stanley_steer)
-
+            #####
+            '''if steer_angle_deg < 0 and steer_angle_deg < -45.0:
+                steer_angle_deg = -45.0
+            elif steer_angle_deg > 0 and steer_angle_deg > 45.0:
+                steer_angle_deg = 45.0'''
             # Publish ackerman with stanley_steer
             curr_time = self.get_clock().now().to_msg()
             dt = self.compute_time_delta(curr_time, self.last_command_time)

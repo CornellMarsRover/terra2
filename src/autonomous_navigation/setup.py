@@ -47,6 +47,7 @@ setup(
             'rtk_filter = autonomous_navigation.rtk_filtered:main',
             'ukf = autonomous_navigation.ukf:main',
             'p2 = autonomous_navigation.planner2:main',
+            'ukf_yaw = autonomous_navigation.ukf_yaw:main',
         ],
     },
 )

@@ -65,13 +65,13 @@ class CostmapNode(Node):
 
         # Store all detected obstacles
         self.obstacles_global = set()
-
+        self.curr_obstacles = set()
         # Maximum cost for occupied cells in the costmap
         self.max_cost = 100
 
         # Ground detection thresholds
         self.obstacle_threshold = 0.2
-        self.ground_threshold = -0.3
+        self.ground_threshold = -0.4
 
         # Mounting height of camera
         self.camera_height = 1.0
@@ -92,6 +92,7 @@ class CostmapNode(Node):
         # Store last pose timestamp to compute current velocity [v_n, v_w, omega]
         self.last_pose_timestamp = None
         self.velocity = None
+        
         # Rotation matrix, continually updated, to convert point cloud points from
         # rotated frame back to global
         self.R = np.array([
@@ -113,6 +114,7 @@ class CostmapNode(Node):
             return
         self.grid_init = True
         curr_obstacles = set()
+        self.curr_obstacles = set()
         curr_free_space = set()
         north, west, R = self.interpolate_pose(msg.header.stamp)
         for pt in point_cloud2.read_points(msg, skip_nans=True):
@@ -172,6 +174,7 @@ class CostmapNode(Node):
             #self.grid_dict[(x_new, y_new)] = max(height, self.grid_dict[(x_new, y_new)])
             if (x_new, y_new) not in curr_obstacles:
                 curr_obstacles.add((x_new, y_new))
+                self.curr_obstacles.add((x_new, y_new))
         return
 
     def ground_plane_callback(self, msg):
@@ -192,7 +195,7 @@ class CostmapNode(Node):
         # Iterate over grid cells and reduce cost if inside the ground polygon
         for (x, y) in list(self.grid_dict.keys()):
             if ground_polygon.contains(Point(x, y)):
-                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 3, 0)
+                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 1, 0)
 
     def publish_obstacles(self):
         """
@@ -213,6 +216,8 @@ class CostmapNode(Node):
         """
         d = set()
         for (x, y) in self.grid_dict.keys():
+            if (x, y) in self.curr_obstacles:
+                continue
             self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
             if self.grid_dict[(x, y)] == 0:
                 d.add((x,y))

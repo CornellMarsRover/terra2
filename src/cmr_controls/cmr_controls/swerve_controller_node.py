@@ -26,10 +26,10 @@ class SwerveControllerNode(Node):
         # Drive constants
         self.swerve_motor_ids = None
         self.drive_motor_ids = None
-        self.swerves_max_torque = 2
+        self.swerves_max_torque = 6
         self.swerves_max_vel = 120
         self.swerves_max_acc = 120
-        self.drives_max_torque = 4
+        self.drives_max_torque = 6
         self.drives_max_vel = 300
         self.drives_max_acc = 150
 
@@ -97,7 +97,7 @@ class SwerveControllerNode(Node):
         '''
         s = (msg.vel/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
         
-        if msg.fl_angle != 0:
+        if abs(msg.fl_angle) > 1.0:
             t = math.tan(math.radians(msg.fl_angle)) 
             R = L/t
             RL = R - (W/2)
@@ -111,7 +111,7 @@ class SwerveControllerNode(Node):
             theta_r = 0.0
             vl = s
             vr = s
-        self.get_logger().info(f"Ackerman\nFront Left: Angle={theta_l} deg  Wheel Speed={vl} rad/s\nFront Right: Angle={theta_r} deg  Wheel Speed={vr}")
+        #self.get_logger().info(f"Ackerman\nFront Left: Angle={theta_l} deg  Wheel Speed={vl} rad/s\nFront Right: Angle={theta_r} deg  Wheel Speed={vr}")
         wa3 = -1.0 * (theta_l / 360) * SWERVE_RATIO
         wa4 = -1.0 * (theta_r / 360) * SWERVE_RATIO
         wa2 = 0.0
@@ -129,13 +129,14 @@ class SwerveControllerNode(Node):
 
         # reset servo positions
         await self.transport.cycle([x.make_stop() for x in self.servos.values()])
-
+        await self.transport.cycle([x.make_rezero() for x in self.servos.values()])
+        
     def set_drive(self, ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4):
         return self.loop.run_until_complete(self.__async_set_drive(ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4))
     
 
     async def __async_set_drive(self, ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4):
-        self.get_logger().info(f"{ws1} {ws2} {ws3} {ws4}")
+        #self.get_logger().info(f"{ws1} {ws2} {ws3} {ws4}")
 
         # Initialize Moteus transport and controllers
         now = time.time()

@@ -57,12 +57,12 @@ class PlannerNode(Node):
             self.new_obstacle_callback,
             10
         )
-        self.ground_plane_sub = self.create_subscription(
+        '''self.ground_plane_sub = self.create_subscription(
             GroundPlaneStamped,
             '/camera/ground_plane',
             self.ground_plane_callback,
             10
-        )
+        )'''
         
         # Publisher for the next waypoint
         self.next_waypoint_publisher = self.create_publisher(Float32MultiArray, '/autonomy/path/next_waypoint', 10)

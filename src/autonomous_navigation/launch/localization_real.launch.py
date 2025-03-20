@@ -1,6 +1,7 @@
 import launch
 import launch_ros.actions
 
+
 def generate_launch_description():
     return launch.LaunchDescription([
         # Start imu node first
@@ -45,8 +46,8 @@ def generate_launch_description():
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='ukf',
-                    name='ukf',
+                    executable='rtk_localization',
+                    name='rtk_localization',
                     output='screen',
                     parameters=[{'real': True}]
                 ),
@@ -94,4 +95,5 @@ def generate_launch_description():
                 ),
             ],
         ),
+
     ])

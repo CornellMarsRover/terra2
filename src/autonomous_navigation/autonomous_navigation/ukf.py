@@ -37,15 +37,15 @@ class UKF(Node):
             self.sub_imu = self.create_subscription(Imu, '/imu', self.imu_sim_callback, 10)
             self.sub_gps = self.create_subscription(NavSatFix, '/gps_exact', self.gps_callback, 10)
         else:
-            self.sub_imu = self.create_subscription(IMUSensorData, '/imu', self.imu_real_callback, 10)
+            self.sub_imu = self.create_subscription(IMUSensorData, '/imu', self.imu_callback, 10)
             self.sub_gps = self.create_subscription(NavSatFix, '/rtk/navsatfix_data', self.gps_callback, 10)
 
         # Publisher for the filtered pose estimate
         self.pub = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
 
         # For GPS coordinate initialization
-        self.initial_lat = 0.0  # Real system or overwritten if in sim
-        self.initial_lon = 0.0
+        self.initial_lat = 42.4443013  # Real starting coords eng quad
+        self.initial_lon = -76.4832399
         if not self.real:
             self.initial_lat = 38.161479
             self.initial_lon = -122.454630
@@ -55,7 +55,7 @@ class UKF(Node):
         self.r_gps = [0.26, 0.08, 0.0]
         self.r_imu = [-0.2, 0.05, 0.0]
 
-        # Scaling factors to correct for sim vs real
+        # Scaling factors to correct for sim driving
         self.k_pt_turn   = -1.32
         self.k_ackerman  =  1.78
 
@@ -91,13 +91,13 @@ class UKF(Node):
         # Process noise covariance (tune as needed)
         self.Q = np.diag([
             0.001, 0.001,    # north, west
-            0.01,  0.01,     # dx_body, dy_body
-            0.0005, 0.0005   # omega (added missing value)
+            0.1,  0.1,     # dx_body, dy_body
+            0.001, 0.001   # omega (added missing value)
         ])
 
         # Measurement noise covariance for GPS: R_gps (2x2)
         # (north, west). Adjust as needed.
-        self.R_gps = np.diag([0.25, 0.25])
+        self.R_gps = np.diag([0.05, 0.05])
 
         # Measurement noise covariance for IMU: R_imu (2x2)
         # We'll only fuse yaw and omega in the measurement update here for simplicity.

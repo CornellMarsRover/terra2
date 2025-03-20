@@ -18,8 +18,8 @@ def generate_launch_description():
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='ukf',
-                    name='ukf',
+                    executable='ukf_yaw',
+                    name='ukf_yaw',
                     output='screen',
                     parameters=[{'real': False}]
                 ),
@@ -57,7 +57,7 @@ def generate_launch_description():
 
         # Start controller after planner starts
         launch.actions.TimerAction(
-            period=5.0,
+            period=6.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',

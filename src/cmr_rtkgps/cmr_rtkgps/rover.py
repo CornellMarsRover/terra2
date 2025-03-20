@@ -40,7 +40,7 @@ class GPSRover(Node):
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '10.49.89.182'  # Basestation IP
+        self.server_ip = '10.49.49.190'  # Basestation IP
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -79,7 +79,7 @@ class GPSRover(Node):
         #    (CFG-NAVHPG-DGNSSMODE=2). That is usually the default.
 
         transaction = 0
-        layers = 1 # RAM
+        layers = 2 # RAM
         cfgData = []
         cfgData.append(("CFG_UART1_BAUDRATE", 115200))
         # (A) Switch to Fixed mode
@@ -91,7 +91,7 @@ class GPSRover(Node):
 
         # (D) Enable UBX output on USB, so we get NAV_PVT
         cfgData.append(("CFG_USBOUTPROT_UBX", 1))
-        cfgData.append(("CFG_USBOUTPROT_NMEA", 1))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 0))
         cfgData.append(("CFG_USBOUTPROT_RTCM3X", 0))
 
         # (E) Make sure we are outputting NAV_PVT at 1 Hz:
@@ -134,7 +134,7 @@ class GPSRover(Node):
             (raw_data, parsed_data) = self.ubr.read()
             if parsed_data:
                 self.get_logger().info(f"{parsed_data}")
-                '''lat_deg = parsed_data.lat
+                lat_deg = parsed_data.lat
                 lon_deg = parsed_data.lon
                 
                 msg = NavSatFix()
@@ -146,7 +146,7 @@ class GPSRover(Node):
 
                 self.pub.publish(msg)
                 # Print or log the position
-                self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")'''
+                self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")
         except Exception as e:
             self.get_logger().error(f"Error reading local GPS data: {e}")
 

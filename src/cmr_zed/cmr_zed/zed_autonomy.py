@@ -60,7 +60,8 @@ class ZedAutonomy(Node):
         # Timers for publishing data
         self.pointcloud_timer = self.create_timer(0.2, self.publish_pointcloud)
         self.get_logger().info('ZedAutonomy node has been started.')
-    
+        self.plane_parameters = sl.PlaneDetectionParameters()
+        self.plane_parameters.normal_similarity_threshold = 10
 
     def publish_ground_plane(self):
         """Publishes the current ground plane detection"""
@@ -70,15 +71,21 @@ class ZedAutonomy(Node):
         plane_transform.init_transform(self.current_pose.pose_data())
         plane_transform.set_rotation_vector(rotation_vec[0], rotation_vec[1], rotation_vec[2])
         '''
-        find_plane_status = self.zed.find_floor_plane(self.ground_plane, plane_transform)
-        if find_plane_status == sl.ERROR_CODE.SUCCESS:
-            msg = GroundPlaneStamped()
-            ground_plane = self.ground_plane.get_bounds()
-            msg.x = [float(x) for x in ground_plane[:, 0]]
-            msg.y = [float(y) for y in ground_plane[:, 1]]
-            #self.get_logger().info(f"{msg.x}")
-            msg.header.stamp = self.get_clock().now().to_msg()
-            self.ground_publisher.publish(msg)
+        hits = [[600, 600], [300, 600], [1000, 600]]
+        for hit in hits:
+            find_plane_status = self.zed.find_plane_at_hit(hit, self.ground_plane, self.plane_parameters)
+            #find_plane_status = self.zed.find_floor_plane(self.ground_plane, plane_transform)
+            if find_plane_status == sl.ERROR_CODE.SUCCESS:
+                if self.ground_plane.type == sl.PLANE_TYPE.HORIZONTAL:
+                    self.get_logger().info(f"{hit}")
+                    msg = GroundPlaneStamped()
+                    ground_plane = self.ground_plane.get_bounds()
+                    msg.x = [float(x) for x in ground_plane[:, 0]]
+                    msg.y = [float(y) for y in ground_plane[:, 1]]
+                    #self.get_logger().info(f"{msg.x}")
+                    msg.header.stamp = self.get_clock().now().to_msg()
+                    self.ground_publisher.publish(msg)
+                    return
 
     def publish_pointcloud(self):
         """Captures the point cloud and publishes it."""

@@ -32,7 +32,8 @@ class RTKLocalization(Node):
         # For GPS offset initialization (using ECEF conversion)
         self.initial_x = None
         self.initial_y = None
-
+        self.initial_lat = None
+        self.initial_lon = None
         # Storage for latest sensor measurements
         self.gps_n = 0.0  # north displacement from GPS (meters)
         self.gps_w = 0.0  # west displacement from GPS (meters)
@@ -46,20 +47,30 @@ class RTKLocalization(Node):
           - The altitude field is used as the horizontal standard deviation (in m)
           - llh2ecef converts (lat, lon, height) to ECEF x,y,z (in meters)
         """
+
         lat = msg.latitude
         lon = msg.longitude
-        # Use a known fixed height (e.g. basestation height)
+
+        if self.initial_lat is None:
+            self.initial_lat = lat
+            self.initial_lon = lon
+            return
+        
+        n, w = self.get_north_west_meters(lat, lon)
+        self.gps_n = n
+        self.gps_w = w
+        '''# Use a known fixed height (e.g. basestation height)
         basestation_height = 245.0  
         x, y, _ = llh2ecef(lat, lon, basestation_height)
         # Initialize offset from first measurement
         if self.initial_x is None:
             self.initial_x = x
             self.initial_y = y
-        # Compute displacement relative to initial position
+        # Compute displacement rukfelative to initial position
         disp_x = x - self.initial_x 
         disp_y = y - self.initial_y 
         self.gps_n = disp_y
-        self.gps_w = -1.0 * disp_x
+        self.gps_w = -1.0 * disp_x'''
 
     def imu_callback(self, msg: IMUSensorData):
         """
@@ -81,7 +92,29 @@ class RTKLocalization(Node):
         twist_msg.twist.linear.y = self.gps_w
         twist_msg.twist.angular.z = self.yaw
         self.pub.publish(twist_msg)
-        self.get_logger().info(f"Pose:\nx: {self.gps_n}m\ny: {self.gps_w}m\nyaw: {math.degrees(self.yaw)}deg")
+        #self.get_logger().info(f"Pose:\nx: {self.gps_n}m\ny: {self.gps_w}m\nyaw: {math.degrees(self.yaw)}deg")
+
+    #--------------------------------------------------------------------------
+    # Helpers
+    #--------------------------------------------------------------------------
+    def get_north_west_meters(self, lat, lon):
+        """
+        Converts GPS coordinates (latitude, longitude) to north/west displacements (meters)
+        relative to the initial GPS coordinate.
+        """
+        R = 6378137.0  # Earth radius in meters
+        lat1_rad = math.radians(lat)
+        lat0_rad = math.radians(self.initial_lat)
+        lon1_rad = math.radians(lon)
+        lon0_rad = math.radians(self.initial_lon)
+
+        d_lat  = lat0_rad - lat1_rad
+        d_lon  = lon0_rad - lon1_rad
+        mean_lat = (lat1_rad + lat0_rad) / 2.0
+
+        north = -1.0 * d_lat * R
+        west  = d_lon * R * math.cos(mean_lat)
+        return north, west
 
 def main(args=None):
     rclpy.init(args=args)

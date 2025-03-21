@@ -37,7 +37,7 @@ class ZedAutonomy(Node):
             self.get_logger().error(f'Cannot open ZED camera: {status}')
             raise RuntimeError("ZED Camera open failed.")
         
-        # Enable positional tracking
+        # Enable positional tracprint(math.degrees(math.atan(1/10)))king
         '''tracking_params = sl.PositionalTrackingParameters()
         tracking_params.mode = sl.POSITIONAL_TRACKING_MODE.GEN_1
         status = self.zed.enable_positional_tracking(tracking_params)
@@ -61,7 +61,8 @@ class ZedAutonomy(Node):
         self.pointcloud_timer = self.create_timer(0.2, self.publish_pointcloud)
         self.get_logger().info('ZedAutonomy node has been started.')
         self.plane_parameters = sl.PlaneDetectionParameters()
-        self.plane_parameters.normal_similarity_threshold = 10
+        self.plane_parameters.normal_similarity_threshold = 6
+        self.plane_parameters.max_distance_threshold = 0.05
 
     def publish_ground_plane(self):
         """Publishes the current ground plane detection"""
@@ -77,7 +78,7 @@ class ZedAutonomy(Node):
             #find_plane_status = self.zed.find_floor_plane(self.ground_plane, plane_transform)
             if find_plane_status == sl.ERROR_CODE.SUCCESS:
                 if self.ground_plane.type == sl.PLANE_TYPE.HORIZONTAL:
-                    self.get_logger().info(f"{hit}")
+                    #self.get_logger().info(f"{hit}")
                     msg = GroundPlaneStamped()
                     ground_plane = self.ground_plane.get_bounds()
                     msg.x = [float(x) for x in ground_plane[:, 0]]

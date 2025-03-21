@@ -23,7 +23,7 @@ class PlannerNode(Node):
         # ------------------------------------
         # Tunable parameters for cost-based path planning
         # ------------------------------------
-        self.max_cell_threshold = 2.0
+        self.max_cell_threshold = 1.0
         self.distance_weight = 0.1
         self.cost_weight = 1.0
 
@@ -57,12 +57,12 @@ class PlannerNode(Node):
             self.new_obstacle_callback,
             10
         )
-        '''self.ground_plane_sub = self.create_subscription(
+        self.ground_plane_sub = self.create_subscription(
             GroundPlaneStamped,
             '/camera/ground_plane',
             self.ground_plane_callback,
             10
-        )'''
+        )
         
         # Publisher for the next waypoint
         self.next_waypoint_publisher = self.create_publisher(Float32MultiArray, '/autonomy/path/next_waypoint', 10)
@@ -96,9 +96,9 @@ class PlannerNode(Node):
         self.next_waypoint = None
         self.waypoint_threshold = 0.6
         self.invalidation_count = 0
-
+        self.invalidated_segments = dict()
         # Timers
-        self.path_check_timer = self.create_timer(0.2, self.validate_path)
+        self.path_check_timer = self.create_timer(0.5, self.validate_path)
         
         self.use_stanley = False
         
@@ -283,34 +283,36 @@ class PlannerNode(Node):
             )
 
             if max_cell > self.max_cell_threshold:
-                self.get_logger().info(
-                    f"Segment from {start_pt} to {end_pt} above threshold ({self.max_cell_threshold}). "
-                    f"Re-planning from {start_pt} to final target."
-                )
-                # Keep the valid path portion up to 'i'
-                valid_portion = deque(path_points[1 : i + 1]) 
-                # i+1 not inclusive, so that means up to point_points[i]
+                self.invalidated_segments[(start_pt, end_pt)] = 1 + self.invalidated_segments.get((start_pt, end_pt), 0)
+                if self.invalidated_segments[(start_pt, end_pt)] >= 3:
+                    self.get_logger().info(
+                        f"Segment from {start_pt} to {end_pt} above threshold ({self.max_cell_threshold}). "
+                        f"Re-planning from {start_pt} to final target."
+                    )
+                    # Keep the valid path portion up to 'i'
+                    valid_portion = deque(path_points[1 : i + 1]) 
+                    # i+1 not inclusive, so that means up to point_points[i]
 
-                # Temporarily override self.robot_position so compute_path()
-                # starts from start_pt
-                old_robot_position = self.robot_position
-                self.robot_position = start_pt
+                    # Temporarily override self.robot_position so compute_path()
+                    # starts from start_pt
+                    old_robot_position = self.robot_position
+                    self.robot_position = start_pt
 
-                # Recompute the rest of the path from start_pt to the final target
-                self.compute_path()
-                self.smooth_path()  # Optionally smooth newly computed path
+                    # Recompute the rest of the path from start_pt to the final target
+                    self.compute_path()
+                    self.smooth_path()  # Optionally smooth newly computed path
 
-                # Restore old position
-                self.robot_position = old_robot_position
+                    # Restore old position
+                    self.robot_position = old_robot_position
 
-                # Now self.current_path is the newly computed path from start_pt to self.next_target
-                # Prepend the valid portion to the front
-                self.current_path = deque(list(valid_portion) + list(self.current_path))
+                    # Now self.current_path is the newly computed path from start_pt to self.next_target
+                    # Prepend the valid portion to the front
+                    self.current_path = deque(list(valid_portion) + list(self.current_path))
 
-                # Make sure next_waypoint is set
-                if len(self.current_path) > 0:
-                    self.next_waypoint = self.current_path[0]
-                break  # We only re-plan once per validation cycle
+                    # Make sure next_waypoint is set
+                    if len(self.current_path) > 0:
+                        self.next_waypoint = self.current_path[0]
+                    break  # We only re-plan once per validation cycle
 
         self.publish_waypoint()
 
@@ -370,7 +372,10 @@ class PlannerNode(Node):
                 d = math.sqrt(((x * 0.25) ** 2) + ((y * 0.25) ** 2))
                 if d < 1e-6:
                     continue
-                c = self.costs.get((x1, y1), 0.0) * (weight / d)
+                co = self.costs.get((x1, y1), 0.0)
+                if co == 1:
+                    co = 0
+                c = co * (weight / d)
                 cost += c
         return cost
     
@@ -403,7 +408,7 @@ class PlannerNode(Node):
 
             # Retrieve cost
             c = self.costs.get((rx, ry), 0.0)
-            c2 = self.get_neighbor_costs(rx, ry, 1, 3)
+            c2 = self.get_neighbor_costs(rx, ry, 1, 5)
             total_here = c + c2
 
             total_cost += total_here

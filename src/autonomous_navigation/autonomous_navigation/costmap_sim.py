@@ -63,14 +63,18 @@ class CostmapNode(Node):
         # Grid with discretized coordinates
         self.grid_dict = dict()
 
+        # Ground plane polygon received from the ZED
+        self.ground_plane = None
+        self.ground_dict = dict()
+
         # Store all detected obstacles
         self.obstacles_global = set()
-        self.curr_obstacles = set()
+        #self.curr_obstacles = set()
         # Maximum cost for occupied cells in the costmap
         self.max_cost = 100
 
         # Ground detection thresholds
-        self.obstacle_threshold = 0.2
+        self.obstacle_threshold = 0.3
         self.ground_threshold = -0.4
 
         # Mounting height of camera
@@ -80,7 +84,7 @@ class CostmapNode(Node):
 
         self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0
-        self.max_depth = 10.0
+        self.max_depth = 8.0
         self.min_depth = 0.3
         self.cell_size = 0.25
         self.k = 4
@@ -101,7 +105,7 @@ class CostmapNode(Node):
         ])
 
         # Timer to decay cell costs
-        self.decay_timer = self.create_timer(10.0, self.decay_cost)
+        self.decay_timer = self.create_timer(5.0, self.decay_cost)
 
         # Timer to publish costmap
         self.pub_timer = self.create_timer(0.2, self.publish_obstacles)
@@ -114,13 +118,14 @@ class CostmapNode(Node):
             return
         self.grid_init = True
         curr_obstacles = set()
-        self.curr_obstacles = set()
+        #self.curr_obstacles = set()
         curr_free_space = set()
         north, west, R = self.interpolate_pose(msg.header.stamp)
         for pt in point_cloud2.read_points(msg, skip_nans=True):
             self.point_cloud_point_to_grid(pt, [north, west], R, curr_obstacles, curr_free_space)
 
         #self.decay_cost(curr_obstacles, curr_free_space)
+        #self.get_logger().info(f"{self.grid_dict}")
 
     def point_cloud_point_to_grid(self, pt, pose, R, curr_obstacles, curr_free_space):
         '''
@@ -136,7 +141,10 @@ class CostmapNode(Node):
             height = self.camera_height + pt[2]
             x, y = pt[0], pt[1]
             dist = math.sqrt((x**2) + (y**2))
-            if dist > self.max_depth or dist < self.min_depth:
+            # Discard points outside of 45 degree line of sight or too far
+            if abs(y) > 1.0 and abs(math.degrees(math.atan(y/x))) > 45.0:
+                return
+            if dist > self.max_depth or dist < self.min_depth or abs(math.degrees(math.atan(y/x))) > 45.0:
                 return
         else:
             # Y points downwards in camera coordinate frame in Gazebo
@@ -160,7 +168,7 @@ class CostmapNode(Node):
         x_new = round(x_rot * self.k) / self.k
         y_new = round(y_rot * self.k) / self.k
         # don't update if out of grid bounds or previously detected an obstacle at that grid location
-        if (x_new, y_new) in curr_obstacles:
+        if (x_new, y_new) in curr_obstacles or self.in_ground_plane(x_new, y_new):
             return
         if (x_new, y_new) not in self.grid_dict:
             self.grid_dict[(x_new, y_new)] = 0
@@ -170,11 +178,10 @@ class CostmapNode(Node):
             return
         # increment cell cost if height seems to represent obstacle
         else:
-            self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+1)
-            #self.grid_dict[(x_new, y_new)] = max(height, self.grid_dict[(x_new, y_new)])
+            self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+2)
             if (x_new, y_new) not in curr_obstacles:
                 curr_obstacles.add((x_new, y_new))
-                self.curr_obstacles.add((x_new, y_new))
+                #self.curr_obstacles.add((x_new, y_new))
         return
 
     def ground_plane_callback(self, msg):
@@ -188,14 +195,15 @@ class CostmapNode(Node):
         x = msg.x
         y = msg.y
         for i in range(len(x)):
-            p = R.dot(np.array([x[i], y[i]]))
-            pts.append([p[0]+north,p[1]+west])
+            p = self.R.dot(np.array([x[i], y[i]]))
+            pts.append([p[0]+self.north,p[1]+self.west])
         ground_polygon = Polygon(pts)
-        
-        # Iterate over grid cells and reduce cost if inside the ground polygon
+        self.ground_plane = ground_polygon
+        self.ground_dict = dict()
+        '''# Iterate over grid cells and reduce cost if inside the ground polygon
         for (x, y) in list(self.grid_dict.keys()):
             if ground_polygon.contains(Point(x, y)):
-                self.grid_dict[(x, y)] = min(self.grid_dict[(x, y)] - 1, 0)
+                self.grid_dict[(x, y)] = max(self.grid_dict[(x, y)] - 3, 0)'''
 
     def publish_obstacles(self):
         """
@@ -216,8 +224,8 @@ class CostmapNode(Node):
         """
         d = set()
         for (x, y) in self.grid_dict.keys():
-            if (x, y) in self.curr_obstacles:
-                continue
+            #if (x, y) in self.curr_obstacles:
+            #    continue
             self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
             if self.grid_dict[(x, y)] == 0:
                 d.add((x,y))
@@ -247,6 +255,20 @@ class CostmapNode(Node):
         
         return [msg.twist.linear.x, msg.twist.linear.y, msg.twist.angular.z]
 
+    def in_ground_plane(self, x, y):
+        """
+        Returns if a grid cell (x, y) is in the most recently
+        detected ground plane polygon given by the ZED
+        """
+        if self.ground_plane is None:
+            return True
+        if (x,y) in self.ground_dict:
+            return self.ground_dict[(x,y)]
+        
+        b = self.ground_plane.contains(Point(x, y))
+        self.ground_dict[(x,y)] = b
+        return b 
+    
     def interpolate_pose(self, ts):
         """
         Returns a linear interpolation of the most accurate north, west

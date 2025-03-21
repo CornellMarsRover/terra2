@@ -40,7 +40,7 @@ class GPSRover(Node):
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '10.49.49.190'  # Basestation IP
+        self.server_ip = '10.49.87.81'  # Basestation IP
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -78,8 +78,13 @@ class GPSRover(Node):
         # 3) Rover is by default in 'RTK Fix' mode if corrections are valid 
         #    (CFG-NAVHPG-DGNSSMODE=2). That is usually the default.
 
-        transaction = 0
-        layers = 2 # RAM
+        transaction = 0 
+        layers = 1  # Configure in volatile RAM for immediate effect
+        clear_keys = ["CFG_USBOUTPROT_NMEA", "CFG_USBOUTPROT_UBX", "CFG_MSGOUT_UBX_NAV_PVT_USB",
+                      ]
+        msg = UBXMessage.config_del(layers, transaction, clear_keys)
+        self.ser.write(msg.serialize())
+
         cfgData = []
         cfgData.append(("CFG_UART1_BAUDRATE", 115200))
         # (A) Switch to Fixed mode
@@ -98,6 +103,10 @@ class GPSRover(Node):
         # CFG_MSGOUT_UBX_NAV_PVT_USB
         cfgData.append(("CFG_MSGOUT_UBX_NAV_PVT_USB", 1))
         cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 0))
+        cfgData.append(("CFG_MSGOUT_NMEA_NAV2_ID_GGA_USB", 0))
+        cfgData.append(("CFG_MSGOUT_NMEA_NAV2_ID_GLL_USB", 0))
+        cfgData.append(("CFG_MSGOUT_NMEA_NAV2_ID_GNS_USB", 0))
+        cfgData.append(("CFG_MSGOUT_NMEA_NAV2_ID_GSA_USB", 0))
         cfgData.append(("CFG_RATE_MEAS", 200))  # 5 Hz (200 ms)
 
         # Build the config message
@@ -132,7 +141,7 @@ class GPSRover(Node):
         # Read any local messages from the ZED-F9P
         try:
             (raw_data, parsed_data) = self.ubr.read()
-            if parsed_data:
+            if parsed_data and parsed_data.identity.startswith("NAV"):
                 self.get_logger().info(f"{parsed_data}")
                 lat_deg = parsed_data.lat
                 lon_deg = parsed_data.lon
@@ -141,14 +150,15 @@ class GPSRover(Node):
                 msg.latitude = lat_deg
                 msg.longitude = lon_deg
                 # Store the standard deviation in altitude field for ease (meters)
-                msg.altitude = float(parsed_data.hAcc)/1000 
+                #msg.altitude = float(parsed_data.hAcc)/1000 
                 msg.header.stamp = self.get_clock().now().to_msg()
 
                 self.pub.publish(msg)
                 # Print or log the position
                 self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")
         except Exception as e:
-            self.get_logger().error(f"Error reading local GPS data: {e}")
+            #self.get_logger().error(f"Error reading local GPS data: {e}")
+            return
 
 
 def main(args=None):

@@ -45,8 +45,8 @@ class UKFYaw(Node):
         self.pub = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
 
         # For GPS coordinate initialization
-        self.initial_lat = 42.4443013  # Real starting coords eng quad
-        self.initial_lon = -76.4832399
+        self.initial_lat = None
+        self.initial_lon = None
         if not self.real:
             self.initial_lat = 38.161479
             self.initial_lon = -122.454630
@@ -84,12 +84,12 @@ class UKFYaw(Node):
         self.Q = np.diag([
             0.0, 0.0,   # (north, west) will be overridden by GPS anyway
             0.0, 0.0,   # (dx_body, dy_body) not used in final filter
-            0.0001, 0.0001  # small process noise for omega, just for stability
+            0.001, 0.001  # small process noise for omega, just for stability
         ])
 
         # We consider GPS as absolute truth, so we do *not* fuse it. We’ll simply override x[0], x[1].
         # Meanwhile we keep the IMU measurement noise for yaw, omega:
-        self.R_imu = np.diag([0.001, 0.001])  # [yaw, omega]
+        self.R_imu = np.diag([0.0001, 0.0001])  # [yaw, omega]
 
         # Unscented transform parameters
         self.alpha = 1e-3

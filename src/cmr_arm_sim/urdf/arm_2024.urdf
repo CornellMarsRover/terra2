@@ -9,7 +9,7 @@
     <inertia ixx="0.0002408366428192344" iyy="0.0001965672947454995" izz="0.0002424930780899016" ixy="-7.00575013293154e-16" iyz="7.933863408177614e-06" ixz="-6.01067807617016e-17"/>
   </inertial>
   <visual>
-    <origin xyz="0 0 2" rpy="1.57079632679 0 0"/>
+    <origin xyz="0 0 1" rpy="1.57079632679 0 0"/>
     <geometry>
       <mesh filename="package://cmr_arm_sim/meshes/base_link.stl" scale="0.1 0.1 0.1"/>
     </geometry>
@@ -29,9 +29,9 @@
     <inertia ixx="0.0003124994298400346" iyy="0.0005106434645971917" izz="0.0005464028450648415" ixy="-2.483982786710172e-05" iyz="-4.971764224987835e-06" ixz="5.171870177614032e-06"/>
   </inertial>
   <visual>
-    <origin xyz="0 -0.044 .342" rpy="-1.57079632679 0 0"/>
+    <origin xyz="-0.114 0 0.251" rpy="-1.57079632679 0 -1.57079632679"/>
     <geometry>
-      <mesh filename="package://cmr_arm_sim/meshes/shoulder.stl" scale="0.1 0.1 0.1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/shoulder.stl" scale="0.00375 0.00375 0.00375"/>
     </geometry>
   </visual>
   <!-- <collision>
@@ -49,35 +49,15 @@
     <inertia ixx="0.0063731112041358895" iyy="0.0002193424289573356" izz="0.006262212418448342" ixy="2.9581372074094503e-15" iyz="7.108667432481271e-18" ixz="2.3372990857653054e-19"/>
   </inertial>
   <visual>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <origin xyz="-0.114 0 0" rpy="-1.57079632679 0.92079632679 -1.57079632679"/>
     <geometry>
-      <mesh filename="package://cmr_arm_sim/meshes/lower_arm.stl" scale="0.1 0.1 0.1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/lower_arm.stl" scale="0.00375 0.00375 0.00375"/>
     </geometry>
   </visual>
   <!-- <collision>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://cmr_arm_sim/meshes/lower_arm.stl" scale="0.1 0.1 0.1"/>
-    </geometry>
-  </collision> -->
-</link>
-
-<link name="upper_arm">
-  <inertial>
-    <origin xyz="0 -1.4425 0" rpy="0 0 0"/>
-    <mass value="1.0473806295634103"/>
-    <inertia ixx="0.01731119919222368" iyy="0.0008396658760116199" izz="0.01753140472050435" ixy="0.0011267961891559507" iyz="1.7658594867117153e-05" ixz="-7.452645136013033e-06"/>
-  </inertial>
-  <visual>
-    <origin xyz="0 1.4425 0" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://cmr_arm_sim/meshes/upper_arm.stl" scale="0.1 0.1 0.1"/>
-    </geometry>
-  </visual>
-  <!-- <collision>
-    <origin xyz="0 1.4425 0" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://cmr_arm_sim/meshes/upper_arm.stl" scale="0.1 0.1 0.1"/>
     </geometry>
   </collision> -->
 </link>
@@ -89,15 +69,35 @@
     <inertia ixx="0.00021278553590153848" iyy="0.00013932651115324126" izz="0.00018035542785257985" ixy="2.097343119030967e-06" iyz="-5.926051072718819e-06" ixz="6.671150022647325e-07"/>
   </inertial>
   <visual>
-    <origin xyz="-.112 -2.885 0" rpy="3.14159265358979323846264338327 0 0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="package://cmr_arm_sim/meshes/wrist_rotate.stl" scale="0.1 0.1 0.1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/wrist_rotate.stl" scale="0.00375 0.00375 0.00375"/>
     </geometry>
   </visual>
   <!-- <collision>
     <origin xyz="-.112 -2.885 0" rpy="3.14159265358979323846264338327 0 0"/>
     <geometry>
       <mesh filename="package://cmr_arm_sim/meshes/wrist_rotate.stl" scale="0.1 0.1 0.1"/>
+    </geometry>
+  </collision> -->
+</link>
+
+<link name="upper_arm">
+  <inertial>
+    <origin xyz="0 -1.4425 0" rpy="0 0 0"/>
+    <mass value="1.0473806295634103"/>
+    <inertia ixx="0.01731119919222368" iyy="0.0008396658760116199" izz="0.01753140472050435" ixy="0.0011267961891559507" iyz="1.7658594867117153e-05" ixz="-7.452645136013033e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://cmr_arm_sim/meshes/upper_arm.stl" scale="0.00375 0.00375 0.00375"/>
+    </geometry>
+  </visual>
+  <!-- <collision>
+    <origin xyz="0 1.4425 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://cmr_arm_sim/meshes/upper_arm.stl" scale="0.1 0.1 0.1"/>
     </geometry>
   </collision> -->
 </link>
@@ -111,7 +111,7 @@
   <visual>
     <origin xyz="-.115 -2.68 -0.00508" rpy="3.14159265358979323846264338327 0 0"/>
     <geometry>
-      <mesh filename="package://cmr_arm_sim/meshes/wrist_twist_rotate.stl" scale="0.1 0.1 0.1"/>
+      <mesh filename="package://cmr_arm_sim/meshes/wrist_twist_rotate.stl" scale="0.00375 0.00375 0.00375"/>
     </geometry>
   </visual>
   <!-- <collision>
@@ -144,7 +144,7 @@
 </link>
 
 <joint name="base_joint" type="continuous">
-  <origin xyz="0.0 0.04335 0.0" rpy="0 0 0"/>
+  <origin xyz="0.0 0 1.1" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="shoulder"/>
   <axis xyz="0.0 0.0 1.0"/>
@@ -162,7 +162,7 @@
 
 
 <joint name="shoulder_joint" type="continuous">
-  <origin xyz="0 -0.044 .361" rpy="0 0 0"/>
+  <origin xyz="0 0 .251" rpy="-1.57079632679 0 0"/>
   <parent link="shoulder"/>
   <child link="lower_arm"/>
   <axis xyz="1 0 0"/>
@@ -179,9 +179,9 @@
 </transmission>
 
 <joint name="elbow_joint" type="continuous">
-  <origin xyz="0 -1.4425 0" rpy="0 0 0"/>
+  <origin xyz="0.09 -1.4425 0.015" rpy="0 0 0"/>
   <parent link="lower_arm"/>
-  <child link="upper_arm"/>
+  <child link="wrist_rotate"/>
   <axis xyz="1 0 0"/>
 </joint>
 <transmission name="elbow_transmission">
@@ -197,8 +197,8 @@
 
 <joint name="wrist_rotate" type="continuous">
   <origin xyz=".112 -1.4425 0" rpy="0 0 0"/>
-  <parent link="upper_arm"/>
-  <child link="wrist_rotate"/>
+  <parent link="wrist_rotate"/>
+  <child link="upper_arm"/>
   <axis xyz="0 1 0"/>
 </joint>
 <transmission name="wrist_rotate_transmission">
@@ -214,7 +214,7 @@
 
 <joint name="wrist_twist" type="continuous">
   <origin xyz="0.0 -.2 0.00508" rpy="0 0 0"/>
-  <parent link="wrist_rotate"/>
+  <parent link="upper_arm"/>
   <child link="wrist_twist_rotate"/>
   <axis xyz="0 0 1"/>
 </joint>

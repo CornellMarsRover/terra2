@@ -11,14 +11,14 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description():
     descr_path = get_package_share_path('cmr_arm_sim')
     default_model_path = descr_path / 'urdf/arm_2024.urdf'
-    #default_rviz_config_path = descr_path / 'rviz/urdf.rviz'
+    default_rviz_config_path = descr_path / 'config.rviz'
 
     gui_arg = DeclareLaunchArgument(name='gui', default_value='true', choices=['true', 'false'],
                                     description='Flag to enable joint_state_publisher_gui')
     model_arg = DeclareLaunchArgument(name='model', default_value=str(default_model_path),
                                       description='Absolute path to robot urdf file')
-    #rviz_arg = DeclareLaunchArgument(name='rvizconfig', default_value=str(default_rviz_config_path),
-    #                                 description='Absolute path to rviz config file')
+    rviz_arg = DeclareLaunchArgument(name='rvizconfig', default_value=str(default_rviz_config_path),
+                                    description='Absolute path to rviz config file')
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
@@ -47,13 +47,13 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         output='screen',
-        arguments=['-d', os.path.join(descr_path, 'config/my_robot.rviz')],
+        arguments=['-d', os.path.join(descr_path, 'config.rviz')],
     )
 
     return LaunchDescription([
         gui_arg,
         model_arg,
-        #rviz_arg,
+        rviz_arg,
         joint_state_publisher_node,
         joint_state_publisher_gui_node,
         robot_state_publisher_node,

@@ -9,8 +9,6 @@ moveit_simple_controller_manager:
 
   main_arm_controller:
     type: FollowJointTrajectory
-    action_ns: follow_joint_trajectory
-    default: true
     joints:
       - base_joint
       - shoulder_joint
@@ -22,7 +20,7 @@ moveit_simple_controller_manager:
     default: true
   end_effector_controller:
     type: FollowJointTrajectory
-    action_ns: follow_joint_trajectory
-    default: true
     joints:
       - wrist_rotate_two
+    action_ns: follow_joint_trajectory
+    default: true

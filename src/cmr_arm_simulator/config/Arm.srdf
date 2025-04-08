@@ -22,12 +22,12 @@
     </group>
     <!--GROUP STATES: Purpose: Define a named state for a particular group, in terms of joint values. This is useful to define states like 'folded arms'-->
     <group_state name="Initial_Position" group="main_arm">
-        <joint name="base_joint" value="-0.2603"/>
-        <joint name="elbow_joint" value="-2.6555"/>
-        <joint name="shoulder_joint" value="-0.0174"/>
-        <joint name="wrist_rotate" value="-3.1415"/>
+        <joint name="base_joint" value="0"/>
+        <joint name="elbow_joint" value="0"/>
+        <joint name="shoulder_joint" value="0"/>
+        <joint name="wrist_rotate" value="0"/>
         <joint name="wrist_rotate_two" value="0"/>
-        <joint name="wrist_twist" value="0.0521"/>
+        <joint name="wrist_twist" value="0"/>
     </group_state>
     <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
     <end_effector name="end_effector" parent_link="wrist_twist_rotate" group="end_effector"/>

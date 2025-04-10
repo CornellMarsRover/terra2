@@ -88,7 +88,7 @@ class JSInputSubscriber(Node):
     
     def translate_to_electrical(self, positions, velocities):
         output_pos = [-self.convert_angle_to_custom_range(positions[0], 100), 
-                      self.convert_angle_to_custom_range(positions[1], 100), 
+                      -self.convert_angle_to_custom_range(positions[1], 100), 
                       -self.convert_angle_to_custom_range(positions[2], 100), 
                       self.convert_angle_to_custom_range(positions[3], 50), 
                       self.convert_angle_to_custom_range(positions[4], 50), 
@@ -124,15 +124,15 @@ class JSInputSubscriber(Node):
             # send_number(self.serial_port, wrist_rotate_2)
 
             base = moteus.Controller(id=9)
-            shoulder = moteus.Controller(id=11)
-            elbow = moteus.Controller(id=10)
+            shoulder = moteus.Controller(id=10)
+            elbow = moteus.Controller(id=11)
             wrist_rotate_1 = moteus.Controller(id=12)
             wrist_tilt = moteus.Controller(id=13)
             wrist_rotate_2 = moteus.Controller(id=14)
 
             send_moteus_command_sync(controller=base, motor=9, position=positions[0], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[0],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=shoulder, motor=11, position=positions[1], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[1],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=elbow, motor=10, position=positions[2], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[2],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=shoulder, motor=10, position=positions[1], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[1],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=elbow, motor=11, position=positions[2], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[2],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=positions[3], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[3],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_tilt, motor=13, position=positions[4], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[4],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=positions[5], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[5],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
@@ -157,15 +157,15 @@ class JSInputSubscriber(Node):
             # send_number(self.serial_port, wrist_rotate_2)
 
             base = moteus.Controller(id=9)
-            shoulder = moteus.Controller(id=11)
-            elbow = moteus.Controller(id=10)
+            shoulder = moteus.Controller(id=10)
+            elbow = moteus.Controller(id=11)
             wrist_rotate_1 = moteus.Controller(id=12)
             wrist_tilt = moteus.Controller(id=13)
             wrist_rotate_2 = moteus.Controller(id=14)
 
             send_moteus_command_sync(controller=base, motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=shoulder, motor=11, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=elbow, motor=10, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=shoulder, motor=10, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=elbow, motor=11, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_tilt, motor=13, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)

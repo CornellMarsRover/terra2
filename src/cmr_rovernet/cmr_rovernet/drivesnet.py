@@ -191,7 +191,7 @@ class CmdVelSubscriber(Node):
         # send_number(self.serial_port, front_right)
         # send_number(self.serial_port, front_left)
         # send_number(self.serial_port, back_left)
-    
+        
         self.controller_command_ly = msg.twist.linear.y
         self.controller_command_lx = msg.twist.linear.x
         self.controller_command_ry = msg.twist.angular.y
@@ -204,6 +204,14 @@ class CmdVelSubscriber(Node):
             self.controller_command_ry = 0
         if abs(msg.twist.angular.x) < 0.1:
             self.controller_command_rx = 0
+        
+        # DISCARD VELOCITIES OVERROTATING THE SWERVES FOR NOW
+        if msg.twist.linear.y > 0.1 or msg.twist.angular.x < -0.1:
+            self.controller_command_ly = 0
+            self.controller_command_lx = 0
+            self.controller_command_ry = 0
+            self.controller_command_rx = 0
+
         self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)
         self.logger.info(f'VEL: {self.velocity}')
@@ -233,10 +241,10 @@ class CmdVelSubscriber(Node):
         bl_swerve = moteus.Controller(id=6)
         fl_swerve = moteus.Controller(id=5)
 
-        send_moteus_command_sync(controller=fr_swerve, motor=7, position=wa1, drives_velocity=None, maximum_torque=10, velocity_limit=20, accel_limit=20, ff_torque=None, logger=logger)
-        send_moteus_command_sync(controller=br_swerve, motor=8, position=wa4, drives_velocity=None, maximum_torque=10, velocity_limit=20, accel_limit=20, ff_torque=None, logger=logger)
-        send_moteus_command_sync(controller=bl_swerve, motor=6, position=wa3, drives_velocity=None, maximum_torque=10, velocity_limit=20, accel_limit=20, ff_torque=None, logger=logger)
-        send_moteus_command_sync(controller=fl_swerve, motor=5, position=wa2, drives_velocity=None, maximum_torque=10, velocity_limit=20, accel_limit=20, ff_torque=None, logger=logger)
+        send_moteus_command_sync(controller=fr_swerve, motor=7, position=wa1, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=logger)
+        send_moteus_command_sync(controller=br_swerve, motor=8, position=wa4, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=logger)
+        send_moteus_command_sync(controller=bl_swerve, motor=6, position=wa3, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=logger)
+        send_moteus_command_sync(controller=fl_swerve, motor=5, position=wa2, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=logger)
 
         # send_number(self.serial_port, back_right)
         # send_number(self.serial_port, front_right)

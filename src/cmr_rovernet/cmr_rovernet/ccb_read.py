@@ -17,7 +17,7 @@ class CCBReadPublisher(Node):
         self.encoder_data_publisher_ = self.create_publisher(MotorReadData, '/ccb/read', 10)
         #self.read_timer = self.create_timer(0.1, self.read_data)
         self.timer = self.create_timer(0.001, self.publish_msg)
-        self.port = "/dev/ttyTHS0"
+        self.port = "/dev/ttyTHS1"
         self.baud_rate = 115200
         self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
         self.logger = self.get_logger()

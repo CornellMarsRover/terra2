@@ -107,7 +107,8 @@ class PlannerNode(Node):
         self.ground_plane = []
 
         if self.visualize:
-            rr.init("ground_plane_grid", spawn=True)
+            rr.init("planning", spawn=False)
+            rr.connect_tcp("10.49.89.182:9876")
             self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
 
     # -------------------------------------------------------------------------

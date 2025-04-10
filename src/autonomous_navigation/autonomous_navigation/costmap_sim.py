@@ -24,7 +24,7 @@ class CostmapNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
-        #self.real = True
+        self.real = True
 
         if self.real:
             self.ground_plane_sub = self.create_subscription(
@@ -80,7 +80,8 @@ class CostmapNode(Node):
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
-            self.camera_height = 1.2
+            #self.camera_height = 1.2
+            self.camera_height = 1.0
 
         self.expected_height = -1.0 * self.camera_height
         self.clearance_height = 2.0
@@ -105,10 +106,12 @@ class CostmapNode(Node):
         ])
 
         # Timer to decay cell costs
-        self.decay_timer = self.create_timer(5.0, self.decay_cost)
+        self.decay_timer = self.create_timer(1.0, self.decay_cost)
 
         # Timer to publish costmap
         self.pub_timer = self.create_timer(0.2, self.publish_obstacles)
+
+        self.get_logger().info("Costmap node initialized")
 
     def pointcloud_callback(self, msg):
         """
@@ -142,8 +145,8 @@ class CostmapNode(Node):
             x, y = pt[0], pt[1]
             dist = math.sqrt((x**2) + (y**2))
             # Discard points outside of 45 degree line of sight or too far
-            if abs(y) > 1.0 and abs(math.degrees(math.atan(y/x))) > 45.0:
-                return
+            #if abs(y) > 1.0 and abs(math.degrees(math.atan(y/x))) > 45.0:
+            #    return
             if dist > self.max_depth or dist < self.min_depth or abs(math.degrees(math.atan(y/x))) > 45.0:
                 return
         else:

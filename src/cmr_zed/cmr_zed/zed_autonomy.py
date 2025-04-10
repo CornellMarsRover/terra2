@@ -2,6 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 
 import pyzed.sl as sl
 import numpy as np
@@ -38,7 +39,7 @@ class ZedAutonomy(Node):
             raise RuntimeError("ZED Camera open failed.")
         
         # Enable positional tracprint(math.degrees(math.atan(1/10)))king
-        '''tracking_params = sl.PositionalTrackingParameters()
+        tracking_params = sl.PositionalTrackingParameters()
         tracking_params.mode = sl.POSITIONAL_TRACKING_MODE.GEN_1
         status = self.zed.enable_positional_tracking(tracking_params)
         if status != sl.ERROR_CODE.SUCCESS:
@@ -49,20 +50,23 @@ class ZedAutonomy(Node):
         self.last_pose = np.zeros(6)
         self.last_covariance = np.zeros(36)
         self.current_xy = [0.0, 0.0]
-        self.current_yaw = 0.0  '''
+        self.current_yaw = 0.0
 
         # Resolution for retrieving the point cloud
-        self.res = sl.Resolution(width=720, height=404)
+        self.res = sl.Resolution(width=360, height=202)
         self.point_cloud = sl.Mat(self.res.width, self.res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
         self.current_pose = sl.Pose()
         self.ground_plane = sl.Plane()  # Detected ground plane
 
         # Timers for publishing data
-        self.pointcloud_timer = self.create_timer(0.2, self.publish_pointcloud)
+        self.pointcloud_timer = self.create_timer(0.1, self.publish_pointcloud)
         self.get_logger().info('ZedAutonomy node has been started.')
         self.plane_parameters = sl.PlaneDetectionParameters()
         self.plane_parameters.normal_similarity_threshold = 6
         self.plane_parameters.max_distance_threshold = 0.05
+        self.pc_count = 0
+        self.ground_count = 0
+        self.pose_count = 0
 
     def publish_ground_plane(self):
         """Publishes the current ground plane detection"""
@@ -86,6 +90,8 @@ class ZedAutonomy(Node):
                     #self.get_logger().info(f"{msg.x}")
                     msg.header.stamp = self.get_clock().now().to_msg()
                     self.ground_publisher.publish(msg)
+                    self.ground_count += 1
+                    self.get_logger().info(f"Ground pub count: {self.ground_count}\n{self.get_clock().now().to_msg()}")
                     return
 
     def publish_pointcloud(self):
@@ -94,6 +100,8 @@ class ZedAutonomy(Node):
         if self.zed.grab() == sl.ERROR_CODE.SUCCESS:
             self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, self.res)
             pc2_msg = self.convert_sl_mat_to_pointcloud2(self.point_cloud)
+            self.pc_count += 1
+            self.get_logger().info(f"PC count: {self.pc_count}\n{self.get_clock().now().to_msg()}")
             self.pointcloud_publisher.publish(pc2_msg)
             self.publish_ground_plane()
 
@@ -188,7 +196,9 @@ class ZedAutonomy(Node):
             # Update last global pose
             self.last_pose[0:3] = np.array(translation)
             self.last_pose[3:6] = np.array(rotation)
-    
+            self.pose_count += 1
+            self.get_logger().info(f"Pose pub count: {self.pose_count}\n{self.get_clock().now().to_msg()}")
+
     def publish_transform(self):
         """
         Publishes a static transform from `map` to `zed_camera_frame`
@@ -227,8 +237,12 @@ class ZedAutonomy(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ZedAutonomy()
+
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
+
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

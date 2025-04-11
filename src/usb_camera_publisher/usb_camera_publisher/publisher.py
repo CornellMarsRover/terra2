@@ -148,7 +148,7 @@ def main(args=None):
 
     # Update this list to match the cameras available on your system
     # e.g., camera_ids = [0, 1] if you have /dev/video0 and /dev/video1
-    camera_ids = [0, 2, 4, 6, 8, 10]
+    camera_ids = [0,2,4,6,8,10]
 
     node = X264MultiCameraPublisher(camera_ids)
     try:

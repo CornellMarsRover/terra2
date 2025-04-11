@@ -21,6 +21,9 @@ setup(
     entry_points={
         'console_scripts': [
             'publisher = usb_camera_publisher.publisher:main',
+            'image_publisher = usb_camera_publisher.publish_images:main',
+            'bev = usb_camera_publisher.bev:main',
+            'stitched = usb_camera_publisher.stitched:main',
         ],
     },
 )

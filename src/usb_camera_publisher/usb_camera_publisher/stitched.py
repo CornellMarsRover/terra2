@@ -3,6 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from std_msgs.msg import String
 import cv2
 import numpy as np
 import threading
@@ -27,6 +28,14 @@ class MultiCameraStitchedPublisher(Node):
         """
         super().__init__('multi_camera_stitched_publisher')
         self.get_logger().info("Initializing Multi-Camera Stitched Publisher...")
+        self.name = "stitched_publisher"
+        # Shutdown Listener
+        self.shutdown_listener = self.create_subscription(
+            String,
+            "/node_management/shutdown",
+            self.shutdown_callback,
+            30
+        )
 
         # Camera ID -> Label
         self.camera_labels = {
@@ -173,6 +182,13 @@ class MultiCameraStitchedPublisher(Node):
             if t.is_alive():
                 t.join()
         self.get_logger().info("All camera capture threads stopped.")
+
+    def shutdown_callback(self, msg):
+        if msg.data == self.name:
+            self.get_logger().warn(f"Shutdown requested for {self.name}. Exiting...")
+            self.stop_all()
+            self.destroy_node()
+            rclpy.shutdown()
 
 def main(args=None):
     rclpy.init(args=args)

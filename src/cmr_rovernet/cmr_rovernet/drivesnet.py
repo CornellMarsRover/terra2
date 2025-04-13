@@ -205,12 +205,6 @@ class CmdVelSubscriber(Node):
         if abs(msg.twist.angular.x) < 0.1:
             self.controller_command_rx = 0
         
-        # DISCARD VELOCITIES OVERROTATING THE SWERVES FOR NOW
-        if msg.twist.linear.y > 0.1 or msg.twist.angular.x < -0.1:
-            self.controller_command_ly = 0
-            self.controller_command_lx = 0
-            self.controller_command_ry = 0
-            self.controller_command_rx = 0
 
         self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)

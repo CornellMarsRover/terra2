@@ -147,14 +147,17 @@ async def _send_moteus_command_async(
                     f"accel_limit={accel_limit}, feedforward_torque={ff_torque}")
 
     # Use moteus "official" parameter names
-    await controller.set_position(
+    result = await controller.set_position(
         position=position,
+        query=True,
         velocity=drives_velocity,
         maximum_torque=maximum_torque,
         velocity_limit=velocity_limit,
         accel_limit=accel_limit,
         feedforward_torque=ff_torque
     )
+
+    logger.info(f"{result}")
 
 def send_moteus_command_sync(
     controller: moteus.Controller,

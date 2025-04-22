@@ -87,7 +87,7 @@ class CmdVelPublisher(Node):
         mini_arm_data_raw, addr = mini_arm_sock.recvfrom(1024)
         # process mini_arm_data
         mini_arm_data = struct.unpack('ffffff', mini_arm_data_raw)
-        self.logger.info(f'mini arm data: {mini_arm_data}')
+        # self.logger.info(f'mini arm data: {mini_arm_data}')
         mini_arm_msg = self.create_mini_arm_message(mini_arm_data)
         self.mini_arm_publisher.publish(mini_arm_msg)
 

@@ -140,12 +140,11 @@ async def _send_moteus_command_async(
     if ff_torque is None:
         ff_torque = 0.0
 
-    # Optional logging
+    '''# Optional logging
     if logger:
         logger.info(f"[motor={motor}] position={position}, velocity={drives_velocity}, "
                     f"maximum_torque={maximum_torque}, velocity_limit={velocity_limit}, "
-                    f"accel_limit={accel_limit}, feedforward_torque={ff_torque}")
-
+                    f"accel_limit={accel_limit}, feedforward_torque={ff_torque}")'''
     # Use moteus "official" parameter names
     await controller.set_position(
         position=position,

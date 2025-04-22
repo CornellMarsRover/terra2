@@ -178,9 +178,11 @@ class JSInputSubscriber(Node):
             # self.logger.info(f'button_array: {msg.button_array[0]}')
             if trigger_val == L1 and button_val == SQUARE:
                 self.moveit_mode = 0
+                self.logger.info(f'Mini arm mode: {str(self.moveit_mode)}')
                 print("Mini arm mode: " + str(self.moveit_mode))
             if trigger_val == L1 and button_val == CIRCLE:
                 self.moveit_mode = 1
+                self.logger.info(f'IK mode: {str(self.moveit_mode)}')
                 print("MoveIt arm mode: " + str(self.moveit_mode))
             if trigger_val == R1 and button_val == SQUARE:
                 self.moveit_mode = 1

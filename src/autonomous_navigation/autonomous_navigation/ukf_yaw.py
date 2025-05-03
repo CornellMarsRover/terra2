@@ -54,6 +54,7 @@ class UKFYaw(Node):
         # Sensor offsets (not really used now, but kept for completeness)
         self.r_gps = [0.26, 0.08, 0.0]
         self.r_imu = [-0.2, 0.05, 0.0]
+        
 
         # Scaling factors to correct for sim driving
         self.k_pt_turn   = -1.32

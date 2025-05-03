@@ -61,7 +61,7 @@ class LocalizationSim(Node):
         self.kalman_timer = self.create_timer(1.0 / 10.0, self.run_kalman_filter)  # 10 Hz
 
         # Data from sensors
-        self.gps_measurement = None
+        self.gps_measurement = np.array([0.0, 0.0])
         self.imu_delta_position = [0.0, 0.0]
         self.imu_velocity = [0.0, 0.0, 0.0]  # [v_north, v_west, omega_z]
         self.yaw = 0.0 # Current yaw in radians
@@ -181,8 +181,8 @@ class LocalizationSim(Node):
         Publishes the fused pose and velocity.
         """
         pose_msg = TwistStamped()
-        pose_msg.twist.linear.x = self.state[0]
-        pose_msg.twist.linear.y = self.state[1]
+        pose_msg.twist.linear.x = self.gps_measurement[0]
+        pose_msg.twist.linear.y = self.gps_measurement[1]
         pose_msg.twist.angular.z = self.yaw
         pose_msg.header.stamp = self.get_clock().now().to_msg()  # Get current time
         self.pose_publisher.publish(pose_msg)

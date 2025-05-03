@@ -37,7 +37,7 @@ def generate_launch_description():
     # Randomly select one world file from the list
     selected_world_file = random.choice(randworld_files)
     empty_world_file = os.path.join(worlds_dir, 'emptyworld.world')
-    #selected_world_file = empty_world_file
+    selected_world_file = empty_world_file
     log_message = f"Randomly selected world file {selected_world_file}"
 
     # Log the selected world file

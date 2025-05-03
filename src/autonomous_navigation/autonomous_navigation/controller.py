@@ -91,7 +91,7 @@ class ControllerNode(Node):
         # Normalize heading error to [-pi, pi]
         heading_error = math.atan2(math.sin(heading_error), math.cos(heading_error))
         angle_error_deg = math.degrees(heading_error)
-        self.get_logger().info(f"Heading error: {angle_error_deg}")
+        #self.get_logger().info(f"Heading error: {angle_error_deg}")
         
         # If large angle error to next waypoint, use point-turn
         if abs(angle_error_deg) > self.point_turn_threshold:

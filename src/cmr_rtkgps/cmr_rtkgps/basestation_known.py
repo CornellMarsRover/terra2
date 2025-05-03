@@ -33,9 +33,9 @@ class GPSBasestation(Node):
             'LAT': 42.4449177,  # decimals
             'LON': -76.4836309,  # decimals
             'ALT': 245.0,      # meters
-            'x': 110183650,
-            'y': -458341884,
-            'z': 428228837
+            'x': 110178142,
+            'y': -458341954,
+            'z': 428229267
         }
         self.configure_fixed_mode()
 
@@ -104,7 +104,6 @@ class GPSBasestation(Node):
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
         self.get_logger().info(f"Configured Fixed mode with coordinates: "
-                               f"Lat: {lat}, Lon: {lon}, Height: {h}m"
                                f"ECEF: ({x}m, {y}m, {z}m)")
 
     def read_gps_loop(self):

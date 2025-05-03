@@ -24,7 +24,7 @@ class CostmapNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
-        self.real = True
+        #self.real = True
 
         if self.real:
             self.ground_plane_sub = self.create_subscription(
@@ -73,10 +73,13 @@ class CostmapNode(Node):
         # Maximum cost for occupied cells in the costmap
         self.max_cost = 100
 
-        # Ground detection thresholds
-        self.obstacle_threshold = 0.3
-        self.ground_threshold = -0.4
-
+        if self.real:
+            # Ground detection thresholds
+            self.obstacle_threshold = 0.3
+            self.ground_threshold = -0.4
+        else:
+            self.obstacle_threshold = 0.15
+            self.ground_threshold = -0.2
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
@@ -167,11 +170,12 @@ class CostmapNode(Node):
         
         if x_rot is None or y_rot is None:
             return
+
         # discretize to 0.25 m
         x_new = round(x_rot * self.k) / self.k
         y_new = round(y_rot * self.k) / self.k
         # don't update if out of grid bounds or previously detected an obstacle at that grid location
-        if (x_new, y_new) in curr_obstacles or self.in_ground_plane(x_new, y_new):
+        if (x_new, y_new) in curr_obstacles or (self.real and self.in_ground_plane(x_new, y_new)):
             return
         if (x_new, y_new) not in self.grid_dict:
             self.grid_dict[(x_new, y_new)] = 0
@@ -182,9 +186,7 @@ class CostmapNode(Node):
         # increment cell cost if height seems to represent obstacle
         else:
             self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+2)
-            if (x_new, y_new) not in curr_obstacles:
-                curr_obstacles.add((x_new, y_new))
-                #self.curr_obstacles.add((x_new, y_new))
+            curr_obstacles.add((x_new, y_new))
         return
 
     def ground_plane_callback(self, msg):

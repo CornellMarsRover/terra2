@@ -18,8 +18,8 @@ def generate_launch_description():
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='ukf_yaw',
-                    name='ukf_yaw',
+                    executable='localization_sim',
+                    name='localization_sim',
                     output='screen',
                     parameters=[{'real': False}]
                 ),
@@ -50,7 +50,7 @@ def generate_launch_description():
                     executable='p2',
                     name='p2',
                     output='screen',
-                    parameters=[{'visualize': True}]
+                    parameters=[{'visualize': True, 'real': False}]
                 ),
             ],
         ),

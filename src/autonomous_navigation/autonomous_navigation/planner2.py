@@ -23,14 +23,17 @@ class PlannerNode(Node):
         # ------------------------------------
         # Tunable parameters for cost-based path planning
         # ------------------------------------
-        self.max_cell_threshold = 1.0
+        self.max_cell_threshold = 10.0
         self.distance_weight = 0.1
         self.cost_weight = 1.0
 
         # If we want to visualize with Rerun
         self.declare_parameter('visualize', True)  # Shows rerun visualization if true
+        self.declare_parameter('real', True)  # False if running sim
+        self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
         self.visualize = True
+        
 
         # Subscriptions
         self.previous_target_subscription = self.create_subscription(
@@ -107,8 +110,11 @@ class PlannerNode(Node):
         self.ground_plane = []
 
         if self.visualize:
-            rr.init("planning", spawn=False)
-            rr.connect_tcp("10.49.89.182:9876")
+            if self.real:
+                rr.init("planning", spawn=False)
+                rr.connect_tcp("10.49.89.182:9876")
+            else:
+                rr.init("planning", spawn=True)
             self.redraw_timer = self.create_timer(0.2, self.plot_grid_rerun)
 
     # -------------------------------------------------------------------------
@@ -250,7 +256,7 @@ class PlannerNode(Node):
             distance = math.sqrt(dx**2 + dy**2)
             if distance < self.waypoint_threshold:
                 self.previous_points.append(self.current_path.popleft())
-                self.invalidation_count = 0
+                self.invalidated_segments = dict()
                 if len(self.current_path) == 0:
                     self.next_waypoint = None
                 else:
@@ -284,8 +290,8 @@ class PlannerNode(Node):
             )
 
             if max_cell > self.max_cell_threshold:
-                self.invalidated_segments[(start_pt, end_pt)] = 1 + self.invalidated_segments.get((start_pt, end_pt), 0)
-                if self.invalidated_segments[(start_pt, end_pt)] >= 3:
+                self.invalidated_segments[(i, i+1)] = 1 + self.invalidated_segments.get((i, i+1), 0)
+                if self.invalidated_segments[(i, i+1)] >= 3:
                     self.get_logger().info(
                         f"Segment from {start_pt} to {end_pt} above threshold ({self.max_cell_threshold}). "
                         f"Re-planning from {start_pt} to final target."
@@ -435,7 +441,7 @@ class PlannerNode(Node):
         goal = tuple(self.next_target)
 
         # Define local search region
-        half_width = 50.0
+        half_width = 8.0
         step_size = 0.25
         min_x = start[0] - half_width
         max_x = start[0] + half_width

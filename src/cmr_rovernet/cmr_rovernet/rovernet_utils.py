@@ -87,6 +87,7 @@ async def _send_moteus_stop_async(
     # This tells the moteus servo to stop actively controlling 
     # (this is the 'stop' mode on the servo).
     await controller.set_stop()  # By default, query=False
+    
 
 def send_moteus_stop_sync(
     controller: moteus.Controller,
@@ -109,6 +110,31 @@ def send_moteus_stop_sync(
         ),
         _moteus_loop
     )
+    return future.result()  # block until done (or raise exception on error)
+
+async def __async_initialize_moteus(servos: list):
+    transport = moteus.Fdcanusb()
+    # 1, 2, 3, 4  = drives: front left, back left, front right, back right
+    # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+    s = {
+        servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+    }
+
+    # reset servo positions
+    await transport.cycle([x.make_stop() for x in s.values()])
+    await transport.cycle([x.make_rezero() for x in s.values()])
+    
+
+def initialize_moteus_sync(servos: list, logger):
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        __async_initialize_moteus(servos),
+        _moteus_loop
+    )
+    logger.info("SENT RESET COMMAND")
     return future.result()  # block until done (or raise exception on error)
 
 async def _send_moteus_command_async(

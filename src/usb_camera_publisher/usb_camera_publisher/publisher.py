@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
+import os
+import yaml
 import rclpy
 from rclpy.node import Node
+
 from foxglove_msgs.msg import CompressedVideo
+from sensor_msgs.msg import CameraInfo
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -11,153 +15,187 @@ from gi.repository import Gst, GLib
 import threading
 
 class X264MultiCameraPublisher(Node):
-    def __init__(self, camera_ids, calibration_xml_map):
-        """
-        camera_ids: list of integers corresponding to /dev/videoX devices.
-        calibration_xml_map: dict mapping cam_id -> XML calibration string
-          e.g. {0: "<?xml version=\"1.0\"?>...<\/opencv_storage>", 1: "..."}
-        """
+    def __init__(self, camera_ids, calib_dir):
         super().__init__("x264_multi_camera_publisher")
-        self.get_logger().info("Initializing Multi-Camera Publisher with x264enc (software H.264)...")
+        self.get_logger().info("Initializing Multi-Camera Publisher with manual calibration…")
 
         self.camera_ids = camera_ids
-        self.calib_map = calibration_xml_map
+        self.calib_dir  = calib_dir
 
-        # Prepare publishers: one raw and one undistorted per camera
-        self.cam_publishers = {}
+        # publishers
+        self.cam_publishers  = {}
+        self.info_publishers = {}
+
+        # per‐camera calibration + crop
+        # expect each YAML to optionally contain a "crop" section:
+        #   crop:
+        #     left:   <px>
+        #     right:  <px>
+        #     top:    <px>
+        #     bottom: <px>
+        self.calib_data  = {}
+        self.crop_params = {}
+
         for cam_id in camera_ids:
-            raw_topic = f"camera_{cam_id}/h264/raw"
-            undist_topic = f"camera_{cam_id}/h264/undistorted"
-            self.cam_publishers[(cam_id, "raw")] = self.create_publisher(CompressedVideo, raw_topic, 10)
-            self.cam_publishers[(cam_id, "undistorted")] = self.create_publisher(CompressedVideo, undist_topic, 10)
+            # set up publishers
+            self.cam_publishers[cam_id]  = self.create_publisher(
+                CompressedVideo, f"camera_{cam_id}/h264", 10)
+            self.info_publishers[cam_id] = self.create_publisher(
+                CameraInfo,     f"camera_{cam_id}/camera_info", 10)
 
-        # Initialize GStreamer once
+            # load YAML
+            yaml_path = os.path.join(calib_dir, f"camera{cam_id}_calib.yaml")
+            if not os.path.isfile(yaml_path):
+                self.get_logger().error(f"Calibration file not found: {yaml_path}")
+                continue
+
+            with open(yaml_path, 'r') as f:
+                calib = yaml.safe_load(f)
+
+            # verify required keys
+            for key in ('image_width','image_height',
+                        'camera_matrix','distortion_coefficients',
+                        'rectification_matrix','projection_matrix'):
+                if key not in calib:
+                    self.get_logger().error(f"{key} missing in {yaml_path}")
+                    break
+
+            # default no crop
+            crop = calib.get('crop', {})
+            self.crop_params[cam_id] = {
+                'left':   crop.get('left',   0),
+                'right':  crop.get('right',  0),
+                'top':    crop.get('top',    0),
+                'bottom': crop.get('bottom', 0)
+            }
+
+            self.calib_data[cam_id] = calib
+
+        # initialize GStreamer
         Gst.init(None)
+        self.camera_pipelines  = {}
+        self.camera_mainloops  = {}
+        self.camera_threads    = {}
 
-        # Launch pipelines
-        self.camera_pipelines = {}
-        self.camera_mainloops = {}
-        self.camera_threads = {}
         for cam_id in camera_ids:
-            self._start_camera_pipeline(cam_id)
+            if cam_id in self.calib_data:
+                self._start_camera_pipeline(cam_id)
 
         self.get_logger().info("All camera pipelines initialized.")
 
     def _start_camera_pipeline(self, cam_id):
-        """
-        Build a single pipeline per camera with two branches:
-        1) Raw H.264
-        2) OpenCV undistorted H.264 via cameraundistort
-        """
-        xml = self.calib_map.get(cam_id)
-        if xml is None:
-            self.get_logger().error(f"No calibration XML for camera {cam_id}, skipping undistort branch")
-            return
+        c = self.crop_params[cam_id]
+        appsink_name = f"appsink_cam{cam_id}"
 
-        raw_sink = f"appsink_raw_cam{cam_id}"
-        undist_sink = f"appsink_undist_cam{cam_id}"
+        # build videocrop element args
+        crop_args = []
+        for side in ('left','right','top','bottom'):
+            val = c[side]
+            if val:
+                crop_args.append(f"{side}={val}")
+        videocrop_str = "videocrop " + " ".join(crop_args) if crop_args else ""
 
         pipeline_str = (
             f"v4l2src device=/dev/video{cam_id} ! "
             "image/jpeg, width=640, height=480, framerate=30/1 ! "
-            "jpegdec ! videoconvert ! tee name=t "
-
-            # Branch 1: raw
-            f"t. ! queue ! x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! "
-            "h264parse config-interval=1 ! "
-            "capsfilter caps=\"video/x-h264,stream-format=(string)byte-stream\" ! "
-            f"appsink name={raw_sink} emit-signals=true sync=false max-buffers=1 drop=true "
-
-            # Branch 2: undistorted via OpenCV plugin
-            f"t. ! queue ! "
-            f"cameraundistort settings='{xml}' ! videoconvert ! "
+            "jpegdec ! videoconvert ! "
+            f"{videocrop_str} ! "
+            "videoconvert ! "
             "x264enc tune=zerolatency speed-preset=ultrafast bitrate=2000 ! "
             "h264parse config-interval=1 ! "
             "capsfilter caps=\"video/x-h264,stream-format=(string)byte-stream\" ! "
-            f"appsink name={undist_sink} emit-signals=true sync=false max-buffers=1 drop=true"
+            f"appsink name={appsink_name} emit-signals=true sync=false max-buffers=1 drop=true"
         )
 
-        self.get_logger().info(f"[Camera {cam_id}] pipeline: {pipeline_str}")
-        pipeline = Gst.parse_launch(pipeline_str)
-        if not pipeline:
-            self.get_logger().error(f"Failed to parse pipeline for camera {cam_id}")
+        self.get_logger().info(f"[cam{cam_id}] {pipeline_str}")
+        pipe = Gst.parse_launch(pipeline_str)
+        if not pipe:
+            self.get_logger().error(f"[cam{cam_id}] parse_launch failed")
             return
 
-        # Connect appsinks
-        raw = pipeline.get_by_name(raw_sink)
-        undist = pipeline.get_by_name(undist_sink)
-        if not raw or not undist:
-            self.get_logger().error(f"Could not get appsink elements for camera {cam_id}")
-            return
-
-        raw.connect("new-sample", self._on_new_sample, (cam_id, "raw"))
-        undist.connect("new-sample", self._on_new_sample, (cam_id, "undistorted"))
-
-        # Store and start
-        self.camera_pipelines[cam_id] = pipeline
-        if pipeline.set_state(Gst.State.PLAYING) == Gst.StateChangeReturn.FAILURE:
-            self.get_logger().error(f"Failed to PLAY pipeline for camera {cam_id}")
-            return
+        appsink = pipe.get_by_name(appsink_name)
+        appsink.connect("new-sample", self._on_new_sample, cam_id)
+        pipe.set_state(Gst.State.PLAYING)
 
         loop = GLib.MainLoop()
+        self.camera_pipelines[cam_id] = pipe
         self.camera_mainloops[cam_id] = loop
-        thread = threading.Thread(target=loop.run, daemon=True)
-        self.camera_threads[cam_id] = thread
-        thread.start()
 
-    def _on_new_sample(self, appsink, user_data):
-        """
-        Called for each new H.264 sample from either branch.
-        user_data is (cam_id, mode) where mode is 'raw' or 'undistorted'.
-        """
-        cam_id, mode = user_data
+        t = threading.Thread(target=loop.run, daemon=True)
+        self.camera_threads[cam_id] = t
+        t.start()
+
+    def _on_new_sample(self, appsink, cam_id):
         sample = appsink.emit("pull-sample")
-        if not sample:
+        buf    = sample.get_buffer()
+        ok, mi = buf.map(Gst.MapFlags.READ)
+        if not ok:
             return Gst.FlowReturn.ERROR
 
-        buf = sample.get_buffer()
-        success, info = buf.map(Gst.MapFlags.READ)
-        if not success:
-            self.get_logger().error(f"Camera {cam_id} [{mode}]: buffer.map failed")
-            return Gst.FlowReturn.ERROR
-
-        msg = CompressedVideo()
+        # publish the (cropped) H.264 frame
         now = self.get_clock().now().to_msg()
-        msg.timestamp.sec = now.sec
-        msg.timestamp.nanosec = now.nanosec
-        msg.format = "h264"
-        msg.data = info.data
-        self.cam_publishers[(cam_id, mode)].publish(msg)
+        vid = CompressedVideo()
+        vid.timestamp.sec     = now.sec
+        vid.timestamp.nanosec = now.nanosec
+        vid.format            = "h264"
+        vid.frame_id          = f"camera_{cam_id}"
+        vid.data              = mi.data
+        self.cam_publishers[cam_id].publish(vid)
+        buf.unmap(mi)
 
-        buf.unmap(info)
+        # publish adjusted CameraInfo
+        calib = self.calib_data[cam_id]
+        crop  = self.crop_params[cam_id]
+
+        info = CameraInfo()
+        info.header.stamp    = now
+        info.header.frame_id = f"camera_{cam_id}"
+
+        # adjust width/height
+        orig_w = calib['image_width']
+        orig_h = calib['image_height']
+        info.width  = orig_w - crop['left'] - crop['right']
+        info.height = orig_h - crop['top'] - crop['bottom']
+
+        # copy distortion & matrices
+        info.distortion_model = calib.get('distortion_model','plumb_bob')
+        info.d = calib['distortion_coefficients']['data']
+        info.k = calib['camera_matrix']['data']
+        info.r = calib['rectification_matrix']['data']
+        info.p = calib['projection_matrix']['data']
+
+        # explicitly declare no binning…
+        info.binning_x = 0
+        info.binning_y = 0
+
+        # …and no ROI so Foxglove sees a “full‐frame” model
+        info.roi.x_offset   = 0
+        info.roi.y_offset   = 0
+        info.roi.width      = 0
+        info.roi.height     = 0
+        info.roi.do_rectify = False
+        
+        self.info_publishers[cam_id].publish(info)
         return Gst.FlowReturn.OK
 
     def stop_all(self):
-        self.get_logger().info("Stopping all camera pipelines...")
+        self.get_logger().info("Stopping pipelines…")
         for p in self.camera_pipelines.values():
             p.set_state(Gst.State.NULL)
-        for loop in self.camera_mainloops.values():
-            loop.quit()
+        for l in self.camera_mainloops.values():
+            l.quit()
         for t in self.camera_threads.values():
             if t.is_alive():
                 t.join()
-        self.get_logger().info("All camera pipelines stopped.")
+        self.get_logger().info("Stopped.")
 
 def main(args=None):
     rclpy.init(args=args)
-
-    # List your camera IDs here
-    camera_ids = [0, 2, 4, 6, 8, 10]
-
-    # Replace these with your real OpenCV XML calibration strings
-    with open("/home/cmr/cmr/terra/src/usb_camera_publisher/usb_camera_publisher/cam.xml","r") as f:
-        CALIBRATION_XML = { 0: f.read() }
-
-    node = X264MultiCameraPublisher(camera_ids, CALIBRATION_XML)
+    camera_ids = [0,2,4,6,8,10]
+    calib_dir  = "/home/cmr/cmr/terra/calib_dir"
+    node = X264MultiCameraPublisher(camera_ids, calib_dir)
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        node.get_logger().info("Interrupted, shutting down...")
     finally:
         node.stop_all()
         node.destroy_node()

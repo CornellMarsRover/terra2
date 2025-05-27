@@ -4,15 +4,6 @@ import launch_ros.actions
 
 def generate_launch_description():
     return launch.LaunchDescription([
-        # Start imu node first
-        launch_ros.actions.Node(
-            package='cmr_imu',
-            executable='imu_node',
-            name='imu_node',
-            output='screen',
-            parameters=[{}]
-        ),
-
         # Start zed node
         launch_ros.actions.Node(
             package='cmr_zed',
@@ -74,10 +65,10 @@ def generate_launch_description():
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='p2',
-                    name='p2',
+                    executable='planner',
+                    name='planner',
                     output='screen',
-                    parameters=[{'visualize': True}]
+                    parameters=[{'visualize': True, 'real': True}]
                 ),
             ],
         ),

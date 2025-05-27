@@ -45,8 +45,8 @@ class ControllerNode(Node):
         self.point_turn_velocity = 0.5
         self.ackerman_velocity = 0.5
         if not self.real:
-            self.ackerman_velocity = 0.055
-            self.point_turn_velocity = 0.08
+            self.ackerman_velocity = 0.057
+            self.point_turn_velocity = 0.085
         # Timers and state
         self.last_movement = 'ackerman'
         self.last_command_time = self.get_clock().now().to_msg()
@@ -143,11 +143,7 @@ class ControllerNode(Node):
             stanley_steer = heading_error + math.atan2(self.k_stanley * cross_track_error, speed)
             # Convert to degrees
             steer_angle_deg = math.degrees(stanley_steer)
-            #####
-            '''if steer_angle_deg < 0 and steer_angle_deg < -45.0:
-                steer_angle_deg = -45.0
-            elif steer_angle_deg > 0 and steer_angle_deg > 45.0:
-                steer_angle_deg = 45.0'''
+
             # Publish ackerman with stanley_steer
             curr_time = self.get_clock().now().to_msg()
             dt = self.compute_time_delta(curr_time, self.last_command_time)
@@ -210,6 +206,14 @@ class ControllerNode(Node):
         """
         self.robot_position = (msg.twist.linear.x, msg.twist.linear.y)
         self.yaw = msg.twist.angular.z
+        if not self.real:
+            mag = math.degrees(abs(self.yaw))
+            if (45.0 < mag < 135.0):
+                self.ackerman_velocity = 0.06
+                self.point_turn_velocity = 0.09
+            else:
+                self.ackerman_velocity = 0.057
+                self.point_turn_velocity = 0.085
 
     def update_waypoint(self, msg):
         """

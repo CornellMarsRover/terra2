@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 
 """
-NavAckerman ROS2 Node
-
-This node autonomously navigates the robot to predefined GPS waypoints using Ackermann steering.
-It subscribes to pose and velocity data from a localization node and calculates movement commands
-to reach the waypoints.
+State Machine ROS2 Node
+High-level logic for autonomy
 """
 
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import Bool, Int16, Float32MultiArray, String
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import Twist, TwistStamped
 import yaml
 import math
 import os
 import time
-from typing import Dict, Tuple, Optional
+import numpy as np
+from collections import deque
+from typing import Dict, Tuple, Optional, Deque
 from ament_index_python.packages import get_package_share_directory
 from pyubx2 import llh2ecef
 
@@ -37,7 +36,9 @@ class StateMachineNode(Node):
         if self.real:
             waypoints_file = 'config/waypoints_engquad.yaml'
         else:
-            waypoints_file = 'config/sim_waypoints_condensed.yaml'
+            #waypoints_file = 'config/sim_waypoints_condensed.yaml'
+            waypoints_file = 'config/waypoints.yaml'
+            waypoints_file = 'config/waypoints_long.yaml'
 
         self.get_logger().info(f"Waypoints file: {waypoints_file}")
         # Load waypoints
@@ -59,8 +60,8 @@ class StateMachineNode(Node):
         # Define first target
         self.current_waypoint_index = 1
         self.next_waypoint = self.waypoints[self.current_waypoint_index]
-        self.next_target_lat = self.next_waypoint['latitude']
-        self.next_target_lon = self.next_waypoint['longitude']
+        self.next_coordinate_lat = self.next_waypoint['latitude']
+        self.next_coordinate_lon = self.next_waypoint['longitude']
 
         # Change from initial pose
         self.north = 0.0 # meters
@@ -69,52 +70,116 @@ class StateMachineNode(Node):
 
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints.')
 
-        # Define states
-        self.states = {'drive_to_coord',
-                       'search_ar_tag',
-                       'search_water_bottle',
-                       'search_mallet'}
-                       
-        # Initial state is driving to first target coordinate
-        self.current_state = 'drive_to_coord'
 
-        # Subscriptions to localization and movement data
+        # Subscriptions to localization and game object data
         self.pose_subscription = self.create_subscription(
             TwistStamped, '/autonomy/pose/robot/global', self.pose_callback, 10
         )
-        self.velocity_subscription = self.create_subscription(
-            Float32MultiArray, '/autonomy/velocity', self.velocity_callback, 10
+        self.object_subscription = self.create_subscription(
+            Twist, '/autonomy/target_object/position', self.object_callback, 10
         )
 
-        # Publisher to broadcast current state
+        # Publishers
         self.state_publisher = self.create_publisher(String, '/autonomy/state', 10)
-
-        # Publishers to broadcast previous and next position targets for planning
-        # Format is [delta_north in m, delta_west in m, desired_yaw in rad (optional)]
         self.previous_target_publisher = self.create_publisher(Float32MultiArray, '/autonomy/target/previous', 10)
-        self.next_target_publisher = self.create_publisher(Float32MultiArray, '/autonomy/target/next', 10)
-        
+        self.next_coordinate_publisher = self.create_publisher(Float32MultiArray, '/autonomy/target/global', 10)
+        self.object_publisher = self.create_publisher(String, '/autonomy/target_object/name', 10)
         self.previous_target = [0.0, 0.0]
-        n, w = self.get_north_west_meters(self.next_target_lat, self.next_target_lon)
-        self.next_target = [n, w]
-        self.target_threshold = 2.0
+        n, w = self.get_north_west_meters(self.next_coordinate_lat, self.next_coordinate_lon)
+        self.next_coordinate = (n, w)
+        
+        # Targets for the mission with (object name, threshold, search_radius, radial step for search, angular step for search)
+        self.targets = {
+            1: ('coordinate', 2.0, 0.0, 0.0, 0.0),
+            2: ('ar1', 1.5, 10.0, 0.2, 15.0),
+            3: ('ar2', 1.5, 15.0, 0.2, 15.0),
+            4: ('ar3', 1.5, 20.0, 0.2, 15.0), # 1
+            5: ('ar1', 1.5, 10.0, 0.2, 30.0),
+            6: ('ar2', 1.5, 15.0, 0.2, 30.0),
+            7: ('ar3', 1.5, 20.0, 0.2, 30.0), # 2
+            8: ('ar1', 1.5, 10.0, 0.2, 45.0),
+            9: ('ar2', 1.5, 15.0, 0.2, 45.0),
+            10: ('ar3', 1.5, 20.0, 0.2, 45.0), # 3
+            11: ('ar1', 1.5, 10.0, 0.4, 15.0),
+            12: ('ar2', 1.5, 15.0, 0.4, 15.0),
+            13: ('ar3', 1.5, 20.0, 0.4, 15.0), # 4
+            14: ('ar1', 1.5, 10.0, 0.4, 30.0),
+            15: ('ar2', 1.5, 15.0, 0.4, 30.0),
+            16: ('ar3', 1.5, 20.0, 0.4, 30.0), # 5
+            17: ('ar1', 1.5, 10.0, 0.4, 45.0),
+            18: ('ar2', 1.5, 15.0, 0.4, 45.0),
+            19: ('ar3', 1.5, 20.0, 0.4, 45.0),  # 6
+            20: ('ar1', 1.5, 10.0, 0.6, 30.0),
+            21: ('ar2', 1.5, 15.0, 0.6, 30.0),
+            22: ('ar3', 1.5, 20.0, 0.6, 30.0), # 7
+            #5: ('mallet', 1.5, 10.0),
+            #6: ('water bottle', 1.5, 10.0)
+        }
+
+        # Initial state is driving to first target coordinate
+        self.current_state = None
+        self.threshold = None
+        self.search_radius = None
+        self.r_step = None
+        self.theta_step = None
+        self.searched = False
+        self.update_search_params() # Updates above values using current waypoint index
+
+        self.target_position = None
+        self.search_waypoints = deque()
+        self.dist_to_coord = math.inf
 
         # Timer for control loop (10 Hz)
         self.timer = self.create_timer(0.1, self.control_loop)
 
-    def update_gps_target(self):
+    def update_targets(self):
         """
         Updates targets from gps coordinate
         """
+        # Update distance to the target GPS coordinate
+        dx = self.next_coordinate[0] - self.north
+        dy = self.next_coordinate[1] - self.west
+        self.dist_to_coord = math.sqrt(dx**2 + dy**2)
+        
+        reached = False
+        # If driving to just coordinate, distance to coord is sufficient to check
+        if self.dist_to_coord < self.threshold:
+            if self.current_state == 'coordinate':
+                reached = True
+            elif len(self.search_waypoints) > 0 and self.target_position is None:
+                self.next_coordinate = self.search_waypoints.popleft()
+            elif self.target_position is None and not self.searched:
+                self.search_waypoints = generate_search_points(self.next_coordinate, self.search_radius, self.r_step, self.theta_step)
+                self.searched = True
+                self.threshold = 2.0 # to account for badly selected waypoints
+                self.get_logger().info(f"Search waypoints generated: {self.search_waypoints}")
+            else:
+                reached = True
+                self.searched = False
+        # If the object has been found and within allowed threshold, target reached
+        elif self.target_position is not None:
+            dx = self.target_position[0] - self.north
+            dy = self.target_position[1] - self.west
+            d = math.sqrt(dx**2 + dy**2)
+            reached = (d < self.threshold)
+            #self.get_logger().info(f"Distance to target object: {d}")
+            if d < self.threshold * 2:
+                self.publish_target_name()
+        if not reached:
+            return
+
+        self.current_waypoint_index += 1
         if self.current_waypoint_index >= len(self.waypoints):
-            self.current_waypoint_index -= 1
-            
-        self.previous_target = self.next_target
+            return
+        # Update target object and coordinates
+        self.update_search_params()
+        self.previous_target = self.next_coordinate
         self.next_waypoint = self.waypoints[self.current_waypoint_index]
-        self.next_target_lat = self.next_waypoint['latitude']
-        self.next_target_lon = self.next_waypoint['longitude']
-        n, w = self.get_north_west_meters(self.next_target_lat, self.next_target_lon)
-        self.next_target = [n, w]
+        self.next_coordinate_lat = self.next_waypoint['latitude']
+        self.next_coordinate_lon = self.next_waypoint['longitude']
+        n, w = self.get_north_west_meters(self.next_coordinate_lat, self.next_coordinate_lon)
+        self.next_coordinate = [n, w]
+
 
     def pose_callback(self, msg):
         """
@@ -123,12 +188,10 @@ class StateMachineNode(Node):
         self.north = msg.twist.linear.x
         self.west = msg.twist.linear.y
         self.yaw = msg.twist.angular.z
-
-    def velocity_callback(self, msg):
-        """
-        Updates the current velocity of the robot (not used directly here but available if needed).
-        """
-        return
+    
+    def object_callback(self, msg):
+        self.target_position = [msg.linear.x, msg.linear.y]
+        self.get_logger().info(f"Current target {self.current_state} found at {self.target_position}")
 
     def control_loop(self):
         """
@@ -141,25 +204,8 @@ class StateMachineNode(Node):
             self.get_logger().info('All waypoints reached.')
             return
 
-        if self.current_state == 'drive_to_coord':
-            reached = self.check_goal_reached()
-            if reached:
-                self.get_logger().info("Target reached!")
-                self.current_waypoint_index += 1
-                self.update_gps_target()
-
-            self.publish_targets()
-
-    def check_goal_reached(self):
-        """
-        Check if the robot has reached the next target and update if necessary
-        """
-        dx = self.next_target[0] - self.north
-        dy = self.next_target[1] - self.west
-        dist = math.sqrt(dx**2 + dy**2)
-        #self.get_logger().info(f"Distance to target: {dist}")
-        return dist < self.target_threshold
-
+        self.update_targets()
+        self.publish_targets()
 
     def publish_targets(self):
         """
@@ -167,13 +213,27 @@ class StateMachineNode(Node):
         """
         prev_target = Float32MultiArray()
         prev_target.data = [float(self.previous_target[0]), float(self.previous_target[1])]
+        self.previous_target_publisher.publish(prev_target)
 
         next_target = Float32MultiArray()
-        next_target.data = [float(self.next_target[0]), float(self.next_target[1])]
+        if self.target_position is None:
+            next_target.data = [float(self.next_coordinate[0]), float(self.next_coordinate[1])]
+        else:
+            next_target.data = [float(self.target_position[0]), float(self.target_position[1])]
+        self.next_coordinate_publisher.publish(next_target)
 
-        self.previous_target_publisher.publish(prev_target)
-        self.next_target_publisher.publish(next_target)
-    
+        # Look for target if not yet found
+        if self.dist_to_coord < self.search_radius and self.target_position is None:
+            self.publish_target_name()
+
+    def publish_target_name(self):
+        """
+        Publish the name of the autonomy game object to be searched for
+        """
+        object_msg = String()
+        object_msg.data = self.current_state
+        self.object_publisher.publish(object_msg)
+
     def get_north_west_meters(self, target_lat, target_lon):
         """
         Converts GPS coordinates (latitude, longitude) to north/west displacements (meters)
@@ -193,7 +253,21 @@ class StateMachineNode(Node):
         north = -1.0 * delta_lat * R
         west = delta_lon * R * math.cos(mean_lat)
         return north, west
-
+    
+    def update_search_params(self):
+        """
+        Update search params with the current waypoint index
+        """
+        t = self.targets[self.current_waypoint_index]
+        self.current_state = t[0]
+        self.threshold = t[1]
+        self.search_radius = t[2]
+        self.r_step = t[3]
+        self.theta_step = t[4]
+        # Reset object variables
+        self.target_position = None
+        self.search_waypoints = deque()
+        
     def publish_state(self):
         """
         Publish current state
@@ -227,6 +301,23 @@ class StateMachineNode(Node):
     def destroy_node(self):
         super().destroy_node()
 
+def generate_search_points(center, radius, radial_step, angular_step_deg):
+    """
+    Helper function to generate waypoints in an outwards spiral
+    to look for objects once a coordinate has been reached
+    """
+    points = deque()
+    r = 0
+    theta = 0
+    while r < radius:
+        r += radial_step
+        theta += angular_step_deg
+        if theta >= 360:
+            theta %= 360
+        x = r * np.cos(math.radians(theta)) + center[0]
+        y = r * np.sin(math.radians(theta)) + center[1]
+        points.append((x, y))
+    return points
 
 def main(args=None):
     rclpy.init(args=args)

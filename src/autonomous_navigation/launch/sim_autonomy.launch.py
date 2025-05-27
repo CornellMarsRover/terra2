@@ -3,11 +3,18 @@ import launch_ros.actions
 
 def generate_launch_description():
     return launch.LaunchDescription([
-        # Start state_machine node first
+        # Start state_machine & object detection nodes first
         launch_ros.actions.Node(
             package='autonomous_navigation',
             executable='state_machine',
             name='state_machine',
+            output='screen',
+            parameters=[{'real': False, 'use_sim_time': True}]
+        ),
+        launch_ros.actions.Node(
+            package='autonomous_navigation',
+            executable='object_detection',
+            name='object_detection',
             output='screen',
             parameters=[{'real': False, 'use_sim_time': True}]
         ),
@@ -21,7 +28,7 @@ def generate_launch_description():
                     executable='localization_sim',
                     name='localization_sim',
                     output='screen',
-                    parameters=[{'real': False}]
+                    parameters=[{'real': False, 'use_sim_time': True}]
                 ),
             ],
         ),
@@ -32,25 +39,36 @@ def generate_launch_description():
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='costmap_sim',
-                    name='costmap_sim',
+                    executable='costmap',
+                    name='costmap',
                     output='screen',
                     parameters=[{'real': False, 'use_sim_time': True}]
                 ),
             ],
         ),
 
-        # Start planner after costmap_sim starts
-        # TESTING OUT NEW PLANNER FOR NOW
+        # Start planners after costmap starts
         launch.actions.TimerAction(
             period=4.0,
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='p2',
-                    name='p2',
+                    executable='local_planner',
+                    name='local_planner',
                     output='screen',
                     parameters=[{'visualize': True, 'real': False}]
+                ),
+            ],
+        ),
+        launch.actions.TimerAction(
+            period=4.0,
+            actions=[
+                launch_ros.actions.Node(
+                    package='autonomous_navigation',
+                    executable='global_planner',
+                    name='global_planner',
+                    output='screen',
+                    parameters=[{'real': False}]
                 ),
             ],
         ),

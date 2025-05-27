@@ -59,18 +59,6 @@ class RTKLocalization(Node):
         n, w = self.get_north_west_meters(lat, lon)
         self.gps_n = n
         self.gps_w = w
-        '''# Use a known fixed height (e.g. basestation height)
-        basestation_height = 245.0  
-        x, y, _ = llh2ecef(lat, lon, basestation_height)
-        # Initialize offset from first measurement
-        if self.initial_x is None:
-            self.initial_x = x
-            self.initial_y = y
-        # Compute displacement rukfelative to initial position
-        disp_x = x - self.initial_x 
-        disp_y = y - self.initial_y 
-        self.gps_n = disp_y
-        self.gps_w = -1.0 * disp_x'''
 
     def imu_callback(self, msg: IMUSensorData):
         """

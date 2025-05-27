@@ -33,9 +33,9 @@ class GPSBasestation(Node):
             'LAT': 42.4449177,  # decimals
             'LON': -76.4836309,  # decimals
             'ALT': 245.0,      # meters
-            'x': 110178142,
-            'y': -458341954,
-            'z': 428229267
+            'x': 110179824,
+            'y': -458339334,
+            'z': 428231903
         }
         self.configure_fixed_mode()
 

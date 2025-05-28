@@ -228,6 +228,7 @@ class CmdVelSubscriber(Node):
         # back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
         # logger = logging.getLogger("DrivesLogger")
         # logger.setLevel(logging.INFO)
+        logger = self.logger
         
 
         send_moteus_command_sync(controller=self.front_left, motor=1, position=math.nan, drives_velocity=(-self.velocity*ws2), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=logger)

@@ -175,7 +175,6 @@ async def _send_moteus_command_async(
     # Use moteus "official" parameter names
     result = await controller.set_position(
         position=position,
-        query=True,
         velocity=drives_velocity,
         maximum_torque=maximum_torque,
         velocity_limit=velocity_limit,

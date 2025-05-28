@@ -1,0 +1,48 @@
+image_width: 640
+image_height: 480
+camera_name: camera0
+
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [295.47681356, 0.0, 329.74792296,
+         0.0, 295.37930705, 240.82374656,
+         0.0, 0.0, 1.0]
+
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.20613443, 0.05750787, 0.00029281, -0.00089186, -0.00870947]
+
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0,
+         0.0, 1.0, 0.0,
+         0.0, 0.0, 1.0]
+
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [47.41768587, 0.0, 553.83406045, 0.0,
+         0.0, 54.65423537, 352.96360144, 0.0,
+         0.0, 0.0, 1.0, 0.0]
+
+#–– tell ROS we have no binning ––
+binning_x: 0
+binning_y: 0
+
+#–– now define the valid-pixel ROI ––
+roi:
+  x_offset: 501    # left column
+  y_offset: 308    # top   row
+  width:     103   # columns
+  height:     89   # rows
+  do_rectify: true # publish it so downstream will crop
+
+crop:
+  left:   30
+  right:  30
+  top:    30
+  bottom: 30

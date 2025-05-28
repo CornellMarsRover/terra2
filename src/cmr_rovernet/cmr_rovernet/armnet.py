@@ -141,7 +141,7 @@ class JSInputSubscriber(Node):
 
     def listener_callback_mini(self, msg):  
         if not self.moveit_mode:
-            max_velocity = 3
+            max_velocity = 6
             print([msg.base_angle, msg.shoulder_angle, msg.elbow_angle, msg.first_rotate_angle, msg.tilt_angle, msg.second_rotate_angle])
             # base = byte_command_converter(ARM, ARM_BASE, msg.base_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
             # shoulder = byte_command_converter(ARM, ARM_SHOULDER, msg.shoulder_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
@@ -164,8 +164,8 @@ class JSInputSubscriber(Node):
             wrist_rotate_2 = moteus.Controller(id=14)
 
             send_moteus_command_sync(controller=base, motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=shoulder, motor=11, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=elbow, motor=10, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=shoulder, motor=10, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=elbow, motor=11, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_tilt, motor=13, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)

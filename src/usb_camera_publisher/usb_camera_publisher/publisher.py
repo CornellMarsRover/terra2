@@ -97,7 +97,7 @@ class X264MultiCameraPublisher(Node):
 
         pipeline_str = (
             f"v4l2src device=/dev/video{cam_id} ! "
-            "image/jpeg, width=640, height=480, framerate=30/1 ! "
+            "image/jpeg, width=640, height=480 ! "
             "jpegdec ! videoconvert ! "
             f"{videocrop_str} ! "
             "videoconvert ! "

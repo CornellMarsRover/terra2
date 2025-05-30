@@ -12,6 +12,7 @@ from collections import deque
 from cv_bridge import CvBridge
 import cv2
 
+from cmr_msgs.msg import GroundPlaneStamped
 from sensor_msgs.msg import PointCloud2, PointField, Image
 from geometry_msgs.msg import TwistStamped, TransformStamped
 from std_msgs.msg import Header
@@ -49,6 +50,7 @@ class ZedAutonomy(Node):
         # Publishers
         self.pointcloud_publisher = self.create_publisher(PointCloud2, '/camera/points', 10)
         self.pose_publisher = self.create_publisher(TwistStamped, '/zed/pose', 10)
+        self.ground_publisher = self.create_publisher(GroundPlaneStamped, '/camera/ground_plane', 10)
         self.image_publisher = self.create_publisher(Image, '/zed/image', 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
@@ -68,7 +70,7 @@ class ZedAutonomy(Node):
         # Ground plane parameters
         self.plane_parameters = sl.PlaneDetectionParameters()
         self.plane_parameters.normal_similarity_threshold = 15
-        self.plane_parameters.max_distance_threshold = 0.07
+        self.plane_parameters.max_distance_threshold = 0.15
 
         # Positional tracking
         tracking_params = sl.PositionalTrackingParameters()
@@ -99,14 +101,18 @@ class ZedAutonomy(Node):
         self.pose_data = None
         self.image_data = None
         self.pose_stamp = None
+        self.ground_data = None
+        self.ground_stamp = None
         self.image_stamp = None
 
         # Frequency trackers
         self.pc_tracker = FrequencyTracker()
         self.pose_tracker = FrequencyTracker()
+        self.ground_tracker = FrequencyTracker()
         self.image_tracker = FrequencyTracker()
         self.publish_pc_tracker = FrequencyTracker()
         self.publish_pose_tracker = FrequencyTracker()
+        self.publish_ground_tracker = FrequencyTracker()
         self.publish_image_tracker = FrequencyTracker()
 
         # Start ZED worker thread
@@ -144,6 +150,17 @@ class ZedAutonomy(Node):
                         self.pose_tracker.update()
                         self.log_frequency("Pose", self.pose_tracker)
 
+                # Ground plane
+                #with self.ground_lock:
+                    for hit in hits:
+                        status = self.zed.find_plane_at_hit(hit, self.ground_plane, self.plane_parameters)
+                        #self.get_logger().info("pls goodness me")
+                        if status == sl.ERROR_CODE.SUCCESS and self.ground_plane.type == sl.PLANE_TYPE.HORIZONTAL:
+                            self.ground_data = self.ground_plane.get_bounds().copy()
+                            self.ground_stamp = self.get_clock().now().to_msg()
+                            self.ground_tracker.update()
+                            self.log_frequency("GroundPlane", self.ground_tracker)
+                            break
                 # Image
                     self.zed.retrieve_image(self.image_left, sl.VIEW.LEFT)
                     self.image_data = self.image_left.get_data().copy()
@@ -157,15 +174,26 @@ class ZedAutonomy(Node):
     def log_frequency(self, label, tracker: FrequencyTracker):
         avg_freq = tracker.average_frequency()
         recent_freq = tracker.recent_frequency()
-        self.get_logger().info(
-            f"{label} - Avg: {avg_freq:.2f} Hz | Last 10: {recent_freq:.2f} Hz"
-        )
+        #self.get_logger().info(f"{label} - Avg: {avg_freq:.2f} Hz | Last 10: {recent_freq:.2f} Hz")
 
+    def publish_image(self):
+        with self.image_lock:
+            image_data = self.image_data
+            image_stamp = self.image_stamp # Not used
+        
+        if self.image_data is not None:
+            # Convert numpy array to ROS Image message
+            image_msg = self.bridge.cv2_to_imgmsg(image_data, encoding="bgra8")
+            self.image_publisher.publish(image_msg)
+            self.publish_image_tracker.update()
+            self.log_frequency("Image publish", self.publish_image_tracker)
 
     def publish_pointcloud(self):
         with self.pc_lock:
             pc_data = self.pc_data
             pc_stamp = self.pc_stamp
+            ground_data = self.ground_data
+            ground_stamp = self.ground_stamp
             pose_data = self.pose_data
             pose_stamp = self.pose_stamp
             image_data = self.image_data
@@ -175,6 +203,10 @@ class ZedAutonomy(Node):
             self.pointcloud_publisher.publish(msg)
             self.publish_pc_tracker.update()
             self.log_frequency("PC publish", self.publish_pc_tracker)
+        if ground_data is not None:
+            self.publish_ground_plane(ground_data, ground_stamp)
+            self.publish_ground_tracker.update()
+            self.log_frequency("Ground plane publish", self.publish_ground_tracker)
         if pose_data is not None:
             self.publish_pose(pose_data, pose_stamp)
             self.publish_transform(pose_stamp)
@@ -187,6 +219,17 @@ class ZedAutonomy(Node):
             self.publish_image_tracker.update()
             self.log_frequency("Image publish", self.publish_image_tracker)
             
+    def publish_ground(self):
+        self.get_logger().info("GROUND 1")
+        with self.ground_lock:
+            ground_data = self.ground_data
+            ground_stamp = self.ground_stamp
+        self.get_logger().info("GROUND 2")
+        if ground_data is not None:
+            self.publish_ground_plane(ground_data, ground_stamp)
+            self.publish_ground_tracker.update()
+            self.log_frequency("Ground plane publish", self.publish_ground_tracker)
+
     def publish_pose_data(self):
         with self.pose_lock:
             pose_data = self.pose_data
@@ -201,7 +244,7 @@ class ZedAutonomy(Node):
     def publish_pose(self, pose, stamp):
         translation = pose.get_translation(sl.Translation()).get()
         rotation = pose.get_rotation_vector()
-
+        
         msg = TwistStamped()
         msg.header.stamp = stamp
         msg.header.frame_id = "zed_camera_frame"
@@ -213,6 +256,13 @@ class ZedAutonomy(Node):
         msg.twist.angular.z = rotation[2]
         self.pose_publisher.publish(msg)
 
+    def publish_ground_plane(self, ground_bounds, stamp):
+        msg = GroundPlaneStamped()
+        msg.header.stamp = stamp
+        msg.header.frame_id = "zed_camera_frame"
+        msg.x = [float(x) for x in ground_bounds[:, 0]]
+        msg.y = [float(y) for y in ground_bounds[:, 1]]
+        self.ground_publisher.publish(msg)
 
     def publish_transform(self, stamp):
         t = TransformStamped()

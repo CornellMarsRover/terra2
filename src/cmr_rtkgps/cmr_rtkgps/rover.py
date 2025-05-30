@@ -21,11 +21,11 @@ class GPSRover(Node):
         # 1. Open local serial port for the rover’s ZED-F9P
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM1', baudrate=115200, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM2', baudrate=115200, timeout=1)
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
-            self.get_logger().info("Rover serial port /dev/ttyACM1 opened successfully.")
+            self.get_logger().info("Rover serial port /dev/ttyACM2 opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
             return

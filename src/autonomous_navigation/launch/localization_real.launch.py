@@ -51,8 +51,10 @@ def generate_launch_description():
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='costmap_sim',
-                    name='costmap_sim',
+                    # executable='costmap_sim',
+                    # name='costmap_sim',
+                    executable='costmap',
+                    name='costmap',
                     output='screen',
                     parameters=[{'real': True, 'use_sim_time': False}]
                 ),

@@ -32,18 +32,24 @@ def generate_launch_description():
         ),
 
         # Start localization node
+        # zenchang replaced this
         launch.actions.TimerAction(
-            period=1.0,
-            actions=[
-                launch_ros.actions.Node(
-                    package='autonomous_navigation',
-                    executable='rtk_localization',
-                    name='rtk_localization',
-                    output='screen',
-                    parameters=[{'real': True}]
-                ),
-            ],
-        ),
+        period=1.0,
+        actions=[
+            launch_ros.actions.Node(
+                package='autonomous_navigation',
+                executable='rtk_localization',
+                name='rtk_localization',
+                output='screen',
+                parameters=[{'real': True}],
+                remappings=[
+                    ('/gps/fix', '/rtk/navsatfix_data'),
+                    ('/imu/data', '/imu'),
+                ],
+            ),
+        ],
+    ),
+
 
         # Start costmap
         launch.actions.TimerAction(
@@ -67,8 +73,8 @@ def generate_launch_description():
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',
-                    executable='planner',
-                    name='planner',
+                    executable='local_planner',
+                    name='local_planner',
                     output='screen',
                     parameters=[{'visualize': True, 'real': True}]
                 ),
@@ -77,7 +83,7 @@ def generate_launch_description():
 
         # Start controller node after long wait to ensure nothing is going wrong
         launch.actions.TimerAction(
-            period=30.0,
+            period=5.0,# it was 30 seconds before
             actions=[
                 launch_ros.actions.Node(
                     package='autonomous_navigation',

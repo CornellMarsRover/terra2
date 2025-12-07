@@ -34,7 +34,9 @@ class StateMachineNode(Node):
 
         # Choose which waypoints file to load
         if self.real:
-            waypoints_file = 'config/waypoints_engquad.yaml'
+            waypoints_file = 'config/waypoints_duff.yaml'
+        # if self.real:
+        #     waypoints_file = 'config/waypoints_engquad.yaml'
         else:
             #waypoints_file = 'config/sim_waypoints_condensed.yaml'
             waypoints_file = 'config/waypoints.yaml'

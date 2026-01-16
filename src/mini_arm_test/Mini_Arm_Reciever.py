@@ -16,6 +16,18 @@ CONTROL_RATE_HZ = 200   # Hz for main loop
 VELOCITY_LIMIT = 2.0    # rad/s
 ACCEL_LIMIT = 4.0       # rad/s²
 
+# ====================== SOFTWARE REDUCTION ======================
+SOFT_GEAR_RATIO = [
+    0.15,  # joint 1
+    0.15,  # joint 2
+    0.12,  # joint 3
+    0.10,  # joint 4
+    0.10,  # joint 5
+    0.08   # joint 6
+]
+
+DEADBAND = 0.002  # rad, ignores hand jitter
+
 # ====================== MOTEUS SETUP ======================
 async def make_controllers():
     print("[INFO] Initializing moteus controllers...")
@@ -47,13 +59,33 @@ async def udp_listener(target_positions):
     sock.setblocking(False)
     print(f"[INFO] Listening for joint commands on UDP {UDP_IP}:{UDP_PORT}...")
 
+    prev_mini = [0.0] * 6
+    initialized = False
+
     while True:
         try:
             data, addr = sock.recvfrom(1024)
             if len(data) == 24:
-                vals = list(struct.unpack('6f', data))
-                target_positions[:] = vals
-                print(f"[RECV] From {addr}: {vals}")
+                mini_vals = list(struct.unpack('6f', data))
+                print(f"[RECV] From {addr}: {mini_vals}")
+                # First packet → initialize
+                if not initialized:
+                    prev_mini = mini_vals[:]
+                    target_positions[:] = [0.0] * 6
+                    initialized = True
+                    continue
+
+                for i in range(6):
+                    delta = mini_vals[i] - prev_mini[i]
+
+                    # Deadband to kill jitter
+                    if abs(delta) < DEADBAND:
+                        delta = 0.0
+
+                    target_positions[i] += SOFT_GEAR_RATIO[i] * delta
+
+                prev_mini = mini_vals[:]
+
             else:
                 print(f"[WARN] Ignoring invalid packet length: {len(data)}")
         except BlockingIOError:
@@ -92,7 +124,7 @@ async def control_loop(controllers, target_positions):
 async def main():
     controllers = await make_controllers()
     #current_positions = await initialize_positions(controllers)
-    target_positions = []
+    target_positions = [0.0] * 6
 
     await asyncio.gather(
         udp_listener(target_positions),

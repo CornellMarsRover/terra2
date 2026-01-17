@@ -291,33 +291,25 @@ class CmdVelSubscriber(Node):
         result_int = int(first_two_hex, 16)
         return result_int
             
+
     def listener_button_callback(self, msg):
-        trigger_val = msg.button_array[0]
-        button_val = msg.button_array[1]
-        # self.logger.info(f'button_array: {msg.button_array[0]}')
-        R2trigger = self.r2TriggerConverter(trigger_val)
-        if R2trigger >= 0 and R2trigger <= 255:
-            vel = scale_value(R2trigger, float(0), float(255), 0, self.MOTOR_MAX_SPEED)
-            self.velocity = vel 
-        if trigger_val >= L2_MIN and trigger_val <= L2:
-            vel = scale_value(trigger_val, L2_MIN, L2, 0, self.MOTOR_MAX_SPEED)
-            self.velocity = -vel
-            # self.logger.info(f'R2: {r2val}')
-            
-        if trigger_val == L1 and button_val == TRIANGLE: 
-            self.current_speed = 0
-            self.current_speed_angular = 0
+    # Layout from your UDP bridge: [L1, R1, L2, R2, Square, Cross, Circle, Triangle]
+        L1b, R1b, L2b, R2b, Sq, X, O, Tri = list(msg.button_array)
 
+        # DIGITAL triggers (0/1) -> choose a throttle value
+        throttle = 0.5 * self.MOTOR_MAX_SPEED  # tune this
+
+        if R2b:
+            self.velocity = throttle
+            self.velocity = -throttle
+        elif L2b:
+        else:
+            self.velocity = 0.0
+
+        # E-stop combo: L1 + Triangle
+        if L1b and Tri:
+            self.velocity = 0.0
             logger = self.get_logger()
-
-            back_right_stop = byte_command_converter(DRIVES, BACK_RIGHT, None, None, None, None, None, None, self.logger)
-            front_right_stop = byte_command_converter(DRIVES, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
-            front_left_stop = byte_command_converter(DRIVES, FRONT_LEFT, None, None, None, None, None, None, self.logger)
-            back_left_stop = byte_command_converter(DRIVES, BACK_LEFT, None, None, None, None, None, None, self.logger)
-            # send_number(self.serial_port, back_right_stop)
-            # send_number(self.serial_port, front_right_stop)
-            # send_number(self.serial_port, front_left_stop)
-            # send_number(self.serial_port, back_left_stop)
 
             front_left  = moteus.Controller(id=1)
             back_left   = moteus.Controller(id=2)
@@ -329,12 +321,11 @@ class CmdVelSubscriber(Node):
             send_moteus_stop_sync(front_right, motor=3, logger=logger)
             send_moteus_stop_sync(back_right,  motor=4, logger=logger)
 
-        if trigger_val == L1 and button_val == CIRCLE: 
+        # Mode toggle (only logs unless you use turn_thread_lock elsewhere)
+        if L1b and O:
             self.turn_thread_lock = not self.turn_thread_lock
-            if self.turn_thread_lock == False:
-                self.logger.info('Switching to Linear')
-            else:
-                self.logger.info('Switching to Angular')
+            self.logger.info("Switching to Angular" if self.turn_thread_lock else "Switching to Linear")
+
 
 def main(args=None):
     rclpy.init(args=args)

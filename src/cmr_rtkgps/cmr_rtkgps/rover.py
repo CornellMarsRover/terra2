@@ -35,12 +35,14 @@ class GPSRover(Node):
         #    a) Enable RTCM input over USB
         #    b) Output UBX-NAV-PVT so we can read lat/lon
         # ------------------------
+
         self.configure_rover()
 
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '10.49.87.81'  # Basestation IP
+        self.server_ip = '174.197.195.143'  # Basestation IP
+        # self.server_ip = '10.49.87.81'  # Basestation IP
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 

@@ -302,7 +302,7 @@ class CmdVelSubscriber(Node):
         if R2b:
             self.velocity = throttle
             self.velocity = -throttle
-        elif L2b:
+        elif L2b:g
         else:
             self.velocity = 0.0
 

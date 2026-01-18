@@ -226,6 +226,7 @@ class CmdVelSubscriber(Node):
         back_left = moteus.Controller(id=2, query_resolution=qr)
         front_right = moteus.Controller(id=3, query_resolution=qr)
         back_right = moteus.Controller(id=4, query_resolution=qr)
+        
         send_moteus_command_sync(controller=front_left, motor=1, position=math.nan, drives_velocity=(-self.velocity*ws2), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=self.logger)
         send_moteus_command_sync(controller=back_left, motor=2, position=math.nan, drives_velocity=(-self.velocity*ws3), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=self.logger)
         send_moteus_command_sync(controller=front_right, motor=3, position=math.nan, drives_velocity=(self.velocity*ws4), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=self.logger)

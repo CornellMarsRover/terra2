@@ -25,7 +25,7 @@ class GPSRover(Node):
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
-            self.get_logger().info("Rover serial port /dev/ttyACM0 opened successfully.")
+            self.get_logger().info("Rover serial port /dev/ttyACM1 opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
             return

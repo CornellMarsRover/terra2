@@ -41,7 +41,7 @@ class GPSRover(Node):
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '174.197.195.143'  # Basestation IP
+        self.server_ip = '192.168.1.103'  # Basestation IP
         # self.server_ip = '10.49.87.81'  # Basestation IP
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

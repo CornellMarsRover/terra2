@@ -21,7 +21,7 @@ class GPSRover(Node):
         # 1. Open local serial port for the rover’s ZED-F9P
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM0', baudrate=115200, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM1', baudrate=115200, timeout=1) #Was ttyACM0 before, which is not the port where the GPS is. Check with ls -l /dev/serial/by-id/
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
@@ -41,7 +41,8 @@ class GPSRover(Node):
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '192.168.1.103'  # Basestation IP
+        self.server_ip = '192.168.1.103'
+        # self.server_ip = '192.168.1.103'  # Basestation IP
         # self.server_ip = '10.49.87.81'  # Basestation IP
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

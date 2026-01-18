@@ -18,12 +18,12 @@ ACCEL_LIMIT = 4.0       # rad/s²
 
 # ====================== SOFTWARE REDUCTION ======================
 SOFT_GEAR_RATIO = [
-    0.15,  # joint 1
-    0.15,  # joint 2
-    0.12,  # joint 3
-    0.10,  # joint 4
-    0.10,  # joint 5
-    0.08   # joint 6
+    0.25,  # joint 1
+    0.25,  # joint 2
+    0.22,  # joint 3
+    0.20,  # joint 4
+    0.20,  # joint 5
+    0.18   # joint 6
 ]
 
 DEADBAND = 0.002  # rad, ignores hand jitter

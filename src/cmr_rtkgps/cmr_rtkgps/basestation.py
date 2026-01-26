@@ -23,10 +23,10 @@ class GPSBasestation(Node):
         # 1. Open serial port
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM0', baudrate=230400, timeout=1)
+            self.ser = serial.Serial('/dev/ttyACM1', baudrate=230400, timeout=1)
             # Allow all protocol messages (UBX, RTCM, NMEA) to be decoded
             self.ubr = UBXReader(self.ser)
-            self.get_logger().info("Serial port /dev/ttyACM0 opened successfully.")
+            self.get_logger().info("Serial port /dev/ttyACM1 opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
             return

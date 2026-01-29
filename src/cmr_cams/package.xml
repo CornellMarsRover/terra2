@@ -3,22 +3,35 @@
 <package format="3">
   <name>cmr_cams</name>
   <version>0.0.0</version>
-  <description>Package to bootstrap rover runtime</description>
+  <description>Camera processing nodes for Cornell Mars Rover including YOLO object detection</description>
   <maintainer email="team@cornellmarsrover.org">CMR</maintainer>
   <license>MIT</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <!-- Build dependencies -->
+  <buildtool_depend>ament_python</buildtool_depend>
 
+  <!-- Original dependencies (kept for other scripts/nodes) -->
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <depend>cmr_msgs</depend>
   <depend>cmr_utils</depend>
   <depend>cmr_fabric</depend>
 
-  <!-- Add additional dependencies here. -->
+  <!-- Object detection node dependencies -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <!-- Launch file dependencies -->
   <exec_depend>ros2launch</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
 
   <export>
-    <build_type>ament_cmake</build_type>
+    <build_type>ament_python</build_type>
   </export>
 </package>

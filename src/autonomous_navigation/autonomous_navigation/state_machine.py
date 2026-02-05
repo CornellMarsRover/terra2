@@ -32,11 +32,11 @@ class StateMachineNode(Node):
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.waypoint_tolerance = self.get_parameter('waypoint_tolerance').get_parameter_value().double_value
 
-        # Choose which waypoints file to load
-        if self.real:
-            waypoints_file = 'config/waypoints_duff.yaml'
+        # # Choose which waypoints file to load
         # if self.real:
-        #     waypoints_file = 'config/waypoints_engquad.yaml'
+        #     waypoints_file = 'config/waypoints_duff.yaml'
+        if self.real:
+            waypoints_file = 'config/waypoints_engquad.yaml'
         else:
             #waypoints_file = 'config/sim_waypoints_condensed.yaml'
             waypoints_file = 'config/waypoints.yaml'

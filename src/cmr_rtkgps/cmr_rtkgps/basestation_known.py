@@ -30,8 +30,8 @@ class GPSBasestation(Node):
         # ------------------------
         # LLH coordinates (lat/lon in decimal, height in meters) - 'LAT', 'LON', 'ALT'
         self.fix = {
-            'LAT': 42.4449177,  # decimals
-            'LON': -76.4836309,  # decimals
+            'LAT': 42.444344, #decimals
+            'LON': -76.483514,  # decimals
             'ALT': 245.0,      # meters
             'x': 110179824,
             'y': -458339334,

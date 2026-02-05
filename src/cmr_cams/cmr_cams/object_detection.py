@@ -75,7 +75,7 @@ class YOLOv8DetectionNode(Node):
 
         # Subscriber: raw ZED images
         self.image_sub = self.create_subscription(
-            Image, '/zed/image', self.image_callback, 10)
+            Image, '/zed/image_left', self.image_callback, 10)
 
         # Subscriber: robot pose
         self.pose_sub = self.create_subscription(
@@ -108,9 +108,12 @@ class YOLOv8DetectionNode(Node):
 
     def image_callback(self, msg: Image):
         """Process incoming camera frame with YOLO detection."""
-        # Convert to OpenCV
+        # Convert to OpenCV (ZED publishes bgra8, convert to bgr8 for YOLO)
         try:
-            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            # Handle BGRA -> BGR conversion if needed
+            if frame.shape[2] == 4:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
         except CvBridgeError as e:
             self.get_logger().error(f'CvBridge error: {e}')
             return

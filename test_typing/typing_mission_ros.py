@@ -51,7 +51,7 @@ class TypingMission(Node):
         self.pub_pose = self.create_publisher(Pose, '/arm_target_pose', 10)
 
         # Hardcoded key for testing
-        self.hardcoded_key = "a"  # Replace with the desired key
+        self.hardcoded_key = "CMR"  # Replace with the desired key
 
     def detect_aruco_tags(self, frame):
         """Detect ArUco tags and return their IDs and corners."""
@@ -116,40 +116,45 @@ class TypingMission(Node):
         if pose:
             self.pub_pose.publish(pose)
             self.get_logger().info(f"Published Pose for key '{key}': {pose}")
+def run(self):
+    """Main loop: Detect ArUco tags and publish key poses."""
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        self.get_logger().error("Could not open camera.")
+        return
 
-    def run(self):
-        """Main loop: Detect ArUco tags and publish key poses."""
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            self.get_logger().error("Could not open camera.")
-            return
+    # Hardcoded string to type
+    keys_to_type = "cmr"
+    current_index = 0
 
-        try:
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    continue
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                continue
 
-                # Detect ArUco tags
-                corners, ids = self.detect_aruco_tags(frame)
+            # Detect ArUco tags
+            corners, ids = self.detect_aruco_tags(frame)
 
-                # Initialize reference frame if not already done
-                if self.reference_origin is None:
-                    if self.initialize_reference_frame(corners, ids):
-                        self.get_logger().info("Reference frame initialized.")
+            # Initialize reference frame if not already done
+            if self.reference_origin is None:
+                if self.initialize_reference_frame(corners, ids):
+                    self.get_logger().info("Reference frame initialized.")
 
-                # Publish the Pose for the hardcoded key
-                self.publish_key_pose(self.hardcoded_key)
+            # Publish the pose for the current key
+            if current_index < len(keys_to_type):
+                current_key = keys_to_type[current_index]
+                self.publish_key_pose(current_key)
+                current_index += 1  # Move to the next key
 
-                # Show the camera feed
-                cv2.imshow("Camera Feed", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+            # Show the camera feed
+            cv2.imshow("Camera Feed", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
-        finally:
-            cap.release()
-            cv2.destroyAllWindows()
-
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
 
 def main():
     rclpy.init()

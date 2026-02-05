@@ -13,7 +13,7 @@ import numpy as np
 import glob
 
 # --- Prepare object points like (0,0,0), (1,0,0), (2,0,0), ...,(6,5,0)
-chessboard_size = (7, 6)
+chessboard_size = (9, 6)
 square_size = 1.0  # arbitrary units (scaling cancels out later)
 
 objp = np.zeros((chessboard_size[0] * chessboard_size[1], 3), np.float32)
@@ -46,7 +46,7 @@ for fname in images:
         cv2.waitKey(200)
 
 cv2.destroyAllWindows()
-
+print(len(objpoints))
 # --- Calibrate camera
 if len(objpoints) < 5:
     raise RuntimeError("Not enough valid calibration images found. Take more chessboard pictures.")

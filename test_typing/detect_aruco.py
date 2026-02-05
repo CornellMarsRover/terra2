@@ -12,6 +12,8 @@ Run:
     python3 detect_aruco.py
 Optional:
     python3 detect_aruco.py --camera-id 0 --width 1280 --height 720
+    OR (Windows, in git file, secondary camera b/c built-in exists)
+    py test_typing\\detect_aruco.py --camera-id 1
 """
 
 import argparse
@@ -19,6 +21,16 @@ import time
 import cv2
 from datetime import datetime
 import os
+import platform
+
+# Camera acess backend system
+if platform.system() == "Windows":
+    BACKEND = cv2.CAP_DSHOW
+elif platform.system() == "Darwin":
+    BACKEND = cv2.CAP_AVFOUNDATION
+else:
+    BACKEND = 0  # default for Linux
+
 
 # --- Helper: build available aruco dictionaries in OpenCV ---
 def get_aruco_dicts():
@@ -38,7 +50,7 @@ def get_aruco_dicts():
 def list_cameras(max_index=10, width=None, height=None):
     found = []
     for idx in range(max_index):
-        cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)  # AVFoundation is good on macOS; falls back if not available
+        cap = cv2.VideoCapture(idx, BACKEND)
         if not cap.isOpened():
             cap.release()
             continue
@@ -62,7 +74,7 @@ def open_camera(camera_id=None, width=None, height=None):
             # Try some defaults if enumeration failed
             indices = [0, 1, 2, 3]
     for idx in indices:
-        cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
+        cap = cv2.VideoCapture(idx, BACKEND)
         if not cap.isOpened():
             cap.release()
             continue

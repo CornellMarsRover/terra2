@@ -4,11 +4,21 @@ AR Tag (ArUco) detection with depth estimation from a USB/USB-C camera on macOS 
 """
 
 import argparse
+import platform
 import time
 import os
 import cv2
 import numpy as np
 from datetime import datetime
+
+# Camera access backend system
+if platform.system() == "Windows":
+    BACKEND = cv2.CAP_DSHOW
+elif platform.system() == "Darwin":
+    BACKEND = cv2.CAP_AVFOUNDATION
+else:
+    BACKEND = 0  # default for Linux
+
 
 # --- Helper: build available aruco dictionaries in OpenCV ---
 def get_aruco_dicts():
@@ -24,11 +34,27 @@ def get_aruco_dicts():
             d.append((n, cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, n))))
     return d
 
+def make_board(dictionary):
+    # Define marker corners given top left position and size
+    def marker_corners(x, y, size):
+        return np.array([
+            [x, y, 0], [x + size, y, 0],
+            [x + size, y + size, 0], [x, y + size, 0] ], dtype=np.float32)
+    # Create keyboard positions and ids
+    marker_length = 0.052
+    # TODO Put in Aruco Tag Measurements
+    boardCorners = [
+        marker_corners(0.00, 0.00, marker_length),
+        marker_corners(0.17, 0.00, marker_length),
+        marker_corners(0.00, 0.106, marker_length),
+        marker_corners(0.17, 0.106, marker_length)]
+    boardIds = np.array([[0], [1], [2], [3]], dtype=np.int32)
+    return cv2.aruco.Board(boardCorners, dictionary, boardIds)
 
 def list_cameras(max_index=10, width=None, height=None):
     found = []
     for idx in range(max_index):
-        cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
+        cap = cv2.VideoCapture(idx, BACKEND)
         if not cap.isOpened():
             cap.release()
             continue
@@ -51,7 +77,7 @@ def open_camera(camera_id=None, width=None, height=None):
         if not indices:
             indices = [0, 1, 2, 3]
     for idx in indices:
-        cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
+        cap = cv2.VideoCapture(idx, BACKEND)
         if not cap.isOpened():
             cap.release()
             continue
@@ -91,6 +117,7 @@ def main():
     dicts = get_aruco_dicts()
     dict_idx = 0  # DICT_4X4_50
     dictionary_name, dictionary = dicts[dict_idx]
+    keyboardBoard = make_board(dictionary)
 
     detector_params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(dictionary, detector_params)
@@ -101,7 +128,8 @@ def main():
     camera_matrix = calib["mtx"]
     dist_coeffs = calib["dist"]
 
-    cap, current_cam = open_camera(args.camera_id, args.width, args.height)
+    # TODO replace 1 with args.camera-id
+    cap, current_cam = open_camera(1, args.width, args.height)
     if cap is None:
         raise RuntimeError("Could not open camera")
 
@@ -130,33 +158,12 @@ def main():
         draw_detected(frame, corners, ids, rejected, dict_name=dictionary_name)
 
         if ids is not None:
-            # Detect 4 markers
-            if not four_detected and len(ids) == 4:
-                print("4 detected")
-                four_detected = True
-
-                centroids = [np.mean(c.reshape(4, 2), axis=0) for c in corners]
-                top_left_index = np.argmin([pt[0] + pt[1] for pt in centroids])
-                top_left_id = int(ids[top_left_index][0])
-                print(f"Top-left marker ID locked as: {top_left_id}")
-
-            # pose loop
-            for i in range(len(ids)):
-                rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(
-                    corners[i], args.marker_length, camera_matrix, dist_coeffs
-                )
-                cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec, tvec, 0.03)
-
-                distance = float(np.linalg.norm(tvec))
-                this_id = int(ids[i][0])
-
-                cv2.putText(frame, f"ID {this_id}: {distance:.2f} m",
-                            (10, 120 + 30 * i),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-
-                if four_detected and not initialized and this_id == top_left_id and distance <= 0.2:
-                    print("initialized")
-                    initialized = True
+            rvec_init = np.zeros((3, 1), dtype=np.float32)
+            tvec_init = np.zeros((3, 1), dtype=np.float32)
+            retval, rvec, tvec = cv2.aruco.estimatePoseBoard(
+                corners, ids,keyboardBoard, camera_matrix, dist_coeffs,
+                rvec_init, tvec_init)
+            cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec, tvec, 0.03)
 
         # FPS calculation
         frames += 1

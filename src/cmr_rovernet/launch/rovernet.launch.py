@@ -37,6 +37,24 @@ def fabric_node(conf_path: str) -> Node:
     executable = result["executable"]
     name = result["name"]
 
+    #makes it so cmr_read does not launch
+    #to make it launch try: ros2 launch cmr_rovernet rovernet.launch.py enable_ccb:=true
+    from launch.conditions import IfCondition 
+    if name == "cmr_read":
+        return Node(
+            package=pkg,
+            executable=executable,
+            name=name,
+            exec_name=name,
+            parameters=[
+                {
+                    "config_path": conf_path,
+                    "composition_ns": composition_ns,
+                }
+            ],
+            condition=IfCondition(enable_ccb),
+    )
+
     return Node(
         package=pkg,
         executable=executable,

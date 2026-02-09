@@ -36,6 +36,7 @@ class YOLOv8DetectionNode(Node):
         self.declare_parameter('conf_threshold', 0.25)
         self.declare_parameter('max_det', 100)
         self.declare_parameter('model_file', 'best.pt')
+        self.declare_parameter('process_every_n_frames', 5)
 
         conf_threshold = self.get_parameter('conf_threshold').value
         max_det = self.get_parameter('max_det').value
@@ -73,6 +74,10 @@ class YOLOv8DetectionNode(Node):
         self.pending_requests = {}
         self.request_index = 0
 
+        # Rate limiting: only process every N frames
+        self.frame_count = 0
+        self.process_every_n_frames = self.get_parameter('process_every_n_frames').value
+
         # Subscriber: raw ZED images
         self.image_sub = self.create_subscription(
             Image, '/zed/image_left', self.image_callback, 10)
@@ -98,6 +103,7 @@ class YOLOv8DetectionNode(Node):
             Image, '/object_detection/annotated_image', 10)
 
         self.get_logger().info(f'Loaded YOLOv8 model from "{model_path}"')
+        self.get_logger().info(f'Processing 1 in every {self.process_every_n_frames} frames')
         self.get_logger().info('YOLO detection node with ZED depth integration started')
 
     def pose_callback(self, msg: TwistStamped):
@@ -108,6 +114,11 @@ class YOLOv8DetectionNode(Node):
 
     def image_callback(self, msg: Image):
         """Process incoming camera frame with YOLO detection."""
+        # Rate limiting: skip frames to reduce CPU/GPU load
+        self.frame_count += 1
+        if self.frame_count % self.process_every_n_frames != 0:
+            return
+
         # Convert to OpenCV (ZED publishes bgra8, convert to bgr8 for YOLO)
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
@@ -140,7 +151,7 @@ class YOLOv8DetectionNode(Node):
                 cx = (x1 + x2) // 2
                 cy = (y1 + y2) // 2
                 self.request_depth(cls_name.lower(), cx, cy)
-                self.get_logger().info(f'Target detected: {cls_name} at pixel ({cx}, {cy})')
+                self.get_logger().info(f'Target detected: {cls_name} (conf={conf:.2f}) at pixel ({cx}, {cy})')
 
         # Publish annotated image
         try:

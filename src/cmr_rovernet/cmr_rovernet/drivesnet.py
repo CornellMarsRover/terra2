@@ -11,15 +11,17 @@ import asyncio
 import logging
 import moteus
 
+import cmr_rovernet.rovernet_utils as rnu
+'''
 from cmr_rovernet.rovernet_utils import (
     parse_toml,
     scale_value,
     init_moteus_loop,
     send_moteus_command_sync,
     send_moteus_stop_sync,
-    _moteus_loop,   # NOTE: rovernet_utils defines this global; we reuse it
+    rnu._moteus_loop,   # NOTE: rovernet_utils defines this global; we reuse it
 )
-
+'''
 # If these constants are defined elsewhere in rovernet_utils, you can delete them here.
 # Keeping them here makes this file fully self-contained regarding swerve geometry.
 ROVER_LENGTH = 39
@@ -32,7 +34,7 @@ class CmdVelSubscriber(Node):
     sends commands directly to moteus servos over fdcanusb.
 
     Fixes "RuntimeError: no running event loop" by creating moteus.Fdcanusb and all
-    controllers inside a dedicated asyncio loop thread (init_moteus_loop()).
+    controllers inside a dedicated asyncio loop thread (rnu.init_moteus_loop()).
     """
 
     def __init__(self):
@@ -69,7 +71,7 @@ class CmdVelSubscriber(Node):
         self.turn_thread_lock = 0
 
         # --- Load TOML config (non-ROS params) ---
-        drives_net_table = parse_toml("drivesnet")
+        drives_net_table = rnu.parse_toml("drivesnet")
         drives_net_node = drives_net_table['node']
 
         self.CONTROLLER_MAX_SPEED = 2.5
@@ -81,13 +83,13 @@ class CmdVelSubscriber(Node):
         self.MAX_FEED_FORWARD_TORQUE = float(drives_net_node['feed_forward_torque_limit'])
 
         # --- Start dedicated moteus asyncio loop thread ---
-        init_moteus_loop()
+        rnu.init_moteus_loop()
 
         # --- Create transport + controllers ONCE, inside the moteus loop thread ---
-        if _moteus_loop is None:
-            raise RuntimeError("moteus loop not initialized; init_moteus_loop() failed")
+        if rnu._moteus_loop is None:
+            raise RuntimeError("moteus loop not initialized; rnu.init_moteus_loop() failed")
 
-        setup_future = asyncio.run_coroutine_threadsafe(self._async_moteus_setup(), _moteus_loop)
+        setup_future = asyncio.run_coroutine_threadsafe(self._async_moteus_setup(), rnu._moteus_loop)
         setup_future.result()  # block until done / raise on error
 
         self.logger.info("drivesnet: moteus transport + controllers initialized")
@@ -215,7 +217,7 @@ class CmdVelSubscriber(Node):
         br_swerve = self.controllers[8]
 
         # Drive motors
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=fl_drive, motor=1,
             position=math.nan, drives_velocity=(-v * ws2),
             maximum_torque=self.MAX_TORQUE,
@@ -224,7 +226,7 @@ class CmdVelSubscriber(Node):
             ff_torque=0.0,
             logger=self.logger
         )
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=bl_drive, motor=2,
             position=math.nan, drives_velocity=(-v * ws3),
             maximum_torque=self.MAX_TORQUE,
@@ -233,7 +235,7 @@ class CmdVelSubscriber(Node):
             ff_torque=0.0,
             logger=self.logger
         )
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=fr_drive, motor=3,
             position=math.nan, drives_velocity=(v * ws4),
             maximum_torque=self.MAX_TORQUE,
@@ -242,7 +244,7 @@ class CmdVelSubscriber(Node):
             ff_torque=0.0,
             logger=self.logger
         )
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=br_drive, motor=4,
             position=math.nan, drives_velocity=(v * ws1),
             maximum_torque=self.MAX_TORQUE,
@@ -253,25 +255,25 @@ class CmdVelSubscriber(Node):
         )
 
         # Swerve motors (position control)
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=fr_swerve, motor=7,
             position=wa1, drives_velocity=None,
             maximum_torque=10.0, velocity_limit=60.0, accel_limit=40.0,
             ff_torque=None, logger=self.logger
         )
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=br_swerve, motor=8,
             position=wa4, drives_velocity=None,
             maximum_torque=10.0, velocity_limit=60.0, accel_limit=40.0,
             ff_torque=None, logger=self.logger
         )
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=bl_swerve, motor=6,
             position=wa3, drives_velocity=None,
             maximum_torque=10.0, velocity_limit=60.0, accel_limit=40.0,
             ff_torque=None, logger=self.logger
         )
-        send_moteus_command_sync(
+        rnu.send_moteus_command_sync(
             controller=fl_swerve, motor=5,
             position=wa2, drives_velocity=None,
             maximum_torque=10.0, velocity_limit=60.0, accel_limit=40.0,
@@ -295,7 +297,7 @@ class CmdVelSubscriber(Node):
         # R2 sets forward velocity
         r2 = self.r2TriggerConverter(trigger_val)
         if 0 <= r2 <= 255:
-            self.velocity = scale_value(float(r2), 0.0, 255.0, 0.0, self.MOTOR_MAX_SPEED)
+            self.velocity = rnu.scale_value(float(r2), 0.0, 255.0, 0.0, self.MOTOR_MAX_SPEED)
 
         # L2 sets reverse velocity (your original used L2_MIN/L2 constants; keep behavior if those exist)
         # If you have L2_MIN and L2 in rovernet_utils, you can re-enable that path.
@@ -307,7 +309,7 @@ class CmdVelSubscriber(Node):
         if trigger_val == 1 and button_val == 16777216:
             logger = self.get_logger()
             for mid in [1, 2, 3, 4]:
-                send_moteus_stop_sync(self.controllers[mid], motor=mid, logger=logger)
+                rnu.send_moteus_stop_sync(self.controllers[mid], motor=mid, logger=logger)
 
         # Mode toggle example (L1 + CIRCLE) - keep your old behavior if needed
         # Replace the condition below with your actual constants if desired.

@@ -36,7 +36,7 @@ class TypingMission(Node):
         super().__init__('typing_mission')
 
         # Load key positions from JSON
-        self.key_positions = load_key_positions("key_positions.json")
+        self.key_positions = load_key_positions("key_position.json")
 
         # ArUco setup
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)

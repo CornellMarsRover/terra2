@@ -43,8 +43,8 @@ class TypingMission(Node):
         self.detector_params = cv2.aruco.DetectorParameters()
 
         # Reference frame initialization
-        self.top_left_tag_id = 0  # Assume top-left tag has ID 0
-        self.reference_origin = None
+        self.corner_tag_ids = {0, 1, 2, 3}   # <-- set these to your 4 corner IDs
+        self.reference_center = None
         self.reference_depth = 0.2  # Example depth (meters)
 
         # Publisher for Pose messages
@@ -61,24 +61,32 @@ class TypingMission(Node):
         return corners, ids
 
     def initialize_reference_frame(self, corners, ids):
-        """Initialize the reference frame using the top-left ArUco tag."""
-        if ids is None or len(ids) < 4:
+        """Initialize the reference frame using the center of the 4 corner ArUco tags."""
+        if ids is None:
+            self.get_logger().error("No ArUco tags detected.")
+            return False
+
+        ids_flat = ids.flatten().tolist()
+
+        # Need all 4 corner tags
+        if not self.corner_tag_ids.issubset(set(ids_flat)):
             self.get_logger().error("Not all four corner ArUco tags detected.")
             return False
 
-        # Find the top-left tag
-        for i, marker_id in enumerate(ids.flatten()):
-            if marker_id == self.top_left_tag_id:
-                self.reference_origin = np.mean(corners[i].reshape(4, 2), axis=0)
-                self.get_logger().info(f"Initialized reference frame to top-left tag (ID {self.top_left_tag_id}).")
-                return True
+        # Compute each tag center (mean of its 4 corner points), then average the 4 tag centers
+        tag_centers = []
+        for i, marker_id in enumerate(ids_flat):
+            if marker_id in self.corner_tag_ids:
+                c = np.mean(corners[i].reshape(4, 2), axis=0)  # (x,y) in image coords
+                tag_centers.append(c)
 
-        self.get_logger().error("Top-left ArUco tag not found.")
-        return False
+        self.reference_center = np.mean(np.array(tag_centers), axis=0)
+        self.get_logger().info(f"Initialized reference frame to keyboard center from tags {sorted(self.corner_tag_ids)}.")
+        return True    
 
     def compute_key_pose(self, key):
         """Compute the Pose message for the given key."""
-        if self.reference_origin is None:
+        if self.reference_center is None:
             self.get_logger().error("Reference frame not initialized.")
             return None
 
@@ -90,8 +98,8 @@ class TypingMission(Node):
         rel_x, rel_y = self.key_positions[key]["x"], self.key_positions[key]["y"]
 
         # Compute global coordinates (relative to top-left ArUco tag)
-        global_x = self.reference_origin[0] + rel_x
-        global_y = self.reference_origin[1] + rel_y
+        global_x = self.reference_center[0] + rel_x
+        global_y = self.reference_center[1] + rel_y
         global_z = self.reference_depth  # Fixed depth for now
 
         # Create Pose message
@@ -138,7 +146,7 @@ class TypingMission(Node):
                 corners, ids = self.detect_aruco_tags(frame)
 
                 # Initialize reference frame if not already done
-                if self.reference_origin is None:
+                if self.reference_center is None:
                     if self.initialize_reference_frame(corners, ids):
                         self.get_logger().info("Reference frame initialized.")
 

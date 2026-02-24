@@ -1,0 +1,20 @@
+Package: cmr_fabric_wrappers (C++)
+
+Purpose
+- Fabric wrapper nodes to manage subprocess lifecycle under the same dependency/fault model.
+
+Executable
+- subprocess_node
+
+Behavior
+- Reads TOML node settings:
+  - command
+  - started_indicator
+  - expects_output
+  - indicator_timeout
+- Starts subprocess via pstreams.
+- Watches stdout/stderr for startup indicator.
+- Escalates kill signals (SIGINT -> SIGTERM -> SIGKILL) on deactivation/timeout.
+
+Interaction role
+- Used by cmr_cams TOML configs to wrap external launch/agent processes.

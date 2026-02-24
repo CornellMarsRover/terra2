@@ -1,0 +1,95 @@
+Topic Catalog (grouped by domain)
+
+Autonomy core
+- /autonomy/pose/robot/global (TwistStamped)
+  - Publishers: autonomous_navigation/new_kalman, autonomous_navigation/localization_sim,
+    cmr_zed/zed_gnss_fusion (alt path)
+  - Subscribers: state_machine, global_planner, local_planner, controller, object_detection,
+    costmap
+- /autonomy/target/global (Float32MultiArray)
+  - Publisher: state_machine
+  - Subscriber: global_planner
+- /autonomy/target/local (Float32MultiArray)
+  - Publishers: state_machine, global_planner
+  - Subscriber: local_planner
+- /autonomy/path/next_waypoint (Float32MultiArray)
+  - Publisher: local_planner
+  - Subscriber: controller
+- /autonomy/costmap (Float32MultiArray)
+  - Publisher: costmap
+  - Subscriber: local_planner
+- /autonomy/target_object/name (String)
+  - Publisher: state_machine
+  - Subscriber: object_detection
+- /autonomy/target_object/position (Twist)
+  - Publisher: object_detection
+  - Subscribers: state_machine, costmap
+- /autonomy/move/ackerman (cmr_msgs/AutonomyDrive)
+- /autonomy/move/point_turn (Twist)
+- /autonomy/move/move_type (String)
+  - Publisher: controller
+  - Subscribers: cmr_controls/swerve_controller_node; move_type consumed by costmap
+- /autonomy/led (String)
+  - Publisher: state_machine
+  - Subscriber: led_node
+
+Drives teleop
+- /drives_controller/cmd_vel (TwistStamped)
+  - Publisher: cmr_controller_remote/connect_node
+  - Subscriber: cmr_rovernet/drivesnet_node
+- /drives_controller/cmd_buttons (ControllerReading)
+  - Publisher: cmr_controller_remote/connect_node
+  - Subscriber: cmr_rovernet/drivesnet_node
+- /cmd_vel_drives (Twist)
+  - Publisher: cmr_controls/keyboard_listener (UDP teleop)
+  - Subscriber: cmr_controls/swerve_controller_node
+
+Arm control
+- /arm_controller/cmd_vel (sensor_msgs/Joy)
+  - Publisher: cmr_controller_remote/connect_node
+  - Subscriber: moveit_servo JoyToServoPub
+- /arm_controller/cmd_buttons (ControllerReading)
+  - Publisher: cmr_controller_remote/connect_node
+  - Subscriber: cmr_rovernet/armnet_node
+- /mini_arm_controller/cmd_pos (MiniArmDegree)
+  - Publisher: cmr_controller_remote/connect_node
+  - Subscriber: cmr_rovernet/armnet_node
+- /servo_node/delta_twist_cmds, /servo_node/delta_joint_cmds
+  - Publisher: moveit_servo JoyToServoPub
+  - Subscriber: moveit_servo ServoCalcs
+- /main_arm_controller/joint_trajectory
+  - Publisher: moveit_servo Servo output
+  - Subscriber: cmr_rovernet/armnet_node
+
+Sensors and vision
+- /camera/points (PointCloud2)
+  - Publishers: cmr_zed pose/zed_autonomy/threaded
+  - Subscribers: autonomous_navigation/costmap
+- /camera/ground_plane (GroundPlaneStamped)
+  - Publishers: cmr_zed pose/zed_autonomy/threaded
+  - Subscribers: costmap, local_planner
+- /zed/pose (TwistStamped)
+  - Publishers: cmr_zed zed_autonomy/threaded/pose
+  - Subscribers: autonomous_navigation/new_kalman and legacy kalman_localization
+- /zed/image (Image)
+  - Publisher: cmr_zed/threaded
+  - Subscribers: object_detection, test_detection
+- /zed/image_left, /zed/image_right
+  - Publisher: cmr_zed/zed_camera_publisher
+- /imu (cmr_msgs/IMUSensorData)
+  - Publisher: cmr_imu/imu_node
+- /rtk/navsatfix_data (NavSatFix)
+  - Publisher: cmr_rtkgps/gps_rover (also duplicate implementation in cmr_zed/rover.py)
+  - Subscribers: new_kalman, kalman_localization, gps_logger
+
+Diagnostics / misc
+- /ccb/read (MotorReadData)
+  - Publisher: cmr_rovernet/ccb_read
+  - Subscriber: cmr_rovernet/debug
+- /gui/display (Float64MultiArray)
+  - Subscriber: cmr_param_gui/gui
+
+Services (selected)
+- /servo_node/start_servo, /stop_servo, /pause_servo, /unpause_servo
+- ~/change_drift_dimensions, ~/change_control_dimensions, ~/reset_servo_status (moveit_servo)
+- Fabric services listed in 01_runtime_graph.txt

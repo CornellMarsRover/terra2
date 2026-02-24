@@ -1,0 +1,19 @@
+Package: cmr_cams (CMake)
+
+Purpose
+- Camera/stack bootstrap package via launch + TOML compositions.
+
+Custom nodes
+- No direct node executable in this package CMakeLists.
+
+Launch files
+- default.launch.py (Fabric composition launcher)
+- gui_server.launch.py (foxglove bridge launcher)
+- ar_tag_demo.launch.py (ros2_aruco + static transforms)
+
+Config directory
+- Many TOML files defining Fabric-managed subprocesses and camera nodes.
+- Several configs reference packages not in this repo (cmr_cv, cmr_arm, cmr_control, cmr_demo).
+
+Interaction role
+- Acts as orchestration wrapper more than algorithm package.

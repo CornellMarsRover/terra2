@@ -1,0 +1,16 @@
+Folder: src/
+
+Purpose
+- Main ROS workspace source tree.
+- Contains ROS packages, shared interfaces, launch/config assets, and some placeholder external dirs.
+
+Key contents
+- Python-first packages: autonomous_navigation, cmr_controller_remote, cmr_controls,
+  cmr_imu, cmr_param_gui, cmr_rovernet, cmr_rtkgps, cmr_zed, usb_camera_publisher.
+- C++/library packages: cmr_fabric, cmr_fabric_wrappers, cmr_utils, cmr_msgs, moveit_servo.
+- Description/config packages: cmr_arm_sim, cmr_arm_simulator_moveit_config, cmr_cams.
+- Empty placeholders: cmr_aruco, ompl, zed-ros2-wrapper, .zed-ros2-wrapper.
+
+Interaction role
+- This folder defines nearly all runtime nodes and topics.
+- Runtime wiring is mostly done via launch/*.launch.py and Fabric TOML config files.

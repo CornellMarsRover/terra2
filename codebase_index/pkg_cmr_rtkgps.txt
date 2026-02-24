@@ -1,0 +1,22 @@
+Package: cmr_rtkgps (rclpy)
+
+Purpose
+- RTK base/rover GNSS pipeline and logging utilities.
+
+Entry-point nodes
+- gps_basestation
+- basestation_known
+- gps_rover
+- data_logger (gps_logger)
+- displacement_logger
+
+Key topics
+- gps_rover publishes /rtk/navsatfix_data.
+- basestation subscribes /rtk/rover_ready.
+
+Networking
+- Basestation and rover exchange RTCM corrections over sockets (TCP/UDP-style usage by file).
+
+Notes
+- displacement_logger currently subscribes /autonomy/pose/global/robot
+  (likely mismatch with /autonomy/pose/robot/global used elsewhere).

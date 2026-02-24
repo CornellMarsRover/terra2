@@ -1,0 +1,23 @@
+Package: cmr_msgs (interfaces)
+
+Purpose
+- Shared custom ROS interfaces (msg/srv/action) used across stack.
+
+High-use messages
+- AutonomyDrive
+- ControllerReading
+- MiniArmDegree
+- MotorReadData / MotorData
+- GroundPlaneStamped
+- IMUSensorData
+
+High-use services (Fabric)
+- AcquireDependency
+- ReleaseDependency
+- NotifyDeactivate
+- ActivateNode
+- DeactivateNode
+- RecoverFault
+
+Interaction role
+- Contracts package for both autonomy and teleop/control infrastructure.

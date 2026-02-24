@@ -1,0 +1,22 @@
+Package: cmr_fabric (C++)
+
+Purpose
+- Lifecycle/dependency/fault framework for managed ROS nodes.
+
+Executables
+- fault_handler
+- lifecycle_manager
+
+Core library components
+- FabricNode: lifecycle-aware base class with TOML config loading.
+- DependencyHandler: decentralized dependency DAG services:
+  - /<node>/acquire
+  - /<node>/release
+  - /<node>/notify_deactivate
+- FaultHandler:
+  - Service /<composition_ns>/recover_fault
+  - Schedules restart attempts after errors.
+- lifecycle_helpers: wrappers to activate/deactivate/cleanup lifecycle nodes via services.
+
+Interaction role
+- Infra backbone used by launch compositions in rovernet/controller_remote/imu/param_gui/cams.

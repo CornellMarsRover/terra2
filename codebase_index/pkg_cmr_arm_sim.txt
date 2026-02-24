@@ -1,0 +1,16 @@
+Package: cmr_arm_sim (rclpy package with assets)
+
+Purpose
+- Arm URDF + meshes for visualization/simulation references.
+
+Runtime nodes
+- No custom node entry points in setup.py.
+
+Launch
+- display.launch.py starts:
+  - robot_state_publisher
+  - joint_state_publisher or joint_state_publisher_gui
+  - rviz2
+
+Interaction role
+- Provides robot description assets used by arm simulation / MoveIt config.

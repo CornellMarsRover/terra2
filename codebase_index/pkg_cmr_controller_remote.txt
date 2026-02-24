@@ -1,0 +1,22 @@
+Package: cmr_controller_remote (rclpy)
+
+Purpose
+- Converts UDP controller packets into ROS topics for drives and arm control.
+
+Node
+- connect_node (cmr_controller_remote.connect)
+
+Publishes
+- /drives_controller/cmd_vel (TwistStamped)
+- /drives_controller/cmd_buttons (ControllerReading)
+- /arm_controller/cmd_vel (Joy)
+- /arm_controller/cmd_buttons (ControllerReading)
+- /mini_arm_controller/cmd_pos (MiniArmDegree)
+
+Launch
+- connect.launch.py (Fabric composition style)
+
+Interactions
+- Drives path consumed by cmr_rovernet/drivesnet.
+- Arm Joy path consumed by moveit_servo JoyToServoPub.
+- Arm button/mini-arm path consumed by cmr_rovernet/armnet.

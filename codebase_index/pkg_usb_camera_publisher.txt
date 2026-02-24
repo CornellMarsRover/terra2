@@ -1,0 +1,21 @@
+Package: usb_camera_publisher (rclpy + optional CMake install)
+
+Purpose
+- Multi-camera USB capture and publishing stack (raw, stitched, birdseye, H.264 for Foxglove).
+
+Entry-point nodes
+- publisher (X264MultiCameraPublisher)
+- image_publisher (raw image publisher)
+- bev (birdseye homography publisher)
+- stitched (2x2 stitched image publisher)
+
+Typical outputs
+- /camera_<id>/image_raw
+- /camera_<id>/image_rect
+- /camera/stitched_image
+- /birdseye/image_raw
+- camera_<id>/h264 + camera_<id>/camera_info
+
+Notes
+- Uses hardcoded calibration path default in publisher.py (/home/cmr/cmr/terra/calib_dir).
+- Can overlap with cmr_zed topic space if not coordinated.

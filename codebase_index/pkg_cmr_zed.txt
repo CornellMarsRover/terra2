@@ -1,0 +1,28 @@
+Package: cmr_zed (rclpy)
+
+Purpose
+- ZED camera integration: point cloud, ground plane, pose, image streaming, and experimental GNSS fusion.
+
+Entry-point nodes (setup.py)
+- zed_publisher_node (zed_camera_publisher)
+- zed_autonomy
+- threaded
+- test_detection
+
+Additional scripts in package folder
+- pose.py
+- zed_gnss_fusion.py
+- rover.py (duplicate-style RTK rover utility)
+
+Typical published topics
+- /camera/points
+- /camera/ground_plane
+- /zed/pose
+- /zed/image or /zed/image_left/right
+- /zed/plane/equation, /zed/point/coordinate
+
+Interaction role
+- Primary perception source for autonomy (costmap/localization/object detection).
+
+Notes
+- Multiple overlapping node implementations exist; choose one runtime path to avoid duplication.

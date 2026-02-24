@@ -1,0 +1,16 @@
+Package: cmr_param_gui (rclpy)
+
+Purpose
+- Lightweight Qt GUI subscriber for display/debug data.
+
+Node
+- gui_node (cmr_param_gui.gui)
+
+Subscriptions
+- /gui/display (Float64MultiArray)
+
+Launch
+- gui.launch.py (Fabric composition style)
+
+Config notes
+- config/*.toml includes camera nodes under package cmr_cv (external to this repo).

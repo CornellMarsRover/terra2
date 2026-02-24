@@ -1,0 +1,49 @@
+Launch Matrix (what starts what)
+
+autonomous_navigation
+- sim_autonomy.launch.py
+  - state_machine, object_detection, led_node, localization_sim, costmap,
+    local_planner, global_planner, controller.
+- localization_real.launch.py
+  - cmr_controls/swerve_controller_node, led_node, state_machine, new_kalman,
+    costmap, local_planner, object_detection, delayed controller.
+
+cmr_controls
+- drives.launch.py
+  - swerve_controller_node only.
+
+cmr_rovernet
+- rovernet.launch.py (Fabric composition)
+  - always starts cmr_fabric fault_handler + lifecycle_manager.
+  - then starts nodes from toml config (armnet, drivesnet, debug, and controller_connect).
+
+cmr_controller_remote / cmr_imu / cmr_param_gui / cmr_cams
+- each has Fabric-style launch:
+  - start fault_handler + lifecycle_manager
+  - materialize nodes from config/*.toml
+
+cmr_arm_sim
+- display.launch.py
+  - robot_state_publisher + joint_state_publisher(_gui) + rviz.
+
+cmr_arm_simulator_moveit_config
+- generated MoveIt launch files (demo, move_group, moveit_rviz, rsp, etc.).
+
+moveit_servo
+- servo_example.launch.py
+  - rviz + ros2_control + controllers + servo_node_main + cmr_controller_remote connect_node
+  - component container with robot_state_publisher, tf static broadcaster,
+    moveit_servo JoyToServoPub, joy node.
+- keyboard.launch.py
+  - similar stack without controller_remote.
+- pose_tracking_example.launch.py
+  - panda sample pose-tracking demo setup.
+
+cmr_cams
+- gui_server.launch.py includes foxglove bridge launch.
+- ar_tag_demo.launch.py starts ros2_aruco and static TF publishers.
+- default.launch.py intends to start fabric + composition from config directory.
+
+Notes
+- Multiple launch files use hardcoded absolute config paths (e.g., /home/cmr/... or /cmr/terra/...).
+- Some config packages/executables referenced by TOML are outside this repo.

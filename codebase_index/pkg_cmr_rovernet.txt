@@ -1,0 +1,30 @@
+Package: cmr_rovernet (rclpy)
+
+Purpose
+- Jetson-to-controller-board bridge and motor I/O handling for drives/arm telemetry and commands.
+
+Entry-point nodes
+- drivesnet_node
+- armnet_node
+- cmr_read_node (ccb_read)
+- debug_node
+
+Main topic IO
+- drivesnet_node subscribes:
+  - /drives_controller/cmd_vel
+  - /drives_controller/cmd_buttons
+  - /autonomy_move (legacy/alternate path)
+- armnet_node subscribes:
+  - /main_arm_controller/joint_trajectory
+  - /mini_arm_controller/cmd_pos
+  - /arm_controller/cmd_buttons
+- ccb_read publishes:
+  - /ccb/read
+- debug subscribes:
+  - /ccb/read
+
+Launch
+- rovernet.launch.py uses Fabric composition + config/*.toml.
+
+Interaction role
+- Final hardware bridge for both manual and MoveIt arm commands.

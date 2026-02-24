@@ -1,0 +1,12 @@
+Folder: cmake/
+
+Purpose
+- Shared CMake macro utilities used by C++ packages.
+
+Key file
+- CmrUtils.cmake
+  - Defines cmr_add_node, cmr_add_lib, cmr_add_test, cmr_install, cmr_export.
+  - Standardizes compile flags/dependencies across C++ packages.
+
+Interaction role
+- Build-time only. It controls how C++ nodes/libraries are built and installed.

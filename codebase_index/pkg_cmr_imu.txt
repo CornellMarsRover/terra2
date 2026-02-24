@@ -1,0 +1,17 @@
+Package: cmr_imu (rclpy)
+
+Purpose
+- Reads WitMotion IMU data and publishes CMR custom IMU message.
+
+Node
+- imu_node (cmr_imu.imu)
+
+Publishes
+- /imu (cmr_msgs/IMUSensorData)
+
+Launch
+- imu.launch.py (Fabric composition style)
+
+Notes
+- Device serial path defaults to /dev/ttyUSB0.
+- Message type differs from sensor_msgs/Imu expected by some simulation code paths.

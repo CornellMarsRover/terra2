@@ -1,0 +1,29 @@
+Package: moveit_servo (C++)
+
+Purpose
+- Real-time arm servoing and joystick-to-servo bridge (adapted from MoveIt Servo stack).
+
+Executables/components
+- servo_node_main
+- servo_pose_tracking_demo
+- Composable: moveit_servo::ServoNode
+- Composable: moveit_servo::JoyToServoPub
+
+Key configured interfaces (from panda_simulated_config.yaml)
+- Input topics:
+  - ~/delta_twist_cmds
+  - ~/delta_joint_cmds
+  - /joint_states
+- Output topic:
+  - /main_arm_controller/joint_trajectory
+- Status topic:
+  - ~/status
+- Services under servo node namespace:
+  - ~/start_servo
+  - ~/stop_servo
+  - ~/pause_servo
+  - ~/unpause_servo
+
+Integration in this repo
+- Joy input topic wired to /arm_controller/cmd_vel (from cmr_controller_remote).
+- Output trajectory consumed by cmr_rovernet/armnet_node.

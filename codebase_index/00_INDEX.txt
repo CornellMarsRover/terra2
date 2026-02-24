@@ -1,0 +1,53 @@
+Terra ROS Codebase Index (generated from source scan)
+
+Scope
+- Workspace root: /Users/zenchangsun/Desktop/CMR_CS/terra
+- Primary ROS area: src/
+- ROS style: mostly ROS 2 (rclpy + rclcpp), with custom Fabric lifecycle/dependency framework.
+
+How to use this index
+1) Read 01_runtime_graph.txt for system-level dataflow.
+2) Read 03_launch_matrix.txt for startup entry points.
+3) Use pkg_*.txt files for package-level node/topic details.
+4) Read 04_known_gaps_and_risks.txt before running on new hardware or in new environments.
+
+Quick architecture summary
+- Teleop pipeline:
+  cmr_controller_remote -> (drives + arm topics) -> cmr_rovernet / moveit_servo -> hardware.
+- Autonomy pipeline:
+  cmr_zed + cmr_rtkgps -> autonomous_navigation (localization/planning/control) -> cmr_controls swerve.
+- Lifecycle/fault orchestration:
+  cmr_fabric + cmr_fabric_wrappers (Fabric-managed nodes, dependency acquire/release, restart on fault).
+
+Packages indexed
+- autonomous_navigation
+- cmr_arm_sim
+- cmr_arm_simulator_moveit_config
+- cmr_cams
+- cmr_controller_remote
+- cmr_controls
+- cmr_fabric
+- cmr_fabric_wrappers
+- cmr_imu
+- cmr_msgs
+- cmr_param_gui
+- cmr_rovernet
+- cmr_rtkgps
+- cmr_utils
+- cmr_zed
+- moveit_servo
+- usb_camera_publisher
+
+Non-package folders indexed
+- scripts
+- calib_dir
+- calib_images
+- test_typing
+- zenchang_controller
+- cmake
+
+External/missing placeholders found in src/
+- src/cmr_aruco (empty)
+- src/ompl (empty)
+- src/zed-ros2-wrapper (empty)
+- src/.zed-ros2-wrapper (empty)

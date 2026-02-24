@@ -1,0 +1,85 @@
+Runtime Interaction Graph (high ROI)
+
+A) Teleop drives + arm control
+1) cmr_controller_remote/connect_node
+   - Listens on UDP ports 5010, 5020, 5030.
+   - Publishes:
+     - /drives_controller/cmd_vel (TwistStamped)
+     - /drives_controller/cmd_buttons (ControllerReading)
+     - /arm_controller/cmd_vel (Joy)
+     - /arm_controller/cmd_buttons (ControllerReading)
+     - /mini_arm_controller/cmd_pos (MiniArmDegree)
+2) cmr_rovernet/drivesnet_node
+   - Subscribes /drives_controller/cmd_vel + /drives_controller/cmd_buttons.
+   - Translates commands to moteus/serial output for drive + swerve motors.
+3) moveit_servo::JoyToServoPub (in moveit_servo launch)
+   - Subscribes /arm_controller/cmd_vel.
+   - Publishes /servo_node/delta_twist_cmds and /servo_node/delta_joint_cmds.
+   - Calls /servo_node/start_servo service.
+4) moveit_servo/servo_node_main
+   - Consumes servo command topics, outputs /main_arm_controller/joint_trajectory.
+5) cmr_rovernet/armnet_node
+   - Subscribes /main_arm_controller/joint_trajectory, /mini_arm_controller/cmd_pos,
+     /arm_controller/cmd_buttons.
+   - Sends arm commands to motor controllers.
+
+B) Autonomy perception -> planning -> control
+1) Sensors and pose sources
+   - cmr_zed nodes publish:
+     - /camera/points
+     - /camera/ground_plane
+     - /zed/pose
+     - /zed/image or /zed/image_left/right (node dependent)
+   - cmr_rtkgps/gps_rover publishes /rtk/navsatfix_data.
+2) Localization
+   - autonomous_navigation/new_kalman subscribes /zed/pose + /rtk/navsatfix_data.
+   - Publishes fused /autonomy/pose/robot/global.
+3) Object and map understanding
+   - autonomous_navigation/object_detection subscribes:
+     - /autonomy/target_object/name
+     - /autonomy/pose/robot/global
+     - /zed/image (real mode)
+   - Publishes /autonomy/target_object/position.
+   - autonomous_navigation/costmap subscribes:
+     - /camera/points
+     - /camera/ground_plane
+     - /autonomy/pose/robot/global
+     - /autonomy/move/move_type
+     - /autonomy/target_object/position
+   - Publishes /autonomy/costmap.
+4) Planner chain
+   - autonomous_navigation/state_machine publishes:
+     - /autonomy/target/global
+     - /autonomy/target/local
+     - /autonomy/target_object/name
+     - /autonomy/led
+   - global_planner: /autonomy/target/global -> /autonomy/target/local.
+   - local_planner: subscribes /autonomy/target/local + /autonomy/costmap + pose + ground plane,
+     publishes /autonomy/path/next_waypoint.
+5) Motion control and actuation
+   - autonomous_navigation/controller subscribes:
+     - /autonomy/pose/robot/global
+     - /autonomy/path/next_waypoint
+     - /autonomy/stop
+   - Publishes:
+     - /autonomy/move/ackerman (AutonomyDrive)
+     - /autonomy/move/point_turn (Twist)
+     - /autonomy/move/move_type (String)
+   - cmr_controls/swerve_controller_node subscribes those move topics + /cmd_vel_drives.
+
+C) Fabric lifecycle/fault management
+- cmr_fabric/fault_handler service: /<composition_ns>/recover_fault
+- cmr_fabric/lifecycle_manager services:
+  - /<ns>/lifecycle/activate
+  - /<ns>/lifecycle/deactivate
+  - /<ns>/lifecycle/cleanup
+- Fabric dependency services on each managed node:
+  - /<node>/acquire
+  - /<node>/release
+  - /<node>/notify_deactivate
+
+D) Camera publishing alternatives
+- cmr_zed package: ZED SDK-based topics.
+- usb_camera_publisher package: USB camera topics (/camera_<id>/image_raw, stitched, birdseye,
+  and foxglove H.264 publishers).
+- These can coexist conceptually but should be coordinated to avoid duplicate/competing image sources.

@@ -1,0 +1,37 @@
+Known Gaps, Mismatches, and Environment Risks
+
+1) Hardcoded absolute paths in launch files
+- Examples: /home/cmr/cmr/terra/... and /cmr/terra/...
+- Impact: non-portable on dev machines; launch can fail unless path matches exactly.
+
+2) Fabric configs referencing packages not present in this workspace
+- cmr_cams/config and cmr_param_gui/config reference package names like cmr_cv, cmr_control,
+  cmr_arm, cmr_demo.
+- Impact: those nodes require additional repos/workspaces.
+
+3) Potential topic mismatch
+- cmr_rtkgps/displacement_logger subscribes /autonomy/pose/global/robot,
+  while autonomy localization publishes /autonomy/pose/robot/global.
+- Impact: displacement logger likely receives no data unless remapped.
+
+4) Legacy/parallel implementations
+- autonomous_navigation has both kalman_localization.py and new_kalman.py.
+- cmr_zed has multiple overlapping nodes (zed_autonomy.py, pose.py, threaded.py, zed_gnss_fusion.py).
+- Impact: running multiple simultaneously may duplicate topics or conflict.
+
+5) MoveIt Servo includes upstream/demo code patterns
+- Some topic names and comments still reference panda demo assumptions; config is partially adapted.
+- Impact: always verify final runtime topic names from launch + params.
+
+6) Empty placeholder directories in src/
+- cmr_aruco, ompl, zed-ros2-wrapper, .zed-ros2-wrapper are empty here.
+- Impact: expected externals/submodules may not be initialized in this checkout.
+
+7) Hardware coupling
+- Many nodes require serial ports, camera devices, FDCan/moteus buses.
+- Impact: code may start but silently fail without required hardware and permissions.
+
+Recommended first runtime checks
+- `ros2 topic list` and `ros2 node list` after launch.
+- Confirm `/autonomy/pose/robot/global`, `/camera/points`, `/autonomy/path/next_waypoint` exist.
+- Confirm moveit servo outputs `/main_arm_controller/joint_trajectory`.

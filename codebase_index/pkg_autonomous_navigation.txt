@@ -1,0 +1,37 @@
+Package: autonomous_navigation (rclpy)
+
+Purpose
+- Full autonomy stack: state machine, localization fusion, planners, controller, object targeting, LED signaling.
+
+Entry-point nodes
+- state_machine
+- global_planner
+- local_planner
+- costmap
+- controller
+- kalman_localization (legacy)
+- localization_sim
+- object_detection
+- led_node
+- new_kalman (current real localization path)
+
+Core topic flow
+- Localization in: /zed/pose + /rtk/navsatfix_data -> /autonomy/pose/robot/global
+- Target generation: state_machine -> /autonomy/target/global and /autonomy/target/local
+- Global planner: /autonomy/target/global -> /autonomy/target/local
+- Local planner: /autonomy/target/local + /autonomy/costmap + pose -> /autonomy/path/next_waypoint
+- Controller: /autonomy/path/next_waypoint + pose -> /autonomy/move/*
+- Object detection: target name + camera image + pose -> /autonomy/target_object/position
+
+Launch files
+- sim_autonomy.launch.py
+- localization_real.launch.py
+
+Interactions with other packages
+- Consumes sensor data from cmr_zed and cmr_rtkgps.
+- Sends drive commands that cmr_controls/swerve_controller_node consumes.
+
+Notable implementation notes
+- state_machine has hardcoded coarse waypoint segments.
+- object_detection currently forces `real=True` in code path.
+- two kalman implementations exist; launch files prefer `new_kalman`.

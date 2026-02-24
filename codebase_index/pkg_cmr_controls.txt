@@ -1,0 +1,28 @@
+Package: cmr_controls (rclpy)
+
+Purpose
+- Low-level drive and arm actuation/control nodes (moteus hardware + IK experiments + teleop helpers).
+
+Entry-point nodes
+- swerve_controller_node
+- arm_controller_node
+- ik_node
+- keyboard_controller_node
+- drives_keyboard (keyboard_listener)
+
+Key subscriptions/publishers
+- swerve_controller_node subscribes:
+  - /autonomy/move/point_turn
+  - /autonomy/move/ackerman
+  - /autonomy/move/move_type
+  - /cmd_vel_drives
+- arm_controller_node subscribes:
+  - /joint_angles/desired
+  - /joint_angles/offsets
+- ik_node subscribes /cmd_vel + /arm/joint_increment, publishes /joint_angles/desired.
+
+Launch
+- drives.launch.py starts swerve_controller_node.
+
+Interaction role
+- Main actuation endpoint for autonomy drive commands (when using swerve_controller_node).

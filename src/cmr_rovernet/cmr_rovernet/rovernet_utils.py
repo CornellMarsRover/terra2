@@ -113,7 +113,8 @@ def send_moteus_stop_sync(
     return future.result()  # block until done (or raise exception on error)
 
 async def __async_initialize_moteus(servos: list):
-    transport = moteus.Fdcanusb()
+    #transport = moteus.Fdcanusb()
+    self.transport = moteus.Fdcanusb("/dev/ttyACM0")
     # 1, 2, 3, 4  = drives: front left, back left, front right, back right
     # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
     s = {

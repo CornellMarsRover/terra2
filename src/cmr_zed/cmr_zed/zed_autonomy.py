@@ -9,10 +9,11 @@ import numpy as np
 import math
 
 from cmr_msgs.msg import GroundPlaneStamped
-from sensor_msgs.msg import PointCloud2, PointField, NavSatFix
+from sensor_msgs.msg import PointCloud2, PointField, NavSatFix, Image
 from geometry_msgs.msg import TwistWithCovarianceStamped, TransformStamped, TwistStamped
 from std_msgs.msg import Header, Float32MultiArray, MultiArrayDimension
 from tf_transformations import euler_from_quaternion
+from cv_bridge import CvBridge
 import tf2_ros
 
 
@@ -23,9 +24,11 @@ class ZedAutonomy(Node):
         # Publishers
         self.pointcloud_publisher = self.create_publisher(PointCloud2, '/camera/points', 10)
         self.ground_publisher = self.create_publisher(GroundPlaneStamped, '/camera/ground_plane', 10)
+        self.image_publisher = self.create_publisher(Image, '/zed/image_left', 10)
 
         self.pose_publisher = self.create_publisher(TwistStamped, '/zed/pose', 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+        self.cv_bridge = CvBridge()
 
         # Initialize and open the ZED camera
         self.zed = sl.Camera()
@@ -55,6 +58,7 @@ class ZedAutonomy(Node):
         # Resolution for retrieving the point cloud
         self.res = sl.Resolution(width=360, height=202)
         self.point_cloud = sl.Mat(self.res.width, self.res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
+        self.image_left = sl.Mat()
         self.current_pose = sl.Pose()
         self.ground_plane = sl.Plane()  # Detected ground plane
 
@@ -91,19 +95,22 @@ class ZedAutonomy(Node):
                     msg.header.stamp = self.get_clock().now().to_msg()
                     self.ground_publisher.publish(msg)
                     self.ground_count += 1
-                    self.get_logger().info(f"Ground pub count: {self.ground_count}\n{self.get_clock().now().to_msg()}")
                     return
 
     def publish_pointcloud(self):
-        """Captures the point cloud and publishes it."""
-        #self.publish_transform()
+        """Captures the point cloud and left image, then publishes both."""
         if self.zed.grab() == sl.ERROR_CODE.SUCCESS:
             self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, self.res)
             pc2_msg = self.convert_sl_mat_to_pointcloud2(self.point_cloud)
             self.pc_count += 1
-            self.get_logger().info(f"PC count: {self.pc_count}\n{self.get_clock().now().to_msg()}")
             self.pointcloud_publisher.publish(pc2_msg)
             self.publish_ground_plane()
+
+            self.zed.retrieve_image(self.image_left, sl.VIEW.LEFT)
+            left_np = self.image_left.get_data()
+            img_msg = self.cv_bridge.cv2_to_imgmsg(left_np, encoding="bgra8")
+            img_msg.header.stamp = self.get_clock().now().to_msg()
+            self.image_publisher.publish(img_msg)
 
     def convert_sl_mat_to_pointcloud2(self, sl_mat):
         """Convert an sl.Mat (F32_C4) to a sensor_msgs/PointCloud2."""
@@ -197,7 +204,6 @@ class ZedAutonomy(Node):
             self.last_pose[0:3] = np.array(translation)
             self.last_pose[3:6] = np.array(rotation)
             self.pose_count += 1
-            self.get_logger().info(f"Pose pub count: {self.pose_count}\n{self.get_clock().now().to_msg()}")
 
     def publish_transform(self):
         """

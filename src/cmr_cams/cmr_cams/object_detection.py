@@ -63,6 +63,7 @@ class YOLOv8DetectionNode(Node):
             'mallet': 5,
             'hammer': 5,
             'bottle': 6,
+            'ice_pick': 7,
         }
 
         # Robot pose for coordinate transforms
@@ -70,9 +71,10 @@ class YOLOv8DetectionNode(Node):
         self.robot_y = 0.0
         self.robot_theta = 0.0
 
-        # Pending depth requests: {index: (cls_name, cx, cy)}
+        # Pending depth requests: {index: (cls_name, cx, cy, timestamp)}
         self.pending_requests = {}
         self.request_index = 0
+        self.MAX_PENDING = 50
 
         # Rate limiting: only process every N frames
         self.frame_count = 0
@@ -132,44 +134,44 @@ class YOLOv8DetectionNode(Node):
         # Run inference
         results = self.model(frame, verbose=False)[0]
 
-        # Process detections
+        has_subscribers = self.image_pub.get_subscription_count() > 0
+
         for box in results.boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             conf = float(box.conf[0])
             cls_id = int(box.cls[0])
             cls_name = self.model.names[cls_id]
 
-            self.get_logger().debug(f'Detected {cls_name} ({conf:.2f})')
+            if has_subscribers:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, f'{cls_name} {conf:.2f}', (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            # Draw rectangle + label
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f'{cls_name} {conf:.2f}', (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-            # If this is a target class, request 3D coordinates from ZED
             if cls_name.lower() in self.target_class_ids:
                 cx = (x1 + x2) // 2
                 cy = (y1 + y2) // 2
                 self.request_depth(cls_name.lower(), cx, cy)
-                self.get_logger().info(f'Target detected: {cls_name} (conf={conf:.2f}) at pixel ({cx}, {cy})')
+                self.get_logger().info(f'{cls_name} ({conf:.2f}) at pixel ({cx}, {cy})')
 
-        # Publish annotated image
-        try:
-            out_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
-            out_msg.header = msg.header
-            self.image_pub.publish(out_msg)
-        except CvBridgeError as e:
-            self.get_logger().error(f'CvBridge error: {e}')
+        if has_subscribers:
+            try:
+                out_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+                out_msg.header = msg.header
+                self.image_pub.publish(out_msg)
+            except CvBridgeError as e:
+                self.get_logger().error(f'CvBridge error: {e}')
 
     def request_depth(self, cls_name: str, cx: int, cy: int):
         """Request 3D coordinate from ZED at bounding box center pixel."""
+        if len(self.pending_requests) >= self.MAX_PENDING:
+            oldest_key = min(self.pending_requests.keys())
+            del self.pending_requests[oldest_key]
+
         self.request_index += 1
         idx = self.request_index
 
-        # Store pending request
         self.pending_requests[idx] = (cls_name, cx, cy)
 
-        # Send pixel coordinate request to ZED
         request = Int32MultiArray()
         request.data = [idx, cx, cy]
         self.depth_request_pub.publish(request)

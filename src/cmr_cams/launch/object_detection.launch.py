@@ -21,7 +21,7 @@ def generate_launch_description():
 
     model_file_arg = DeclareLaunchArgument(
         'model_file',
-        default_value='best.pt',
+        default_value='urc_objects_v7.pt',
         description='YOLO model filename in config directory'
     )
 

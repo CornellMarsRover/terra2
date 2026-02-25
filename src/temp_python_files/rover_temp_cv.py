@@ -310,18 +310,19 @@ def draw_detections(frame: np.ndarray, detections: Detections) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 def yolo_thread(grabber, detections, model, imgsz, half_w_event, half_w_box,
-                interval, conf_thresh):
+                interval, conf_thresh, full_frame):
     """Throttled YOLO: runs once every `interval` seconds."""
     half_w_event.wait(timeout=10)
 
-    # Log model info so we know it loaded correctly
     try:
-        names = model.names
-        print(f"[yolo] model loaded — classes: {names}")
+        model_names = model.names
+        print(f"[yolo] model classes: {model_names}")
     except Exception as e:
         print(f"[yolo] warning reading model names: {e}")
+        model_names = {}
 
-    print(f"[yolo] started, imgsz={imgsz}, interval={interval}s, conf={conf_thresh}")
+    print(f"[yolo] started, imgsz={imgsz}, interval={interval}s, "
+          f"conf={conf_thresh}, full_frame={full_frame}")
     run_count = 0
 
     while True:
@@ -332,27 +333,55 @@ def yolo_thread(grabber, detections, model, imgsz, half_w_event, half_w_box,
                 time.sleep(0.05)
                 continue
 
-            hw = half_w_box[0] if half_w_box else frame.shape[1] // 2
-            left = frame[:, :hw]
+            if full_frame:
+                img = frame
+            else:
+                hw = half_w_box[0] if half_w_box else frame.shape[1] // 2
+                img = frame[:, :hw]
 
-            results = model(left, verbose=False, conf=conf_thresh, imgsz=imgsz)[0]
+            if run_count == 0:
+                print(f"[yolo] input image shape: {img.shape}")
+                debug_path = Path("/tmp/yolo_debug_frame.jpg")
+                cv2.imwrite(str(debug_path), img)
+                print(f"[yolo] saved debug frame to {debug_path}")
+
+            # Run with very low conf first to see ALL potential detections
+            results = model(img, verbose=False, conf=0.05, imgsz=imgsz)[0]
             elapsed = time.time() - t0
             run_count += 1
 
+            # Log everything YOLO found (even low-conf) for debugging
+            all_boxes_debug = []
+            for box in results.boxes:
+                cls_id = int(box.cls[0])
+                conf = float(box.conf[0])
+                cls_name = model_names.get(cls_id, f"cls{cls_id}")
+                all_boxes_debug.append(f"{cls_name}:{conf:.3f}")
+
+            if all_boxes_debug:
+                print(f"[yolo] #{run_count} {elapsed*1000:.0f}ms  ALL raw detections (conf>=0.05): "
+                      f"{all_boxes_debug}")
+
+            # Only keep detections above the real threshold for display
             boxes = []
             for box in results.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 cls_id = int(box.cls[0])
                 conf = float(box.conf[0])
-                boxes.append((x1, y1, x2, y2, cls_id, conf))
+                if conf >= conf_thresh:
+                    if not full_frame:
+                        boxes.append((x1, y1, x2, y2, cls_id, conf))
+                    else:
+                        boxes.append((x1, y1, x2, y2, cls_id, conf))
             detections.update_yolo(boxes)
 
             if boxes:
-                names_det = [YOLO_CLASSES[b[4]] if b[4] < len(YOLO_CLASSES) else f"cls{b[4]}" for b in boxes]
+                names_det = [model_names.get(b[4], f"cls{b[4]}") for b in boxes]
                 confs = [f"{b[5]:.2f}" for b in boxes]
-                print(f"[yolo] #{run_count} {elapsed*1000:.0f}ms  detected: {list(zip(names_det, confs))}")
+                print(f"[yolo] #{run_count}  DISPLAY (conf>={conf_thresh}): "
+                      f"{list(zip(names_det, confs))}")
             else:
-                print(f"[yolo] #{run_count} {elapsed*1000:.0f}ms  no detections")
+                print(f"[yolo] #{run_count} {elapsed*1000:.0f}ms  no detections above {conf_thresh}")
 
         except Exception as e:
             print(f"[yolo] ERROR: {e}")
@@ -561,13 +590,17 @@ def main() -> None:
     )
     parser.add_argument("--port", type=int, default=8000, help="HTTP port (default: 8000).")
     parser.add_argument(
-        "--imgsz", type=int, default=320,
-        help="YOLO input size (default: 320, try 640 for accuracy).",
+        "--imgsz", type=int, default=640,
+        help="YOLO input size (default: 640).",
     )
     parser.add_argument("--fps", type=float, default=15.0, help="Target stream FPS (default: 15).")
     parser.add_argument("--no-aruco", action="store_true", help="Disable ArUco overlay.")
     parser.add_argument("--no-yolo", action="store_true", help="Disable YOLO entirely.")
     parser.add_argument("--no-depth", action="store_true", help="Disable depth / point cloud panels.")
+    parser.add_argument(
+        "--full-frame", action="store_true",
+        help="Feed YOLO the full frame instead of left-eye crop (use if camera is NOT side-by-side stereo).",
+    )
     parser.add_argument(
         "--yolo-interval", type=float, default=3.0,
         help="Seconds between YOLO runs (default: 3.0 — lower = more CPU).",
@@ -617,7 +650,7 @@ def main() -> None:
         threading.Thread(
             target=yolo_thread,
             args=(grabber, detections, model, args.imgsz, half_w_event, half_w_box,
-                  args.yolo_interval, args.yolo_conf),
+                  args.yolo_interval, args.yolo_conf, args.full_frame),
             daemon=True,
         ).start()
 

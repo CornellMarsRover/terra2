@@ -29,8 +29,8 @@ L = 0.8
 W = 0.8
 R = math.sqrt(L**2 + W**2)
 
-MAX_V = 3.0 # was 2.0
-MAX_OMEGA = 1.5 # was 1.0
+MAX_V = 2.0
+MAX_OMEGA = 1.0
 
 ACCEL_RATE = 2.0
 ROT_ACCEL_RATE = 2.0
@@ -41,7 +41,7 @@ STEER_VEL_LIMIT = 5.0
 
 # ---- SPEED / ACCEL SCALING (NEW) ----
 # opt_spd from kinematics is normalized ~[-1..+1]. This converts to motor rotations/sec.
-DRIVE_MAX_RPS = 100.0          # start 20 -> 40 -> 60+
+DRIVE_MAX_RPS = 60.0          # start 20 -> 40 -> 60+
 DRIVE_ACCEL_LIMIT = 200.0     # motor rps^2 (or set to math.nan to use moteus default)
 QUERY_TIMEOUT_S = 0.10        # seconds, avoids hangs if a controller stops replying
 

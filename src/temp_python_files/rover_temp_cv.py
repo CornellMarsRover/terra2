@@ -277,7 +277,7 @@ def draw_detections(frame: np.ndarray, detections: Detections) -> np.ndarray:
     yolo_boxes, aruco_markers, stamp = detections.get()
 
     age = time.time() - stamp if stamp > 0 else 999
-    stale = age > 5.0
+    stale = age > 8.0
 
     for x1, y1, x2, y2, cls_id, conf in yolo_boxes:
         name = YOLO_CLASSES[cls_id] if cls_id < len(YOLO_CLASSES) else f"cls{cls_id}"
@@ -310,44 +310,56 @@ def draw_detections(frame: np.ndarray, detections: Detections) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 def yolo_thread(grabber, detections, model, imgsz, half_w_event, half_w_box,
-                interval, yolo_scale):
-    """Throttled YOLO: runs once every `interval` seconds, pre-shrinks frame."""
+                interval, conf_thresh):
+    """Throttled YOLO: runs once every `interval` seconds."""
     half_w_event.wait(timeout=10)
-    print(f"[yolo] started, imgsz={imgsz}, interval={interval}s, pre-scale={yolo_scale}")
+
+    # Log model info so we know it loaded correctly
+    try:
+        names = model.names
+        print(f"[yolo] model loaded — classes: {names}")
+    except Exception as e:
+        print(f"[yolo] warning reading model names: {e}")
+
+    print(f"[yolo] started, imgsz={imgsz}, interval={interval}s, conf={conf_thresh}")
+    run_count = 0
 
     while True:
         t0 = time.time()
-        frame = grabber.read()
-        if frame is None:
-            time.sleep(0.05)
-            continue
+        try:
+            frame = grabber.read()
+            if frame is None:
+                time.sleep(0.05)
+                continue
 
-        hw = half_w_box[0] if half_w_box else frame.shape[1] // 2
-        left = frame[:, :hw]
+            hw = half_w_box[0] if half_w_box else frame.shape[1] // 2
+            left = frame[:, :hw]
 
-        # Pre-shrink to reduce memory + compute before YOLO's own resize
-        if yolo_scale < 1.0:
-            small = cv2.resize(left, None, fx=yolo_scale, fy=yolo_scale,
-                               interpolation=cv2.INTER_AREA)
-        else:
-            small = left
+            results = model(left, verbose=False, conf=conf_thresh, imgsz=imgsz)[0]
+            elapsed = time.time() - t0
+            run_count += 1
 
-        results = model(small, verbose=False, conf=0.3, imgsz=imgsz)[0]
-        elapsed = time.time() - t0
+            boxes = []
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                cls_id = int(box.cls[0])
+                conf = float(box.conf[0])
+                boxes.append((x1, y1, x2, y2, cls_id, conf))
+            detections.update_yolo(boxes)
 
-        # Scale boxes back to original left-eye coordinates
-        inv = 1.0 / yolo_scale if yolo_scale < 1.0 else 1.0
-        boxes = []
-        for box in results.boxes:
-            x1, y1, x2, y2 = [int(v * inv) for v in box.xyxy[0]]
-            boxes.append((x1, y1, x2, y2, int(box.cls[0]), float(box.conf[0])))
-        detections.update_yolo(boxes)
+            if boxes:
+                names_det = [YOLO_CLASSES[b[4]] if b[4] < len(YOLO_CLASSES) else f"cls{b[4]}" for b in boxes]
+                confs = [f"{b[5]:.2f}" for b in boxes]
+                print(f"[yolo] #{run_count} {elapsed*1000:.0f}ms  detected: {list(zip(names_det, confs))}")
+            else:
+                print(f"[yolo] #{run_count} {elapsed*1000:.0f}ms  no detections")
 
-        if boxes:
-            names = [YOLO_CLASSES[b[4]] if b[4] < len(YOLO_CLASSES) else "?" for b in boxes]
-            print(f"[yolo] {elapsed*1000:.0f}ms  detected: {names}")
+        except Exception as e:
+            print(f"[yolo] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            time.sleep(2.0)
 
-        # Throttle: sleep the remaining interval time
         remaining = interval - (time.time() - t0)
         if remaining > 0:
             time.sleep(remaining)
@@ -549,20 +561,20 @@ def main() -> None:
     )
     parser.add_argument("--port", type=int, default=8000, help="HTTP port (default: 8000).")
     parser.add_argument(
-        "--imgsz", type=int, default=160,
-        help="YOLO input size (default: 160).",
+        "--imgsz", type=int, default=320,
+        help="YOLO input size (default: 320, try 640 for accuracy).",
     )
     parser.add_argument("--fps", type=float, default=15.0, help="Target stream FPS (default: 15).")
     parser.add_argument("--no-aruco", action="store_true", help="Disable ArUco overlay.")
     parser.add_argument("--no-yolo", action="store_true", help="Disable YOLO entirely.")
     parser.add_argument("--no-depth", action="store_true", help="Disable depth / point cloud panels.")
     parser.add_argument(
-        "--yolo-interval", type=float, default=2.0,
-        help="Seconds between YOLO runs (default: 2.0 — lower = more CPU).",
+        "--yolo-interval", type=float, default=3.0,
+        help="Seconds between YOLO runs (default: 3.0 — lower = more CPU).",
     )
     parser.add_argument(
-        "--yolo-scale", type=float, default=0.3,
-        help="Pre-shrink factor before YOLO (default: 0.3 = 30%% of left eye).",
+        "--yolo-conf", type=float, default=0.25,
+        help="YOLO confidence threshold (default: 0.25).",
     )
     parser.add_argument(
         "--depth-scale", type=float, default=0.35,
@@ -599,11 +611,13 @@ def main() -> None:
     ).start()
 
     if not args.no_yolo:
+        print(f"[startup] loading YOLO model: {args.model}")
         model = YOLO(args.model)
+        print(f"[startup] YOLO model loaded successfully")
         threading.Thread(
             target=yolo_thread,
             args=(grabber, detections, model, args.imgsz, half_w_event, half_w_box,
-                  args.yolo_interval, args.yolo_scale),
+                  args.yolo_interval, args.yolo_conf),
             daemon=True,
         ).start()
 

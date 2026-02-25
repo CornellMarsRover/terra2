@@ -4,15 +4,15 @@ Temporary standalone CV script for the rover (no ROS).
 
 - Opens ZED as a USB camera, uses side-by-side stereo feed.
 - Left eye: live camera view with YOLO + ArUco overlays.
-- Right panel: live stereo depth / point cloud preview.
-- Streams side-by-side via MJPEG on http://<jetson-ip>:8000
+- Right panel: front-view depth point cloud (scattered dots, colored by depth).
+- Bottom panel: angled 3D point cloud preview.
+- YOLO runs throttled (every N seconds) so it doesn't overwhelm the Jetson.
+- Streams via MJPEG on http://<jetson-ip>:8000
 
-Usage (Jetson side):
-  python3 rover_temp_cv.py --camera /dev/video1 --no-yolo
-
-From laptop:
-  ssh -L 8000:localhost:8000 user@JETSON_IP
-  then open http://localhost:8000
+Usage:
+  python3 rover_temp_cv.py --camera /dev/video1
+  python3 rover_temp_cv.py --camera /dev/video1 --yolo-interval 3
+  python3 rover_temp_cv.py --camera /dev/video1 --no-yolo   # skip YOLO entirely
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def boost_conf(real_conf: float) -> float:
 
 
 def make_stereo_matcher() -> cv2.StereoSGBM:
-    num_disp = 16 * 5  # 80 — lighter than the full 128
+    num_disp = 16 * 5
     block = 7
     return cv2.StereoSGBM_create(
         minDisparity=0,
@@ -92,29 +92,55 @@ def make_stereo_matcher() -> cv2.StereoSGBM:
     )
 
 
-def compute_depth_colormap(
+def depth_to_color(z_vals: np.ndarray, z_min: float, z_max: float) -> np.ndarray:
+    """Map depth values to a green-to-red gradient (close=green, far=red)."""
+    norm = np.clip((z_vals - z_min) / max(z_max - z_min, 1e-3), 0, 1)
+    r = (norm * 255).astype(np.uint8)
+    g = ((1.0 - norm) * 255).astype(np.uint8)
+    b = np.full_like(r, 40)
+    return np.stack([b, g, r], axis=-1)
+
+
+def render_front_pointcloud(
     gray_l: np.ndarray,
     gray_r: np.ndarray,
+    left_bgr: np.ndarray,
     matcher: cv2.StereoSGBM,
+    out_w: int,
+    out_h: int,
+    max_points: int = 50_000,
 ) -> np.ndarray:
-    """Return a colormapped depth image from a stereo pair."""
+    """Render a front-view scattered point cloud colored by depth."""
+    canvas = np.zeros((out_h, out_w, 3), dtype=np.uint8)
+
     disp = matcher.compute(gray_l, gray_r).astype(np.float32) / 16.0
     valid = (disp > 0) & np.isfinite(disp)
     if not np.any(valid):
-        return np.zeros((*gray_l.shape, 3), dtype=np.uint8)
-    d_min = float(np.percentile(disp[valid], 5))
-    d_max = float(np.percentile(disp[valid], 95))
-    if d_max - d_min < 1.0:
-        d_max = d_min + 1.0
-    norm = np.clip((disp - d_min) / (d_max - d_min), 0, 1)
-    norm = np.nan_to_num(norm, nan=0.0)
-    gray8 = (norm * 255).astype(np.uint8)
-    colored = cv2.applyColorMap(gray8, cv2.COLORMAP_INFERNO)
-    colored[~valid] = 0
-    return colored
+        return canvas
+
+    h, w = gray_l.shape
+    ys, xs = np.where(valid)
+    d_vals = disp[valid]
+
+    if len(ys) > max_points:
+        idx = np.random.choice(len(ys), size=max_points, replace=False)
+        ys, xs, d_vals = ys[idx], xs[idx], d_vals[idx]
+
+    d_min = float(np.percentile(d_vals, 5))
+    d_max = float(np.percentile(d_vals, 95))
+    colors = depth_to_color(d_vals, d_min, d_max)
+
+    u = (xs.astype(np.float32) * out_w / w).astype(np.int32)
+    v = (ys.astype(np.float32) * out_h / h).astype(np.int32)
+    inside = (u >= 0) & (u < out_w) & (v >= 0) & (v < out_h)
+    u, v, colors = u[inside], v[inside], colors[inside]
+
+    canvas[v, u] = colors
+    canvas = cv2.dilate(canvas, np.ones((3, 3), dtype=np.uint8), iterations=1)
+    return canvas
 
 
-def render_pointcloud_preview(
+def render_angled_pointcloud(
     gray_l: np.ndarray,
     gray_r: np.ndarray,
     left_bgr: np.ndarray,
@@ -125,7 +151,7 @@ def render_pointcloud_preview(
     baseline_m: float = 0.12,
     max_points: int = 40_000,
 ) -> np.ndarray:
-    """Render a small 3D point cloud preview from a stereo pair."""
+    """Render a rotated 3D point cloud preview with real colors."""
     canvas = np.zeros((height, width, 3), dtype=np.uint8)
     disp = matcher.compute(gray_l, gray_r).astype(np.float32) / 16.0
     valid = (disp > 0) & np.isfinite(disp)
@@ -151,13 +177,12 @@ def render_pointcloud_preview(
 
     if len(verts) > max_points:
         idx = np.random.choice(len(verts), size=max_points, replace=False)
-        verts = verts[idx]
-        cols = cols[idx]
+        verts, cols = verts[idx], cols[idx]
 
     center = np.median(verts, axis=0)
     verts = verts - center
 
-    yaw, pitch = np.deg2rad(-20.0), np.deg2rad(12.0)
+    yaw, pitch = np.deg2rad(-25.0), np.deg2rad(15.0)
     ry = np.array([
         [np.cos(yaw), 0, np.sin(yaw)],
         [0, 1, 0],
@@ -178,6 +203,10 @@ def render_pointcloud_preview(
     if not np.any(pos):
         return canvas
     verts, cols, z = verts[pos], cols[pos], z[pos]
+
+    # Depth-sort so closer points draw on top
+    order = np.argsort(-z)
+    verts, cols, z = verts[order], cols[order], z[order]
 
     focal = 300.0
     u = (focal * (verts[:, 0] / z) + width / 2.0).astype(np.int32)
@@ -227,7 +256,7 @@ class CameraGrabber:
 
 
 # ---------------------------------------------------------------------------
-# Detection cache (YOLO + ArUco results)
+# Caches
 # ---------------------------------------------------------------------------
 
 class Detections:
@@ -251,26 +280,22 @@ class Detections:
             return list(self.yolo_boxes), list(self.aruco_markers), self.stamp
 
 
-# ---------------------------------------------------------------------------
-# Depth cache
-# ---------------------------------------------------------------------------
-
 class DepthCache:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._depth_color: np.ndarray | None = None
-        self._cloud_preview: np.ndarray | None = None
+        self._front: np.ndarray | None = None
+        self._angled: np.ndarray | None = None
 
-    def update(self, depth_color: np.ndarray, cloud_preview: np.ndarray) -> None:
+    def update(self, front: np.ndarray, angled: np.ndarray) -> None:
         with self._lock:
-            self._depth_color = depth_color
-            self._cloud_preview = cloud_preview
+            self._front = front
+            self._angled = angled
 
     def get(self) -> tuple[np.ndarray | None, np.ndarray | None]:
         with self._lock:
-            dc = self._depth_color.copy() if self._depth_color is not None else None
-            cp = self._cloud_preview.copy() if self._cloud_preview is not None else None
-            return dc, cp
+            f = self._front.copy() if self._front is not None else None
+            a = self._angled.copy() if self._angled is not None else None
+            return f, a
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +307,7 @@ def draw_detections(frame: np.ndarray, detections: Detections) -> np.ndarray:
     yolo_boxes, aruco_markers, stamp = detections.get()
 
     age = time.time() - stamp if stamp > 0 else 999
-    stale = age > 3.0
+    stale = age > 5.0
 
     for x1, y1, x2, y2, cls_id, conf in yolo_boxes:
         name = YOLO_CLASSES[cls_id] if cls_id < len(YOLO_CLASSES) else f"cls{cls_id}"
@@ -314,27 +339,48 @@ def draw_detections(frame: np.ndarray, detections: Detections) -> np.ndarray:
 # Background threads
 # ---------------------------------------------------------------------------
 
-def yolo_thread(grabber, detections, model, imgsz, half_w_event, half_w_box):
+def yolo_thread(grabber, detections, model, imgsz, half_w_event, half_w_box,
+                interval, yolo_scale):
+    """Throttled YOLO: runs once every `interval` seconds, pre-shrinks frame."""
     half_w_event.wait(timeout=10)
-    print(f"[yolo] started, imgsz={imgsz}")
+    print(f"[yolo] started, imgsz={imgsz}, interval={interval}s, pre-scale={yolo_scale}")
+
     while True:
+        t0 = time.time()
         frame = grabber.read()
         if frame is None:
             time.sleep(0.05)
             continue
+
         hw = half_w_box[0] if half_w_box else frame.shape[1] // 2
         left = frame[:, :hw]
-        t0 = time.time()
-        results = model(left, verbose=False, conf=0.3, imgsz=imgsz)[0]
+
+        # Pre-shrink to reduce memory + compute before YOLO's own resize
+        if yolo_scale < 1.0:
+            small = cv2.resize(left, None, fx=yolo_scale, fy=yolo_scale,
+                               interpolation=cv2.INTER_AREA)
+        else:
+            small = left
+
+        results = model(small, verbose=False, conf=0.3, imgsz=imgsz)[0]
         elapsed = time.time() - t0
+
+        # Scale boxes back to original left-eye coordinates
+        inv = 1.0 / yolo_scale if yolo_scale < 1.0 else 1.0
         boxes = []
         for box in results.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            x1, y1, x2, y2 = [int(v * inv) for v in box.xyxy[0]]
             boxes.append((x1, y1, x2, y2, int(box.cls[0]), float(box.conf[0])))
         detections.update_yolo(boxes)
+
         if boxes:
             names = [YOLO_CLASSES[b[4]] if b[4] < len(YOLO_CLASSES) else "?" for b in boxes]
             print(f"[yolo] {elapsed*1000:.0f}ms  detected: {names}")
+
+        # Throttle: sleep the remaining interval time
+        remaining = interval - (time.time() - t0)
+        if remaining > 0:
+            time.sleep(remaining)
 
 
 def aruco_thread(grabber, detections, half_w_event, half_w_box):
@@ -364,7 +410,7 @@ def aruco_thread(grabber, detections, half_w_event, half_w_box):
 
 
 def depth_thread(grabber, depth_cache, half_w_event, half_w_box, scale):
-    """Background: computes stereo depth colormap + point cloud preview."""
+    """Background: computes front-view + angled point cloud renders."""
     half_w_event.wait(timeout=10)
     matcher = make_stereo_matcher()
     print(f"[depth] started, scale={scale:.2f}")
@@ -376,6 +422,7 @@ def depth_thread(grabber, depth_cache, half_w_event, half_w_box, scale):
             continue
 
         hw = half_w_box[0] if half_w_box else frame.shape[1] // 2
+        h = frame.shape[0]
         left = frame[:, :hw]
         right = frame[:, hw:]
 
@@ -388,19 +435,13 @@ def depth_thread(grabber, depth_cache, half_w_event, half_w_box, scale):
         gray_l = cv2.cvtColor(left_s, cv2.COLOR_BGR2GRAY)
         gray_r = cv2.cvtColor(right_s, cv2.COLOR_BGR2GRAY)
 
-        depth_color = compute_depth_colormap(gray_l, gray_r, matcher)
-        if scale < 1.0:
-            depth_color = cv2.resize(depth_color, (hw, frame.shape[0]), interpolation=cv2.INTER_NEAREST)
-
-        cloud_h = frame.shape[0] // 2
-        cloud_preview = render_pointcloud_preview(
+        front = render_front_pointcloud(gray_l, gray_r, left_s, matcher, hw, h)
+        angled = render_angled_pointcloud(
             gray_l, gray_r, left_s, matcher,
-            width=hw, height=cloud_h,
+            width=hw * 2, height=h // 2,
         )
-        if scale < 1.0:
-            cloud_preview = cv2.resize(cloud_preview, (hw, cloud_h), interpolation=cv2.INTER_NEAREST)
 
-        depth_cache.update(depth_color, cloud_preview)
+        depth_cache.update(front, angled)
         time.sleep(0.01)
 
 
@@ -408,7 +449,7 @@ def stream_thread(
     grabber, detections, depth_cache, jpeg_lock, jpeg_box,
     target_fps, half_w_event, half_w_box, enable_depth,
 ):
-    """Encodes side-by-side (cam | depth) MJPEG frames."""
+    """Encodes side-by-side (cam | point cloud) MJPEG frames."""
     min_dt = 1.0 / max(target_fps, 1.0)
     count = 0
     last_log = time.time()
@@ -431,15 +472,15 @@ def stream_thread(
         annotated = draw_detections(left, detections)
 
         if enable_depth:
-            depth_color, cloud_preview = depth_cache.get()
+            front_cloud, angled_cloud = depth_cache.get()
 
-            if depth_color is not None and depth_color.shape[:2] == annotated.shape[:2]:
-                right_panel = depth_color
+            if front_cloud is not None and front_cloud.shape[:2] == annotated.shape[:2]:
+                right_panel = front_cloud
             else:
                 right_panel = np.zeros_like(annotated)
                 cv2.putText(
-                    right_panel, "Depth loading...",
-                    (20, h // 2), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100, 100, 100), 2,
+                    right_panel, "Point cloud loading...",
+                    (20, h // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (100, 100, 100), 2,
                 )
 
             cv2.putText(
@@ -447,21 +488,24 @@ def stream_thread(
                 (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA,
             )
             cv2.putText(
-                right_panel, "Depth Map",
-                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA,
+                right_panel, "Depth Point Cloud",
+                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0), 2, cv2.LINE_AA,
             )
 
             top_row = np.hstack([annotated, right_panel])
 
-            if cloud_preview is not None:
+            if angled_cloud is not None:
                 cloud_h = h // 2
-                if cloud_preview.shape[1] != top_row.shape[1]:
-                    cloud_preview = cv2.resize(cloud_preview, (top_row.shape[1], cloud_h))
+                if angled_cloud.shape[1] != top_row.shape[1]:
+                    angled_cloud = cv2.resize(
+                        angled_cloud, (top_row.shape[1], cloud_h),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
                 cv2.putText(
-                    cloud_preview, "Point Cloud Preview",
+                    angled_cloud, "3D Point Cloud",
                     (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA,
                 )
-                composite = np.vstack([top_row, cloud_preview])
+                composite = np.vstack([top_row, angled_cloud])
             else:
                 composite = top_row
         else:
@@ -536,17 +580,26 @@ def main() -> None:
     )
     parser.add_argument("--fps", type=float, default=15.0, help="Target stream FPS (default: 15).")
     parser.add_argument("--no-aruco", action="store_true", help="Disable ArUco overlay.")
-    parser.add_argument("--no-yolo", action="store_true", help="Disable YOLO.")
-    parser.add_argument("--no-depth", action="store_true", help="Disable depth / point cloud panel.")
+    parser.add_argument("--no-yolo", action="store_true", help="Disable YOLO entirely.")
+    parser.add_argument("--no-depth", action="store_true", help="Disable depth / point cloud panels.")
     parser.add_argument(
-        "--depth-scale", type=float, default=0.4,
-        help="Downscale factor for stereo matching (default: 0.4 = 40%% resolution, faster).",
+        "--yolo-interval", type=float, default=2.0,
+        help="Seconds between YOLO runs (default: 2.0 — lower = more CPU).",
+    )
+    parser.add_argument(
+        "--yolo-scale", type=float, default=0.3,
+        help="Pre-shrink factor before YOLO (default: 0.3 = 30%% of left eye).",
+    )
+    parser.add_argument(
+        "--depth-scale", type=float, default=0.35,
+        help="Downscale for stereo matching (default: 0.35).",
     )
     args = parser.parse_args()
 
     camera = int(args.camera) if args.camera.isdigit() else args.camera
     enable_depth = not args.no_depth
-    print(f"[startup] camera={camera}  depth={enable_depth}  imgsz={args.imgsz}")
+    print(f"[startup] camera={camera}  depth={enable_depth}  "
+          f"yolo={'off' if args.no_yolo else f'every {args.yolo_interval}s'}")
 
     grabber = CameraGrabber(camera)
     print("[startup] camera opened, waiting for first frame...")
@@ -575,7 +628,8 @@ def main() -> None:
         model = YOLO(args.model)
         threading.Thread(
             target=yolo_thread,
-            args=(grabber, detections, model, args.imgsz, half_w_event, half_w_box),
+            args=(grabber, detections, model, args.imgsz, half_w_event, half_w_box,
+                  args.yolo_interval, args.yolo_scale),
             daemon=True,
         ).start()
 

@@ -8,6 +8,9 @@ Temporary standalone CV script for the rover (no ROS).
 - Optionally runs ArUco DICT_4X4_50 for IDs 0,1,2.
 - Streams annotated frames via MJPEG on http://<jetson-ip>:8000
 
+Camera capture and YOLO inference run on separate threads so the
+camera never stalls waiting for the model.
+
 Usage (Jetson side):
   python3 rover_temp_cv.py --model /absolute/path/to/urc_objects_v8.pt
 
@@ -24,10 +27,10 @@ import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 from flask import Flask, Response, render_template_string
 from ultralytics import YOLO
 
-# Labels for YOLO classes (must match training order)
 YOLO_CLASSES = ["mallet", "bottle", "ice_pick"]
 YOLO_COLORS = [
     (0, 165, 255),  # mallet
@@ -35,7 +38,6 @@ YOLO_COLORS = [
     (0, 0, 255),    # ice_pick
 ]
 
-# Labels for ArUco tags
 ARUCO_ID_LABELS = {
     0: "start post",
     1: "post 1",
@@ -71,31 +73,70 @@ def get_aruco_dict():
 
 
 def boost_conf(real_conf: float) -> float:
-    """Map real conf (~0.3–1.0) to ~0.80–0.99 for nicer display."""
+    """Map real conf (~0.3-1.0) to ~0.80-0.99 for nicer display."""
     base = 0.82 + (real_conf - 0.3) * 0.20
-    jitter = 0.06 * (2 * (time.time() % 1) - 1)  # small oscillation
+    jitter = 0.06 * (2 * (time.time() % 1) - 1)
     return min(0.99, max(0.80, base + jitter))
 
 
-class CameraWorker:
-    def __init__(
-        self,
-        model_path: str,
-        camera_index: int | str = 0,
-        fps: float = 20.0,
-        enable_aruco: bool = True,
-    ) -> None:
-        self.model = YOLO(model_path)
+class CameraGrabber:
+    """Continuously grabs frames from the camera on its own thread."""
 
+    def __init__(self, camera_index: int | str) -> None:
         self.cap = cv2.VideoCapture(camera_index)
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open camera: {camera_index}")
 
-        self.fps = fps
-        self.min_dt = 1.0 / max(self.fps, 1.0)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        self._lock = threading.Lock()
+        self._frame: np.ndarray | None = None
+        self._running = True
+        self._grab_count = 0
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def _loop(self) -> None:
+        while self._running:
+            ok, frame = self.cap.read()
+            if not ok or frame is None:
+                time.sleep(0.005)
+                continue
+            with self._lock:
+                self._frame = frame
+                self._grab_count += 1
+
+    def read(self) -> np.ndarray | None:
+        with self._lock:
+            return self._frame.copy() if self._frame is not None else None
+
+    @property
+    def grab_count(self) -> int:
+        with self._lock:
+            return self._grab_count
+
+    def stop(self) -> None:
+        self._running = False
+        self._thread.join(timeout=2.0)
+        self.cap.release()
+
+
+class InferenceWorker:
+    """Pulls the latest frame from CameraGrabber and runs YOLO + ArUco."""
+
+    def __init__(
+        self,
+        grabber: CameraGrabber,
+        model_path: str,
+        imgsz: int = 640,
+        enable_aruco: bool = True,
+    ) -> None:
+        self.grabber = grabber
+        self.model = YOLO(model_path)
+        self.imgsz = imgsz
         self.enable_aruco = enable_aruco
 
-        self.lock = threading.Lock()
+        self._lock = threading.Lock()
         self.latest_jpeg: bytes | None = None
         self.running = True
 
@@ -104,31 +145,38 @@ class CameraWorker:
         if self.enable_aruco:
             self.aruco_dict, self.aruco_params = get_aruco_dict()
 
+        self._fps = 0.0
+
     def stop(self) -> None:
         self.running = False
 
+    @property
+    def fps(self) -> float:
+        return self._fps
+
     def loop(self) -> None:
         half_w: int | None = None
+        last_log = time.time()
+        frame_count = 0
 
         while self.running:
-            t0 = time.time()
-            ok, frame = self.cap.read()
-            if not ok or frame is None:
+            frame = self.grabber.read()
+            if frame is None:
                 time.sleep(0.01)
                 continue
+
+            t0 = time.time()
 
             h, w = frame.shape[:2]
             if half_w is None:
                 half_w = w // 2
+                print(f"[inference] frame size {w}x{h}, using left half {half_w}x{h}")
 
-            # Use left eye of ZED (or just left half of any side-by-side feed)
             left = frame[:, :half_w]
 
-            # Run YOLO
-            results = self.model(left, verbose=False, conf=0.3)[0]
+            results = self.model(left, verbose=False, conf=0.3, imgsz=self.imgsz)[0]
             disp = left.copy()
 
-            # Draw YOLO boxes
             for box in results.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 cls_id = int(box.cls[0])
@@ -150,7 +198,6 @@ class CameraWorker:
                     cv2.LINE_AA,
                 )
 
-            # Optional: ArUco overlay (IDs 0,1,2)
             if self.enable_aruco and self.aruco_dict is not None:
                 gray = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
                 corners, ids, _rej = cv2.aruco.detectMarkers(
@@ -176,24 +223,29 @@ class CameraWorker:
                                 cv2.LINE_AA,
                             )
 
-            # Encode JPEG
             ok2, jpg = cv2.imencode(".jpg", disp, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             if ok2:
-                with self.lock:
+                with self._lock:
                     self.latest_jpeg = jpg.tobytes()
 
-            dt = time.time() - t0
-            if dt < self.min_dt:
-                time.sleep(self.min_dt - dt)
-
-        self.cap.release()
+            frame_count += 1
+            now = time.time()
+            if now - last_log >= 3.0:
+                self._fps = frame_count / (now - last_log)
+                print(
+                    f"[inference] {self._fps:.1f} fps | "
+                    f"cam grabs: {self.grabber.grab_count} | "
+                    f"yolo {(time.time() - t0)*1000:.0f}ms"
+                )
+                frame_count = 0
+                last_log = now
 
     def get_latest_jpeg(self) -> bytes | None:
-        with self.lock:
+        with self._lock:
             return self.latest_jpeg
 
 
-def make_app(worker: CameraWorker) -> Flask:
+def make_app(worker: InferenceWorker) -> Flask:
     app = Flask(__name__)
 
     @app.route("/")
@@ -223,9 +275,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=str,
-        default=str(
-            Path(__file__).parent / "config" / "urc_objects_v8.pt"
-        ),
+        default=str(Path(__file__).parent / "config" / "urc_objects_v8.pt"),
         help="Path to YOLO model (.pt).",
     )
     parser.add_argument(
@@ -235,22 +285,35 @@ def main() -> None:
         help="Camera index (int) or device path like /dev/video1 (default: 0).",
     )
     parser.add_argument(
-        "--port", type=int, default=8000, help="HTTP port for MJPEG stream (default: 8000)."
+        "--port", type=int, default=8000, help="HTTP port for MJPEG stream (default: 8000).",
     )
     parser.add_argument(
-        "--fps", type=float, default=20.0, help="Target FPS (default: 20)."
+        "--imgsz", type=int, default=320,
+        help="YOLO input size — smaller = faster (default: 320, try 640 for accuracy).",
     )
     parser.add_argument(
-        "--no-aruco", action="store_true", help="Disable ArUco overlay."
+        "--no-aruco", action="store_true", help="Disable ArUco overlay.",
     )
     args = parser.parse_args()
 
     camera = int(args.camera) if args.camera.isdigit() else args.camera
 
-    worker = CameraWorker(
+    print(f"[startup] camera={camera}  model={args.model}  imgsz={args.imgsz}")
+
+    grabber = CameraGrabber(camera)
+    print("[startup] camera opened, waiting for first frame...")
+
+    for _ in range(100):
+        if grabber.read() is not None:
+            break
+        time.sleep(0.05)
+    else:
+        print("[warning] no frame received after 5s — camera may be stuck")
+
+    worker = InferenceWorker(
+        grabber=grabber,
         model_path=args.model,
-        camera_index=camera,
-        fps=args.fps,
+        imgsz=args.imgsz,
         enable_aruco=not args.no_aruco,
     )
 
@@ -265,10 +328,9 @@ def main() -> None:
         app.run(host="0.0.0.0", port=args.port, threaded=True)
     finally:
         worker.stop()
-        t.join(timeout=2.0)
+        grabber.stop()
         print("[shutdown]")
 
 
 if __name__ == "__main__":
     main()
-

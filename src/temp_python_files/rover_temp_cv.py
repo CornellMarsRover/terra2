@@ -602,8 +602,8 @@ def main() -> None:
         help="Feed YOLO the full frame instead of left-eye crop (use if camera is NOT side-by-side stereo).",
     )
     parser.add_argument(
-        "--yolo-interval", type=float, default=3.0,
-        help="Seconds between YOLO runs (default: 3.0 — lower = more CPU).",
+        "--yolo-interval", type=float, default=1.0,
+        help="Seconds between YOLO runs (default: 1.0 — lower = more CPU).",
     )
     parser.add_argument(
         "--yolo-conf", type=float, default=0.25,

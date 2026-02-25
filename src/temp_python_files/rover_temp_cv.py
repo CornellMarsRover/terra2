@@ -81,7 +81,7 @@ class CameraWorker:
     def __init__(
         self,
         model_path: str,
-        camera_index: int = 0,
+        camera_index: int | str = 0,
         fps: float = 20.0,
         enable_aruco: bool = True,
     ) -> None:
@@ -89,7 +89,7 @@ class CameraWorker:
 
         self.cap = cv2.VideoCapture(camera_index)
         if not self.cap.isOpened():
-            raise RuntimeError(f"Could not open camera index {camera_index}")
+            raise RuntimeError(f"Could not open camera: {camera_index}")
 
         self.fps = fps
         self.min_dt = 1.0 / max(self.fps, 1.0)
@@ -229,7 +229,10 @@ def main() -> None:
         help="Path to YOLO model (.pt).",
     )
     parser.add_argument(
-        "--camera", type=int, default=0, help="Camera index (default: 0)."
+        "--camera",
+        type=str,
+        default="0",
+        help="Camera index (int) or device path like /dev/video1 (default: 0).",
     )
     parser.add_argument(
         "--port", type=int, default=8000, help="HTTP port for MJPEG stream (default: 8000)."
@@ -242,9 +245,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    camera = int(args.camera) if args.camera.isdigit() else args.camera
+
     worker = CameraWorker(
         model_path=args.model,
-        camera_index=args.camera,
+        camera_index=camera,
         fps=args.fps,
         enable_aruco=not args.no_aruco,
     )

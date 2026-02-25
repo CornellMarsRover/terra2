@@ -92,55 +92,29 @@ def make_stereo_matcher() -> cv2.StereoSGBM:
     )
 
 
-def depth_to_color(z_vals: np.ndarray, z_min: float, z_max: float) -> np.ndarray:
-    """Map depth values to a green-to-red gradient (close=green, far=red)."""
-    norm = np.clip((z_vals - z_min) / max(z_max - z_min, 1e-3), 0, 1)
-    r = (norm * 255).astype(np.uint8)
-    g = ((1.0 - norm) * 255).astype(np.uint8)
-    b = np.full_like(r, 40)
-    return np.stack([b, g, r], axis=-1)
-
-
-def render_front_pointcloud(
+def compute_depth_colormap(
     gray_l: np.ndarray,
     gray_r: np.ndarray,
-    left_bgr: np.ndarray,
     matcher: cv2.StereoSGBM,
-    out_w: int,
-    out_h: int,
-    max_points: int = 50_000,
 ) -> np.ndarray:
-    """Render a front-view scattered point cloud colored by depth."""
-    canvas = np.zeros((out_h, out_w, 3), dtype=np.uint8)
-
+    """Return a colormapped depth image from a stereo pair."""
     disp = matcher.compute(gray_l, gray_r).astype(np.float32) / 16.0
     valid = (disp > 0) & np.isfinite(disp)
     if not np.any(valid):
-        return canvas
-
-    h, w = gray_l.shape
-    ys, xs = np.where(valid)
-    d_vals = disp[valid]
-
-    if len(ys) > max_points:
-        idx = np.random.choice(len(ys), size=max_points, replace=False)
-        ys, xs, d_vals = ys[idx], xs[idx], d_vals[idx]
-
-    d_min = float(np.percentile(d_vals, 5))
-    d_max = float(np.percentile(d_vals, 95))
-    colors = depth_to_color(d_vals, d_min, d_max)
-
-    u = (xs.astype(np.float32) * out_w / w).astype(np.int32)
-    v = (ys.astype(np.float32) * out_h / h).astype(np.int32)
-    inside = (u >= 0) & (u < out_w) & (v >= 0) & (v < out_h)
-    u, v, colors = u[inside], v[inside], colors[inside]
-
-    canvas[v, u] = colors
-    canvas = cv2.dilate(canvas, np.ones((3, 3), dtype=np.uint8), iterations=1)
-    return canvas
+        return np.zeros((*gray_l.shape, 3), dtype=np.uint8)
+    d_min = float(np.percentile(disp[valid], 5))
+    d_max = float(np.percentile(disp[valid], 95))
+    if d_max - d_min < 1.0:
+        d_max = d_min + 1.0
+    norm = np.clip((disp - d_min) / (d_max - d_min), 0, 1)
+    norm = np.nan_to_num(norm, nan=0.0)
+    gray8 = (norm * 255).astype(np.uint8)
+    colored = cv2.applyColorMap(gray8, cv2.COLORMAP_INFERNO)
+    colored[~valid] = 0
+    return colored
 
 
-def render_angled_pointcloud(
+def render_pointcloud_preview(
     gray_l: np.ndarray,
     gray_r: np.ndarray,
     left_bgr: np.ndarray,
@@ -151,7 +125,7 @@ def render_angled_pointcloud(
     baseline_m: float = 0.12,
     max_points: int = 40_000,
 ) -> np.ndarray:
-    """Render a rotated 3D point cloud preview with real colors."""
+    """Render a small 3D point cloud preview from a stereo pair."""
     canvas = np.zeros((height, width, 3), dtype=np.uint8)
     disp = matcher.compute(gray_l, gray_r).astype(np.float32) / 16.0
     valid = (disp > 0) & np.isfinite(disp)
@@ -182,7 +156,7 @@ def render_angled_pointcloud(
     center = np.median(verts, axis=0)
     verts = verts - center
 
-    yaw, pitch = np.deg2rad(-25.0), np.deg2rad(15.0)
+    yaw, pitch = np.deg2rad(-20.0), np.deg2rad(12.0)
     ry = np.array([
         [np.cos(yaw), 0, np.sin(yaw)],
         [0, 1, 0],
@@ -203,10 +177,6 @@ def render_angled_pointcloud(
     if not np.any(pos):
         return canvas
     verts, cols, z = verts[pos], cols[pos], z[pos]
-
-    # Depth-sort so closer points draw on top
-    order = np.argsort(-z)
-    verts, cols, z = verts[order], cols[order], z[order]
 
     focal = 300.0
     u = (focal * (verts[:, 0] / z) + width / 2.0).astype(np.int32)
@@ -283,19 +253,19 @@ class Detections:
 class DepthCache:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._front: np.ndarray | None = None
-        self._angled: np.ndarray | None = None
+        self._depth_color: np.ndarray | None = None
+        self._cloud_preview: np.ndarray | None = None
 
-    def update(self, front: np.ndarray, angled: np.ndarray) -> None:
+    def update(self, depth_color: np.ndarray, cloud_preview: np.ndarray) -> None:
         with self._lock:
-            self._front = front
-            self._angled = angled
+            self._depth_color = depth_color
+            self._cloud_preview = cloud_preview
 
     def get(self) -> tuple[np.ndarray | None, np.ndarray | None]:
         with self._lock:
-            f = self._front.copy() if self._front is not None else None
-            a = self._angled.copy() if self._angled is not None else None
-            return f, a
+            dc = self._depth_color.copy() if self._depth_color is not None else None
+            cp = self._cloud_preview.copy() if self._cloud_preview is not None else None
+            return dc, cp
 
 
 # ---------------------------------------------------------------------------
@@ -435,13 +405,17 @@ def depth_thread(grabber, depth_cache, half_w_event, half_w_box, scale):
         gray_l = cv2.cvtColor(left_s, cv2.COLOR_BGR2GRAY)
         gray_r = cv2.cvtColor(right_s, cv2.COLOR_BGR2GRAY)
 
-        front = render_front_pointcloud(gray_l, gray_r, left_s, matcher, hw, h)
-        angled = render_angled_pointcloud(
+        depth_color = compute_depth_colormap(gray_l, gray_r, matcher)
+        if scale < 1.0:
+            depth_color = cv2.resize(depth_color, (hw, h), interpolation=cv2.INTER_NEAREST)
+
+        cloud_h = h // 2
+        cloud_preview = render_pointcloud_preview(
             gray_l, gray_r, left_s, matcher,
-            width=hw * 2, height=h // 2,
+            width=hw * 2, height=cloud_h,
         )
 
-        depth_cache.update(front, angled)
+        depth_cache.update(depth_color, cloud_preview)
         time.sleep(0.01)
 
 
@@ -472,15 +446,15 @@ def stream_thread(
         annotated = draw_detections(left, detections)
 
         if enable_depth:
-            front_cloud, angled_cloud = depth_cache.get()
+            depth_color, cloud_preview = depth_cache.get()
 
-            if front_cloud is not None and front_cloud.shape[:2] == annotated.shape[:2]:
-                right_panel = front_cloud
+            if depth_color is not None and depth_color.shape[:2] == annotated.shape[:2]:
+                right_panel = depth_color
             else:
                 right_panel = np.zeros_like(annotated)
                 cv2.putText(
-                    right_panel, "Point cloud loading...",
-                    (20, h // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (100, 100, 100), 2,
+                    right_panel, "Depth loading...",
+                    (20, h // 2), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100, 100, 100), 2,
                 )
 
             cv2.putText(
@@ -488,24 +462,24 @@ def stream_thread(
                 (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA,
             )
             cv2.putText(
-                right_panel, "Depth Point Cloud",
-                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0), 2, cv2.LINE_AA,
+                right_panel, "Depth Map",
+                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA,
             )
 
             top_row = np.hstack([annotated, right_panel])
 
-            if angled_cloud is not None:
+            if cloud_preview is not None:
                 cloud_h = h // 2
-                if angled_cloud.shape[1] != top_row.shape[1]:
-                    angled_cloud = cv2.resize(
-                        angled_cloud, (top_row.shape[1], cloud_h),
+                if cloud_preview.shape[1] != top_row.shape[1]:
+                    cloud_preview = cv2.resize(
+                        cloud_preview, (top_row.shape[1], cloud_h),
                         interpolation=cv2.INTER_NEAREST,
                     )
                 cv2.putText(
-                    angled_cloud, "3D Point Cloud",
+                    cloud_preview, "Point Cloud Preview",
                     (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA,
                 )
-                composite = np.vstack([top_row, angled_cloud])
+                composite = np.vstack([top_row, cloud_preview])
             else:
                 composite = top_row
         else:

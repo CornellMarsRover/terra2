@@ -234,15 +234,15 @@ class CmdVelSubscriber(Node):
             self.controller_command_rx = 0
         
 
-        self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
+        self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
         ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)
         self.logger.info(f'VEL: {self.velocity}')
         # back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, -self.velocity*ws1,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
         # front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.velocity*ws4,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
         # front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, self.velocity*ws2, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
         # back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
-        logger = logging.getLogger("DrivesLogger")
-        logger.setLevel(logging.INFO)
+        # logger = logging.getLogger("DrivesLogger")
+        # logger.setLevel(logging.INFO)
         # qr = moteus.QueryResolution()
         # qr.mode = moteus.INT8
         # qr.position = moteus.F32
@@ -389,10 +389,15 @@ class CmdVelSubscriber(Node):
             front_right = moteus.Controller(id=3)
             back_right  = moteus.Controller(id=4)
 
-            send_moteus_stop_sync(front_left,  motor=1, logger=logger)
-            send_moteus_stop_sync(back_left,   motor=2, logger=logger)
-            send_moteus_stop_sync(front_right, motor=3, logger=logger)
-            send_moteus_stop_sync(back_right,  motor=4, logger=logger)
+            # send_moteus_stop_sync(front_left,  motor=1, logger=logger)
+            # send_moteus_stop_sync(back_left,   motor=2, logger=logger)
+            # send_moteus_stop_sync(front_right, motor=3, logger=logger)
+            # send_moteus_stop_sync(back_right,  motor=4, logger=logger)
+
+            send_moteus_stop_sync(self.ctrl_drive["FL"], motor=1, logger=logger)
+            send_moteus_stop_sync(self.ctrl_drive["BL"], motor=2, logger=logger)
+            send_moteus_stop_sync(self.ctrl_drive["FR"], motor=3, logger=logger)
+            send_moteus_stop_sync(self.ctrl_drive["BR"], motor=4, logger=logger)
 
         if trigger_val == L1 and button_val == CIRCLE: 
             self.turn_thread_lock = not self.turn_thread_lock

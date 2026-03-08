@@ -45,7 +45,7 @@ TRIANGLE = 16777216 #0x01010101
 
 #SWERVE MOTORS
 FRONT_LEFT_SWERVE = 0x05
-BACK_RIGHT_SWERVE = 0x06
+BACK_RIGHT_SWERVE = 0x08
 FRONT_RIGHT_SWERVE = 0x07
 BACK_LEFT_SWERVE = 0x06
 
@@ -112,16 +112,26 @@ def send_moteus_stop_sync(
     )
     return future.result()  # block until done (or raise exception on error)
 
+# async def __async_initialize_moteus(servos: list):
+#     #transport = moteus.Fdcanusb()
+#     self.transport = moteus.Fdcanusb("/dev/ttyACM0")
+#     # 1, 2, 3, 4  = drives: front left, back left, front right, back right
+#     # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+#     s = {
+#         servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+#     }
+
+#     # reset servo positions
+#     await transport.cycle([x.make_stop() for x in s.values()])
+#     await transport.cycle([x.make_rezero() for x in s.values()])
+
 async def __async_initialize_moteus(servos: list):
-    #transport = moteus.Fdcanusb()
-    self.transport = moteus.Fdcanusb("/dev/ttyACM0")
-    # 1, 2, 3, 4  = drives: front left, back left, front right, back right
-    # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+    transport = moteus.Fdcanusb("/dev/ttyACM0")
     s = {
-        servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+        servo_id: moteus.Controller(id=servo_id, transport=transport)
+        for servo_id in servos
     }
 
-    # reset servo positions
     await transport.cycle([x.make_stop() for x in s.values()])
     await transport.cycle([x.make_rezero() for x in s.values()])
     

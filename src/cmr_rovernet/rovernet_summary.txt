@@ -1,0 +1,1427 @@
+
+================================================================================
+File: README.md
+Size: 82 B
+================================================================================
+
+# cmr_rovernet
+
+The CCB-Jetson communication package omitting the micro ros agent
+
+
+================================================================================
+File: cmr_rovernet/__init__.py
+Size: 0 B
+================================================================================
+
+
+
+================================================================================
+File: cmr_rovernet/armnet.py
+Size: 12.23 kB
+================================================================================
+
+import rclpy
+from rclpy.node import Node
+from cmr_msgs.msg import ControllerReading
+from cmr_msgs.msg import MiniArmDegree
+from trajectory_msgs.msg import JointTrajectory
+import time
+import serial
+from cmr_rovernet.rovernet_utils import *
+
+MAX_TORQUE = 0.7
+MAX_ACCEL = 5.0
+
+logger = logging.getLogger("ArmLogger")
+logger.setLevel(logging.INFO)
+
+class JSInputSubscriber(Node):
+    """
+    This node subscribes to the /js_input topic output by the 
+    armcontroller node. It will then convert the output to a pre-defined 40-byte 
+    format and send the output to the CCB via UART. 
+    """
+    
+    def __init__(self):
+        super().__init__('js_input_subscriber')
+        self.subscription = self.create_subscription(
+            JointTrajectory,
+            '/main_arm_controller/joint_trajectory',
+            self.listener_callback,
+            10)
+        self.miniarm_subscription = self.create_subscription(
+            MiniArmDegree,
+            '/mini_arm_controller/cmd_pos',
+            self.listener_callback_mini,
+            10)
+        self.button_subscription = self.create_subscription(
+            ControllerReading,
+            '/arm_controller/cmd_buttons',
+            self.listener_button_callback,
+            10)
+        self.subscription  # prevent unused variable warning
+        self.current_speed = 0
+        self.current_speed_angular = 0
+        self.last_time = time.time()
+        # self.port = "/dev/ttyTHS0"
+        self.baud_rate = 115200
+        # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        self.moveit_mode = 1
+        # self.serial_port = None
+        self.logger = self.get_logger()
+        
+        # Init constants given TOML file
+        # arm_controller_table = parse_toml("TODO")
+        # self.CONTROLLER_MAX_SPEED = arm_controller_table['node']['max_speed']
+
+        # arm_net_table = parse_toml("armnet")
+        # arm_net_node = arm_net_table['node']
+        # self.MOTOR_MAX_SPEED = arm_net_node['motor_max_speed']
+        # self.GRADUAL_INCREASE_RATE = arm_net_node['gradual_increase_rate']
+        # self.BASE_DYNAMIC_RATIO = arm_net_node['base_dynamic_ratio']
+        
+
+    def convert_angle_to_custom_range(self, angle, max_range):
+        """
+        Converts an angle from the range [-pi, pi] to a custom range [max_range, 0],
+        where -pi translates to max_range and pi translates to 0.
+        
+        Parameters:
+        - angle (float): The angle in radians, must be in the range [-pi, pi].
+        - max_range (float): The maximum value of the target range, corresponding to -pi.
+        
+        Returns:
+        - float: The converted value in the range [max_range, 0].
+        """
+        # Normalize the input angle from [-pi, pi] to [1, 0]
+        normalized_angle = (angle - 3.141592653589793) / (-2 * 3.141592653589793)
+        
+        # Scale the normalized angle to the custom range [max_range, 0]
+        offset = max_range/2
+        scaled_value = (normalized_angle * max_range) - offset
+        
+        return scaled_value
+    
+
+    def convert_radians_to_motor_rotation(self, vel, ratio):
+        conversion = vel* 1/(2 * 3.141592653589793) * ratio
+        return conversion
+
+    
+    def translate_to_electrical(self, positions, velocities):
+        output_pos = [-self.convert_angle_to_custom_range(positions[0], 100), 
+                      self.convert_angle_to_custom_range(positions[1], 100), 
+                      -self.convert_angle_to_custom_range(positions[2], 100), 
+                      self.convert_angle_to_custom_range(positions[3], 50), 
+                      self.convert_angle_to_custom_range(positions[4], 50), 
+                      self.convert_angle_to_custom_range(positions[5], 50), 
+                      ]
+        # output_vels = [self.convert_radians_to_motor_rotation(velocities[0], 100), 
+        #                self.convert_radians_to_motor_rotation(velocities[1], 100), 
+        #                -self.convert_radians_to_motor_rotation(velocities[2], 100), 
+        #                self.convert_radians_to_motor_rotation(velocities[3], 50), 
+        #                self.convert_radians_to_motor_rotation(velocities[4], 50),
+        #                self.convert_radians_to_motor_rotation(velocities[5], 50)]
+        output_vels = [6, 6, 6, 6, 6, 6]
+        #indexing [base_joint, shoulder_joint, elbow_joint, wrist_rotate, wrist_twist, wrist_rotate_two]
+        self.get_logger().info(f'{output_pos}, {output_vels}')
+        return output_pos, output_vels
+
+
+    def listener_callback(self, msg):
+        if self.moveit_mode:
+            positions, velocities = self.translate_to_electrical(msg.points[0].positions, msg.points[0].velocities)
+            print(positions)
+            # base = byte_command_converter(ARM, ARM_BASE, positions[0], None, MAX_TORQUE, velocities[0], MAX_ACCEL, None, self.get_logger())
+            # shoulder = byte_command_converter(ARM, ARM_SHOULDER, positions[1], None, MAX_TORQUE, velocities[1], MAX_ACCEL, None, self.get_logger())
+            # elbow = byte_command_converter(ARM, ARM_ELBOW, positions[2], None, MAX_TORQUE, velocities[2], MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, positions[3], None, MAX_TORQUE, velocities[3], MAX_ACCEL, None, self.get_logger())
+            # wrist_tilt = byte_command_converter(ARM, WRIST_TILT, positions[4], None, MAX_TORQUE, velocities[4], MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, positions[5], None, MAX_TORQUE, velocities[5], MAX_ACCEL, None, self.get_logger())
+            # send_number(self.serial_port, base)
+            # send_number(self.serial_port, shoulder)
+            # send_number(self.serial_port, elbow)
+            # send_number(self.serial_port, wrist_rotate_1)
+            # send_number(self.serial_port, wrist_tilt)
+            # send_number(self.serial_port, wrist_rotate_2)
+
+            base = moteus.Controller(id=9)
+            shoulder = moteus.Controller(id=10)
+            elbow = moteus.Controller(id=11)
+            wrist_rotate_1 = moteus.Controller(id=12)
+            wrist_tilt = moteus.Controller(id=13)
+            wrist_rotate_2 = moteus.Controller(id=14)
+
+            send_moteus_command_sync(controller=base, motor=9, position=positions[0], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[0],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=shoulder, motor=10, position=positions[1], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[1],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=elbow, motor=11, position=positions[2], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[2],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=positions[3], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[3],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_tilt, motor=13, position=positions[4], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[4],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=positions[5], drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocities[5],  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+
+
+
+    def listener_callback_mini(self, msg):  
+        if not self.moveit_mode:
+            max_velocity = 6
+            print([msg.base_angle, msg.shoulder_angle, msg.elbow_angle, msg.first_rotate_angle, msg.tilt_angle, msg.second_rotate_angle])
+            # base = byte_command_converter(ARM, ARM_BASE, msg.base_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # shoulder = byte_command_converter(ARM, ARM_SHOULDER, msg.shoulder_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # elbow = byte_command_converter(ARM, ARM_ELBOW, msg.elbow_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, msg.first_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # wrist_tilt = byte_command_converter(ARM, WRIST_TILT, msg.tilt_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, msg.second_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
+            # send_number(self.serial_port, base)
+            # send_number(self.serial_port, shoulder)
+            # send_number(self.serial_port, elbow)
+            # send_number(self.serial_port, wrist_rotate_1)
+            # send_number(self.serial_port, wrist_tilt)
+            # send_number(self.serial_port, wrist_rotate_2)
+
+            base = moteus.Controller(id=9)
+            shoulder = moteus.Controller(id=10)
+            elbow = moteus.Controller(id=11)
+            wrist_rotate_1 = moteus.Controller(id=12)
+            wrist_tilt = moteus.Controller(id=13)
+            wrist_rotate_2 = moteus.Controller(id=14)
+
+            send_moteus_command_sync(controller=base, motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=shoulder, motor=10, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=elbow, motor=11, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_tilt, motor=13, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+
+
+
+    def listener_button_callback(self, msg):
+            trigger_val = msg.button_array[0]
+            button_val = msg.button_array[1]
+            # self.logger.info(f'button_array: {msg.button_array[0]}')
+            if trigger_val == L1 and button_val == SQUARE:
+                self.moveit_mode = 0
+                print("Mini arm mode: " + str(self.moveit_mode))
+            if trigger_val == L1 and button_val == CIRCLE:
+                self.moveit_mode = 1
+                print("MoveIt arm mode: " + str(self.moveit_mode))
+            if trigger_val == R1 and button_val == SQUARE:
+                self.moveit_mode = 1
+                print("MoveIt arm mode: " + str(self.moveit_mode))
+            if trigger_val == R1 and button_val == CIRCLE:
+                self.moveit_mode = 1
+                print("MoveIt arm mode: " + str(self.moveit_mode))
+            if trigger_val == R1 and button_val == TRIANGLE:
+                self.moveit_mode = 1
+                print("MoveIt arm mode: " + str(self.moveit_mode))
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    init_moteus_loop()
+    cmd_vel_subscriber = JSInputSubscriber()
+    rclpy.spin(cmd_vel_subscriber)
+
+    # Destroy the node explicitly
+    # (optional - otherwise it will be done automatically when the garbage collector destroys the node object)
+    cmd_vel_subscriber.destroy_node()
+    rclpy.shutdown()
+    return
+
+if __name__ == '__main__':
+    main()
+
+
+================================================================================
+File: cmr_rovernet/ccb_read.py
+Size: 6.38 kB
+================================================================================
+
+import rclpy
+from rclpy.node import Node
+from cmr_msgs.msg import MotorReadData
+import time
+import serial
+from cmr_rovernet.rovernet_utils import *
+
+class CCBReadPublisher(Node):
+    """
+    This node subscribes to the /drives_controller/cmd_vel topic output by the 
+    drivescontroller node. It will then convert the output to a pre-defined 40-byte 
+    format and send the output to the CCB via UART. 
+    """
+
+    def __init__(self):
+        super().__init__('cmd_vel_publisher')
+        self.encoder_data_publisher_ = self.create_publisher(MotorReadData, '/ccb/read', 10)
+        #self.read_timer = self.create_timer(0.1, self.read_data)
+        self.timer = self.create_timer(0.001, self.publish_msg)
+        self.port = "/dev/ttyTHS1"
+        self.baud_rate = 115200
+        self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        self.logger = self.get_logger()
+        self.stored_data = MotorReadData()
+        self.motor_data_mapping = {
+            FRONT_LEFT: self.stored_data.front_left,
+            BACK_RIGHT: self.stored_data.back_right,
+            FRONT_RIGHT: self.stored_data.front_right,
+            BACK_LEFT: self.stored_data.back_left,
+            ARM_BASE: self.stored_data.base, 
+            ARM_SHOULDER: self.stored_data.shoulder,
+            ARM_ELBOW: self.stored_data.elbow,
+            WRIST_ROTATE_1: self.stored_data.wrist_r1, 
+            WRIST_TILT: self.stored_data.wrist_twist,
+            WRIST_ROTATE_2: self.stored_data.wrist_r2,
+            FRONT_LEFT_SWERVE: self.stored_data.front_left_swerve, 
+            BACK_RIGHT_SWERVE: self.stored_data.back_right_swerve, 
+            FRONT_RIGHT_SWERVE: self.stored_data.front_right_swerve,
+            BACK_LEFT_SWERVE: self.stored_data.back_left_swerve
+        }
+
+    def publish_msg(self):
+        back_right_request = byte_command_converter(RECEIVE_DATA, BACK_RIGHT, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, back_right_request)
+        self.read_data()
+
+        front_right_request = byte_command_converter(RECEIVE_DATA, FRONT_RIGHT, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, front_right_request)
+        self.read_data()
+
+        front_left_request = byte_command_converter(RECEIVE_DATA, FRONT_LEFT, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, front_left_request)
+        self.read_data()
+
+        back_left_request = byte_command_converter(RECEIVE_DATA, BACK_LEFT, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, back_left_request)
+        self.read_data()
+
+        base_request = byte_command_converter(RECEIVE_DATA, ARM_BASE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, base_request)
+        self.read_data()
+
+        shoulder_request = byte_command_converter(RECEIVE_DATA, ARM_SHOULDER, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, shoulder_request)
+        self.read_data()
+
+        elbow_request = byte_command_converter(RECEIVE_DATA, ARM_ELBOW, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, elbow_request)
+        self.read_data()
+
+        wrist_rotate_1_request = byte_command_converter(RECEIVE_DATA, WRIST_ROTATE_1, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, wrist_rotate_1_request)
+        self.read_data()
+
+        wrist_twist_request = byte_command_converter(RECEIVE_DATA, WRIST_ROTATE_2, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, wrist_twist_request)
+        self.read_data()
+
+        wrist_rotate_2_request = byte_command_converter(RECEIVE_DATA, WRIST_TILT, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, wrist_rotate_2_request)
+        self.read_data()
+
+        back_right_swerve_request = byte_command_converter(RECEIVE_DATA, BACK_RIGHT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, back_right_swerve_request)
+        self.read_data()
+
+        front_right_swerve_request = byte_command_converter(RECEIVE_DATA, FRONT_RIGHT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, front_right_swerve_request)
+        self.read_data()
+
+        front_left_swerve_request = byte_command_converter(RECEIVE_DATA, FRONT_LEFT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, front_left_swerve_request)
+        self.read_data()
+
+        back_left_swerve_request = byte_command_converter(RECEIVE_DATA, BACK_LEFT_SWERVE, 10, 10, 10, 10, 10, 10, self.logger)
+        send_number(self.serial_port, back_left_swerve_request)
+        self.read_data()
+
+    def read_data(self):
+        data = self.serial_port.read(20)  # Adjust read method based on your data format
+        #self.logger.info(f'data: {data.hex()}')
+        self.process_data(data)
+            
+    def process_data(self, data):
+        format_string = '<BBBffffB'
+        try: 
+            subteam, motor_id, mode, position, velocity, torque, current, fault = struct.unpack(format_string, data)
+            #self.logger.info(f"Received - Subteam: {subteam}, Motor ID: {motor_id}, Mode: {mode}, Position: {position}, Velocity: {velocity}, Torque: {torque}, Current: {current}")
+            if motor_id in self.motor_data_mapping:
+                motor_data = self.motor_data_mapping[motor_id]
+                motor_data.mode = mode 
+                motor_data.position = position
+                #self.logger.info(f'pos: {position.hex()}')
+                motor_data.velocity = velocity
+                #self.logger.info(f'vel: {velocity.hex()}')
+                motor_data.torque = torque 
+                #self.logger.info(f'tor: {torque.hex()}')
+                motor_data.current = current
+                #self.logger.info(f'curr: {current.hex()}')
+            self.encoder_data_publisher_.publish(self.stored_data)
+
+        except struct.error as e: 
+            self.logger.error(f"Error unpacking data: {e}")
+
+def main(args=None):
+    rclpy.init(args=args)
+    cmd_vel_publisher = CCBReadPublisher()
+    rclpy.spin(cmd_vel_publisher)
+
+    # Destroy the node explicitly
+    # (optional - otherwise it will be done automatically when the garbage collector destroys the node object)
+    cmd_vel_publisher.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================================
+File: cmr_rovernet/debug.py
+Size: 1.93 kB
+================================================================================
+
+import rclpy
+from rclpy.node import Node
+from cmr_msgs.msg import MotorReadData
+
+class DebugSubscriber(Node):
+    
+    def __init__(self):
+        super().__init__('debug_subscriber')
+        self.subscription = self.create_subscription(
+            MotorReadData,
+            '/ccb/read',
+            self.listener_callback,
+            10)
+        self.velocity_total = 0
+        self.torque_total = 0
+        self.current_total = 0
+        self.count = 0
+        self.logger = self.get_logger()
+        
+    def listener_callback(self, msg):
+        # Update totals and count
+        motors = [msg.back_left, msg.front_right, msg.back_right, msg.front_left]
+        for motor in motors:
+            self.velocity_total += motor.velocity
+            self.torque_total += motor.torque
+            self.current_total += motor.current
+            self.count += 1
+
+        # Calculate averages and totals
+        if self.count > 0:  # Avoid division by zero
+            average_velocity = self.velocity_total / self.count
+            average_torque = self.torque_total / self.count
+            average_current = self.current_total / self.count
+            total_torque = self.torque_total
+            total_current = self.current_total
+
+            # Print the calculated values
+            #self.logger.info(f'Average Velocity: {average_velocity}, Average Torque: {average_torque}, Total Torque: {total_torque}, Average Current: {average_current}, Total Current: {total_current}')
+
+            # Reset totals and count for next calculation
+            self.velocity_total = 0
+            self.torque_total = 0
+            self.current_total = 0
+            self.count = 0
+
+def main(args=None):
+    rclpy.init(args=args)
+    debug_subscriber = DebugSubscriber()
+    rclpy.spin(debug_subscriber)
+
+    # Clean up before shutting down
+    debug_subscriber.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+
+
+================================================================================
+File: cmr_rovernet/drivesnet.py
+Size: 18.88 kB
+================================================================================
+
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import TwistStamped
+from cmr_msgs.msg import ControllerReading, AutonomyDrive
+import time
+import serial
+import math
+from cmr_rovernet.rovernet_utils import *
+
+
+class CmdVelSubscriber(Node):
+    """
+    This node subscribes to the /drives_controller/cmd_vel topic output by the 
+    drivescontroller node. It will then convert the output to a pre-defined 40-byte 
+    format and send the output to the CCB via UART. 
+    """
+    
+    def __init__(self):
+        super().__init__('cmd_vel_subscriber')
+        self.subscription = self.create_subscription(
+            TwistStamped,
+            '/drives_controller/cmd_vel',
+            self.listener_callback,
+            10)
+        self.button_subscription = self.create_subscription(
+            AutonomyDrive,
+            '/autonomy_move',
+            self.autonomy_callback,
+            10)
+        self.autonomy_subscription = self.create_subscription(
+            ControllerReading,
+            '/drives_controller/cmd_buttons',
+            self.listener_button_callback,
+            10)
+        self.subscription  # prevent unused variable warning
+        self.current_speed_left = 0
+        self.current_speed_right = 0
+        self.turn_thread_lock = 0
+        self.controller_command_ly = 0
+        self.controller_command_lx = 0
+        self.controller_command_ry = 0
+        self.controller_command_rx = 0
+        self.last_time_left = time.time()
+        self.last_time_right = time.time()
+        # self.port = "/dev/ttyTHS0"
+        self.baud_rate = 115200
+        # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+        self.feed_forward_torque = 0.0
+        self.velocity = 0
+        # self.serial_port = None
+        self.logger = self.get_logger()
+        self.swerve = False
+        
+        # Init constants given TOML file
+        #drives_controller_table = parse_toml("connect")
+        drives_net_table = parse_toml("drivesnet")
+        drives_net_node = drives_net_table['node']
+        self.CONTROLLER_MAX_SPEED = 2.5
+        self.MOTOR_MAX_SPEED = drives_net_node['motor_max_speed']
+        self.GRADUAL_INCREASE_RATE = drives_net_node['gradual_increase_rate']
+        self.BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
+        self.MAX_ACCELERATION = drives_net_node['acceleration_limit']
+        self.MAX_TORQUE = drives_net_node['torque_limit']
+        self.MAX_FEED_FORWARD_TORQUE = drives_net_node['feed_forward_torque_limit']
+
+    # def set_feed_forward_torque(self, trigger_input):
+    #     trigger_input = trigger_input/255
+    #     ff_torque_output = trigger_input*self.MAX_FEED_FORWARD_TORQUE
+    #     self.feed_forward_torque = ff_torque_output
+    #     return ff_torque_output
+    
+    def gradually_increase_speed_left(self, target_speed):
+        current_time = time.time()
+        time_difference = current_time - self.last_time_left
+        self.last_time_left = current_time
+
+        # Base rate of speed change
+        base_rate = self.GRADUAL_INCREASE_RATE * time_difference
+
+        # Modify the rate based on how close the target speed is to neutral (0)
+        # The rate of change is faster when the joystick is near neutral
+        dynamic_rate = base_rate * (1 - abs(target_speed) / 35)  # Assuming 35 is the max speed
+
+        # Ensure dynamic_rate does not drop below a certain threshold
+        dynamic_rate = max(dynamic_rate, base_rate * self.BASE_DYNAMIC_RATIO)
+
+
+        if self.current_speed_left < target_speed:
+            self.current_speed_left = min(self.current_speed_left+dynamic_rate, target_speed)
+        elif self.current_speed_left > target_speed:
+            self.current_speed_left = max(self.current_speed_left-dynamic_rate, target_speed)
+
+    def gradually_increase_speed_right(self, target_speed):
+        current_time = time.time()
+        time_difference = current_time - self.last_time_right
+        self.last_time_right = current_time
+
+        # Base rate of speed change
+        base_rate = self.GRADUAL_INCREASE_RATE * time_difference
+
+        # Modify the rate based on how close the target speed is to neutral (0)
+        # The rate of change is faster when the joystick is near neutral
+        dynamic_rate = base_rate * (1 - abs(target_speed) / 35)  # Assuming 35 is the max speed
+        # Ensure dynamic_rate does not drop below a certain threshold
+        dynamic_rate = max(dynamic_rate, base_rate * self.BASE_DYNAMIC_RATIO)
+
+        if self.current_speed_right < target_speed:
+            self.current_speed_right = min(self.current_speed_right+dynamic_rate, target_speed)
+        elif self.current_speed_right > target_speed:
+            self.current_speed_right = max(self.current_speed_right-dynamic_rate, target_speed)
+        #self.logger.info(f'{self.current_speed_right}')
+
+    #Script to calculate swerve speed and angles
+    def wheelAnglesAndSpeeds(self, Vx, Vy, omega, L, W):
+        """calculates the wheel angles and speeds for a swerve module
+
+        Args:
+            Vx (double): desired velocity in the X direction, as a porportion of the max velocity
+            Vy (double): desired velocity in the Y direction, as a porportion of max velocity
+            omega (double): desired angular roll rate
+            L (double): wheel base length
+            W (double): wheel base width
+        """
+        R = math.sqrt(L**2 + W**2)
+        
+        Vx = round(Vx, 2)
+        Vy = round(Vy, 2)
+        omega = round(omega, 2)
+
+        #define helpful variables A-D
+        A = Vy - omega * (L/R)
+        B = Vy + omega * (L/R)
+        C = Vx - omega * (W/R)
+        D = Vx + omega * (W/R)
+
+        #define wheel speeds
+        ws1 = math.sqrt(B**2 + C**2)
+        ws2 = math.sqrt(B**2 + D**2)
+        ws3 = math.sqrt(A**2 + D**2)
+        ws4 = math.sqrt(A**2 + C**2)
+
+        #define wheel angles
+        wa1 = math.atan2(B,C) * 180 / math.pi
+        wa2 = math.atan2(B,D) * 180 / math.pi
+        wa3 = math.atan2(A,D) * 180 / math.pi
+        wa4 = math.atan2(A,C) * 180 / math.pi
+
+        #normalize wheel speeds
+        max = ws1
+        if(ws2 > max): max = ws2
+        if(ws3 > max): max = ws3
+        if(ws4 > max): max = ws4
+        if(max > 1): ws1 /= max; ws2 /= max; ws3 /= max; ws4 /= max
+
+        ws1 = round(ws1, 3) 
+        ws2 = round(ws2, 3) 
+        ws3 = round(ws3, 3)
+        ws4 = round(ws4, 3) 
+        
+        wa1 = (round(wa1, 3)) / 360 * 50
+        wa2 = (round(wa2, 3)) / 360 * 50
+        wa3 = (round(wa3, 3)) / 360 * 50
+        wa4 = (round(wa4, 3)) / 360 * 50
+        
+        return ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4
+    
+    def listener_callback(self, msg):
+        # if msg.twist.angular.z == 2.5: 
+        #    output = byte_command_converter(DRIVES, "back_right", None, None, None, None, None, self.get_logger())
+        # target_speed_left = scale_value(msg.twist.linear.y, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
+        #                         -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
+        # target_speed_right = scale_value(msg.twist.angular.y, -self.CONTROLLER_MAX_SPEED, self.CONTROLLER_MAX_SPEED, 
+        #                         -self.MOTOR_MAX_SPEED, self.MOTOR_MAX_SPEED)
+        # self.gradually_increase_speed_left(target_speed_left)
+        # self.gradually_increase_speed_right(target_speed_right)
+        # if self.current_speed_right < 0.2 and self.current_speed_right > -0.2:
+        #     right_speed = 0
+        # else:
+        #     right_speed = self.current_speed_right
+
+        # if self.current_speed_left < 0.2 and self.current_speed_left > -0.2:
+        #     left_speed = 0
+        # else:
+        #     left_speed = self.current_speed_left
+        # back_right =  byte_command_converter(DRIVES, BACK_RIGHT, None, -left_speed, self.MAX_TORQUE, None,  self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
+        # front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -left_speed, self.MAX_TORQUE, None, self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
+        # front_left =  byte_command_converter(DRIVES, FRONT_LEFT, None, left_speed, self.MAX_TORQUE, None,    self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
+        # back_left =   byte_command_converter(DRIVES, BACK_LEFT, None, left_speed, self.MAX_TORQUE, None,     self.MAX_ACCELERATION, self.feed_forward_torque, self.logger)
+        # self.logger.info(f'Left Speed: {left_speed}, Right Speed: {right_speed}')
+        # send_number(self.serial_port, back_right)
+        # send_number(self.serial_port, front_right)
+        # send_number(self.serial_port, front_left)
+        # send_number(self.serial_port, back_left)
+        
+        self.controller_command_ly = msg.twist.linear.y
+        self.controller_command_lx = msg.twist.linear.x
+        self.controller_command_ry = msg.twist.angular.y
+        self.controller_command_rx = msg.twist.angular.x
+        if abs(msg.twist.linear.y) < 0.1:
+            self.controller_command_ly = 0
+        if abs(msg.twist.linear.x) < 0.1:
+            self.controller_command_lx = 0
+        if abs(msg.twist.angular.y) < 0.1:
+            self.controller_command_ry = 0
+        if abs(msg.twist.angular.x) < 0.1:
+            self.controller_command_rx = 0
+        
+
+        self.logger.info(f'{self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, -self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)}')
+        ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(-self.controller_command_ly, self.controller_command_lx, self.controller_command_rx, ROVER_LENGTH, ROVER_WIDTH)
+        self.logger.info(f'VEL: {self.velocity}')
+        # back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, -self.velocity*ws1,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        # front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -self.velocity*ws4,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        # front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, self.velocity*ws2, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        # back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, self.velocity*ws3, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        logger = logging.getLogger("DrivesLogger")
+        logger.setLevel(logging.INFO)
+        qr = moteus.QueryResolution()
+        qr.mode = moteus.INT8
+        qr.position = moteus.F32
+        qr.velocity = moteus.F32
+        qr.torque = moteus.F32
+        qr.q_current = moteus.F32
+        
+        front_left = moteus.Controller(id=1, query_resolution=qr)
+        back_left = moteus.Controller(id=2, query_resolution=qr)
+        front_right = moteus.Controller(id=3, query_resolution=qr)
+        back_right = moteus.Controller(id=4, query_resolution=qr)
+        
+        send_moteus_command_sync(controller=front_left, motor=1, position=math.nan, drives_velocity=(-self.velocity*ws2), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=self.logger)
+        send_moteus_command_sync(controller=back_left, motor=2, position=math.nan, drives_velocity=(-self.velocity*ws3), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=self.logger)
+        send_moteus_command_sync(controller=front_right, motor=3, position=math.nan, drives_velocity=(self.velocity*ws4), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=self.logger)
+        send_moteus_command_sync(controller=back_right, motor=4, position=math.nan, drives_velocity=(self.velocity*ws1), maximum_torque=self.MAX_TORQUE, velocity_limit=self.MOTOR_MAX_SPEED,  accel_limit=self.MAX_ACCELERATION, ff_torque=0, logger=self.logger)
+        # br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, wa4, None, 5, 120, 120, None, self.logger)
+        # fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, wa1, None, 5, 120, 120, None, self.logger)
+        # fl_swerve = byte_command_converter(ARM, FRONT_LEFT_SWERVE, wa2, None, 5, 120, 120, None, self.logger)
+        # bl_swerve = byte_command_converter(ARM, BACK_LEFT_SWERVE, wa3, None, 5, 120, 120, None, self.logger)
+        
+        fr_swerve = moteus.Controller(id=7, query_resolution=qr)
+        br_swerve = moteus.Controller(id=8, query_resolution=qr)
+        bl_swerve = moteus.Controller(id=6, query_resolution=qr)
+        fl_swerve = moteus.Controller(id=5, query_resolution=qr)
+
+        send_moteus_command_sync(controller=fr_swerve, motor=7, position=wa1, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=self.logger)
+        send_moteus_command_sync(controller=br_swerve, motor=8, position=wa4, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=self.logger)
+        send_moteus_command_sync(controller=bl_swerve, motor=6, position=wa3, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=self.logger)
+        send_moteus_command_sync(controller=fl_swerve, motor=5, position=wa2, drives_velocity=None, maximum_torque=10, velocity_limit=60, accel_limit=40, ff_torque=None, logger=self.logger)
+
+        # send_number(self.serial_port, back_right)
+        # send_number(self.serial_port, front_right)
+        # send_number(self.serial_port, front_left)
+        # send_number(self.serial_port, back_left)
+        # send_number(self.serial_port, br_swerve)
+        # send_number(self.serial_port, fr_swerve)
+        # send_number(self.serial_port, fl_swerve)
+        # send_number(self.serial_port, bl_swerve)
+        
+    def autonomy_callback(self, msg):
+        vel = msg.vel
+        fl_angle = scale_value(msg.fl_angle, -360, 360, -100, 100)
+        fr_angle = scale_value(msg.fr_angle, -360, 360, -100, 100)
+        bl_angle = scale_value(msg.bl_angle, -360, 360, -100, 100)
+        br_angle = scale_value(msg.br_angle, -360, 360, -100, 100)
+
+
+        back_right =  byte_command_converter(DRIVES, BACK_RIGHT,  None, -vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -vel,  self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        front_left =  byte_command_converter(DRIVES, FRONT_LEFT,  None, vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        back_left =   byte_command_converter(DRIVES, BACK_LEFT,   None, vel, self.MAX_TORQUE, self.MOTOR_MAX_SPEED,  self.MAX_ACCELERATION, 0, self.logger)
+        
+        br_swerve = byte_command_converter(ARM, BACK_RIGHT_SWERVE, br_angle, None, 5, 120, 120, None, self.logger)
+        fr_swerve = byte_command_converter(ARM, FRONT_RIGHT_SWERVE, fr_angle, None, 5, 120, 120, None, self.logger)
+        fl_swerve = byte_command_converter(ARM, FRONT_LEFT_SWERVE, fl_angle, None, 5, 120, 120, None, self.logger)
+        bl_swerve = byte_command_converter(ARM, BACK_LEFT_SWERVE, bl_angle, None, 5, 120, 120, None, self.logger)
+    #     send_number(self.serial_port, back_right)
+    #     send_number(self.serial_port, front_right)
+    #     send_number(self.serial_port, front_left)
+    #     send_number(self.serial_port, back_left)
+    #     send_number(self.serial_port, br_swerve)
+    #     send_number(self.serial_port, fr_swerve)
+    #     send_number(self.serial_port, fl_swerve)
+    #     send_number(self.serial_port, bl_swerve)
+
+
+    def r2TriggerConverter(self, val):
+        # Convert the integer to a hexadecimal string
+        hex_value = hex(val & 0xFFFFFFFF)  # Mask with 0xFFFFFFFF to handle negative values correctly
+        # Take the first two hex digits (after '0x')
+        first_two_hex = hex_value[2:4]
+        # Convert the two hex digits back to an integer
+        result_int = int(first_two_hex, 16)
+        return result_int
+            
+    def listener_button_callback(self, msg):
+        trigger_val = msg.button_array[0]
+        button_val = msg.button_array[1]
+        # self.logger.info(f'button_array: {msg.button_array[0]}')
+        R2trigger = self.r2TriggerConverter(trigger_val)
+        if R2trigger >= 0 and R2trigger <= 255:
+            vel = scale_value(R2trigger, float(0), float(255), 0, self.MOTOR_MAX_SPEED)
+            self.velocity = vel 
+        if trigger_val >= L2_MIN and trigger_val <= L2:
+            vel = scale_value(trigger_val, L2_MIN, L2, 0, self.MOTOR_MAX_SPEED)
+            self.velocity = -vel
+            # self.logger.info(f'R2: {r2val}')
+            
+        if trigger_val == L1 and button_val == TRIANGLE: 
+            self.current_speed = 0
+            self.current_speed_angular = 0
+
+            logger = self.get_logger()
+
+            back_right_stop = byte_command_converter(DRIVES, BACK_RIGHT, None, None, None, None, None, None, self.logger)
+            front_right_stop = byte_command_converter(DRIVES, FRONT_RIGHT, None, None, None, None, None, None, self.logger)
+            front_left_stop = byte_command_converter(DRIVES, FRONT_LEFT, None, None, None, None, None, None, self.logger)
+            back_left_stop = byte_command_converter(DRIVES, BACK_LEFT, None, None, None, None, None, None, self.logger)
+            # send_number(self.serial_port, back_right_stop)
+            # send_number(self.serial_port, front_right_stop)
+            # send_number(self.serial_port, front_left_stop)
+            # send_number(self.serial_port, back_left_stop)
+
+            front_left  = moteus.Controller(id=1)
+            back_left   = moteus.Controller(id=2)
+            front_right = moteus.Controller(id=3)
+            back_right  = moteus.Controller(id=4)
+
+            send_moteus_stop_sync(front_left,  motor=1, logger=logger)
+            send_moteus_stop_sync(back_left,   motor=2, logger=logger)
+            send_moteus_stop_sync(front_right, motor=3, logger=logger)
+            send_moteus_stop_sync(back_right,  motor=4, logger=logger)
+
+        if trigger_val == L1 and button_val == CIRCLE: 
+            self.turn_thread_lock = not self.turn_thread_lock
+            if self.turn_thread_lock == False:
+                self.logger.info('Switching to Linear')
+            else:
+                self.logger.info('Switching to Angular')
+
+def main(args=None):
+    rclpy.init(args=args)
+    init_moteus_loop()
+    cmd_vel_subscriber = CmdVelSubscriber()
+    rclpy.spin(cmd_vel_subscriber)
+
+    # Destroy the node explicitly
+    # (optional - otherwise it will be done automatically when the garbage collector destroys the node object)
+    cmd_vel_subscriber.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+
+
+================================================================================
+File: cmr_rovernet/rovernet_utils.py
+Size: 13.32 kB
+================================================================================
+
+import struct
+from toml import load
+from os import path
+import time
+import math
+import logging
+import moteus
+import asyncio
+import threading
+
+#VALID SUBTEAMS
+DRIVES = 0x01
+ARM = 0x02
+ASTROTECH = 0x03
+RECEIVE_DATA = 0x04
+BRAKE = 0x08
+
+#VALID MOTORS
+FRONT_LEFT = 0x01
+BACK_RIGHT = 0x04
+FRONT_RIGHT = 0x03
+BACK_LEFT = 0x02
+
+#VALID ARM MOTORS
+ARM_BASE = 0x09
+ARM_SHOULDER = 0x0A
+ARM_ELBOW = 0x0B
+WRIST_ROTATE_1 = 0x0C
+WRIST_ROTATE_2 = 0x0E
+WRIST_TILT = 0x0D
+
+#TRIGGERS - INDEX 0 OF BUTTON_ARRAY
+L1 = 1 #0x01
+R1 = 256 #0x0101
+L2_MIN = 65536
+L2 = 16711680 
+R2_MIN = 26711680
+R2 = -16777216 #0x01010101
+
+#BUTTONS - INDEX 1 OF BUTTON_ARRAY
+SQUARE = 1 #0x01
+X = 256 #0x0101
+CIRCLE = 65536 #0x010101
+TRIANGLE = 16777216 #0x01010101
+
+#SWERVE MOTORS
+FRONT_LEFT_SWERVE = 0x05
+BACK_RIGHT_SWERVE = 0x06
+FRONT_RIGHT_SWERVE = 0x07
+BACK_LEFT_SWERVE = 0x06
+
+#WHEEL BASE IN METERS
+ROVER_LENGTH = 39
+ROVER_WIDTH = 39
+R = math.sqrt(ROVER_LENGTH**2 + ROVER_WIDTH**2)
+maxWheelVelocity = 12
+
+
+# Create a global event loop that will run in another thread
+_moteus_loop = None
+_moteus_loop_thread = None
+
+def init_moteus_loop():
+    """
+    Initializes a dedicated asyncio event loop in a separate thread.
+    Call this once at the start of your node.
+    """
+    global _moteus_loop, _moteus_loop_thread
+    if _moteus_loop is None:
+        _moteus_loop = asyncio.new_event_loop()
+        _moteus_loop_thread = threading.Thread(
+            target=_moteus_loop.run_forever, 
+            daemon=True
+        )
+        _moteus_loop_thread.start()
+
+async def _send_moteus_stop_async(
+    controller: moteus.Controller,
+    motor: int,
+    logger: logging.Logger | None = None
+):
+    """
+    The actual async version of stopping the servo.
+    """
+    if logger:
+        logger.info(f"[motor={motor}] calling set_stop()")
+    # This tells the moteus servo to stop actively controlling 
+    # (this is the 'stop' mode on the servo).
+    await controller.set_stop()  # By default, query=False
+    
+
+def send_moteus_stop_sync(
+    controller: moteus.Controller,
+    motor: int,
+    logger: logging.Logger | None = None
+):
+    """
+    Synchronous wrapper that schedules an async stop call on our single
+    global event loop thread, then waits for completion.
+    """
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        _send_moteus_stop_async(
+            controller=controller,
+            motor=motor,
+            logger=logger
+        ),
+        _moteus_loop
+    )
+    return future.result()  # block until done (or raise exception on error)
+
+async def __async_initialize_moteus(servos: list):
+    #transport = moteus.Fdcanusb()
+    self.transport = moteus.Fdcanusb("/dev/ttyACM0")
+    # 1, 2, 3, 4  = drives: front left, back left, front right, back right
+    # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+    s = {
+        servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+    }
+
+    # reset servo positions
+    await transport.cycle([x.make_stop() for x in s.values()])
+    await transport.cycle([x.make_rezero() for x in s.values()])
+    
+
+def initialize_moteus_sync(servos: list, logger):
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        __async_initialize_moteus(servos),
+        _moteus_loop
+    )
+    logger.info("SENT RESET COMMAND")
+    return future.result()  # block until done (or raise exception on error)
+
+async def _send_moteus_command_async(
+    controller: moteus.Controller,
+    motor: int,
+    position: float | None,
+    drives_velocity: float | None,
+    maximum_torque: float | None,
+    velocity_limit: float | None,
+    accel_limit: float | None,
+    ff_torque: float | None,
+    logger: logging.Logger | None = None
+):
+    """
+    The actual async version of sending commands to moteus.
+    (Adapt the parameter names to match the current moteus library.)
+    """
+    # fallback defaults
+    if position is None:
+        position = math.nan
+    if drives_velocity is None:
+        drives_velocity = math.nan
+    if maximum_torque is None:
+        maximum_torque = 1.0
+    if velocity_limit is None:
+        velocity_limit = 10.0
+    if accel_limit is None:
+        accel_limit = 10.0
+    if ff_torque is None:
+        ff_torque = 0.0
+
+    # Optional logging
+    if logger:
+        logger.info(f"[motor={motor}] position={position}, velocity={drives_velocity}, "
+                    f"maximum_torque={maximum_torque}, velocity_limit={velocity_limit}, "
+                    f"accel_limit={accel_limit}, feedforward_torque={ff_torque}")
+
+    # Use moteus "official" parameter names
+    result = await controller.set_position(
+        position=position,
+        velocity=drives_velocity,
+        maximum_torque=maximum_torque,
+        velocity_limit=velocity_limit,
+        accel_limit=accel_limit,
+        feedforward_torque=ff_torque
+    )
+
+    logger.info(f"{result}")
+
+def send_moteus_command_sync(
+    controller: moteus.Controller,
+    motor: int,
+    position: float | None,
+    drives_velocity: float | None,
+    maximum_torque: float | None,
+    velocity_limit: float | None,
+    accel_limit: float | None,
+    ff_torque: float | None,
+    logger: logging.Logger | None = None
+):
+    """
+    Synchronous wrapper that schedules an async call on the single
+    global event loop thread, then waits for completion.
+    """
+    # Make sure our loop is initialized
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        _send_moteus_command_async(
+            controller=controller,
+            motor=motor,
+            position=position,
+            drives_velocity=drives_velocity,
+            maximum_torque=maximum_torque,
+            velocity_limit=velocity_limit,
+            accel_limit=accel_limit,
+            ff_torque=ff_torque,
+            logger=logger
+        ),
+        _moteus_loop
+    )
+    # Block until done (or raise exception if error)
+    return future.result()
+
+def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, ff_torque, logger):
+    """
+    Helper function to convert a given motor command into a 40-byte encoding. Current format, with 
+    number of bytes written in parantheses:
+    
+    - SUBTEAM (1): either 'drives', 'arm', 'astrotech', 'business'
+    - MOTOR (1): either 'front_right', 'front_left', 'back_right', 'back_left'
+    - POSITION (4)
+    - DRIVES_VELOCITY (1)
+    - DIRECTION (1): derived from DRIVES_VELOCITY
+    - MAX_TORQUE (4)
+    - MAX_VELOCITY (4)
+    - MAX_ACCEL (4) 
+    - FEED FORWARD TORQUE (4)
+    - EXTRA (20) 
+    """
+    
+    #stop command - subteam byte, motor byte, then all FF bytes
+    #subteam = which subteam is being controller
+    #motor_id = which motor is being commanded
+    #position = the position of the arm motor from 0 to 100 (0 = 0 degress or n o turn, 100 = 360 degrees or full turn )
+    
+    if subteam < DRIVES or subteam > RECEIVE_DATA:
+        raise ValueError(f"Invalid Subteam in command")
+    # if motor < FRONT_LEFT or motor > BACK_RIGHT:
+    #     raise ValueError("Invalid motor_id")
+    # if position is not None and position not in range(100):
+    #     raise ValueError("Invalid position")
+    # if drives_velocity is not None and not isinstance(drives_velocity, float) and not isinstance(drives_velocity, int):
+    #     raise TypeError("drives_velocity must be an float or int")
+    
+    #Init hex values to be output
+    
+    
+
+    subteam_hex = subteam #1 byte
+    motor_hex = motor #1 byte
+    position_hex = struct.pack('f', position) if position is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
+    drives_vel_hex = struct.pack('f', drives_velocity) if drives_velocity is not None else b'\xFF\xFF\xFF\xFF' #4 byte
+    direction_hex = struct.pack('B', drives_velocity < 0) if drives_velocity is not None else b'\xFF' #1 byte
+    max_torque_hex = struct.pack('f', max_torque) if max_torque is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
+    max_vel_hex = struct.pack('f', max_vel) if max_vel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
+    max_accel_hex = struct.pack('f', max_accel) if max_accel is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
+    ff_torque_hex = struct.pack('f', ff_torque) if ff_torque is not None else b'\xFF\xFF\xFF\xFF' #4 bytes
+
+    # drives_vel_hex_string = drives_vel_hex.hex()
+    # logger.info(f'Vel: {drives_vel_hex_string}')
+
+    # direction_hex_string = direction_hex.hex()
+    # logger.info(f'Direction: {direction_hex_string}')
+    
+    # position_hex_string = position_hex.hex()
+    # logger.info(f'Direction: {position_hex_string}')
+
+    # ff_torque_hex_string = ff_torque_hex.hex()
+    # logger.info(f'Vel: {ff_torque_hex_string}')
+
+    # max_torque_hex_string = max_torque_hex.hex()
+    # logger.info(f'Vel: {max_torque_hex_string}')
+
+    # max_accel_hex_string = max_accel_hex.hex()
+    # logger.info(f'Vel: {max_accel_hex_string}')
+
+    # Concatenate the parts and pad to ensure the total length is 40 bytes
+    output = bytes([subteam_hex, motor_hex]) + position_hex + drives_vel_hex + direction_hex + max_torque_hex + max_vel_hex + max_accel_hex + ff_torque_hex
+
+    # output_string = output.hex()
+    # logger.info(f'Output: {output_string}')
+    output = output.ljust(40, b'\x00')
+    return output
+
+
+def scale_value(value, old_min, old_max, new_min, new_max):
+    """
+    Scale a value to new boundaries from old boundaries
+    """
+    
+    return (new_max - new_min) * (value - old_min) / (old_max - old_min) + new_min
+
+
+def send_number(serial_port, byte):
+    """
+    Send a number over the specified serial port.
+    """
+    
+    # Convert the number to a string and encode it to bytes
+    # Write the data to the serial port
+    serial_port.write(byte)
+    
+def parse_toml(toml_name):
+    """
+    Helper function to parse a toml file from the "config" directory given a [toml_name]
+    """
+    
+    folder_path = "/home/cmr/cmr/terra/src/cmr_rovernet/config"
+    toml_file_path = path.join(folder_path, f"{toml_name}.toml")
+    
+    try:
+        with open(toml_file_path, 'r') as file:
+            toml_data = load(file)
+        # Your code to work with the parsed data goes here
+        return toml_data
+        
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+drives_net_table = parse_toml("drivesnet")
+drives_net_node = drives_net_table['node']
+CONTROLLER_MAX_SPEED = 2.5
+MOTOR_MAX_SPEED = drives_net_node['motor_max_speed']
+GRADUAL_INCREASE_RATE = drives_net_node['gradual_increase_rate']
+BASE_DYNAMIC_RATIO = drives_net_node['base_dynamic_ratio']
+MAX_ACCELERATION = drives_net_node['acceleration_limit']
+MAX_TORQUE = drives_net_node['torque_limit']
+MAX_FEED_FORWARD_TORQUE = drives_net_node['feed_forward_torque_limit']
+
+def set_speed(speed, serial_port): 
+    """
+    Helper function to drive forward or backword at a certain speed
+
+    speed - Units in RPM, negative speed for reverse  
+    serial_port - serial port to send information
+
+    Example for port:
+    self.port = "/dev/ttyTHS0"
+    self.baud_rate = 115200
+    self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+    """
+    back_right =  byte_command_converter(DRIVES, BACK_RIGHT, None, -speed, MAX_TORQUE, None,  MAX_ACCELERATION, 0, None)
+    front_right = byte_command_converter(DRIVES, FRONT_RIGHT, None, -speed, MAX_TORQUE, None, MAX_ACCELERATION, 0, None)
+    front_left =  byte_command_converter(DRIVES, FRONT_LEFT, None, speed, MAX_TORQUE, None,   MAX_ACCELERATION, 0, None)
+    back_left =   byte_command_converter(DRIVES, BACK_LEFT, None, speed, MAX_TORQUE, None,    MAX_ACCELERATION, 0, None)
+    send_number(serial_port, back_right)
+    send_number(serial_port, front_right)
+    send_number(serial_port, front_left)
+    send_number(serial_port, back_left)
+    
+
+def set_speed_forward_timed(speed, drive_time, serial_port):
+    """
+    Helper function to drive forward or backword at a certain speed 
+    for a certain amount of time
+
+    speed - Units in RPM, negative speed for reverse  
+    drive_time - duration of drive
+    serial_port - serial port to send information
+
+    Example for port:
+    self.port = "/dev/ttyTHS0"
+    self.baud_rate = 115200
+    self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+    """
+    set_speed(speed, serial_port)
+    time.sleep(drive_time)
+    set_speed(0, serial_port)
+ 
+def drive_distance(speed, distance, wheel_diameter, serial_port):
+    """
+    Helper function to drive forward or backword for a set distance
+
+    speed - Units in RPM, negative speed for reverse  
+    distance - distance in inches
+    wheel_diameter - Right now, the wheel diameter is 11 inches
+    serial_port - serial port to send information
+
+    Example for port:
+    self.port = "/dev/ttyTHS0"
+    self.baud_rate = 115200
+    self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
+    """    
+    pi = 3.14159
+    time_in_minutes = distance / ((pi * wheel_diameter) * speed)
+    set_speed_forward_timed(speed, time_in_minutes*60, serial_port)
+    
+
+
+
+================================================================================
+File: config/armnet.toml
+Size: 144 B
+================================================================================
+
+package = "cmr_rovernet"
+executable = "armnet_node"
+name = "armnet"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
+
+
+================================================================================
+File: config/connect.toml
+Size: 189 B
+================================================================================
+
+package = "cmr_controller_remote"
+executable = "connect_node"
+name = "controller_connect"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
+
+[node]
+max_speed = 2.5
+
+================================================================================
+File: config/debug.toml
+Size: 142 B
+================================================================================
+
+package = "cmr_rovernet"
+executable = "debug_node"
+name = "debug"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
+
+
+================================================================================
+File: config/drivesnet.toml
+Size: 308 B
+================================================================================
+
+package = "cmr_rovernet"
+executable = "drivesnet_node"
+name = "drivesnet"
+dependencies = []
+
+[fault_handling]
+restart_attempts = 2
+restart_delay = 10
+
+[node]
+motor_max_speed = 40
+gradual_increase_rate = 10
+base_dynamic_ratio = 0.5
+acceleration_limit = 10.0
+torque_limit = 8.0
+feed_forward_torque_limit = 5.0
+
+
+================================================================================
+File: launch/rovernet.launch.py
+Size: 1.43 kB
+================================================================================
+
+from typing import List
+from os import listdir, path
+from toml import load
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+
+composition_ns = "rover"
+
+
+def generate_launch_description():
+    return LaunchDescription(
+        [
+            Node(
+                package="cmr_fabric",
+                executable="fault_handler",
+                namespace=composition_ns,
+                # arguments=["--ros-args", "--log-level", "debug"],
+            ),
+            Node(
+                package="cmr_fabric",
+                executable="lifecycle_manager",
+                namespace=composition_ns,
+            ),
+            *fabric_composition("/home/cmr/cmr/terra/src/cmr_rovernet/config"),
+        ]
+    )
+
+
+def fabric_composition(conf_dir: str) -> List[Node]:
+    return [fabric_node(path.join(conf_dir, x)) for x in listdir(conf_dir)]
+
+
+def fabric_node(conf_path: str) -> Node:
+    result = load(conf_path)
+    pkg = result["package"]
+    executable = result["executable"]
+    name = result["name"]
+
+    return Node(
+        package=pkg,
+        executable=executable,
+        name=name,
+        exec_name=name,
+        parameters=[
+            {
+                "config_path": conf_path,
+                "composition_ns": composition_ns,
+            }
+        ],
+        # arguments=["--ros-args", "--log-level", "debug"],
+    )
+
+
+================================================================================
+File: package.xml
+Size: 628 B
+================================================================================
+
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+    <name>cmr_rovernet</name>
+    <version>0.0.0</version>
+    <description>The CCB-Jetson communication package omitting the micro ros agent</description>
+    <maintainer email="team@cornellmarsrover.org">CMR</maintainer>
+    <license>MIT</license>
+
+
+    <depend>geometry_msgs</depend>
+    <!-- Add additional dependencies here. -->
+
+    <test_depend>python3-pytest</test_depend>
+
+    <export>
+        <build_type>ament_python</build_type>
+    </export>
+</package>
+
+================================================================================
+File: resource/cmr_rovernet
+Size: 0 B
+================================================================================
+
+
+
+================================================================================
+File: setup.cfg
+Size: 93 B
+================================================================================
+
+[develop]
+script_dir=$base/lib/cmr_rovernet
+[install]
+install_scripts=$base/lib/cmr_rovernet
+
+
+================================================================================
+File: setup.py
+Size: 961 B
+================================================================================
+
+from setuptools import setup
+
+package_name = "cmr_rovernet"
+
+setup(
+    name=package_name,
+    version="0.0.0",
+    packages=[package_name],
+    data_files=[
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+        ('share/' + package_name + '/launch', ['launch/rovernet.launch.py']),
+    ],
+    install_requires=["setuptools"],
+    zip_safe=True,
+    maintainer="CMR",
+    maintainer_email="team@cornellmarsrover.org",
+    description="The CCB-Jetson communication package omitting the micro ros agent",
+    license="MIT",
+    tests_require=["pytest"],
+    entry_points={
+        "console_scripts": [
+            "armnet_node = cmr_rovernet.armnet:main",
+            # PHOBOS_APPEND
+            'drivesnet_node = cmr_rovernet.drivesnet:main',
+            'cmr_read_node = cmr_rovernet.ccb_read:main',
+            'debug_node = cmr_rovernet.debug:main'
+        ],
+    },
+)
+

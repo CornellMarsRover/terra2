@@ -57,6 +57,16 @@ class ObjectDetectionNode(Node):
                               cv2.aruco.DICT_4X4_50
                             )
         self.aruco_params = cv2.aruco.DetectorParameters()
+        self.aruco_detector = cv2.aruco.ArucoDetector(
+            self.aruco_dict, self.aruco_params)
+
+        half = self.marker_length / 2.0
+        self.marker_obj_points = np.array([
+            [-half,  half, 0],
+            [ half,  half, 0],
+            [ half, -half, 0],
+            [-half, -half, 0],
+        ], dtype=np.float32)
 
         self.get_logger().info('ArUco object detection node started.')
 
@@ -93,10 +103,7 @@ class ObjectDetectionNode(Node):
             cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGRA2BGR)
         gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
 
-        # Detect markers
-        corners, ids, _ = cv2.aruco.detectMarkers(
-            gray, self.aruco_dict, parameters=self.aruco_params
-        )
+        corners, ids, _ = self.aruco_detector.detectMarkers(gray)
         if ids is None:
             return
 
@@ -108,15 +115,14 @@ class ObjectDetectionNode(Node):
 
         # Estimate pose of all detected markers
         # rvecs, tvecs shape=(N,1,3)
-        rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
-            corners,
-            self.marker_length,
-            self.camera_matrix,
-            self.dist_coeffs
-        )
+        success, rvec, tvec = cv2.solvePnP(
+            self.marker_obj_points, corners[idx][0],
+            self.camera_matrix, self.dist_coeffs)
+        if not success:
+            return
 
         # pick our target’s translation vector
-        t = tvecs[idx][0]   # [x_cam, y_cam, z_cam] in OpenCV camera frame
+        t = tvec.flatten()  # [x_cam, y_cam, z_cam] in OpenCV camera frame
 
         # Convert to your robot frame: 
         #   OpenCV camera frame: x→right, y→down, z→forward

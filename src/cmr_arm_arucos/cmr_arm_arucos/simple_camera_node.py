@@ -20,7 +20,7 @@ class SimpleCameraNode(Node):
         self.declare_parameter('image_topic', '/zed/image_left')
 
         camera_index = self.get_parameter('camera_index').value
-        fps = self.get_parameter('fps').value
+        fps = float(self.get_parameter('fps').value)
         image_topic = self.get_parameter('image_topic').value
 
         self.publisher = self.create_publisher(Image, image_topic, 10)

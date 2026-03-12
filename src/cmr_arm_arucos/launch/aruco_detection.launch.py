@@ -18,7 +18,7 @@ def generate_launch_description():
         description='Camera device index (0 for default USB camera)')
 
     fps_arg = DeclareLaunchArgument(
-        'fps', default_value='10',
+        'fps', default_value='10.0',
         description='Camera capture FPS')
 
     camera_node = Node(

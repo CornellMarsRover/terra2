@@ -25,7 +25,7 @@ def generate_launch_description():
                 executable="lifecycle_manager",
                 namespace=composition_ns,
             ),
-            *fabric_composition("/cmr/cmr/terra2/src/cmr_rover/config"),
+            *fabric_composition("/home/cmr/cmr/terra2/src/cmr_rover/config"),
         ]
     )
 

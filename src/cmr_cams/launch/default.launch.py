@@ -31,7 +31,7 @@ def generate_launch_description():
 
 
 def fabric_composition(conf_dir: str) -> List[Node]:
-    return [fabric_node(path.join(conf_dir, x)) for x in listdir(conf_dir)]
+    return [fabric_node(path.join(conf_dir, x)) for x in listdir(conf_dir) if x.endswith(".toml")]
 
 
 def fabric_node(conf_path: str) -> Node:

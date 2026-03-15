@@ -192,7 +192,7 @@ class X264MultiCameraPublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
     camera_ids = [0,2,4,6,8,10]
-    calib_dir  = "/home/cmr/cmr/terra/calib_dir"
+    calib_dir  = "/home/cmr/cmr/terra2/calib_dir"
     node = X264MultiCameraPublisher(camera_ids, calib_dir)
     try:
         rclpy.spin(node)

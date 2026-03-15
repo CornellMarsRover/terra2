@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Manually perform static analysis
-# assumes we are in terra directory
+# assumes we are in terra2 directory
 
 format_files=$(find ./src -type f \( -name "*.cpp" -or -name "*.hpp" -or -name "*.inl" \) -and -not -path "*/external/*")
 clang-format --dry-run --Werror $format_files

@@ -2,7 +2,7 @@
 
 # Runs a build on the ROS workspace.
 
-pushd "$CMR_ROOT/terra" &>/dev/null
+pushd "$CMR_ROOT/terra2" &>/dev/null
 source install/setup.bash
 CC=clang CXX=clang++ colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "$@"
 retval=$?

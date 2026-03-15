@@ -22,7 +22,7 @@ def generate_launch_description():
                 executable="lifecycle_manager",
                 namespace=composition_ns,
             ),
-            *fabric_composition("/cmr/terra/src/cmr_param_gui/config"),
+            *fabric_composition("/cmr/terra2/src/cmr_param_gui/config"),
         ]
     )
 

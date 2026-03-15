@@ -2,9 +2,9 @@
 
 # Performs code coverage after running tests
 # Builds html output in build/cov-output directory
-# Assumes the working directory is the terra root directory
+# Assumes the working directory is the terra2 root directory
 
-# pushd "$CMR_ROOT/terra" &> /dev/null
+# pushd "$CMR_ROOT/terra2" &> /dev/null
 
 lcov --directory . --base-directory . "$@"  --capture -o build/cov.info > /dev/null
 lcov -r build/cov.info "/opt/*" -o build/cov.info > /dev/null

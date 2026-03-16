@@ -144,8 +144,8 @@ def parse_toml(toml_name):
     """
     Helper function to parse a toml file from the "config" directory given a [toml_name]
     """
-    folder_path = "/home/cmr/cmr/terra/src/cmr_rovernet/config"
-    
+    folder_path = "/home/cmr/cmr/terra2/src/cmr_rovernet/config"
+
     # folder_path = "/cmr/terra/src/cmr_rovernet/config"
     toml_file_path = path.join(folder_path, f"{toml_name}.toml")
     

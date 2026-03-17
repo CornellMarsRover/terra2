@@ -148,11 +148,9 @@ class TypingMission(Node):
                     if self.initialize_reference_frame(corners, ids):
                         self.get_logger().info("Reference frame initialized.")
 
-                # Publish the pose for the current key
-                if current_index < len(keys_to_type):
-                    current_key = keys_to_type[current_index]
-                    self.publish_key_pose(current_key)
-                    current_index += 1  # Move to the next key
+                # Temp fix to make sure poses publish correctly
+                current_key = keys_to_type[current_index]
+                self.publish_key_pose(current_key)
 
                 # Show the camera feed
                 cv2.imshow("Camera Feed", frame)

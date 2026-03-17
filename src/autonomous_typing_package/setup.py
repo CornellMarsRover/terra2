@@ -21,7 +21,8 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            'autonomous_typing = autonomous_typing_package.typing_mission_ros:main'
+            'autonomous_typing = autonomous_typing_package.typing_mission_ros:main',
+            'arm_coordinator   = autonomous_typing_package.arm_coordinator:main',
         ],
     },
 )

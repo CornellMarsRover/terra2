@@ -9,5 +9,10 @@ def generate_launch_description():
             name='autonomous_typing_publisher',
             output='screen', #This option directs logs to the console
         ),
-        # Add more nodes if needed
+        Node(
+            package='autonomous_typing_package',
+            executable='arm_coordinator',
+            name='arm_coordinator',
+            output='screen',
+        ),
     ])

@@ -57,7 +57,7 @@ class TypingMission(Node):
         self.detector_params = cv2.aruco.DetectorParameters_create()
 
         # Reference frame state
-        self.top_left_tag_id = 0
+        self.corner_tag_ids = {0, 1, 2, 3}
         self.reference_origin = None
         self.reference_depth = 0.2  # meters
 
@@ -90,23 +90,31 @@ class TypingMission(Node):
 
     def initialize_reference_frame(self, corners, ids):
         """
-        Update the rolling window with the current top-left tag position.
-        Returns True if the tag was found this frame.
+        Update the rolling window with the current keyboard center position,
+        computed from the 4 corner ArUco tags.
+        Returns True if all 4 corner tags were found this frame.
         """
-        if ids is None or len(ids) < 4:
-            # Not all tags visible — don't add to history so variance stays high
+        if ids is None:
             return False
 
-        for i, marker_id in enumerate(ids.flatten()):
-            if marker_id == self.top_left_tag_id:
-                origin = np.mean(corners[i].reshape(4, 2), axis=0)
-                self.origin_history.append(origin)
-                # Keep reference_origin as the latest observation for pose
-                # computation; the coordinator decides when to trust it.
-                self.reference_origin = origin
-                return True
+        ids_flat = ids.flatten().tolist()
 
-        return False
+        # Require all 4 corner tags
+        if not self.corner_tag_ids.issubset(set(ids_flat)):
+            return False
+
+        # Compute center of each corner tag, then average them
+        tag_centers = []
+        for i, marker_id in enumerate(ids_flat):
+            if marker_id in self.corner_tag_ids:
+                center = np.mean(corners[i].reshape(4, 2), axis=0)
+                tag_centers.append(center)
+
+        origin = np.mean(np.array(tag_centers), axis=0)
+
+        self.origin_history.append(origin)
+        self.reference_origin = origin
+        return True
 
     # ------------------------------------------------------------------
     # Confidence estimation

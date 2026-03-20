@@ -5,7 +5,7 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='autonomous_typing_package',
-            executable='typing_mission_ros',
+            executable='autonomous_typing',
             name='autonomous_typing_publisher',
             output='screen', #This option directs logs to the console
         ),

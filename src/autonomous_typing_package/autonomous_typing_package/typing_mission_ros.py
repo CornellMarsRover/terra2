@@ -54,7 +54,7 @@ class TypingMission(Node):
 
         # ArUco setup
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-        self.detector_params = cv2.aruco.DetectorParameters_create()
+        self.detector_params = cv2.aruco.DetectorParameters()
 
         # Reference frame state
         self.corner_tag_ids = {0, 1, 2, 3}

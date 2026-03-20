@@ -112,16 +112,26 @@ def send_moteus_stop_sync(
     )
     return future.result()  # block until done (or raise exception on error)
 
+# async def __async_initialize_moteus(servos: list):
+#     #transport = moteus.Fdcanusb()
+#     self.transport = moteus.Fdcanusb("/dev/ttyACM0")
+#     # 1, 2, 3, 4  = drives: front left, back left, front right, back right
+#     # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+#     s = {
+#         servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+#     }
+
+#     # reset servo positions
+#     await transport.cycle([x.make_stop() for x in s.values()])
+#     await transport.cycle([x.make_rezero() for x in s.values()])
+
 async def __async_initialize_moteus(servos: list):
-    #transport = moteus.Fdcanusb()
-    self.transport = moteus.Fdcanusb("/dev/ttyACM0")
-    # 1, 2, 3, 4  = drives: front left, back left, front right, back right
-    # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+    transport = moteus.Fdcanusb("/dev/ttyACM0")
     s = {
-        servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+        servo_id: moteus.Controller(id=servo_id, transport=transport)
+        for servo_id in servos
     }
 
-    # reset servo positions
     await transport.cycle([x.make_stop() for x in s.values()])
     await transport.cycle([x.make_rezero() for x in s.values()])
     
@@ -316,7 +326,7 @@ def parse_toml(toml_name):
     Helper function to parse a toml file from the "config" directory given a [toml_name]
     """
     
-    folder_path = "/home/cmr/cmr/terra2/src/cmr_rovernet/config"
+    folder_path = "/home/cmr/cmr/terra/src/cmr_rovernet/config"
     toml_file_path = path.join(folder_path, f"{toml_name}.toml")
     
     try:

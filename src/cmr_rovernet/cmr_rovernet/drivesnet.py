@@ -83,7 +83,7 @@ class CmdVelSubscriber(Node):
         qr.torque = moteus.F32
         qr.q_current = moteus.F32
 
-        self.transport = moteus.Fdcanusb("/dev/ttyACM1")
+        self.transport = moteus.Fdcanusb("/dev/ttyACM0")
 
         self.ctrl_drive = {
             "FL": moteus.Controller(id=1, transport=self.transport, query_resolution=qr),

@@ -83,20 +83,19 @@ class CmdVelSubscriber(Node):
         qr.torque = moteus.F32
         qr.q_current = moteus.F32
 
-        self.transport = moteus.Fdcanusb("/dev/ttyACM0")
 
         self.ctrl_drive = {
-            "FL": moteus.Controller(id=1, transport=self.transport, query_resolution=qr),
-            "BL": moteus.Controller(id=2, transport=self.transport, query_resolution=qr),
-            "FR": moteus.Controller(id=3, transport=self.transport, query_resolution=qr),
-            "BR": moteus.Controller(id=4, transport=self.transport, query_resolution=qr),
+            "FL": moteus.Controller(id=1, query_resolution=qr),
+            "BL": moteus.Controller(id=2, query_resolution=qr),
+            "FR": moteus.Controller(id=3, query_resolution=qr),
+            "BR": moteus.Controller(id=4, query_resolution=qr),
         }
 
         self.ctrl_steer = {
-            "FL": moteus.Controller(id=5, transport=self.transport, query_resolution=qr),
-            "BL": moteus.Controller(id=6, transport=self.transport, query_resolution=qr),
-            "FR": moteus.Controller(id=7, transport=self.transport, query_resolution=qr),
-            "BR": moteus.Controller(id=8, transport=self.transport, query_resolution=qr),
+            "FL": moteus.Controller(id=5, query_resolution=qr),
+            "BL": moteus.Controller(id=6, query_resolution=qr),
+            "FR": moteus.Controller(id=7, query_resolution=qr),
+            "BR": moteus.Controller(id=8, query_resolution=qr),
         }
 
         self.logger.info("drivesnet initialized")

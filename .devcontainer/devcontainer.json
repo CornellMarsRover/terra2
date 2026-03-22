@@ -32,9 +32,13 @@
     }
   },
   "containerEnv": {
-    "DISPLAY": "host.docker.internal:0"
+    "DISPLAY": "host.docker.internal:0",
+    "TERRA_GUI_MODE": "xpra",
+    "TERRA_XPRA_DISPLAY": ":0",
+    "TERRA_XQUARTZ_DISPLAY": "host.docker.internal:0"
   },
   "runArgs": [
+    "--platform=linux/amd64",
     "--network=host",
     "--cap-add=SYS_PTRACE",
     "--security-opt=seccomp:unconfined",

@@ -34,7 +34,7 @@ def generate_launch_description():
                 namespace=composition_ns,
             ),
             *fabric_composition(
-                "/home/cmr/cmr/terra/src/cmr_rovernet/config",
+                "/home/cmr/cmr/terra2/src/cmr_rovernet/config",
                 enable_ccb,
             ),
         ]

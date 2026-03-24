@@ -101,7 +101,7 @@ PoseTracking::PoseTracking(
 
     // Connect to Servo ROS interfaces
     target_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
-        "key_location", rclcpp::SystemDefaultsQoS(),
+        "target_pose", rclcpp::SystemDefaultsQoS(),
         [this](const geometry_msgs::msg::PoseStamped::ConstSharedPtr& msg) {
             return targetPoseCallback(msg);
         });

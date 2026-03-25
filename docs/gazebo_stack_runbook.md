@@ -119,6 +119,7 @@ Recommended:
 Important detail:
 - this repo needed the devcontainer to run as `linux/amd64`, not `arm64`, in order for the Gazebo Classic path to work cleanly on Apple Silicon.
 - the current repo devcontainer has already been updated to include `--platform=linux/amd64`.
+- the devcontainer now publishes the Gazebo/Xpra and controller UDP ports explicitly instead of relying on Docker's Linux-side `host` network mode. That makes the Mac host able to use `127.0.0.1` for controller traffic.
 
 Verification inside the container:
 ```bash
@@ -185,13 +186,19 @@ From inside the devcontainer:
 ```bash
 cd /cmr/terra2
 source /opt/ros/humble/setup.bash
-colcon build --symlink-install
+colcon build --symlink-install --packages-up-to cmr_msgs cmr_controller_remote cmr_controls autonomous_navigation
 source install/setup.bash
 ```
 
 Note:
-- for the first Gazebo smoke test, a full build is not strictly required because the robot is spawned directly from the root-level URDF;
-- but it is still the cleanest default workflow.
+- this narrower build is recommended here because the full workspace can fail on unrelated packages;
+- `cmr_msgs`, `cmr_controller_remote`, `cmr_controls`, and `autonomous_navigation` are the packages needed for the Gazebo controller + drive bridge path.
+
+If you previously built this workspace in an `arm64` container and are now in `amd64`, clear stale caches first:
+```bash
+cd /cmr/terra2
+rm -rf build install log
+```
 
 ## G) Launch Gazebo Classic headless first
 Use Gazebo Classic, not `gz sim`:
@@ -217,7 +224,46 @@ ros2 run gazebo_ros spawn_entity.py \
 
 This is the concrete robot bringup path that worked during debugging.
 
-## I) Open the Gazebo GUI through Xpra
+## I) Start the Gazebo drive bridge
+The repo now includes a Gazebo bridge node that listens to the rover's normal drive topics and mirrors them into Gazebo wheel efforts.
+
+Standalone launch:
+```bash
+cd /cmr/terra2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch cmr_controls gazebo_drives.launch.py
+```
+
+Controller-enabled launch:
+```bash
+cd /cmr/terra2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch cmr_controls gazebo_drives.launch.py with_remote:=true
+```
+
+What it listens to:
+- `/cmd_vel_drives`
+- `/cmd_vel`
+- `/autonomy/move/point_turn`
+- `/autonomy/move/ackerman`
+- `/drives_controller/cmd_vel`
+
+What it does:
+- converts those commands into left/right wheel efforts;
+- calls Gazebo's `/apply_joint_effort` service repeatedly while commands are active;
+- clears wheel efforts when commands go stale.
+
+Architecture note:
+- the Gazebo bridge now reuses the repo's existing `cmr_controller_remote/connect.py` UDP ingress path instead of maintaining a separate container-side teleop receiver;
+- the only new controller helper is the host-side Sony controller reader script, because the controller is attached to macOS while ROS runs inside the Linux devcontainer.
+
+Important limitation:
+- the spawned `drives.urdf` model is still not a true swerve/ackermann Gazebo model;
+- the bridge mirrors **driving intent**, not exact real rover steering geometry.
+
+## J) Open the Gazebo GUI through Xpra
 This was the key discovery from the macOS debugging session.
 
 Even though X11 tools like `xclock`, `xeyes`, and `gzclient` could connect, the devcontainer image was actually running its own Xpra/Xvfb display server internally. Gazebo windows were created there, not directly in XQuartz.
@@ -242,7 +288,7 @@ Important notes:
 - `xwininfo` confirmed the Gazebo window existed even when XQuartz did not show it;
 - the browser/Xpra view is the reliable GUI path for this image.
 
-## J) Optional: try direct XQuartz instead
+## K) Optional: try direct XQuartz instead
 The repo now includes a switchable Gazebo GUI launcher:
 - [/Users/agupta/Desktop/terra2/scripts/gazebo_gui.sh](/Users/agupta/Desktop/terra2/scripts/gazebo_gui.sh)
 
@@ -274,11 +320,11 @@ Notes:
 - `xpra` should be treated as the default path;
 - the launcher is flaggable by design because a single GUI process normally targets one display at a time, not both simultaneously.
 
-## K) Verify the Gazebo bringup
+## L) Verify the Gazebo bringup
 In another devcontainer terminal:
 ```bash
 source /opt/ros/humble/setup.bash
-ros2 topic list | rg 'image_raw|camera_info|clock'
+ros2 topic list | grep -E 'image_raw|camera_info|clock|camera1'
 ```
 
 Expected:
@@ -287,30 +333,166 @@ Expected:
 Observed during debugging:
 - Gazebo server startup and `spawn_entity.py` worked;
 - the `drives` model spawn worked;
-- `/clock` was the main topic we expected to confirm first;
-- camera topics from the `libgazebo_ros_camera.so` plugin were **not** fully confirmed in this session, so treat camera ROS output as still needing verification.
+- `/clock` was confirmed;
+- Gazebo logged camera info publishing under `/camera1/camera_info`;
+- the new Gazebo drive bridge should log that it is listening for rover drive commands.
 
-## L) What this Gazebo launch actually gives you
+## M) What this Gazebo launch actually gives you
 - A Classic Gazebo server.
 - The root-level `drives.urdf` robot spawned into the world.
+- A Gazebo drive bridge that reacts to rover drive topics.
 - A GUI path through the devcontainer's Xpra session at `http://localhost:14500`.
 
 It does **not** give you:
 - IMU, GPS, or point cloud topics expected by `autonomous_navigation`;
-- a wired drive controller;
 - a full rover sim;
 - an arm Gazebo sim.
 
-## M) Run autonomy sim pipeline only (without hardware drives)
+## N) Run autonomy sim pipeline with the Gazebo drive bridge
 ```bash
+cd /cmr/terra2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
 ros2 launch autonomous_navigation sim_autonomy.launch.py
 ```
 
 Notes:
-- This starts the autonomy graph, but behavior depends on sensor topics being available.
-- It does **not** start Gazebo.
+- `sim_autonomy.launch.py` now also starts `gazebo_drive_bridge`;
+- if Gazebo is already running, autonomy drive commands should now reach the simulated rover;
+- behavior still depends on the expected sensor topics being available.
 
-## N) Optional: run arm simulation (MoveIt + fake ros2_control)
+## O) Run the Sony controller through the existing ROS controller stack
+This is the cleaned-up controller path after debugging.
+
+Data flow:
+- Sony controller on macOS
+- `/Users/agupta/Desktop/terra2/scripts/sony_controller_udp.py`
+- existing `cmr_controller_remote/connect.py` on UDP port `5010`
+- `/drives_controller/cmd_vel`
+- `gazebo_drive_bridge`
+- Gazebo wheel efforts
+
+### 1. Start Gazebo and spawn the rover
+Terminal 1:
+```bash
+cd /cmr/terra2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch gazebo_ros gazebo.launch.py gui:=false
+```
+
+Terminal 2:
+```bash
+cd /cmr/terra2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run gazebo_ros spawn_entity.py \
+  -entity drives \
+  -file /cmr/terra2/drives.urdf \
+  -x 0 -y 0 -z 0.2
+```
+
+### 2. Start the existing remote-control ingress plus the Gazebo bridge
+Terminal 3:
+```bash
+cd /cmr/terra2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch cmr_controls gazebo_drives.launch.py with_remote:=true
+```
+
+This launch starts:
+- `cmr_controller_remote/connect_node`
+- `cmr_controls/gazebo_drive_bridge`
+
+### 3. On the Mac host, install `pygame` once
+```bash
+python3 -m pip install pygame
+```
+
+### 4. On the Mac host, run the Sony controller sender
+```bash
+cd /Users/agupta/Desktop/terra2
+python3 scripts/sony_controller_udp.py --host 127.0.0.1 --port 5010
+```
+
+Controls:
+- left stick Y: forward/back
+- right stick X: turn
+- L1: slow mode
+- R1: boost
+- Cross / A: stop
+
+If your controller maps the right stick to a different SDL axis, try:
+```bash
+python3 scripts/sony_controller_udp.py --host 127.0.0.1 --port 5010 --right-x-axis 3
+```
+
+Important:
+- after changing the devcontainer networking, use `Dev Containers: Rebuild and Reopen in Container`;
+- the published UDP ports only exist after that rebuild.
+
+### 5. What success looks like
+In the `gazebo_drive_bridge` terminal you should see repeated logs like:
+- `Drive command from /drives_controller/cmd_vel: linear_x=... angular_z=...`
+
+In the `connect_node` terminal you should now also see repeated logs like:
+- `Drive packet from ... -> lx=... ly=... rx=... ry=...`
+
+In Gazebo:
+- the rover should move or rotate as you move the controller;
+- the `pose` values in the left panel should begin updating.
+
+### 6. If the rover does not move
+Check these in order:
+1. Gazebo is not paused.
+2. `connect_node` is running.
+3. `gazebo_drive_bridge` is running.
+4. The host script is printing changing `lx/ly/rx/ry` values.
+5. The bridge terminal is printing `Drive command from /drives_controller/cmd_vel`.
+
+Useful checks:
+```bash
+source /opt/ros/humble/setup.bash
+source /cmr/terra2/install/setup.bash
+ros2 topic echo /drives_controller/cmd_vel
+```
+
+```bash
+source /opt/ros/humble/setup.bash
+ros2 service list | grep -E 'apply_joint_effort|clear_joint_efforts'
+```
+
+## P) Quick manual drive test
+With Gazebo running and `gazebo_drive_bridge` launched:
+
+Forward:
+```bash
+source /opt/ros/humble/setup.bash
+ros2 topic pub -r 5 /cmd_vel_drives geometry_msgs/msg/Twist "{linear: {x: 0.5}, angular: {z: 0.0}}"
+```
+
+Rotate:
+```bash
+source /opt/ros/humble/setup.bash
+ros2 topic pub -r 5 /cmd_vel_drives geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.5}}"
+```
+
+Stop:
+```bash
+source /opt/ros/humble/setup.bash
+ros2 topic pub -1 /cmd_vel_drives geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}"
+```
+
+## Q) Make the Gazebo camera follow the rover
+Fast manual option in the Gazebo GUI:
+1. Expand `Models`.
+2. Right-click `drives`.
+3. Choose `Follow` if that menu option is available in your Classic Gazebo view.
+
+If the GUI does not expose a follow action cleanly, use the view controls to keep the camera centered on `drives`. The current repo does not yet ship a custom world file that pins the camera to the rover automatically.
+
+## R) Optional: run arm simulation (MoveIt + fake ros2_control)
 ```bash
 ros2 launch moveit_servo servo_example.launch.py
 ```
@@ -319,7 +501,7 @@ Notes:
 - This is RViz/FakeSystem simulation for the arm.
 - It is not Gazebo physics simulation.
 
-## O) If you insist on testing autonomy loop end-to-end without Gazebo
+## S) If you insist on testing autonomy loop end-to-end without Gazebo
 You can provide fake sensor topics from terminals (basic smoke test only):
 
 ```bash

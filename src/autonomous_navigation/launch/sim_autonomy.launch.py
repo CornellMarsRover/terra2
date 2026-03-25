@@ -25,6 +25,13 @@ def generate_launch_description():
             output='screen',
             parameters=[{}]
         ),
+        launch_ros.actions.Node(
+            package='cmr_controls',
+            executable='gazebo_drive_bridge',
+            name='gazebo_drive_bridge',
+            output='screen',
+            parameters=[{'use_sim_time': True}]
+        ),
 
         # Start localization after state_machine starts
         launch.actions.TimerAction(

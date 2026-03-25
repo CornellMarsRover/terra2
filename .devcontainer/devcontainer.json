@@ -39,7 +39,10 @@
   },
   "runArgs": [
     "--platform=linux/amd64",
-    "--network=host",
+    "-p=14500:14500",
+    "-p=5010:5010/udp",
+    "-p=5020:5020/udp",
+    "-p=5030:5030/udp",
     "--cap-add=SYS_PTRACE",
     "--security-opt=seccomp:unconfined",
     "--security-opt=apparmor:unconfined",

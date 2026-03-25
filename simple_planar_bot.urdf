@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<robot name="simple_planar_bot">
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.4 0.25 0.2"/>
+      </geometry>
+      <material name="orange">
+        <color rgba="1.0 0.45 0.1 1.0"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.4 0.25 0.2"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+      <mass value="5.0"/>
+      <inertia ixx="0.05" ixy="0.0" ixz="0.0" iyy="0.09" iyz="0.0" izz="0.1"/>
+    </inertial>
+  </link>
+
+  <gazebo>
+    <plugin filename="libgazebo_ros_planar_move.so" name="simple_planar_move">
+      <ros>
+        <namespace>/simple_bot</namespace>
+        <remapping>cmd_vel:=cmd_vel</remapping>
+        <remapping>odom:=odom</remapping>
+      </ros>
+      <update_rate>50</update_rate>
+      <publish_rate>20</publish_rate>
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>false</publish_odom_tf>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+    </plugin>
+  </gazebo>
+</robot>

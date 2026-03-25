@@ -53,6 +53,10 @@ class CmdVelPublisher(Node):
     self.timer = self.create_timer(0.1, self.publish_msg)
 
     self.logger = self.get_logger()
+    self.logger.info(
+        f"Listening for drive UDP packets on 0.0.0.0:{UDP_PORT_DRIVES}, "
+        f"arm on {UDP_PORT_ARM}, mini-arm on {UDP_PORT_MINI_ARM}"
+    )
   
   def publish_msg(self):
 
@@ -64,6 +68,11 @@ class CmdVelPublisher(Node):
           button_msg = self.create_button_message(button_array, dpad)
           self.publisher_.publish(msg)
           self.button_publisher_.publish(button_msg)
+          self.logger.info(
+              f"Drive packet from {addr[0]}:{addr[1]} -> "
+              f"lx={lx:.3f} ly={ly:.3f} rx={rx:.3f} ry={ry:.3f}",
+              throttle_duration_sec=1.0,
+          )
           # process data
       except BlockingIOError:
           # Handle the case where no data is received
@@ -169,7 +178,6 @@ class CmdVelPublisher(Node):
     # Assuming it starts from the 11th byte to the end
     hat_switch_data = raw_data[12:]
     hat_switch = hat_switch_data.split(b'\x00')[0].decode('utf-8') # Split at null byte and decode
-    print("Hat Switch Direction:", hat_switch)
     return float(lx), float(ly), float(rx), float(ry)
 
   def parse_button_data(self, raw_data):

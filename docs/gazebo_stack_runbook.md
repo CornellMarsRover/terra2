@@ -410,7 +410,7 @@ This launch starts:
 python3 -m pip install pygame
 ```
 
-### 4. On the Mac host, run the Sony controller sender
+### 4. On the Mac host, run the Sony controller sender if you are testing gazebo or drive inputs
 ```bash
 cd /Users/agupta/Desktop/terra2
 python3 scripts/sony_controller_udp.py --host 127.0.0.1 --port 5010

@@ -53,6 +53,8 @@ class CmdVelSubscriber(Node):
         self.velocity_scale = 1.0
         self.deadband = 0.1
         self.last_motion_log = None
+        self.last_cmd_vel_log = None
+        self.last_buttons_log = None
 
         drives_net_table = parse_toml("drivesnet")
         drives_net_node = drives_net_table["node"]
@@ -118,6 +120,24 @@ class CmdVelSubscriber(Node):
             self.logger.info(summary)
             self.last_motion_log = summary
 
+    def log_cmd_vel(self, msg: TwistStamped):
+        summary = (
+            f"cmd_vel rx: lx={msg.twist.linear.x:.2f} ly={msg.twist.linear.y:.2f} "
+            f"rx={msg.twist.angular.x:.2f} ry={msg.twist.angular.y:.2f}"
+        )
+        if summary != self.last_cmd_vel_log:
+            self.logger.info(summary)
+            self.last_cmd_vel_log = summary
+
+    def log_buttons(self, msg: ControllerReading, trigger_val: int, button_val: int):
+        summary = (
+            "buttons rx: "
+            f"raw={list(msg.button_array)} trigger={trigger_val} button={button_val} dpad={msg.dpad}"
+        )
+        if summary != self.last_buttons_log:
+            self.logger.info(summary)
+            self.last_buttons_log = summary
+
     def stop_all_motors(self):
         for motor_id, controller in self.drive_controllers.items():
             send_moteus_stop_sync(controller, motor=motor_id, logger=self.logger)
@@ -172,11 +192,7 @@ class CmdVelSubscriber(Node):
         return ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4
 
     def listener_callback(self, msg: TwistStamped):
-        self.logger.info(
-            "cmd_vel rx: "
-            f"lx={msg.twist.linear.x:.2f} ly={msg.twist.linear.y:.2f} "
-            f"rx={msg.twist.angular.x:.2f} ry={msg.twist.angular.y:.2f}"
-        )
+        self.log_cmd_vel(msg)
 
         self.controller_command_ly = self.apply_deadband(msg.twist.linear.y)
         self.controller_command_lx = self.apply_deadband(msg.twist.linear.x)
@@ -217,7 +233,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,
             ff_torque=0,
-            logger=self.logger,
+            logger=None,
         )
         send_moteus_command_sync(
             controller=self.drive_controllers[2],
@@ -228,7 +244,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,
             ff_torque=0,
-            logger=self.logger,
+            logger=None,
         )
         send_moteus_command_sync(
             controller=self.drive_controllers[3],
@@ -239,7 +255,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,
             ff_torque=0,
-            logger=self.logger,
+            logger=None,
         )
         send_moteus_command_sync(
             controller=self.drive_controllers[4],
@@ -250,7 +266,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,
             ff_torque=0,
-            logger=self.logger,
+            logger=None,
         )
 
         send_moteus_command_sync(
@@ -262,7 +278,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=60,
             accel_limit=40,
             ff_torque=None,
-            logger=self.logger,
+            logger=None,
         )
         send_moteus_command_sync(
             controller=self.swerve_controllers[7],
@@ -273,7 +289,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=60,
             accel_limit=40,
             ff_torque=None,
-            logger=self.logger,
+            logger=None,
         )
         send_moteus_command_sync(
             controller=self.swerve_controllers[8],
@@ -284,7 +300,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=60,
             accel_limit=40,
             ff_torque=None,
-            logger=self.logger,
+            logger=None,
         )
         send_moteus_command_sync(
             controller=self.swerve_controllers[5],
@@ -295,7 +311,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=60,
             accel_limit=40,
             ff_torque=None,
-            logger=self.logger,
+            logger=None,
         )
 
     def autonomy_callback(self, msg: AutonomyDrive):
@@ -306,10 +322,7 @@ class CmdVelSubscriber(Node):
     def listener_button_callback(self, msg: ControllerReading):
         trigger_val = int(msg.button_array[0]) if len(msg.button_array) > 0 else 0
         button_val = int(msg.button_array[1]) if len(msg.button_array) > 1 else 0
-        self.logger.info(
-            "buttons rx: "
-            f"raw={list(msg.button_array)} trigger={trigger_val} button={button_val} dpad={msg.dpad}"
-        )
+        self.log_buttons(msg, trigger_val, button_val)
 
         if trigger_val == L1 and button_val == TRIANGLE:
             self.velocity_scale = 0.0

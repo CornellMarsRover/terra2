@@ -193,7 +193,8 @@ async def _send_moteus_command_async(
         feedforward_torque=ff_torque
     )
 
-    logger.info(f"{result}")
+    if logger:
+        logger.info(f"{result}")
 
 def send_moteus_command_sync(
     controller: moteus.Controller,
@@ -406,4 +407,3 @@ def drive_distance(speed, distance, wheel_diameter, serial_port):
     time_in_minutes = distance / ((pi * wheel_diameter) * speed)
     set_speed_forward_timed(speed, time_in_minutes*60, serial_port)
     
-

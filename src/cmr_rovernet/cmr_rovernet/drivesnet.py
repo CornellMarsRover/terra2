@@ -27,6 +27,7 @@ class DrivesnetDiagnostic(Node):
         self.logger = self.get_logger()
         self.velocity_scale = 1.0
         self.deadband = 0.1
+        self.last_motion_log = None
         
         # Init constants given TOML file
         drives_net_table = parse_toml("drivesnet")
@@ -56,6 +57,11 @@ class DrivesnetDiagnostic(Node):
             8: moteus.Controller(id=8, query_resolution=qr),
         }
 
+        self.logger.info("Drivesnet teleop ready")
+        self.logger.info(f"deadband={self.deadband}, controller_max={self.CONTROLLER_MAX_SPEED}, motor_max={self.MOTOR_MAX_SPEED}")
+        self.logger.info("Teleop input topic: /drives_controller/cmd_vel")
+        self.logger.info("Buttons topic: /drives_controller/cmd_buttons")
+
     def apply_deadband(self, value):
         if abs(value) < self.deadband:
             return 0.0
@@ -69,6 +75,17 @@ class DrivesnetDiagnostic(Node):
         )
         normalized = min(1.0, max_input / self.CONTROLLER_MAX_SPEED)
         return normalized * self.velocity_scale * self.MOTOR_MAX_SPEED
+
+    def log_motion_summary(self, drive_speed, wheel_speeds, wheel_angles):
+        summary = (
+            f"sticks raw: lx={self.controller_command_lx:.2f} ly={self.controller_command_ly:.2f} "
+            f"rx={self.controller_command_rx:.2f} ry={self.controller_command_ry:.2f} | "
+            f"drive_scale={drive_speed:.2f} vel_scale={self.velocity_scale:.2f} | "
+            f"wheel_speeds={wheel_speeds} | swerve={wheel_angles}"
+        )
+        if summary != self.last_motion_log:
+            self.logger.info(summary)
+            self.last_motion_log = summary
 
     def stop_all_motors(self):
         for motor_id, controller in self.drive_controllers.items():
@@ -131,6 +148,11 @@ class DrivesnetDiagnostic(Node):
         return ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4
     
     def listener_callback(self, msg):
+        self.logger.info(
+            "cmd_vel rx: "
+            f"lx={msg.twist.linear.x:.2f} ly={msg.twist.linear.y:.2f} "
+            f"rx={msg.twist.angular.x:.2f} ry={msg.twist.angular.y:.2f}"
+        )
         self.controller_command_ly = self.apply_deadband(msg.twist.linear.y)
         self.controller_command_lx = self.apply_deadband(msg.twist.linear.x)
         self.controller_command_ry = self.apply_deadband(msg.twist.angular.y)
@@ -143,6 +165,22 @@ class DrivesnetDiagnostic(Node):
             self.controller_command_rx,
             ROVER_LENGTH,
             ROVER_WIDTH,
+        )
+
+        self.log_motion_summary(
+            drive_speed,
+            {
+                "br": round(ws1, 3),
+                "fl": round(ws2, 3),
+                "bl": round(ws3, 3),
+                "fr": round(ws4, 3),
+            },
+            {
+                "fr": round(wa1, 3),
+                "fl": round(wa2, 3),
+                "bl": round(wa3, 3),
+                "br": round(wa4, 3),
+            },
         )
 
         send_moteus_command_sync(
@@ -251,16 +289,23 @@ class DrivesnetDiagnostic(Node):
     def listener_button_callback(self, msg):
         trigger_val = int(msg.button_array[0]) if len(msg.button_array) > 0 else 0
         button_val = int(msg.button_array[1]) if len(msg.button_array) > 1 else 0
+        self.logger.info(
+            "buttons rx: "
+            f"raw={list(msg.button_array)} trigger={trigger_val} button={button_val} dpad={msg.dpad}"
+        )
 
         if trigger_val == L1 and button_val == TRIANGLE:
             self.velocity_scale = 0.0
+            self.logger.info("L1+Triangle detected -> STOP ALL")
             self.stop_all_motors()
             return
 
         if trigger_val == R1:
             self.velocity_scale = 1.0
+            self.logger.info("R1 held -> full speed mode")
         elif trigger_val == L1:
             self.velocity_scale = 0.4
+            self.logger.info("L1 held -> slow mode")
 
         if trigger_val == L1 and button_val == CIRCLE:
             self.send_drive_test("FR", 3, drive_velocity)

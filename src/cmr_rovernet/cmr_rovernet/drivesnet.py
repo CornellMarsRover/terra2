@@ -2,40 +2,64 @@ import math
 
 import moteus
 import rclpy
-from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
-from cmr_msgs.msg import ControllerReading, AutonomyDrive
-import math
-from cmr_rovernet.rovernet_utils import *
+from rclpy.node import Node
+
+from cmr_msgs.msg import AutonomyDrive, ControllerReading
+from cmr_rovernet.rovernet_utils import (
+    CIRCLE,
+    L1,
+    R1,
+    ROVER_LENGTH,
+    ROVER_WIDTH,
+    TRIANGLE,
+    X,
+    init_moteus_loop,
+    parse_toml,
+    send_moteus_command_sync,
+    send_moteus_stop_sync,
+)
 
 
-class DrivesnetDiagnostic(Node):
+class CmdVelSubscriber(Node):
     def __init__(self):
-        super().__init__("drivesnet_diagnostic")
+        super().__init__("drivesnet")
 
+        self.create_subscription(
+            TwistStamped,
+            "/drives_controller/cmd_vel",
+            self.listener_callback,
+            10,
+        )
         self.create_subscription(
             ControllerReading,
             "/drives_controller/cmd_buttons",
             self.listener_button_callback,
-            10)
-        self.subscription  # prevent unused variable warning
-        self.turn_thread_lock = 0
-        self.controller_command_ly = 0
-        self.controller_command_lx = 0
-        self.controller_command_ry = 0
-        self.controller_command_rx = 0
+            10,
+        )
+        self.create_subscription(
+            AutonomyDrive,
+            "/autonomy_move",
+            self.autonomy_callback,
+            10,
+        )
+
         self.logger = self.get_logger()
+        self.turn_thread_lock = False
+        self.controller_command_lx = 0.0
+        self.controller_command_ly = 0.0
+        self.controller_command_rx = 0.0
+        self.controller_command_ry = 0.0
         self.velocity_scale = 1.0
         self.deadband = 0.1
         self.last_motion_log = None
-        
-        # Init constants given TOML file
+
         drives_net_table = parse_toml("drivesnet")
-        drives_net_node = drives_net_table['node']
+        drives_net_node = drives_net_table["node"]
         self.CONTROLLER_MAX_SPEED = 2.5
-        self.MOTOR_MAX_SPEED = float(drives_net_node['motor_max_speed'])
-        self.MAX_ACCELERATION = float(drives_net_node['acceleration_limit'])
-        self.MAX_TORQUE = float(drives_net_node['torque_limit'])
+        self.MOTOR_MAX_SPEED = float(drives_net_node["motor_max_speed"])
+        self.MAX_ACCELERATION = float(drives_net_node["acceleration_limit"])
+        self.MAX_TORQUE = float(drives_net_node["torque_limit"])
 
         qr = moteus.QueryResolution()
         qr.mode = moteus.INT8
@@ -58,16 +82,21 @@ class DrivesnetDiagnostic(Node):
         }
 
         self.logger.info("Drivesnet teleop ready")
-        self.logger.info(f"deadband={self.deadband}, controller_max={self.CONTROLLER_MAX_SPEED}, motor_max={self.MOTOR_MAX_SPEED}")
+        self.logger.info(
+            f"deadband={self.deadband}, controller_max={self.CONTROLLER_MAX_SPEED}, "
+            f"motor_max={self.MOTOR_MAX_SPEED}"
+        )
         self.logger.info("Teleop input topic: /drives_controller/cmd_vel")
         self.logger.info("Buttons topic: /drives_controller/cmd_buttons")
+        self.logger.info("L1 + Triangle -> stop all motors")
+        self.logger.info("R1 -> full speed mode, L1 -> slow mode")
 
-    def apply_deadband(self, value):
+    def apply_deadband(self, value: float) -> float:
         if abs(value) < self.deadband:
             return 0.0
         return value
 
-    def compute_drive_scale(self):
+    def compute_drive_scale(self) -> float:
         max_input = max(
             abs(self.controller_command_lx),
             abs(self.controller_command_ly),
@@ -78,8 +107,10 @@ class DrivesnetDiagnostic(Node):
 
     def log_motion_summary(self, drive_speed, wheel_speeds, wheel_angles):
         summary = (
-            f"sticks raw: lx={self.controller_command_lx:.2f} ly={self.controller_command_ly:.2f} "
-            f"rx={self.controller_command_rx:.2f} ry={self.controller_command_ry:.2f} | "
+            f"sticks raw: lx={self.controller_command_lx:.2f} "
+            f"ly={self.controller_command_ly:.2f} "
+            f"rx={self.controller_command_rx:.2f} "
+            f"ry={self.controller_command_ry:.2f} | "
             f"drive_scale={drive_speed:.2f} vel_scale={self.velocity_scale:.2f} | "
             f"wheel_speeds={wheel_speeds} | swerve={wheel_angles}"
         )
@@ -93,66 +124,60 @@ class DrivesnetDiagnostic(Node):
         for motor_id, controller in self.swerve_controllers.items():
             send_moteus_stop_sync(controller, motor=motor_id, logger=self.logger)
 
-    #Script to calculate swerve speed and angles
-    def wheelAnglesAndSpeeds(self, Vx, Vy, omega, L, W):
-        """calculates the wheel angles and speeds for a swerve module
+    def wheelAnglesAndSpeeds(self, vx, vy, omega, length, width):
+        r = math.sqrt(length**2 + width**2)
 
-        Args:
-            Vx (double): desired velocity in the X direction, as a porportion of the max velocity
-            Vy (double): desired velocity in the Y direction, as a porportion of max velocity
-            omega (double): desired angular roll rate
-            L (double): wheel base length
-            W (double): wheel base width
-        """
-        R = math.sqrt(L**2 + W**2)
-        
-        Vx = round(Vx, 2)
-        Vy = round(Vy, 2)
+        vx = round(vx, 2)
+        vy = round(vy, 2)
         omega = round(omega, 2)
 
-        #define helpful variables A-D
-        A = Vy - omega * (L/R)
-        B = Vy + omega * (L/R)
-        C = Vx - omega * (W/R)
-        D = Vx + omega * (W/R)
+        a = vy - omega * (length / r)
+        b = vy + omega * (length / r)
+        c = vx - omega * (width / r)
+        d = vx + omega * (width / r)
 
-        #define wheel speeds
-        ws1 = math.sqrt(B**2 + C**2)
-        ws2 = math.sqrt(B**2 + D**2)
-        ws3 = math.sqrt(A**2 + D**2)
-        ws4 = math.sqrt(A**2 + C**2)
+        ws1 = math.sqrt(b**2 + c**2)
+        ws2 = math.sqrt(b**2 + d**2)
+        ws3 = math.sqrt(a**2 + d**2)
+        ws4 = math.sqrt(a**2 + c**2)
 
-        #define wheel angles
-        wa1 = math.atan2(B,C) * 180 / math.pi
-        wa2 = math.atan2(B,D) * 180 / math.pi
-        wa3 = math.atan2(A,D) * 180 / math.pi
-        wa4 = math.atan2(A,C) * 180 / math.pi
+        wa1 = math.atan2(b, c) * 180 / math.pi
+        wa2 = math.atan2(b, d) * 180 / math.pi
+        wa3 = math.atan2(a, d) * 180 / math.pi
+        wa4 = math.atan2(a, c) * 180 / math.pi
 
-        #normalize wheel speeds
-        max = ws1
-        if(ws2 > max): max = ws2
-        if(ws3 > max): max = ws3
-        if(ws4 > max): max = ws4
-        if(max > 1): ws1 /= max; ws2 /= max; ws3 /= max; ws4 /= max
+        max_speed = ws1
+        if ws2 > max_speed:
+            max_speed = ws2
+        if ws3 > max_speed:
+            max_speed = ws3
+        if ws4 > max_speed:
+            max_speed = ws4
+        if max_speed > 1:
+            ws1 /= max_speed
+            ws2 /= max_speed
+            ws3 /= max_speed
+            ws4 /= max_speed
 
-        ws1 = round(ws1, 3) 
-        ws2 = round(ws2, 3) 
+        ws1 = round(ws1, 3)
+        ws2 = round(ws2, 3)
         ws3 = round(ws3, 3)
-        ws4 = round(ws4, 3) 
-        
-        wa1 = (round(wa1, 3)) / 360 * 50
-        wa2 = (round(wa2, 3)) / 360 * 50
-        wa3 = (round(wa3, 3)) / 360 * 50
-        wa4 = (round(wa4, 3)) / 360 * 50
-        
+        ws4 = round(ws4, 3)
+
+        wa1 = round(wa1, 3) / 360 * 50
+        wa2 = round(wa2, 3) / 360 * 50
+        wa3 = round(wa3, 3) / 360 * 50
+        wa4 = round(wa4, 3) / 360 * 50
+
         return ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4
-    
-    def listener_callback(self, msg):
+
+    def listener_callback(self, msg: TwistStamped):
         self.logger.info(
             "cmd_vel rx: "
             f"lx={msg.twist.linear.x:.2f} ly={msg.twist.linear.y:.2f} "
             f"rx={msg.twist.angular.x:.2f} ry={msg.twist.angular.y:.2f}"
         )
+
         self.controller_command_ly = self.apply_deadband(msg.twist.linear.y)
         self.controller_command_lx = self.apply_deadband(msg.twist.linear.x)
         self.controller_command_ry = self.apply_deadband(msg.twist.angular.y)
@@ -272,21 +297,13 @@ class DrivesnetDiagnostic(Node):
             ff_torque=None,
             logger=self.logger,
         )
-        
-    def autonomy_callback(self, msg):
-        self.logger.info("Ignoring legacy /autonomy_move command; teleop uses /drives_controller/cmd_vel")
 
+    def autonomy_callback(self, msg: AutonomyDrive):
+        self.logger.info(
+            "Ignoring legacy /autonomy_move command; teleop uses /drives_controller/cmd_vel"
+        )
 
-    def r2TriggerConverter(self, val):
-        # Convert the integer to a hexadecimal string
-        hex_value = hex(val & 0xFFFFFFFF)  # Mask with 0xFFFFFFFF to handle negative values correctly
-        # Take the first two hex digits (after '0x')
-        first_two_hex = hex_value[2:4]
-        # Convert the two hex digits back to an integer
-        result_int = int(first_two_hex, 16)
-        return result_int
-            
-    def listener_button_callback(self, msg):
+    def listener_button_callback(self, msg: ControllerReading):
         trigger_val = int(msg.button_array[0]) if len(msg.button_array) > 0 else 0
         button_val = int(msg.button_array[1]) if len(msg.button_array) > 1 else 0
         self.logger.info(
@@ -308,40 +325,20 @@ class DrivesnetDiagnostic(Node):
             self.logger.info("L1 held -> slow mode")
 
         if trigger_val == L1 and button_val == CIRCLE:
-            self.send_drive_test("FR", 3, drive_velocity)
-            return
-
-        if trigger_val == L1 and button_val == R1:
-            self.send_drive_test("BR", 4, drive_velocity)
-            return
-
-        # STEER TESTS
-        if trigger_val == R1 and button_val == SQUARE:
-            self.send_steer_test("FL", 5, steer_position)
-            return
-
-        if trigger_val == R1 and button_val == X:
-            self.send_steer_test("BL", 6, steer_position)
-            return
-
-        if trigger_val == R1 and button_val == CIRCLE:
-            self.send_steer_test("FR", 7, steer_position)
-            return
-
-        if trigger_val == R1 and button_val == TRIANGLE:
-            self.send_steer_test("BR", 8, steer_position)
-            return
-
-        self.logger.info(f"No diagnostic action for trigger={trigger_val}, button={button_val}")
+            self.turn_thread_lock = not self.turn_thread_lock
+            if self.turn_thread_lock:
+                self.logger.info("Switching to Angular")
+            else:
+                self.logger.info("Switching to Linear")
+        elif trigger_val != 0 or button_val != 0:
+            self.logger.info("Button combo did not match a special action")
 
 
 def main(args=None):
     rclpy.init(args=args)
     init_moteus_loop()
-
-    node = DrivesnetDiagnostic()
+    node = CmdVelSubscriber()
     rclpy.spin(node)
-
     node.destroy_node()
     rclpy.shutdown()
 

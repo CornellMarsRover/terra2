@@ -125,21 +125,28 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
         return false;
     }
 
-    // The bread and butter: map buttons to twist commands
+    // The bread and butter: map controller inputs to twist commands.
+    // These bindings match the current PS5 layout used on the rover arm stack:
+    //   - right stick left/right  -> right/left translation
+    //   - triggers                -> forward/back translation
+    //   - right stick up/down     -> vertical translation
+    //   - left stick left/right   -> yaw
+    //   - left stick up/down      -> pitch
+    //   - L1 / R1                 -> roll
     twist->twist.linear.z = axes[RIGHT_STICK_Y];
-    twist->twist.linear.y = axes[RIGHT_STICK_X];
+    twist->twist.linear.x = axes[RIGHT_STICK_X];
 
     double lin_x_right =
         -0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
     double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
-    twist->twist.linear.x = lin_x_right + lin_x_left;
+    twist->twist.linear.y = lin_x_right + lin_x_left;
 
-    twist->twist.angular.y = axes[LEFT_STICK_Y];
-    twist->twist.angular.x = axes[LEFT_STICK_X];
+    twist->twist.angular.z = axes[LEFT_STICK_X];
+    twist->twist.angular.x = axes[LEFT_STICK_Y];
 
     double roll_positive = buttons[RIGHT_BUMPER];
     double roll_negative = -1 * (buttons[LEFT_BUMPER]);
-    twist->twist.angular.z = roll_positive + roll_negative;
+    twist->twist.angular.y = roll_positive + roll_negative;
 
     return true;
 }

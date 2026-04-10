@@ -1,4 +1,5 @@
 import math
+import time
 
 import moteus
 import rclpy
@@ -29,7 +30,9 @@ STEER_ACCEL_LIMIT = 40.0
 IDLE_COMMAND_EPSILON = 0.03
 WHEEL_SPEED_EPSILON = 0.02
 DRIVE_WATCHDOG_TIMEOUT = 0.25
-STEER_WATCHDOG_TIMEOUT = 0.25
+STEER_WATCHDOG_TIMEOUT = 1.0
+STEER_POSITION_SYNC_INTERVAL = 0.25
+STEER_QUERY_TIMEOUT = 0.08
 
 MODULES = {
     "FL": {"drive": 1, "steer": 5, "drive_sign": -1.0},
@@ -74,6 +77,8 @@ class CmdVelSubscriber(Node):
         self.last_cmd_vel_log = None
         self.last_buttons_log = None
         self.last_module_command_log = None
+        self.last_steer_sync_time = 0.0
+        self.last_steer_query_warn = 0.0
 
         drives_net_table = parse_toml("drivesnet")
         drives_net_node = drives_net_table["node"]
@@ -141,11 +146,42 @@ class CmdVelSubscriber(Node):
     def query_steer_position(self, side: str) -> float:
         motor_id = MODULES[side]["steer"]
         try:
-            result = query_moteus_sync(self.swerve_controllers[motor_id])
+            result = query_moteus_sync(
+                self.swerve_controllers[motor_id],
+                timeout_s=STEER_QUERY_TIMEOUT,
+            )
             return float(result.values.get(moteus.Register.POSITION, 0.0))
         except Exception as exc:
             self.logger.warn(f"Could not query {side} steer position on startup: {exc!r}")
             return 0.0
+
+    def sync_steer_positions(self, force: bool = False):
+        now = time.monotonic()
+        if not force and now - self.last_steer_sync_time < STEER_POSITION_SYNC_INTERVAL:
+            return
+
+        synced = []
+        failed = []
+        for side, module in MODULES.items():
+            steer_id = module["steer"]
+            try:
+                result = query_moteus_sync(
+                    self.swerve_controllers[steer_id],
+                    timeout_s=STEER_QUERY_TIMEOUT,
+                )
+                self.steer_motor_pos_est[side] = float(
+                    result.values.get(moteus.Register.POSITION, self.steer_motor_pos_est[side])
+                )
+                synced.append(side)
+            except Exception:
+                failed.append(side)
+
+        self.last_steer_sync_time = now
+        if failed and now - self.last_steer_query_warn > 2.0:
+            self.logger.warn(
+                "Could not refresh steer position for: " + ", ".join(failed)
+            )
+            self.last_steer_query_warn = now
 
     def compute_drive_scale(self) -> float:
         max_input = max(
@@ -317,6 +353,8 @@ class CmdVelSubscriber(Node):
         if command_mag < IDLE_COMMAND_EPSILON or drive_speed == 0.0:
             self.stop_drive_motors()
             return
+
+        self.sync_steer_positions()
 
         wheel_speeds, wheel_angles = self.calculate_swerve(
             -self.controller_command_ly,

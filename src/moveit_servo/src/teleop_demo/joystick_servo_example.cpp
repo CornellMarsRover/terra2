@@ -127,24 +127,25 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
 
     // Arm teleop mapping:
     //   - right stick up/down    -> vertical translation
-    //   - right stick left/right -> left/right translation
+    //   - right stick left/right -> right/left plane translation
     //   - triggers               -> forward/back translation
     //   - left stick up/down     -> pitch (up = pitch down, down = pitch up)
     //   - left stick left/right  -> yaw
     //   - bumpers                -> roll (R1 positive, L1 negative)
     twist->twist.linear.z = axes[RIGHT_STICK_Y];
-    twist->twist.linear.y = axes[RIGHT_STICK_X];
+    twist->twist.linear.x = axes[RIGHT_STICK_X];
 
-    double lin_x_right =
+    double lin_forward_right =
         -0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-    double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
-    twist->twist.linear.x = lin_x_right + lin_x_left;
+    double lin_backward_left =
+        0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
+    twist->twist.linear.y = lin_forward_right + lin_backward_left;
 
     twist->twist.angular.x = -axes[LEFT_STICK_Y];
     twist->twist.angular.z = axes[LEFT_STICK_X];
 
-    double roll_positive = buttons[RIGHT_BUMPER];
-    double roll_negative = -1 * (buttons[LEFT_BUMPER]);
+    double roll_positive = buttons[LEFT_BUMPER];
+    double roll_negative = -1 * (buttons[RIGHT_BUMPER]);
     twist->twist.angular.y = roll_positive + roll_negative;
 
     return true;

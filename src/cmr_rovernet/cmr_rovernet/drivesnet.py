@@ -73,6 +73,7 @@ class CmdVelSubscriber(Node):
         self.last_motion_log = None
         self.last_cmd_vel_log = None
         self.last_buttons_log = None
+        self.last_module_command_log = None
 
         drives_net_table = parse_toml("drivesnet")
         drives_net_node = drives_net_table["node"]
@@ -235,6 +236,17 @@ class CmdVelSubscriber(Node):
                 logger=None,
             )
 
+    def log_module_commands(self, commands):
+        summary = "module commands: " + " | ".join(
+            f"{side} drv={cmd['drive_velocity']:.2f} "
+            f"steer={cmd['steer_target']:.2f} "
+            f"delta={cmd['steer_delta']:.2f}"
+            for side, cmd in commands.items()
+        )
+        if summary != self.last_module_command_log:
+            self.logger.info(summary)
+            self.last_module_command_log = summary
+
     def command_module(self, side: str, drive_speed: float, wheel_speed: float, wheel_angle: float):
         module = MODULES[side]
         drive_id = module["drive"]
@@ -255,12 +267,13 @@ class CmdVelSubscriber(Node):
         angle_delta = target_angle - current_angle
         target_motor_pos = current_motor_pos + self.wheel_rad_delta_to_motor_rot(angle_delta)
         self.steer_motor_pos_est[side] = target_motor_pos
+        drive_velocity = module["drive_sign"] * drive_speed * optimized_speed
 
         send_moteus_command_sync(
             controller=self.drive_controllers[drive_id],
             motor=drive_id,
             position=math.nan,
-            drives_velocity=module["drive_sign"] * drive_speed * optimized_speed,
+            drives_velocity=drive_velocity,
             maximum_torque=self.MAX_TORQUE,
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,
@@ -280,6 +293,11 @@ class CmdVelSubscriber(Node):
             watchdog_timeout=STEER_WATCHDOG_TIMEOUT,
             logger=None,
         )
+        return {
+            "drive_velocity": drive_velocity,
+            "steer_target": target_motor_pos,
+            "steer_delta": target_motor_pos - current_motor_pos,
+        }
 
     def listener_callback(self, msg: TwistStamped):
         self.log_cmd_vel(msg)
@@ -312,8 +330,15 @@ class CmdVelSubscriber(Node):
             {side: round(angle, 3) for side, angle in wheel_angles.items()},
         )
 
+        module_commands = {}
         for side in MODULES:
-            self.command_module(side, drive_speed, wheel_speeds[side], wheel_angles[side])
+            module_commands[side] = self.command_module(
+                side,
+                drive_speed,
+                wheel_speeds[side],
+                wheel_angles[side],
+            )
+        self.log_module_commands(module_commands)
 
     def autonomy_callback(self, msg: AutonomyDrive):
         self.logger.info(

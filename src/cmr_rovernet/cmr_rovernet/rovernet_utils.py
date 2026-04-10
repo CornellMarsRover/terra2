@@ -196,6 +196,23 @@ async def _send_moteus_command_async(
     if logger:
         logger.info(f"{result}")
 
+
+async def _query_moteus_async(controller: moteus.Controller):
+    return await controller.query()
+
+
+def query_moteus_sync(controller: moteus.Controller, timeout_s: float = 0.2):
+    """
+    Synchronous wrapper for querying a moteus controller on the shared event loop.
+    """
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(_query_moteus_async(controller), _moteus_loop)
+    return future.result(timeout=timeout_s)
+
+
 def send_moteus_command_sync(
     controller: moteus.Controller,
     motor: int,

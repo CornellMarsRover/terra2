@@ -16,9 +16,25 @@ from cmr_rovernet.rovernet_utils import (
     X,
     init_moteus_loop,
     parse_toml,
+    query_moteus_sync,
     send_moteus_command_sync,
     send_moteus_stop_sync,
 )
+
+
+STEER_GEAR_RATIO = 50.0
+STEER_MAX_TORQUE = 10.0
+STEER_VELOCITY_LIMIT = 60.0
+STEER_ACCEL_LIMIT = 40.0
+IDLE_COMMAND_EPSILON = 0.03
+WHEEL_SPEED_EPSILON = 0.02
+
+MODULES = {
+    "FL": {"drive": 1, "steer": 5, "drive_sign": -1.0},
+    "BL": {"drive": 2, "steer": 6, "drive_sign": -1.0},
+    "FR": {"drive": 3, "steer": 7, "drive_sign": 1.0},
+    "BR": {"drive": 4, "steer": 8, "drive_sign": 1.0},
+}
 
 
 class CmdVelSubscriber(Node):
@@ -93,10 +109,40 @@ class CmdVelSubscriber(Node):
         self.logger.info("L1 + Triangle -> stop all motors")
         self.logger.info("R1 -> full speed mode, L1 -> slow mode")
 
+        self.steer_motor_pos_est = {
+            side: self.query_steer_position(side)
+            for side in MODULES
+        }
+        self.logger.info(
+            "Initial steer estimates radians: "
+            + ", ".join(
+                f"{side}={self.motor_rot_to_wheel_rad(pos):.2f}"
+                for side, pos in self.steer_motor_pos_est.items()
+            )
+        )
+
     def apply_deadband(self, value: float) -> float:
         if abs(value) < self.deadband:
             return 0.0
         return value
+
+    def normalize_angle_rad(self, angle: float) -> float:
+        return (angle + math.pi) % (2 * math.pi) - math.pi
+
+    def motor_rot_to_wheel_rad(self, motor_rot: float) -> float:
+        return self.normalize_angle_rad((motor_rot / STEER_GEAR_RATIO) * (2 * math.pi))
+
+    def wheel_rad_delta_to_motor_rot(self, wheel_rad: float) -> float:
+        return (wheel_rad / (2 * math.pi)) * STEER_GEAR_RATIO
+
+    def query_steer_position(self, side: str) -> float:
+        motor_id = MODULES[side]["steer"]
+        try:
+            result = query_moteus_sync(self.swerve_controllers[motor_id])
+            return float(result.values.get(moteus.Register.POSITION, 0.0))
+        except Exception as exc:
+            self.logger.warn(f"Could not query {side} steer position on startup: {exc!r}")
+            return 0.0
 
     def compute_drive_scale(self) -> float:
         max_input = max(
@@ -144,52 +190,91 @@ class CmdVelSubscriber(Node):
         for motor_id, controller in self.swerve_controllers.items():
             send_moteus_stop_sync(controller, motor=motor_id, logger=self.logger)
 
-    def wheelAnglesAndSpeeds(self, vx, vy, omega, length, width):
-        r = math.sqrt(length**2 + width**2)
+    def calculate_swerve(self, vx: float, vy: float, omega: float):
+        r = math.sqrt(ROVER_LENGTH**2 + ROVER_WIDTH**2)
+        x_term = omega * (ROVER_LENGTH / r)
+        y_term = omega * (ROVER_WIDTH / r)
 
-        vx = round(vx, 2)
-        vy = round(vy, 2)
-        omega = round(omega, 2)
+        vectors = {
+            "FL": (vx - x_term, vy + y_term),
+            "FR": (vx - x_term, vy - y_term),
+            "BL": (vx + x_term, vy + y_term),
+            "BR": (vx + x_term, vy - y_term),
+        }
+        speeds = {side: math.hypot(x, y) for side, (x, y) in vectors.items()}
+        angles = {side: math.atan2(y, x) for side, (x, y) in vectors.items()}
 
-        a = vy - omega * (length / r)
-        b = vy + omega * (length / r)
-        c = vx - omega * (width / r)
-        d = vx + omega * (width / r)
+        max_speed = max(speeds.values())
+        if max_speed > 1.0:
+            speeds = {side: speed / max_speed for side, speed in speeds.items()}
 
-        ws1 = math.sqrt(b**2 + c**2)
-        ws2 = math.sqrt(b**2 + d**2)
-        ws3 = math.sqrt(a**2 + d**2)
-        ws4 = math.sqrt(a**2 + c**2)
+        return speeds, angles
 
-        wa1 = math.atan2(b, c) * 180 / math.pi
-        wa2 = math.atan2(b, d) * 180 / math.pi
-        wa3 = math.atan2(a, d) * 180 / math.pi
-        wa4 = math.atan2(a, c) * 180 / math.pi
+    def optimize_swerve(self, target_angle: float, target_speed: float, current_angle: float):
+        diff = self.normalize_angle_rad(target_angle - current_angle)
+        if abs(diff) > math.pi / 2:
+            diff = self.normalize_angle_rad(diff - math.copysign(math.pi, diff))
+            target_speed *= -1.0
+        return current_angle + diff, target_speed
 
-        max_speed = ws1
-        if ws2 > max_speed:
-            max_speed = ws2
-        if ws3 > max_speed:
-            max_speed = ws3
-        if ws4 > max_speed:
-            max_speed = ws4
-        if max_speed > 1:
-            ws1 /= max_speed
-            ws2 /= max_speed
-            ws3 /= max_speed
-            ws4 /= max_speed
+    def stop_drive_motors(self):
+        for side, module in MODULES.items():
+            motor_id = module["drive"]
+            send_moteus_command_sync(
+                controller=self.drive_controllers[motor_id],
+                motor=motor_id,
+                position=math.nan,
+                drives_velocity=0.0,
+                maximum_torque=self.MAX_TORQUE,
+                velocity_limit=self.MOTOR_MAX_SPEED,
+                accel_limit=self.MAX_ACCELERATION,
+                ff_torque=0,
+                logger=None,
+            )
 
-        ws1 = round(ws1, 3)
-        ws2 = round(ws2, 3)
-        ws3 = round(ws3, 3)
-        ws4 = round(ws4, 3)
+    def command_module(self, side: str, drive_speed: float, wheel_speed: float, wheel_angle: float):
+        module = MODULES[side]
+        drive_id = module["drive"]
+        steer_id = module["steer"]
+        current_motor_pos = self.steer_motor_pos_est[side]
+        current_angle = self.motor_rot_to_wheel_rad(current_motor_pos)
 
-        wa1 = round(wa1, 3) / 360 * 50
-        wa2 = round(wa2, 3) / 360 * 50
-        wa3 = round(wa3, 3) / 360 * 50
-        wa4 = round(wa4, 3) / 360 * 50
+        if abs(wheel_speed) < WHEEL_SPEED_EPSILON:
+            target_angle = current_angle
+            optimized_speed = 0.0
+        else:
+            target_angle, optimized_speed = self.optimize_swerve(
+                wheel_angle,
+                wheel_speed,
+                current_angle,
+            )
 
-        return ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4
+        angle_delta = target_angle - current_angle
+        target_motor_pos = current_motor_pos + self.wheel_rad_delta_to_motor_rot(angle_delta)
+        self.steer_motor_pos_est[side] = target_motor_pos
+
+        send_moteus_command_sync(
+            controller=self.drive_controllers[drive_id],
+            motor=drive_id,
+            position=math.nan,
+            drives_velocity=module["drive_sign"] * drive_speed * optimized_speed,
+            maximum_torque=self.MAX_TORQUE,
+            velocity_limit=self.MOTOR_MAX_SPEED,
+            accel_limit=self.MAX_ACCELERATION,
+            ff_torque=0,
+            logger=None,
+        )
+        send_moteus_command_sync(
+            controller=self.swerve_controllers[steer_id],
+            motor=steer_id,
+            position=target_motor_pos,
+            drives_velocity=None,
+            maximum_torque=STEER_MAX_TORQUE,
+            velocity_limit=STEER_VELOCITY_LIMIT,
+            accel_limit=STEER_ACCEL_LIMIT,
+            ff_torque=None,
+            logger=None,
+        )
 
     def listener_callback(self, msg: TwistStamped):
         self.log_cmd_vel(msg)
@@ -200,119 +285,30 @@ class CmdVelSubscriber(Node):
         self.controller_command_rx = self.apply_deadband(msg.twist.angular.x)
 
         drive_speed = self.compute_drive_scale()
-        ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(
+        command_mag = max(
+            abs(self.controller_command_lx),
+            abs(self.controller_command_ly),
+            abs(self.controller_command_rx),
+        )
+
+        if command_mag < IDLE_COMMAND_EPSILON or drive_speed == 0.0:
+            self.stop_drive_motors()
+            return
+
+        wheel_speeds, wheel_angles = self.calculate_swerve(
             -self.controller_command_ly,
             self.controller_command_lx,
             self.controller_command_rx,
-            ROVER_LENGTH,
-            ROVER_WIDTH,
         )
 
         self.log_motion_summary(
             drive_speed,
-            {
-                "br": round(ws1, 3),
-                "fl": round(ws2, 3),
-                "bl": round(ws3, 3),
-                "fr": round(ws4, 3),
-            },
-            {
-                "fr": round(wa1, 3),
-                "fl": round(wa2, 3),
-                "bl": round(wa3, 3),
-                "br": round(wa4, 3),
-            },
+            {side: round(speed, 3) for side, speed in wheel_speeds.items()},
+            {side: round(angle, 3) for side, angle in wheel_angles.items()},
         )
 
-        send_moteus_command_sync(
-            controller=self.drive_controllers[1],
-            motor=1,
-            position=math.nan,
-            drives_velocity=(-drive_speed * ws2),
-            maximum_torque=self.MAX_TORQUE,
-            velocity_limit=self.MOTOR_MAX_SPEED,
-            accel_limit=self.MAX_ACCELERATION,
-            ff_torque=0,
-            logger=None,
-        )
-        send_moteus_command_sync(
-            controller=self.drive_controllers[2],
-            motor=2,
-            position=math.nan,
-            drives_velocity=(-drive_speed * ws3),
-            maximum_torque=self.MAX_TORQUE,
-            velocity_limit=self.MOTOR_MAX_SPEED,
-            accel_limit=self.MAX_ACCELERATION,
-            ff_torque=0,
-            logger=None,
-        )
-        send_moteus_command_sync(
-            controller=self.drive_controllers[3],
-            motor=3,
-            position=math.nan,
-            drives_velocity=(drive_speed * ws4),
-            maximum_torque=self.MAX_TORQUE,
-            velocity_limit=self.MOTOR_MAX_SPEED,
-            accel_limit=self.MAX_ACCELERATION,
-            ff_torque=0,
-            logger=None,
-        )
-        send_moteus_command_sync(
-            controller=self.drive_controllers[4],
-            motor=4,
-            position=math.nan,
-            drives_velocity=(drive_speed * ws1),
-            maximum_torque=self.MAX_TORQUE,
-            velocity_limit=self.MOTOR_MAX_SPEED,
-            accel_limit=self.MAX_ACCELERATION,
-            ff_torque=0,
-            logger=None,
-        )
-
-        send_moteus_command_sync(
-            controller=self.swerve_controllers[6],
-            motor=6,
-            position=wa3,
-            drives_velocity=None,
-            maximum_torque=10,
-            velocity_limit=60,
-            accel_limit=40,
-            ff_torque=None,
-            logger=None,
-        )
-        send_moteus_command_sync(
-            controller=self.swerve_controllers[7],
-            motor=7,
-            position=wa1,
-            drives_velocity=None,
-            maximum_torque=10,
-            velocity_limit=60,
-            accel_limit=40,
-            ff_torque=None,
-            logger=None,
-        )
-        send_moteus_command_sync(
-            controller=self.swerve_controllers[8],
-            motor=8,
-            position=wa4,
-            drives_velocity=None,
-            maximum_torque=10,
-            velocity_limit=60,
-            accel_limit=40,
-            ff_torque=None,
-            logger=None,
-        )
-        send_moteus_command_sync(
-            controller=self.swerve_controllers[5],
-            motor=5,
-            position=wa2,
-            drives_velocity=None,
-            maximum_torque=10,
-            velocity_limit=60,
-            accel_limit=40,
-            ff_torque=None,
-            logger=None,
-        )
+        for side in MODULES:
+            self.command_module(side, drive_speed, wheel_speeds[side], wheel_angles[side])
 
     def autonomy_callback(self, msg: AutonomyDrive):
         self.logger.info(

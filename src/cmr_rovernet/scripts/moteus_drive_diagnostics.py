@@ -260,19 +260,45 @@ def print_table(results: list[QueryResult], min_voltage: float):
 
 
 async def clear_faults(controllers, timeout_s: float):
-    print("\nClearing faults with set_stop(clear_faults=True)...")
+    print("\nSending stop/clear-fault commands...")
     tasks = []
     for _motor_id, (_label, ctrl) in controllers.items():
-        tasks.append(asyncio.wait_for(ctrl.set_stop(clear_faults=True), timeout=timeout_s))
+        tasks.append(asyncio.wait_for(stop_compat(ctrl, clear_faults=True), timeout=timeout_s))
     results = await asyncio.gather(*tasks, return_exceptions=True)
     for (motor_id, (label, _ctrl)), result in zip(controllers.items(), results):
         if isinstance(result, Exception):
             print(f"  id {motor_id:>2} {label:<8}: failed: {result!r}")
         else:
-            print(f"  id {motor_id:>2} {label:<8}: stop/clear sent")
+            print(f"  id {motor_id:>2} {label:<8}: {result}")
 
 
-async def motion_test(controllers, ids: list[int], timeout_s: float, drive_rps: float, steer_delta: float):
+async def stop_compat(ctrl, clear_faults: bool = False):
+    if clear_faults:
+        try:
+            await ctrl.set_stop(clear_faults=True)
+            return "stop/clear sent"
+        except TypeError as exc:
+            if "clear_faults" not in str(exc):
+                raise
+
+    await ctrl.set_stop()
+    if clear_faults:
+        return "stop sent; this moteus Python package does not support clear_faults=True"
+    return "stop sent"
+
+
+async def motion_test(
+    controllers,
+    ids: list[int],
+    timeout_s: float,
+    drive_rps: float,
+    drive_hold_time: float,
+    drive_torque: float,
+    steer_delta: float,
+    steer_hold_time: float,
+    steer_torque: float,
+    steer_velocity_limit: float,
+):
     print("\nMOTION TEST ENABLED. Wheels should be off the ground.")
     print("Sending tiny commands one motor at a time, then stopping each motor.")
 
@@ -289,28 +315,28 @@ async def motion_test(controllers, ids: list[int], timeout_s: float, drive_rps: 
                     ctrl.set_position(
                         position=math.nan,
                         velocity=drive_rps,
-                        maximum_torque=1.0,
+                        maximum_torque=drive_torque,
                         accel_limit=5.0,
                         watchdog_timeout=0.25,
                     ),
                     timeout=timeout_s,
                 )
-                await asyncio.sleep(0.35)
+                await asyncio.sleep(drive_hold_time)
             else:
                 target = (before_pos or 0.0) + steer_delta
                 await asyncio.wait_for(
                     ctrl.set_position(
                         position=target,
-                        velocity_limit=1.0,
-                        maximum_torque=1.0,
-                        watchdog_timeout=0.5,
+                        velocity_limit=steer_velocity_limit,
+                        maximum_torque=steer_torque,
+                        watchdog_timeout=max(0.5, steer_hold_time + 0.25),
                     ),
                     timeout=timeout_s,
                 )
-                await asyncio.sleep(0.50)
+                await asyncio.sleep(steer_hold_time)
 
             after = await asyncio.wait_for(ctrl.query(), timeout=timeout_s)
-            await asyncio.wait_for(ctrl.set_stop(), timeout=timeout_s)
+            await asyncio.wait_for(stop_compat(ctrl), timeout=timeout_s)
 
             after_pos = read_value(after, "POSITION")
             after_vel = read_value(after, "VELOCITY")
@@ -321,7 +347,7 @@ async def motion_test(controllers, ids: list[int], timeout_s: float, drive_rps: 
         except Exception as exc:
             print(f"  FAILED: {exc!r}")
             try:
-                await asyncio.wait_for(ctrl.set_stop(), timeout=timeout_s)
+                await asyncio.wait_for(stop_compat(ctrl), timeout=timeout_s)
             except Exception:
                 pass
 
@@ -420,7 +446,18 @@ async def main_async(args):
         write_csv(args.csv, all_results)
 
     if args.motion_test:
-        await motion_test(controllers, ids, args.timeout, args.drive_rps, args.steer_delta)
+        await motion_test(
+            controllers,
+            ids,
+            args.timeout,
+            args.drive_rps,
+            args.drive_hold_time,
+            args.drive_torque,
+            args.steer_delta,
+            args.steer_hold_time,
+            args.steer_torque,
+            args.steer_velocity_limit,
+        )
         print("\nFinal status after motion test:")
         final_results = await query_all(controllers, args.timeout)
         print_table(final_results, args.min_voltage)
@@ -456,7 +493,12 @@ def main():
         help="Actually command tiny one-at-a-time motion tests. Wheels off ground.",
     )
     parser.add_argument("--drive-rps", type=float, default=1.0, help="Drive test velocity in motor rev/s.")
+    parser.add_argument("--drive-hold-time", type=float, default=0.35, help="Seconds to hold each drive test command.")
+    parser.add_argument("--drive-torque", type=float, default=1.0, help="Maximum torque for each drive test.")
     parser.add_argument("--steer-delta", type=float, default=0.05, help="Steer test position delta in motor rev.")
+    parser.add_argument("--steer-hold-time", type=float, default=0.50, help="Seconds to hold each steer test command.")
+    parser.add_argument("--steer-torque", type=float, default=1.0, help="Maximum torque for each steer test.")
+    parser.add_argument("--steer-velocity-limit", type=float, default=1.0, help="Steer test velocity limit in motor rev/s.")
     args = parser.parse_args()
 
     try:

@@ -28,6 +28,8 @@ STEER_VELOCITY_LIMIT = 60.0
 STEER_ACCEL_LIMIT = 40.0
 IDLE_COMMAND_EPSILON = 0.03
 WHEEL_SPEED_EPSILON = 0.02
+DRIVE_WATCHDOG_TIMEOUT = 0.25
+STEER_WATCHDOG_TIMEOUT = 0.25
 
 MODULES = {
     "FL": {"drive": 1, "steer": 5, "drive_sign": -1.0},
@@ -229,6 +231,7 @@ class CmdVelSubscriber(Node):
                 velocity_limit=self.MOTOR_MAX_SPEED,
                 accel_limit=self.MAX_ACCELERATION,
                 ff_torque=0,
+                watchdog_timeout=DRIVE_WATCHDOG_TIMEOUT,
                 logger=None,
             )
 
@@ -262,6 +265,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,
             ff_torque=0,
+            watchdog_timeout=DRIVE_WATCHDOG_TIMEOUT,
             logger=None,
         )
         send_moteus_command_sync(
@@ -273,6 +277,7 @@ class CmdVelSubscriber(Node):
             velocity_limit=STEER_VELOCITY_LIMIT,
             accel_limit=STEER_ACCEL_LIMIT,
             ff_torque=None,
+            watchdog_timeout=STEER_WATCHDOG_TIMEOUT,
             logger=None,
         )
 
@@ -347,9 +352,16 @@ def main(args=None):
     rclpy.init(args=args)
     init_moteus_loop()
     node = CmdVelSubscriber()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    finally:
+        try:
+            node.logger.info("drivesnet shutting down -> stopping all motors")
+            node.stop_all_motors()
+        except Exception as exc:
+            node.logger.error(f"Failed to stop motors during shutdown: {exc!r}")
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":

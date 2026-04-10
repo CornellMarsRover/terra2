@@ -157,6 +157,7 @@ async def _send_moteus_command_async(
     velocity_limit: float | None,
     accel_limit: float | None,
     ff_torque: float | None,
+    watchdog_timeout: float | None = None,
     logger: logging.Logger | None = None
 ):
     """
@@ -183,15 +184,24 @@ async def _send_moteus_command_async(
                     f"maximum_torque={maximum_torque}, velocity_limit={velocity_limit}, "
                     f"accel_limit={accel_limit}, feedforward_torque={ff_torque}")
 
-    # Use moteus "official" parameter names
-    result = await controller.set_position(
-        position=position,
-        velocity=drives_velocity,
-        maximum_torque=maximum_torque,
-        velocity_limit=velocity_limit,
-        accel_limit=accel_limit,
-        feedforward_torque=ff_torque
-    )
+    command_kwargs = {
+        "position": position,
+        "velocity": drives_velocity,
+        "maximum_torque": maximum_torque,
+        "velocity_limit": velocity_limit,
+        "accel_limit": accel_limit,
+        "feedforward_torque": ff_torque,
+    }
+    if watchdog_timeout is not None:
+        command_kwargs["watchdog_timeout"] = watchdog_timeout
+
+    try:
+        result = await controller.set_position(**command_kwargs)
+    except TypeError as exc:
+        if "watchdog_timeout" not in str(exc):
+            raise
+        command_kwargs.pop("watchdog_timeout", None)
+        result = await controller.set_position(**command_kwargs)
 
     if logger:
         logger.info(f"{result}")
@@ -222,6 +232,7 @@ def send_moteus_command_sync(
     velocity_limit: float | None,
     accel_limit: float | None,
     ff_torque: float | None,
+    watchdog_timeout: float | None = None,
     logger: logging.Logger | None = None
 ):
     """
@@ -243,6 +254,7 @@ def send_moteus_command_sync(
             velocity_limit=velocity_limit,
             accel_limit=accel_limit,
             ff_torque=ff_torque,
+            watchdog_timeout=watchdog_timeout,
             logger=logger
         ),
         _moteus_loop

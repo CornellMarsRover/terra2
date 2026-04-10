@@ -130,15 +130,15 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     twist->twist.linear.y = axes[RIGHT_STICK_X];
 
     double lin_x_right =
-        -0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-    double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
+        -0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
+    double lin_x_left = 0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
     twist->twist.linear.x = lin_x_right + lin_x_left;
 
-    twist->twist.angular.y = axes[LEFT_STICK_Y];
+    twist->twist.angular.y = -axes[LEFT_STICK_Y];
     twist->twist.angular.x = axes[LEFT_STICK_X];
 
-    double roll_positive = buttons[RIGHT_BUMPER];
-    double roll_negative = -1 * (buttons[LEFT_BUMPER]);
+    double roll_positive = buttons[LEFT_BUMPER];
+    double roll_negative = -1 * (buttons[RIGHT_BUMPER]);
     twist->twist.angular.z = roll_positive + roll_negative;
 
     return true;

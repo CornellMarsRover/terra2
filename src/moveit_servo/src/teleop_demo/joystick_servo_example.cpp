@@ -125,7 +125,13 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
         return false;
     }
 
-    // The bread and butter: map buttons to twist commands
+    // Arm teleop mapping:
+    //   - right stick up/down    -> vertical translation
+    //   - right stick left/right -> left/right translation
+    //   - triggers               -> forward/back translation
+    //   - left stick up/down     -> pitch (up = pitch down, down = pitch up)
+    //   - left stick left/right  -> yaw
+    //   - bumpers                -> roll (R1 positive, L1 negative)
     twist->twist.linear.z = axes[RIGHT_STICK_Y];
     twist->twist.linear.y = axes[RIGHT_STICK_X];
 
@@ -134,12 +140,12 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     double lin_x_left = 0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
     twist->twist.linear.x = lin_x_right + lin_x_left;
 
-    twist->twist.angular.y = -axes[LEFT_STICK_Y];
-    twist->twist.angular.x = axes[LEFT_STICK_X];
+    twist->twist.angular.x = -axes[LEFT_STICK_Y];
+    twist->twist.angular.z = axes[LEFT_STICK_X];
 
     double roll_positive = buttons[RIGHT_BUMPER];
     double roll_negative = -1 * (buttons[LEFT_BUMPER]);
-    twist->twist.angular.z = roll_positive + roll_negative;
+    twist->twist.angular.y = roll_positive + roll_negative;
 
     return true;
 }

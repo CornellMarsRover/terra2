@@ -19,7 +19,7 @@ from nav_msgs.msg import Odometry
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PACKAGE_DIR = os.path.dirname(SCRIPT_DIR)
-DEFAULT_WAYPOINT_FILE = os.path.join(PACKAGE_DIR, 'config', 'waypoints.yaml')
+DEFAULT_WAYPOINT_FILE = os.path.join(PACKAGE_DIR, 'config', 'waypoints_engquad.yaml')
 
 class RealtimeRobotPlotter(Node):
     def __init__(self):

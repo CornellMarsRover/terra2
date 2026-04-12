@@ -17,8 +17,9 @@ from geometry_msgs.msg import PoseStamped, Point, Twist
 from nav_msgs.msg import Odometry
 
 
-DEFAULT_WAYPOINT_FILE = '/home/syedusamabinsabir/waypoint_config.yaml'
-
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PACKAGE_DIR = os.path.dirname(SCRIPT_DIR)
+DEFAULT_WAYPOINT_FILE = os.path.join(PACKAGE_DIR, 'config', 'waypoints.yaml')
 
 class RealtimeRobotPlotter(Node):
     def __init__(self):

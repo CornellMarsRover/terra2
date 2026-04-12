@@ -5,10 +5,12 @@ from geometry_msgs.msg import Twist
 from cmr_msgs.msg import AutonomyDrive
 
 import asyncio
+import glob
 import math
 import moteus
 import yaml
 import os
+import sys
 import time
 import math
 
@@ -67,6 +69,7 @@ class SwerveControllerNode(Node):
         
         self.transport = None
         self.servos = None
+        self.fdcanusb_path = None
 
         self.loop = asyncio.get_event_loop()
 
@@ -120,16 +123,40 @@ class SwerveControllerNode(Node):
     
 
     async def __async_initialize_moteus(self):
-        self.transport = moteus.Fdcanusb()
+        self.fdcanusb_path = self._detect_fdcanusb_path()
+        self.get_logger().info(f"Initializing moteus transport on {self.fdcanusb_path}")
+        self.transport = moteus.Fdcanusb(path=self.fdcanusb_path)
         # 1, 2, 3, 4  = drives: front left, back left, front right, back right
         # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
         self.servos = {
             servo_id : moteus.Controller(id=servo_id, transport=self.transport) for servo_id in [1,2,3,4,5,6,7,8]
         }
 
-        # reset servo positions
-        await self.transport.cycle([x.make_stop() for x in self.servos.values()])
-        await self.transport.cycle([x.make_rezero() for x in self.servos.values()])
+        try:
+            self.get_logger().info('Sending moteus stop command to all drive and swerve servos')
+            await self.transport.cycle([x.make_stop() for x in self.servos.values()])
+            self.get_logger().info('Sending moteus rezero command to all drive and swerve servos')
+            await self.transport.cycle([x.make_rezero() for x in self.servos.values()])
+        except Exception as exc:
+            self.get_logger().error(
+                f"Moteus initialization failed on {self.fdcanusb_path}: {type(exc).__name__}: {exc}"
+            )
+            raise
+
+    def _detect_fdcanusb_path(self):
+        if os.path.exists('/dev/fdcanusb'):
+            return '/dev/fdcanusb'
+
+        maybe_list = glob.glob('/dev/serial/by-id/*fdcanusb*')
+        if len(maybe_list):
+            return sorted(maybe_list)[0]
+
+        if sys.platform != 'win32':
+            ports = glob.glob('/dev/ttyACM*') + glob.glob('/dev/ttyUSB*')
+            if len(ports):
+                return sorted(ports)[0]
+
+        return moteus.Fdcanusb.detect_fdcanusb()
         
     def set_drive(self, ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4):
         return self.loop.run_until_complete(self.__async_set_drive(ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4))

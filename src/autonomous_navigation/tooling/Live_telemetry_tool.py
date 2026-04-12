@@ -13,8 +13,12 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 
-from geometry_msgs.msg import PoseStamped, Point, Twist
+from geometry_msgs.msg import PoseStamped, Point, Twist, TwistStamped
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import NavSatFix
+from std_msgs.msg import String
+
+from cmr_msgs.msg import AutonomyDrive
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,9 +36,15 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('robot_pose_topic', '/autonomy/pose/robot/global')
         self.declare_parameter('target_topic', '/autonomy/target_object/position')
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
-        self.declare_parameter('robot_pose_type', 'pose_stamped')   # pose_stamped / odometry
-        self.declare_parameter('target_type', 'point')              # point / pose_stamped
+        self.declare_parameter('ackermann_topic', '/autonomy/move/ackerman')
+        self.declare_parameter('point_turn_topic', '/autonomy/move/point_turn')
+        self.declare_parameter('state_topic', '/autonomy/state')
+        self.declare_parameter('gps_topic', '/rtk/navsatfix_data')
+        self.declare_parameter('move_type_topic', '/autonomy/move/move_type')
+        self.declare_parameter('robot_pose_type', 'twist_stamped')  # pose_stamped / odometry / twist_stamped
+        self.declare_parameter('target_type', 'twist')              # point / pose_stamped / twist
         self.declare_parameter('waypoints_file', DEFAULT_WAYPOINT_FILE)
+        self.declare_parameter('debug_logging', True)
 
         self.declare_parameter('canvas_width', 950)
         self.declare_parameter('canvas_height', 680)
@@ -50,9 +60,15 @@ class RealtimeRobotPlotter(Node):
         self.robot_pose_topic = self.get_parameter('robot_pose_topic').value
         self.target_topic = self.get_parameter('target_topic').value
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        self.ackermann_topic = self.get_parameter('ackermann_topic').value
+        self.point_turn_topic = self.get_parameter('point_turn_topic').value
+        self.state_topic = self.get_parameter('state_topic').value
+        self.gps_topic = self.get_parameter('gps_topic').value
+        self.move_type_topic = self.get_parameter('move_type_topic').value
         self.robot_pose_type = self.get_parameter('robot_pose_type').value
         self.target_type = self.get_parameter('target_type').value
         self.waypoints_file = self.get_parameter('waypoints_file').value or DEFAULT_WAYPOINT_FILE
+        self.debug_logging = bool(self.get_parameter('debug_logging').value)
 
         self.initial_canvas_width = int(self.get_parameter('canvas_width').value)
         self.initial_canvas_height = int(self.get_parameter('canvas_height').value)
@@ -71,14 +87,46 @@ class RealtimeRobotPlotter(Node):
 
         self.target_x = None
         self.target_y = None
+        self.current_state = '--'
+        self.current_move_type = '--'
+        self.gps_lat = None
+        self.gps_lon = None
 
         self.cmd_vx = 0.0
         self.cmd_vy = 0.0
         self.cmd_wz = 0.0
         self.speed = 0.0
+        self.cmd_source = 'none'
+        self.ackermann_speed = 0.0
+        self.ackermann_fl = 0.0
+        self.ackermann_fr = 0.0
+        self.point_turn_wz = 0.0
 
         self.robot_path = []
         self.waypoints = []
+        self.msg_counts = {
+            'robot_pose': 0,
+            'target': 0,
+            'cmd_vel': 0,
+            'ackermann': 0,
+            'point_turn': 0,
+            'state': 0,
+            'gps': 0,
+            'move_type': 0,
+        }
+        self.last_seen = {key: None for key in self.msg_counts}
+        self.topic_configs = {
+            'robot_pose': self.robot_pose_topic,
+            'target': self.target_topic,
+            'cmd_vel': self.cmd_vel_topic,
+            'ackermann': self.ackermann_topic,
+            'point_turn': self.point_turn_topic,
+            'state': self.state_topic,
+            'gps': self.gps_topic,
+            'move_type': self.move_type_topic,
+        }
+        self.last_debug_log = 0.0
+        self.debug_period = 2.0
 
         # logging
         self.is_logging = False
@@ -97,6 +145,10 @@ class RealtimeRobotPlotter(Node):
             self.robot_sub = self.create_subscription(
                 PoseStamped, self.robot_pose_topic, self.robot_pose_pose_stamped_cb, 10
             )
+        elif self.robot_pose_type == 'twist_stamped':
+            self.robot_sub = self.create_subscription(
+                TwistStamped, self.robot_pose_topic, self.robot_pose_twist_stamped_cb, 10
+            )
         elif self.robot_pose_type == 'odometry':
             self.robot_sub = self.create_subscription(
                 Odometry, self.robot_pose_topic, self.robot_pose_odom_cb, 10
@@ -108,6 +160,10 @@ class RealtimeRobotPlotter(Node):
             self.target_sub = self.create_subscription(
                 Point, self.target_topic, self.target_point_cb, 10
             )
+        elif self.target_type == 'twist':
+            self.target_sub = self.create_subscription(
+                Twist, self.target_topic, self.target_twist_cb, 10
+            )
         elif self.target_type == 'pose_stamped':
             self.target_sub = self.create_subscription(
                 PoseStamped, self.target_topic, self.target_pose_stamped_cb, 10
@@ -118,11 +174,30 @@ class RealtimeRobotPlotter(Node):
         self.cmd_vel_sub = self.create_subscription(
             Twist, self.cmd_vel_topic, self.cmd_vel_cb, 10
         )
+        self.ackermann_sub = self.create_subscription(
+            AutonomyDrive, self.ackermann_topic, self.ackermann_cb, 10
+        )
+        self.point_turn_sub = self.create_subscription(
+            Twist, self.point_turn_topic, self.point_turn_cb, 10
+        )
+        self.state_sub = self.create_subscription(
+            String, self.state_topic, self.state_cb, 10
+        )
+        self.gps_sub = self.create_subscription(
+            NavSatFix, self.gps_topic, self.gps_cb, 10
+        )
+        self.move_type_sub = self.create_subscription(
+            String, self.move_type_topic, self.move_type_cb, 10
+        )
 
         self.get_logger().info('Realtime Robot Plotter started.')
         self.get_logger().info(f'Robot pose topic: {self.robot_pose_topic} ({self.robot_pose_type})')
         self.get_logger().info(f'Target topic: {self.target_topic} ({self.target_type})')
         self.get_logger().info(f'Cmd vel topic: {self.cmd_vel_topic}')
+        self.get_logger().info(f'Ackermann topic: {self.ackermann_topic}')
+        self.get_logger().info(f'Point turn topic: {self.point_turn_topic}')
+        self.get_logger().info(f'State topic: {self.state_topic}')
+        self.get_logger().info(f'GPS topic: {self.gps_topic}')
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoint(s) from config.')
 
         # ---------------- Tkinter UI ----------------
@@ -155,6 +230,10 @@ class RealtimeRobotPlotter(Node):
         self.robot_yaw_label.pack(anchor='w')
         self.speed_label = ttk.Label(robot_box, text='Speed: -- m/s')
         self.speed_label.pack(anchor='w')
+        self.gps_lat_label = ttk.Label(robot_box, text='GPS Lat: --')
+        self.gps_lat_label.pack(anchor='w')
+        self.gps_lon_label = ttk.Label(robot_box, text='GPS Lon: --')
+        self.gps_lon_label.pack(anchor='w')
 
         # ---- Target box
         target_box = ttk.LabelFrame(side, text='Target State', padding=8)
@@ -175,6 +254,23 @@ class RealtimeRobotPlotter(Node):
         self.cmd_vy_label.pack(anchor='w')
         self.cmd_wz_label = ttk.Label(cmd_box, text='wz: --')
         self.cmd_wz_label.pack(anchor='w')
+        self.cmd_source_label = ttk.Label(cmd_box, text='Source: --')
+        self.cmd_source_label.pack(anchor='w')
+        self.ack_label = ttk.Label(cmd_box, text='Ackermann: vel=-- fl=-- fr=--')
+        self.ack_label.pack(anchor='w')
+        self.point_turn_label = ttk.Label(cmd_box, text='Point turn wz: --')
+        self.point_turn_label.pack(anchor='w')
+
+        autonomy_box = ttk.LabelFrame(side, text='Autonomy Status', padding=8)
+        autonomy_box.pack(fill='x', pady=4)
+        self.state_value_label = ttk.Label(autonomy_box, text='Current state: --')
+        self.state_value_label.pack(anchor='w')
+        self.move_type_label = ttk.Label(autonomy_box, text='Move type: --')
+        self.move_type_label.pack(anchor='w')
+        self.topic_health_label = ttk.Label(autonomy_box, text='Topic health: --', wraplength=280)
+        self.topic_health_label.pack(anchor='w')
+        self.publisher_health_label = ttk.Label(autonomy_box, text='Publishers: --', wraplength=280)
+        self.publisher_health_label.pack(anchor='w')
 
         # ---- Map box
         map_box = ttk.LabelFrame(side, text='Map / Plot Info', padding=8)
@@ -327,6 +423,10 @@ class RealtimeRobotPlotter(Node):
         )
 
     # ---------------- ROS Callbacks ----------------
+    def mark_seen(self, key):
+        self.msg_counts[key] += 1
+        self.last_seen[key] = time.time()
+
     def robot_pose_pose_stamped_cb(self, msg: PoseStamped):
         with self.lock:
             self.robot_x = msg.pose.position.x
@@ -338,6 +438,15 @@ class RealtimeRobotPlotter(Node):
                 msg.pose.orientation.w
             )
             self.append_robot_path(self.robot_x, self.robot_y)
+        self.mark_seen('robot_pose')
+
+    def robot_pose_twist_stamped_cb(self, msg: TwistStamped):
+        with self.lock:
+            self.robot_x = msg.twist.linear.x
+            self.robot_y = msg.twist.linear.y
+            self.robot_yaw = msg.twist.angular.z
+            self.append_robot_path(self.robot_x, self.robot_y)
+        self.mark_seen('robot_pose')
 
     def robot_pose_odom_cb(self, msg: Odometry):
         with self.lock:
@@ -350,16 +459,25 @@ class RealtimeRobotPlotter(Node):
                 msg.pose.pose.orientation.w
             )
             self.append_robot_path(self.robot_x, self.robot_y)
+        self.mark_seen('robot_pose')
 
     def target_point_cb(self, msg: Point):
         with self.lock:
             self.target_x = msg.x
             self.target_y = msg.y
+        self.mark_seen('target')
+
+    def target_twist_cb(self, msg: Twist):
+        with self.lock:
+            self.target_x = msg.linear.x
+            self.target_y = msg.linear.y
+        self.mark_seen('target')
 
     def target_pose_stamped_cb(self, msg: PoseStamped):
         with self.lock:
             self.target_x = msg.pose.position.x
             self.target_y = msg.pose.position.y
+        self.mark_seen('target')
 
     def cmd_vel_cb(self, msg: Twist):
         with self.lock:
@@ -367,14 +485,46 @@ class RealtimeRobotPlotter(Node):
             self.cmd_vy = msg.linear.y
             self.cmd_wz = msg.angular.z
             self.speed = math.sqrt(self.cmd_vx ** 2 + self.cmd_vy ** 2)
+            self.cmd_source = 'cmd_vel'
+        self.mark_seen('cmd_vel')
 
-            print(
-                f"[cmd_vel telemetry] "
-                f"vx={self.cmd_vx:.3f} m/s, "
-                f"vy={self.cmd_vy:.3f} m/s, "
-                f"wz={self.cmd_wz:.3f} rad/s, "
-                f"speed={self.speed:.3f} m/s"
-            )
+    def ackermann_cb(self, msg: AutonomyDrive):
+        with self.lock:
+            self.ackermann_speed = msg.vel
+            self.ackermann_fl = msg.fl_angle
+            self.ackermann_fr = msg.fr_angle
+            self.cmd_vx = msg.vel
+            self.cmd_vy = 0.0
+            self.cmd_wz = 0.0
+            self.speed = abs(msg.vel)
+            self.cmd_source = 'ackermann'
+        self.mark_seen('ackermann')
+
+    def point_turn_cb(self, msg: Twist):
+        with self.lock:
+            self.point_turn_wz = msg.angular.z
+            self.cmd_vx = 0.0
+            self.cmd_vy = 0.0
+            self.cmd_wz = msg.angular.z
+            self.speed = 0.0
+            self.cmd_source = 'point_turn'
+        self.mark_seen('point_turn')
+
+    def state_cb(self, msg: String):
+        with self.lock:
+            self.current_state = msg.data
+        self.mark_seen('state')
+
+    def move_type_cb(self, msg: String):
+        with self.lock:
+            self.current_move_type = msg.data
+        self.mark_seen('move_type')
+
+    def gps_cb(self, msg: NavSatFix):
+        with self.lock:
+            self.gps_lat = msg.latitude
+            self.gps_lon = msg.longitude
+        self.mark_seen('gps')
 
     # ---------------- Helpers ----------------
     def append_robot_path(self, x, y):
@@ -391,6 +541,67 @@ class RealtimeRobotPlotter(Node):
         if self.robot_x is None or self.robot_y is None or self.target_x is None or self.target_y is None:
             return None
         return math.sqrt((self.target_x - self.robot_x) ** 2 + (self.target_y - self.robot_y) ** 2)
+
+    def format_topic_health(self):
+        parts = []
+        now = time.time()
+        display_order = [
+            ('robot_pose', 'pose'),
+            ('target', 'target'),
+            ('ackermann', 'ack'),
+            ('point_turn', 'turn'),
+            ('state', 'state'),
+            ('gps', 'gps'),
+            ('move_type', 'move'),
+        ]
+        for key, label in display_order:
+            last = self.last_seen[key]
+            if last is None:
+                parts.append(f'{label}:never')
+            else:
+                parts.append(f'{label}:{now - last:.1f}s')
+        return ' | '.join(parts)
+
+    def format_publisher_health(self):
+        parts = []
+        display_order = [
+            ('robot_pose', 'pose'),
+            ('target', 'target'),
+            ('ackermann', 'ack'),
+            ('point_turn', 'turn'),
+            ('state', 'state'),
+            ('gps', 'gps'),
+            ('move_type', 'move'),
+        ]
+        for key, label in display_order:
+            topic = self.topic_configs[key]
+            count = len(self.get_publishers_info_by_topic(topic))
+            parts.append(f'{label}:{count}')
+        return ' | '.join(parts)
+
+    def maybe_emit_debug_log(self):
+        if not self.debug_logging:
+            return
+
+        now = time.time()
+        if now - self.last_debug_log < self.debug_period:
+            return
+
+        with self.lock:
+            summary = (
+                f"state={self.current_state} move={self.current_move_type} "
+                f"pose=({self.robot_x}, {self.robot_y}, yaw={self.robot_yaw:.3f}) "
+                f"target=({self.target_x}, {self.target_y}) "
+                f"cmd_source={self.cmd_source} "
+                f"cmd=({self.cmd_vx:.3f}, {self.cmd_vy:.3f}, {self.cmd_wz:.3f}) "
+                f"gps=({self.gps_lat}, {self.gps_lon}) "
+                f"counts={self.msg_counts}"
+            )
+
+        self.get_logger().info(
+            f'[telemetry debug] {summary} publishers=({self.format_publisher_health()})'
+        )
+        self.last_debug_log = now
 
     def current_world_spans(self):
         x_span = max(1e-6, self.world_x_max - self.world_x_min)
@@ -463,6 +674,11 @@ class RealtimeRobotPlotter(Node):
                 'cmd_vx': self.cmd_vx,
                 'cmd_vy': self.cmd_vy,
                 'cmd_wz': self.cmd_wz,
+                'cmd_source': self.cmd_source,
+                'current_state': self.current_state,
+                'current_move_type': self.current_move_type,
+                'gps_lat': self.gps_lat,
+                'gps_lon': self.gps_lon,
                 'speed': self.speed,
                 'distance_to_target': self.compute_distance_to_target(),
             }
@@ -477,6 +693,8 @@ class RealtimeRobotPlotter(Node):
             'robot_x', 'robot_y', 'robot_yaw',
             'target_x', 'target_y',
             'cmd_vx', 'cmd_vy', 'cmd_wz',
+            'cmd_source', 'current_state', 'current_move_type',
+            'gps_lat', 'gps_lon',
             'speed', 'distance_to_target'
         ]
 
@@ -601,6 +819,7 @@ class RealtimeRobotPlotter(Node):
             return
 
         self.maybe_log_row()
+        self.maybe_emit_debug_log()
 
         with self.lock:
             robot_x = self.robot_x
@@ -612,6 +831,15 @@ class RealtimeRobotPlotter(Node):
             cmd_vx = self.cmd_vx
             cmd_vy = self.cmd_vy
             cmd_wz = self.cmd_wz
+            cmd_source = self.cmd_source
+            ackermann_speed = self.ackermann_speed
+            ackermann_fl = self.ackermann_fl
+            ackermann_fr = self.ackermann_fr
+            point_turn_wz = self.point_turn_wz
+            current_state = self.current_state
+            current_move_type = self.current_move_type
+            gps_lat = self.gps_lat
+            gps_lon = self.gps_lon
 
         self.canvas.delete('all')
         self.draw_grid()
@@ -629,6 +857,8 @@ class RealtimeRobotPlotter(Node):
         self.robot_y_label.config(text=f'Y: {robot_y:.3f}' if robot_y is not None else 'Y: --')
         self.robot_yaw_label.config(text=f'Yaw: {robot_yaw:.3f} rad')
         self.speed_label.config(text=f'Speed: {speed:.3f} m/s')
+        self.gps_lat_label.config(text=f'GPS Lat: {gps_lat:.7f}' if gps_lat is not None else 'GPS Lat: --')
+        self.gps_lon_label.config(text=f'GPS Lon: {gps_lon:.7f}' if gps_lon is not None else 'GPS Lon: --')
 
         self.target_x_label.config(text=f'Target X: {target_x:.3f}' if target_x is not None else 'Target X: --')
         self.target_y_label.config(text=f'Target Y: {target_y:.3f}' if target_y is not None else 'Target Y: --')
@@ -639,6 +869,16 @@ class RealtimeRobotPlotter(Node):
         self.cmd_vx_label.config(text=f'vx: {cmd_vx:.3f} m/s')
         self.cmd_vy_label.config(text=f'vy: {cmd_vy:.3f} m/s')
         self.cmd_wz_label.config(text=f'wz: {cmd_wz:.3f} rad/s')
+        self.cmd_source_label.config(text=f'Source: {cmd_source}')
+        self.ack_label.config(
+            text=f'Ackermann: vel={ackermann_speed:.3f} fl={ackermann_fl:.2f} fr={ackermann_fr:.2f}'
+        )
+        self.point_turn_label.config(text=f'Point turn wz: {point_turn_wz:.3f}')
+        self.state_value_label.config(text=f'Current state: {current_state}')
+        self.move_type_label.config(text=f'Move type: {current_move_type}')
+        self.topic_health_label.config(text=f'Topic health: {self.format_topic_health()}')
+        publisher_health = self.format_publisher_health()
+        self.publisher_health_label.config(text=f'Publishers: {publisher_health}')
 
         self.wp_label.config(text=f'Waypoints: {len(self.waypoints)}')
         self.bounds_label.config(
@@ -654,6 +894,7 @@ class RealtimeRobotPlotter(Node):
 
         self.logging_status_label.config(text=f'Logging: {"ON" if self.is_logging else "OFF"}')
         self.log_count_label.config(text=f'Rows logged: {len(self.logged_rows)}')
+        self.status_label.config(text=f'Running | Latest command source: {cmd_source} | {publisher_health}')
 
         if not self._closing:
             self.root.after(self.ui_period_ms, self.update_ui)

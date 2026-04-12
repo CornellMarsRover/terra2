@@ -80,6 +80,18 @@ def generate_launch_description():
                 ),
             ],
         ),
+        launch.actions.TimerAction(
+            period=4.0,
+            actions=[
+                launch_ros.actions.Node(
+                    package='autonomous_navigation',
+                    executable='global_planner',
+                    name='global_planner',
+                    output='screen',
+                    parameters=[{'real': True}]
+                ),
+            ],
+        ),
 
         # Start controller node after long wait to ensure nothing is going wrong
         launch.actions.TimerAction(
@@ -90,7 +102,7 @@ def generate_launch_description():
                     executable='controller',
                     name='controller',
                     output='screen',
-                    parameters=[{'visualize': True}]
+                    parameters=[{'real': True}]
                 ),
             ],
         ),

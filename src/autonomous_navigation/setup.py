@@ -19,6 +19,8 @@ setup(
         ('share/' + package_name + '/config', ['config/waypoints_engquad.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_long.yaml']),
         ('share/' + package_name + '/config', ['config/sim_waypoints_condensed.yaml']),
+        ('share/' + package_name + '/tooling', ['tooling/Live_telemetry_tool.py']),
+        ('share/' + package_name + '/tooling', ['tooling/test_script.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -39,6 +41,7 @@ setup(
             'kalman_localization = autonomous_navigation.kalman_localization:main',
             'rtk_localization = autonomous_navigation.rtk_localization:main',
             'object_detection = autonomous_navigation.object_detection:main',
+            'live_telemetry_tool = autonomous_navigation.live_telemetry_tool_runner:main',
         ],
     },
 )

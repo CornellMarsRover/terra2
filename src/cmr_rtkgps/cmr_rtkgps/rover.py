@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import glob
+import os
 import rclpy
 from rclpy.node import Node
 
@@ -13,19 +15,23 @@ import time
 class GPSRover(Node):
     def __init__(self):
         super().__init__('gps_rover')
+        self.declare_parameter('serial_path', '')
 
         # Navsatfix data publisher
         self.pub = self.create_publisher(NavSatFix, '/rtk/navsatfix_data', 10)
+        requested_serial_path = self.get_parameter('serial_path').value
+        self.serial_path = requested_serial_path or self.detect_gps_serial_path()
+        self.last_read_log_time = 0.0
 
         # ------------------------
         # 1. Open local serial port for the rover’s ZED-F9P
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM1', baudrate=115200, timeout=1) #Was ttyACM0 before, which is not the port where the GPS is. Check with ls -l /dev/serial/by-id/
+            self.ser = serial.Serial(self.serial_path, baudrate=115200, timeout=1)
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
-            self.get_logger().info("Rover serial port /dev/ttyACM1 opened successfully.")
+            self.get_logger().info(f"Rover serial port {self.serial_path} opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
             return
@@ -34,6 +40,7 @@ class GPSRover(Node):
         # 2. Configure local ZED-F9P for RTK rover:
         #    a) Enable RTCM input over USB
         #    b) Output UBX-NAV-PVT so we can read lat/lon
+
         # ------------------------
 
         self.configure_rover()
@@ -69,6 +76,41 @@ class GPSRover(Node):
         self.create_timer(0.1, self.timer_callback)
 
         self.get_logger().info("GPS Rover node started.")
+
+    def detect_gps_serial_path(self):
+        by_id_dir = '/dev/serial/by-id'
+        if os.path.isdir(by_id_dir):
+            candidates = sorted(glob.glob(os.path.join(by_id_dir, '*')))
+            self.get_logger().info(f"Serial by-id candidates: {candidates}")
+            preferred = []
+            fallback = []
+            for path in candidates:
+                lower = os.path.basename(path).lower()
+                if 'fdcanusb' in lower:
+                    continue
+                if any(token in lower for token in ['u-blox', 'ublox', 'zed', 'gnss', 'gps']):
+                    preferred.append(path)
+                else:
+                    fallback.append(path)
+
+            if preferred:
+                self.get_logger().info(f"Detected GPS serial device by-id: {preferred[0]}")
+                return preferred[0]
+            if fallback:
+                self.get_logger().warn(
+                    f"No explicit GPS serial device found by-id, falling back to {fallback[0]}"
+                )
+                return fallback[0]
+
+        tty_candidates = sorted(glob.glob('/dev/ttyACM*') + glob.glob('/dev/ttyUSB*'))
+        if tty_candidates:
+            self.get_logger().warn(f"Raw serial candidates: {tty_candidates}")
+
+        self.get_logger().warn(
+            "No /dev/serial/by-id match found; falling back to /dev/ttyACM1. "
+            "Update this if the GPS receiver is on a different port."
+        )
+        return '/dev/ttyACM1'
 
     def configure_rover(self):
         """
@@ -144,6 +186,14 @@ class GPSRover(Node):
         # Read any local messages from the ZED-F9P
         try:
             (raw_data, parsed_data) = self.ubr.read()
+            if parsed_data is None:
+                now = time.time()
+                if now - self.last_read_log_time > 2.0:
+                    self.get_logger().warn(
+                        f"No parsed UBX data received yet from {self.serial_path}"
+                    )
+                    self.last_read_log_time = now
+                return
             if parsed_data and parsed_data.identity.startswith("NAV"):
                 self.get_logger().info(f"{parsed_data}")
                 lat_deg = parsed_data.lat
@@ -160,7 +210,7 @@ class GPSRover(Node):
                 # Print or log the position
                 self.get_logger().info(f"Rover: lat={lat_deg:.7f}, lon={lon_deg:.7f}, hAcc={parsed_data.hAcc} mm")
         except Exception as e:
-            #self.get_logger().error(f"Error reading local GPS data: {e}")
+            self.get_logger().error(f"Error reading local GPS data from {self.serial_path}: {e}")
             return
 
 

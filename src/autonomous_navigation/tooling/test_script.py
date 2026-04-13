@@ -5,7 +5,11 @@ import math
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import PoseStamped, Point, Twist
+from geometry_msgs.msg import Twist, TwistStamped
+from sensor_msgs.msg import NavSatFix
+from std_msgs.msg import String
+
+from cmr_msgs.msg import AutonomyDrive
 
 
 class TestRealtimePlotterPublisher(Node):
@@ -13,12 +17,12 @@ class TestRealtimePlotterPublisher(Node):
         super().__init__('test_realtime_plotter_publisher')
 
         self.pose_pub = self.create_publisher(
-            PoseStamped,
+            TwistStamped,
             '/autonomy/pose/robot/global',
             10
         )
         self.target_pub = self.create_publisher(
-            Point,
+            Twist,
             '/autonomy/target_object/position',
             10
         )
@@ -27,93 +31,136 @@ class TestRealtimePlotterPublisher(Node):
             '/cmd_vel',
             10
         )
+        self.gps_pub = self.create_publisher(
+            NavSatFix,
+            '/rtk/navsatfix_data',
+            10
+        )
+        self.state_pub = self.create_publisher(
+            String,
+            '/autonomy/state',
+            10
+        )
+        self.move_type_pub = self.create_publisher(
+            String,
+            '/autonomy/move/move_type',
+            10
+        )
+        self.ackermann_pub = self.create_publisher(
+            AutonomyDrive,
+            '/autonomy/move/ackerman',
+            10
+        )
+        self.point_turn_pub = self.create_publisher(
+            Twist,
+            '/autonomy/move/point_turn',
+            10
+        )
 
-        self.declare_parameter('publish_rate', 20.0)
-        self.declare_parameter('radius', 3.0)
-        self.declare_parameter('angular_speed', 0.25)
-        self.declare_parameter('center_x', 0.0)
-        self.declare_parameter('center_y', 0.0)
-        self.declare_parameter('target_x', 5.0)
-        self.declare_parameter('target_y', 2.0)
-        self.declare_parameter('frame_id', 'map')
+        self.declare_parameter('publish_rate', 10.0)
+        self.declare_parameter('lat_radius', 0.000120)
+        self.declare_parameter('lon_radius', 0.000120)
+        self.declare_parameter('angular_speed', 0.45)
+        self.declare_parameter('center_lat', 42.444180)
+        self.declare_parameter('center_lon', -76.483450)
+        self.declare_parameter('target_lat', 42.444061)
+        self.declare_parameter('target_lon', -76.483483)
+        self.declare_parameter('frame_id', 'gps')
+        self.declare_parameter('state_text', 'NAVIGATING')
 
-        self.publish_rate = self.get_parameter('publish_rate').value
-        self.radius = self.get_parameter('radius').value
-        self.angular_speed = self.get_parameter('angular_speed').value
-        self.center_x = self.get_parameter('center_x').value
-        self.center_y = self.get_parameter('center_y').value
-        self.target_x = self.get_parameter('target_x').value
-        self.target_y = self.get_parameter('target_y').value
+        self.publish_rate = float(self.get_parameter('publish_rate').value)
+        self.lat_radius = float(self.get_parameter('lat_radius').value)
+        self.lon_radius = float(self.get_parameter('lon_radius').value)
+        self.angular_speed = float(self.get_parameter('angular_speed').value)
+        self.center_lat = float(self.get_parameter('center_lat').value)
+        self.center_lon = float(self.get_parameter('center_lon').value)
+        self.target_lat = float(self.get_parameter('target_lat').value)
+        self.target_lon = float(self.get_parameter('target_lon').value)
         self.frame_id = self.get_parameter('frame_id').value
+        self.state_text = self.get_parameter('state_text').value
 
         self.t = 0.0
-        self.dt = 1.0 / float(self.publish_rate)
-
-        timer_period = self.dt
-        self.timer = self.create_timer(timer_period, self.timer_callback)
+        self.dt = 1.0 / max(self.publish_rate, 1.0)
+        self.timer = self.create_timer(self.dt, self.timer_callback)
 
         self.get_logger().info('Test publisher started.')
-        self.get_logger().info('Publishing fake robot pose, target point, and cmd_vel.')
-
-    def yaw_to_quaternion(self, yaw):
-        qz = math.sin(yaw / 2.0)
-        qw = math.cos(yaw / 2.0)
-        return (0.0, 0.0, qz, qw)
+        self.get_logger().info(
+            'Publishing fake TwistStamped pose, GPS, target twist, cmd_vel, autonomy state, and drive topics.'
+        )
 
     def timer_callback(self):
-        # Circular trajectory
-        x = self.center_x + self.radius * math.cos(self.angular_speed * self.t)
-        y = self.center_y + self.radius * math.sin(self.angular_speed * self.t)
+        phase = self.angular_speed * self.t
 
-        # Velocity for circular motion
-        vx = -self.radius * self.angular_speed * math.sin(self.angular_speed * self.t)
-        vy = self.radius * self.angular_speed * math.cos(self.angular_speed * self.t)
+        lon = self.center_lon + self.lon_radius * math.cos(phase)
+        lat = self.center_lat + self.lat_radius * math.sin(phase)
 
-        # Heading aligned with tangent of motion
-        yaw = math.atan2(vy, vx)
+        dlon_dt = -self.lon_radius * self.angular_speed * math.sin(phase)
+        dlat_dt = self.lat_radius * self.angular_speed * math.cos(phase)
+        yaw = math.atan2(dlat_dt, dlon_dt)
 
-        # ---------------- PoseStamped ----------------
-        pose_msg = PoseStamped()
+        pseudo_speed = math.sqrt(dlon_dt * dlon_dt + dlat_dt * dlat_dt)
+        steer_angle_deg = 18.0 * math.sin(phase)
+        point_turn_wz = 0.35 * math.cos(phase)
+        move_type = 'ackerman' if math.cos(phase) >= 0.0 else 'point_turn'
+
+        pose_msg = TwistStamped()
         pose_msg.header.stamp = self.get_clock().now().to_msg()
         pose_msg.header.frame_id = self.frame_id
-
-        pose_msg.pose.position.x = x
-        pose_msg.pose.position.y = y
-        pose_msg.pose.position.z = 0.0
-
-        qx, qy, qz, qw = self.yaw_to_quaternion(yaw)
-        pose_msg.pose.orientation.x = qx
-        pose_msg.pose.orientation.y = qy
-        pose_msg.pose.orientation.z = qz
-        pose_msg.pose.orientation.w = qw
-
+        pose_msg.twist.linear.x = lon
+        pose_msg.twist.linear.y = lat
+        pose_msg.twist.linear.z = 0.0
+        pose_msg.twist.angular.x = 0.0
+        pose_msg.twist.angular.y = 0.0
+        pose_msg.twist.angular.z = yaw
         self.pose_pub.publish(pose_msg)
 
-        # ---------------- Target Point ----------------
-        target_msg = Point()
-        target_msg.x = self.target_x
-        target_msg.y = self.target_y
-        target_msg.z = 0.0
+        gps_msg = NavSatFix()
+        gps_msg.header.stamp = pose_msg.header.stamp
+        gps_msg.header.frame_id = self.frame_id
+        gps_msg.latitude = lat
+        gps_msg.longitude = lon
+        gps_msg.altitude = 488.0
+        self.gps_pub.publish(gps_msg)
 
+        target_msg = Twist()
+        target_msg.linear.x = self.target_lon
+        target_msg.linear.y = self.target_lat
+        target_msg.linear.z = 0.0
         self.target_pub.publish(target_msg)
 
-        # ---------------- cmd_vel ----------------
         cmd_msg = Twist()
-        cmd_msg.linear.x = vx
-        cmd_msg.linear.y = vy
+        cmd_msg.linear.x = dlon_dt
+        cmd_msg.linear.y = dlat_dt
         cmd_msg.linear.z = 0.0
         cmd_msg.angular.x = 0.0
         cmd_msg.angular.y = 0.0
         cmd_msg.angular.z = self.angular_speed
-
         self.cmd_pub.publish(cmd_msg)
 
-        speed = math.sqrt(vx * vx + vy * vy)
+        ack_msg = AutonomyDrive()
+        ack_msg.vel = pseudo_speed
+        ack_msg.fl_angle = steer_angle_deg
+        ack_msg.fr_angle = steer_angle_deg
+        ack_msg.bl_angle = 0.0
+        ack_msg.br_angle = 0.0
+        self.ackermann_pub.publish(ack_msg)
+
+        point_turn_msg = Twist()
+        point_turn_msg.angular.z = point_turn_wz
+        self.point_turn_pub.publish(point_turn_msg)
+
+        state_msg = String()
+        state_msg.data = self.state_text
+        self.state_pub.publish(state_msg)
+
+        move_type_msg = String()
+        move_type_msg.data = move_type
+        self.move_type_pub.publish(move_type_msg)
 
         self.get_logger().info(
-            f'Robot -> x={x:.2f}, y={y:.2f}, yaw={yaw:.2f} rad | '
-            f'Target -> x={self.target_x:.2f}, y={self.target_y:.2f} | '
-            f'cmd_vel -> vx={vx:.2f}, vy={vy:.2f}, wz={self.angular_speed:.2f}, speed={speed:.2f}'
+            f'Robot -> lon={lon:.6f}, lat={lat:.6f}, yaw={yaw:.2f} rad | '
+            f'Target -> lon={self.target_lon:.6f}, lat={self.target_lat:.6f} | '
+            f'Move={move_type} | cmd_vel -> vx={dlon_dt:.6f}, vy={dlat_dt:.6f}, wz={self.angular_speed:.2f}'
         )
 
         self.t += self.dt

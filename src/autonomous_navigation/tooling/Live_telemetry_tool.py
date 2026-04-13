@@ -51,11 +51,11 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('ui_update_hz', 20.0)
         self.declare_parameter('trail_length', 800)
 
-        # fallback bounds if no waypoints
-        self.declare_parameter('world_x_min', -50.0)
-        self.declare_parameter('world_x_max', 50.0)
-        self.declare_parameter('world_y_min', -50.0)
-        self.declare_parameter('world_y_max', 50.0)
+        # fallback bounds if no waypoints; for geospatial plotting, x=longitude and y=latitude
+        self.declare_parameter('world_x_min', -76.484000)
+        self.declare_parameter('world_x_max', -76.483000)
+        self.declare_parameter('world_y_min', 42.443500)
+        self.declare_parameter('world_y_max', 42.444500)
 
         self.robot_pose_topic = self.get_parameter('robot_pose_topic').value
         self.target_topic = self.get_parameter('target_topic').value
@@ -79,6 +79,8 @@ class RealtimeRobotPlotter(Node):
         self.world_x_max = float(self.get_parameter('world_x_max').value)
         self.world_y_min = float(self.get_parameter('world_y_min').value)
         self.world_y_max = float(self.get_parameter('world_y_max').value)
+        self.world_x_label_name = 'Longitude'
+        self.world_y_label_name = 'Latitude'
 
         # ---------------- State ----------------
         self.robot_x = None
@@ -222,9 +224,9 @@ class RealtimeRobotPlotter(Node):
         # ---- Robot box
         robot_box = ttk.LabelFrame(side, text='Robot State', padding=8)
         robot_box.pack(fill='x', pady=4)
-        self.robot_x_label = ttk.Label(robot_box, text='X: --')
+        self.robot_x_label = ttk.Label(robot_box, text='Longitude: --')
         self.robot_x_label.pack(anchor='w')
-        self.robot_y_label = ttk.Label(robot_box, text='Y: --')
+        self.robot_y_label = ttk.Label(robot_box, text='Latitude: --')
         self.robot_y_label.pack(anchor='w')
         self.robot_yaw_label = ttk.Label(robot_box, text='Yaw: --')
         self.robot_yaw_label.pack(anchor='w')
@@ -357,6 +359,8 @@ class RealtimeRobotPlotter(Node):
                 return
 
             if all(('x' in wp and 'y' in wp) for wp in loaded):
+                self.world_x_label_name = 'X'
+                self.world_y_label_name = 'Y'
                 for wp in loaded:
                     self.waypoints.append((float(wp['x']), float(wp['y'])))
                 self.get_logger().info(f'Waypoints parsed successfully: {len(self.waypoints)}')
@@ -364,19 +368,10 @@ class RealtimeRobotPlotter(Node):
                 return
 
             if all(('latitude' in wp and 'longitude' in wp) for wp in loaded):
-                lat0 = float(loaded[0]['latitude'])
-                lon0 = float(loaded[0]['longitude'])
-
-                meters_per_deg_lat = 111320.0
-                meters_per_deg_lon = 111320.0 * math.cos(math.radians(lat0))
-
                 for wp in loaded:
-                    lat = float(wp['latitude'])
                     lon = float(wp['longitude'])
-
-                    x = (lon - lon0) * meters_per_deg_lon
-                    y = (lat - lat0) * meters_per_deg_lat
-                    self.waypoints.append((x, y))
+                    lat = float(wp['latitude'])
+                    self.waypoints.append((lon, lat))
 
                 self.get_logger().info(
                     f'Waypoints parsed successfully from GPS format: {len(self.waypoints)}'
@@ -405,11 +400,19 @@ class RealtimeRobotPlotter(Node):
         min_y = min(ys)
         max_y = max(ys)
 
-        span_x = max(1.0, max_x - min_x)
-        span_y = max(1.0, max_y - min_y)
+        if self.is_geospatial_plot():
+            span_x = max(1e-6, max_x - min_x)
+            span_y = max(1e-6, max_y - min_y)
+        else:
+            span_x = max(1.0, max_x - min_x)
+            span_y = max(1.0, max_y - min_y)
 
-        margin_x = max(5.0, 0.15 * span_x)
-        margin_y = max(5.0, 0.15 * span_y)
+        if self.is_geospatial_plot():
+            margin_x = max(0.00005, 0.15 * span_x)
+            margin_y = max(0.00005, 0.15 * span_y)
+        else:
+            margin_x = max(5.0, 0.15 * span_x)
+            margin_y = max(5.0, 0.15 * span_y)
 
         self.world_x_min = min_x - margin_x
         self.world_x_max = max_x + margin_x
@@ -418,8 +421,10 @@ class RealtimeRobotPlotter(Node):
 
         self.get_logger().info(
             f'Auto plot bounds from waypoints -> '
-            f'X:[{self.world_x_min:.2f}, {self.world_x_max:.2f}] '
-            f'Y:[{self.world_y_min:.2f}, {self.world_y_max:.2f}]'
+            f'{self.world_x_label_name}:[{self.format_axis_value(self.world_x_min, self.world_x_label_name)}, '
+            f'{self.format_axis_value(self.world_x_max, self.world_x_label_name)}] '
+            f'{self.world_y_label_name}:[{self.format_axis_value(self.world_y_min, self.world_y_label_name)}, '
+            f'{self.format_axis_value(self.world_y_max, self.world_y_label_name)}]'
         )
 
     # ---------------- ROS Callbacks ----------------
@@ -437,7 +442,8 @@ class RealtimeRobotPlotter(Node):
                 msg.pose.orientation.z,
                 msg.pose.orientation.w
             )
-            self.append_robot_path(self.robot_x, self.robot_y)
+            if not self.is_geospatial_plot():
+                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def robot_pose_twist_stamped_cb(self, msg: TwistStamped):
@@ -445,7 +451,8 @@ class RealtimeRobotPlotter(Node):
             self.robot_x = msg.twist.linear.x
             self.robot_y = msg.twist.linear.y
             self.robot_yaw = msg.twist.angular.z
-            self.append_robot_path(self.robot_x, self.robot_y)
+            if not self.is_geospatial_plot():
+                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def robot_pose_odom_cb(self, msg: Odometry):
@@ -458,7 +465,8 @@ class RealtimeRobotPlotter(Node):
                 msg.pose.pose.orientation.z,
                 msg.pose.pose.orientation.w
             )
-            self.append_robot_path(self.robot_x, self.robot_y)
+            if not self.is_geospatial_plot():
+                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def target_point_cb(self, msg: Point):
@@ -524,10 +532,14 @@ class RealtimeRobotPlotter(Node):
         with self.lock:
             self.gps_lat = msg.latitude
             self.gps_lon = msg.longitude
+            if self.is_geospatial_plot():
+                self.append_robot_path(self.gps_lon, self.gps_lat)
         self.mark_seen('gps')
 
     # ---------------- Helpers ----------------
     def append_robot_path(self, x, y):
+        if self.robot_path and self.robot_path[-1] == (x, y):
+            return
         self.robot_path.append((x, y))
         if len(self.robot_path) > self.trail_length:
             self.robot_path.pop(0)
@@ -608,6 +620,9 @@ class RealtimeRobotPlotter(Node):
         y_span = max(1e-6, self.world_y_max - self.world_y_min)
         return x_span, y_span
 
+    def is_geospatial_plot(self):
+        return self.world_x_label_name == 'Longitude' and self.world_y_label_name == 'Latitude'
+
     def world_to_canvas(self, x, y):
         canvas_width, canvas_height = self.get_canvas_size()
         x_span, y_span = self.current_world_spans()
@@ -642,7 +657,14 @@ class RealtimeRobotPlotter(Node):
     def compute_robot_world_size(self):
         x_span, y_span = self.current_world_spans()
         base = 0.025 * min(x_span, y_span)
+        if self.is_geospatial_plot():
+            return max(0.00001, base)
         return max(0.8, base)
+
+    def format_axis_value(self, value, axis_name):
+        if axis_name in ('Latitude', 'Longitude'):
+            return f'{value:.6f}'
+        return f'{value:.1f}'
 
     # ---------------- Logging ----------------
     def start_logging(self):
@@ -725,7 +747,13 @@ class RealtimeRobotPlotter(Node):
             self.canvas.create_line(cx, 0, cx, canvas_height, fill=color, width=width)
 
             if 0 <= cx <= canvas_width:
-                self.canvas.create_text(cx + 15, 12, text=f'{x:.1f}', fill='gray35', font=('TkDefaultFont', 8))
+                self.canvas.create_text(
+                    cx + 22,
+                    12,
+                    text=self.format_axis_value(x, self.world_x_label_name),
+                    fill='gray35',
+                    font=('TkDefaultFont', 8)
+                )
             x += x_step
 
         y0 = math.floor(self.world_y_min / y_step) * y_step
@@ -737,10 +765,21 @@ class RealtimeRobotPlotter(Node):
             self.canvas.create_line(0, cy, canvas_width, cy, fill=color, width=width)
 
             if 0 <= cy <= canvas_height:
-                self.canvas.create_text(30, cy - 8, text=f'{y:.1f}', fill='gray35', font=('TkDefaultFont', 8))
+                self.canvas.create_text(
+                    42,
+                    cy - 8,
+                    text=self.format_axis_value(y, self.world_y_label_name),
+                    fill='gray35',
+                    font=('TkDefaultFont', 8)
+                )
             y += y_step
 
-        self.grid_label.config(text=f'Grid step: dx={x_step:.2f}, dy={y_step:.2f}')
+        self.grid_label.config(
+            text=(
+                f'Grid step: {self.world_x_label_name}={self.format_axis_value(x_step, self.world_x_label_name)}, '
+                f'{self.world_y_label_name}={self.format_axis_value(y_step, self.world_y_label_name)}'
+            )
+        )
 
     def draw_border(self):
         canvas_width, canvas_height = self.get_canvas_size()
@@ -811,7 +850,9 @@ class RealtimeRobotPlotter(Node):
         self.canvas.create_line(cx, cy, hx, hy, fill='black', width=2, arrow=tk.LAST)
         self.canvas.create_text(cx + 22, cy + 15, text='Robot', fill='red')
 
-        self.robot_size_label.config(text=f'Robot size (world): {robot_world_size:.2f}')
+        self.robot_size_label.config(
+            text=f'Robot size (world): {self.format_axis_value(robot_world_size, self.world_x_label_name)}'
+        )
 
     # ---------------- UI ----------------
     def update_ui(self):
@@ -847,14 +888,17 @@ class RealtimeRobotPlotter(Node):
         self.draw_waypoints()
         self.draw_robot_path()
 
+        plot_robot_x = gps_lon if gps_lon is not None else robot_x
+        plot_robot_y = gps_lat if gps_lat is not None else robot_y
+
         if target_x is not None and target_y is not None:
             self.draw_target(target_x, target_y)
 
-        if robot_x is not None and robot_y is not None:
-            self.draw_robot(robot_x, robot_y, robot_yaw)
+        if plot_robot_x is not None and plot_robot_y is not None:
+            self.draw_robot(plot_robot_x, plot_robot_y, robot_yaw)
 
-        self.robot_x_label.config(text=f'X: {robot_x:.3f}' if robot_x is not None else 'X: --')
-        self.robot_y_label.config(text=f'Y: {robot_y:.3f}' if robot_y is not None else 'Y: --')
+        self.robot_x_label.config(text=f'Longitude: {gps_lon:.7f}' if gps_lon is not None else 'Longitude: --')
+        self.robot_y_label.config(text=f'Latitude: {gps_lat:.7f}' if gps_lat is not None else 'Latitude: --')
         self.robot_yaw_label.config(text=f'Yaw: {robot_yaw:.3f} rad')
         self.speed_label.config(text=f'Speed: {speed:.3f} m/s')
         self.gps_lat_label.config(text=f'GPS Lat: {gps_lat:.7f}' if gps_lat is not None else 'GPS Lat: --')
@@ -884,8 +928,10 @@ class RealtimeRobotPlotter(Node):
         self.bounds_label.config(
             text=(
                 f'Bounds:\n'
-                f'X [{self.world_x_min:.2f}, {self.world_x_max:.2f}]\n'
-                f'Y [{self.world_y_min:.2f}, {self.world_y_max:.2f}]'
+                f'{self.world_x_label_name} [{self.format_axis_value(self.world_x_min, self.world_x_label_name)}, '
+                f'{self.format_axis_value(self.world_x_max, self.world_x_label_name)}]\n'
+                f'{self.world_y_label_name} [{self.format_axis_value(self.world_y_min, self.world_y_label_name)}, '
+                f'{self.format_axis_value(self.world_y_max, self.world_y_label_name)}]'
             )
         )
 

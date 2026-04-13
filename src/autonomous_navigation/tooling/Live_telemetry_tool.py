@@ -7,7 +7,9 @@ import threading
 import time
 import tkinter as tk
 from tkinter import ttk
+import cv2
 import yaml
+from cv_bridge import CvBridge, CvBridgeError
 
 import rclpy
 from rclpy.node import Node
@@ -15,7 +17,7 @@ from rclpy.executors import ExternalShutdownException
 
 from geometry_msgs.msg import PoseStamped, Point, Twist, TwistStamped
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import Image, NavSatFix
 from std_msgs.msg import String
 
 from cmr_msgs.msg import AutonomyDrive
@@ -41,6 +43,7 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('state_topic', '/autonomy/state')
         self.declare_parameter('gps_topic', '/rtk/navsatfix_data')
         self.declare_parameter('move_type_topic', '/autonomy/move/move_type')
+        self.declare_parameter('image_topic', '/zed/image_left')
         self.declare_parameter('robot_pose_type', 'twist_stamped')  # pose_stamped / odometry / twist_stamped
         self.declare_parameter('target_type', 'twist')              # point / pose_stamped / twist
         self.declare_parameter('waypoints_file', DEFAULT_WAYPOINT_FILE)
@@ -51,11 +54,11 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('ui_update_hz', 20.0)
         self.declare_parameter('trail_length', 800)
 
-        # fallback bounds if no waypoints
-        self.declare_parameter('world_x_min', -50.0)
-        self.declare_parameter('world_x_max', 50.0)
-        self.declare_parameter('world_y_min', -50.0)
-        self.declare_parameter('world_y_max', 50.0)
+        # fallback bounds if no waypoints; for geospatial plotting, x=longitude and y=latitude
+        self.declare_parameter('world_x_min', -76.484000)
+        self.declare_parameter('world_x_max', -76.483000)
+        self.declare_parameter('world_y_min', 42.443500)
+        self.declare_parameter('world_y_max', 42.444500)
 
         self.robot_pose_topic = self.get_parameter('robot_pose_topic').value
         self.target_topic = self.get_parameter('target_topic').value
@@ -65,6 +68,7 @@ class RealtimeRobotPlotter(Node):
         self.state_topic = self.get_parameter('state_topic').value
         self.gps_topic = self.get_parameter('gps_topic').value
         self.move_type_topic = self.get_parameter('move_type_topic').value
+        self.image_topic = self.get_parameter('image_topic').value
         self.robot_pose_type = self.get_parameter('robot_pose_type').value
         self.target_type = self.get_parameter('target_type').value
         self.waypoints_file = self.get_parameter('waypoints_file').value or DEFAULT_WAYPOINT_FILE
@@ -79,6 +83,8 @@ class RealtimeRobotPlotter(Node):
         self.world_x_max = float(self.get_parameter('world_x_max').value)
         self.world_y_min = float(self.get_parameter('world_y_min').value)
         self.world_y_max = float(self.get_parameter('world_y_max').value)
+        self.world_x_label_name = 'Longitude'
+        self.world_y_label_name = 'Latitude'
 
         # ---------------- State ----------------
         self.robot_x = None
@@ -101,6 +107,13 @@ class RealtimeRobotPlotter(Node):
         self.ackermann_fl = 0.0
         self.ackermann_fr = 0.0
         self.point_turn_wz = 0.0
+        self.bridge = CvBridge()
+        self.latest_image = None
+        self.latest_image_stamp = None
+        self.latest_image_size = None
+        self.latest_image_tk = None
+        self.image_topics = []
+        self.last_image_topic_refresh = 0.0
 
         self.robot_path = []
         self.waypoints = []
@@ -113,6 +126,7 @@ class RealtimeRobotPlotter(Node):
             'state': 0,
             'gps': 0,
             'move_type': 0,
+            'image': 0,
         }
         self.last_seen = {key: None for key in self.msg_counts}
         self.topic_configs = {
@@ -124,6 +138,7 @@ class RealtimeRobotPlotter(Node):
             'state': self.state_topic,
             'gps': self.gps_topic,
             'move_type': self.move_type_topic,
+            'image': self.image_topic,
         }
         self.last_debug_log = 0.0
         self.debug_period = 2.0
@@ -189,6 +204,9 @@ class RealtimeRobotPlotter(Node):
         self.move_type_sub = self.create_subscription(
             String, self.move_type_topic, self.move_type_cb, 10
         )
+        self.image_sub = self.create_subscription(
+            Image, self.image_topic, self.image_cb, 10
+        )
 
         self.get_logger().info('Realtime Robot Plotter started.')
         self.get_logger().info(f'Robot pose topic: {self.robot_pose_topic} ({self.robot_pose_type})')
@@ -198,33 +216,67 @@ class RealtimeRobotPlotter(Node):
         self.get_logger().info(f'Point turn topic: {self.point_turn_topic}')
         self.get_logger().info(f'State topic: {self.state_topic}')
         self.get_logger().info(f'GPS topic: {self.gps_topic}')
+        self.get_logger().info(f'Image topic: {self.image_topic}')
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoint(s) from config.')
 
         # ---------------- Tkinter UI ----------------
         self.root = tk.Tk()
         self.root.title("ROS 2 Live Telemetry Tool")
-        self.root.geometry(f"{self.initial_canvas_width + 360}x{self.initial_canvas_height + 40}")
+        self.root.geometry(f"{self.initial_canvas_width + 430}x{self.initial_canvas_height + 360}")
+        self.root.minsize(1150, 760)
 
         main_frame = ttk.Frame(self.root, padding=8)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
+        left_frame = ttk.Frame(main_frame)
+        left_frame.grid(row=0, column=0, sticky='nsew', padx=(0, 10))
+
         self.canvas = tk.Canvas(
-            main_frame,
+            left_frame,
             width=self.initial_canvas_width,
             height=self.initial_canvas_height,
             bg='white'
         )
-        self.canvas.grid(row=0, column=0, rowspan=30, sticky='nsew', padx=(0, 10))
+        self.canvas.grid(row=0, column=0, sticky='nsew')
 
-        side = ttk.Frame(main_frame)
-        side.grid(row=0, column=1, sticky='nsew')
+        camera_box = ttk.LabelFrame(left_frame, text='Camera Feed', padding=8)
+        camera_box.grid(row=1, column=0, sticky='nsew', pady=(10, 0))
+
+        camera_controls = ttk.Frame(camera_box)
+        camera_controls.pack(fill='x', pady=(0, 6))
+
+        ttk.Label(camera_controls, text='Image topic:').grid(row=0, column=0, sticky='w')
+        self.image_topic_var = tk.StringVar(value=self.image_topic)
+        self.image_topic_combo = ttk.Combobox(
+            camera_controls,
+            textvariable=self.image_topic_var,
+            state='readonly'
+        )
+        self.image_topic_combo.grid(row=0, column=1, sticky='ew', padx=6)
+        self.image_topic_combo.bind('<<ComboboxSelected>>', self.on_image_topic_selected)
+
+        self.refresh_topics_btn = ttk.Button(
+            camera_controls,
+            text='Refresh Topics',
+            command=self.refresh_image_topics
+        )
+        self.refresh_topics_btn.grid(row=0, column=2, sticky='e')
+        camera_controls.columnconfigure(1, weight=1)
+
+        self.image_canvas = tk.Canvas(camera_box, bg='black', highlightthickness=0)
+        self.image_canvas.pack(fill='both', expand=True)
+        self.image_status_label = ttk.Label(camera_box, text='Topic: -- | Image: waiting for frames', wraplength=700)
+        self.image_status_label.pack(anchor='w')
+
+        self.side_frame = ttk.Frame(main_frame)
+        self.side_frame.grid(row=0, column=1, sticky='nsew')
 
         # ---- Robot box
-        robot_box = ttk.LabelFrame(side, text='Robot State', padding=8)
+        robot_box = ttk.LabelFrame(self.side_frame, text='Robot State', padding=8)
         robot_box.pack(fill='x', pady=4)
-        self.robot_x_label = ttk.Label(robot_box, text='X: --')
+        self.robot_x_label = ttk.Label(robot_box, text='Longitude: --')
         self.robot_x_label.pack(anchor='w')
-        self.robot_y_label = ttk.Label(robot_box, text='Y: --')
+        self.robot_y_label = ttk.Label(robot_box, text='Latitude: --')
         self.robot_y_label.pack(anchor='w')
         self.robot_yaw_label = ttk.Label(robot_box, text='Yaw: --')
         self.robot_yaw_label.pack(anchor='w')
@@ -236,7 +288,7 @@ class RealtimeRobotPlotter(Node):
         self.gps_lon_label.pack(anchor='w')
 
         # ---- Target box
-        target_box = ttk.LabelFrame(side, text='Target State', padding=8)
+        target_box = ttk.LabelFrame(self.side_frame, text='Target State', padding=8)
         target_box.pack(fill='x', pady=4)
         self.target_x_label = ttk.Label(target_box, text='Target X: --')
         self.target_x_label.pack(anchor='w')
@@ -246,7 +298,7 @@ class RealtimeRobotPlotter(Node):
         self.dist_label.pack(anchor='w')
 
         # ---- Command box
-        cmd_box = ttk.LabelFrame(side, text='cmd_vel Telemetry', padding=8)
+        cmd_box = ttk.LabelFrame(self.side_frame, text='cmd_vel Telemetry', padding=8)
         cmd_box.pack(fill='x', pady=4)
         self.cmd_vx_label = ttk.Label(cmd_box, text='vx: --')
         self.cmd_vx_label.pack(anchor='w')
@@ -261,7 +313,7 @@ class RealtimeRobotPlotter(Node):
         self.point_turn_label = ttk.Label(cmd_box, text='Point turn wz: --')
         self.point_turn_label.pack(anchor='w')
 
-        autonomy_box = ttk.LabelFrame(side, text='Autonomy Status', padding=8)
+        autonomy_box = ttk.LabelFrame(self.side_frame, text='Autonomy Status', padding=8)
         autonomy_box.pack(fill='x', pady=4)
         self.state_value_label = ttk.Label(autonomy_box, text='Current state: --')
         self.state_value_label.pack(anchor='w')
@@ -273,7 +325,7 @@ class RealtimeRobotPlotter(Node):
         self.publisher_health_label.pack(anchor='w')
 
         # ---- Map box
-        map_box = ttk.LabelFrame(side, text='Map / Plot Info', padding=8)
+        map_box = ttk.LabelFrame(self.side_frame, text='Map / Plot Info', padding=8)
         map_box.pack(fill='x', pady=4)
         self.wp_label = ttk.Label(map_box, text=f'Waypoints: {len(self.waypoints)}')
         self.wp_label.pack(anchor='w')
@@ -287,7 +339,7 @@ class RealtimeRobotPlotter(Node):
         self.canvas_size_label.pack(anchor='w')
 
         # ---- Logging box
-        log_box = ttk.LabelFrame(side, text='Logging', padding=8)
+        log_box = ttk.LabelFrame(self.side_frame, text='Logging', padding=8)
         log_box.pack(fill='x', pady=4)
 
         self.logging_status_label = ttk.Label(log_box, text='Logging: OFF')
@@ -319,18 +371,23 @@ class RealtimeRobotPlotter(Node):
         self.log_file_label.pack(anchor='w', pady=(4, 0))
 
         # ---- Status box
-        status_box = ttk.LabelFrame(side, text='Status', padding=8)
+        status_box = ttk.LabelFrame(self.side_frame, text='Status', padding=8)
         status_box.pack(fill='x', pady=4)
         self.status_label = ttk.Label(status_box, text='Running')
         self.status_label.pack(anchor='w')
 
-        main_frame.columnconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=0)
+        left_frame.columnconfigure(0, weight=1)
+        left_frame.rowconfigure(0, weight=3)
+        left_frame.rowconfigure(1, weight=2)
+
+        main_frame.columnconfigure(0, weight=3)
+        main_frame.columnconfigure(1, weight=1)
         main_frame.rowconfigure(0, weight=1)
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.ui_period_ms = max(1, int(1000.0 / max(self.ui_update_hz, 1.0)))
+        self.refresh_image_topics()
         self.root.after(self.ui_period_ms, self.update_ui)
 
     # ---------------- Canvas helpers ----------------
@@ -357,6 +414,8 @@ class RealtimeRobotPlotter(Node):
                 return
 
             if all(('x' in wp and 'y' in wp) for wp in loaded):
+                self.world_x_label_name = 'X'
+                self.world_y_label_name = 'Y'
                 for wp in loaded:
                     self.waypoints.append((float(wp['x']), float(wp['y'])))
                 self.get_logger().info(f'Waypoints parsed successfully: {len(self.waypoints)}')
@@ -364,19 +423,10 @@ class RealtimeRobotPlotter(Node):
                 return
 
             if all(('latitude' in wp and 'longitude' in wp) for wp in loaded):
-                lat0 = float(loaded[0]['latitude'])
-                lon0 = float(loaded[0]['longitude'])
-
-                meters_per_deg_lat = 111320.0
-                meters_per_deg_lon = 111320.0 * math.cos(math.radians(lat0))
-
                 for wp in loaded:
-                    lat = float(wp['latitude'])
                     lon = float(wp['longitude'])
-
-                    x = (lon - lon0) * meters_per_deg_lon
-                    y = (lat - lat0) * meters_per_deg_lat
-                    self.waypoints.append((x, y))
+                    lat = float(wp['latitude'])
+                    self.waypoints.append((lon, lat))
 
                 self.get_logger().info(
                     f'Waypoints parsed successfully from GPS format: {len(self.waypoints)}'
@@ -405,11 +455,19 @@ class RealtimeRobotPlotter(Node):
         min_y = min(ys)
         max_y = max(ys)
 
-        span_x = max(1.0, max_x - min_x)
-        span_y = max(1.0, max_y - min_y)
+        if self.is_geospatial_plot():
+            span_x = max(1e-6, max_x - min_x)
+            span_y = max(1e-6, max_y - min_y)
+        else:
+            span_x = max(1.0, max_x - min_x)
+            span_y = max(1.0, max_y - min_y)
 
-        margin_x = max(5.0, 0.15 * span_x)
-        margin_y = max(5.0, 0.15 * span_y)
+        if self.is_geospatial_plot():
+            margin_x = max(0.00005, 0.15 * span_x)
+            margin_y = max(0.00005, 0.15 * span_y)
+        else:
+            margin_x = max(5.0, 0.15 * span_x)
+            margin_y = max(5.0, 0.15 * span_y)
 
         self.world_x_min = min_x - margin_x
         self.world_x_max = max_x + margin_x
@@ -418,8 +476,10 @@ class RealtimeRobotPlotter(Node):
 
         self.get_logger().info(
             f'Auto plot bounds from waypoints -> '
-            f'X:[{self.world_x_min:.2f}, {self.world_x_max:.2f}] '
-            f'Y:[{self.world_y_min:.2f}, {self.world_y_max:.2f}]'
+            f'{self.world_x_label_name}:[{self.format_axis_value(self.world_x_min, self.world_x_label_name)}, '
+            f'{self.format_axis_value(self.world_x_max, self.world_x_label_name)}] '
+            f'{self.world_y_label_name}:[{self.format_axis_value(self.world_y_min, self.world_y_label_name)}, '
+            f'{self.format_axis_value(self.world_y_max, self.world_y_label_name)}]'
         )
 
     # ---------------- ROS Callbacks ----------------
@@ -437,7 +497,8 @@ class RealtimeRobotPlotter(Node):
                 msg.pose.orientation.z,
                 msg.pose.orientation.w
             )
-            self.append_robot_path(self.robot_x, self.robot_y)
+            if not self.is_geospatial_plot():
+                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def robot_pose_twist_stamped_cb(self, msg: TwistStamped):
@@ -445,7 +506,8 @@ class RealtimeRobotPlotter(Node):
             self.robot_x = msg.twist.linear.x
             self.robot_y = msg.twist.linear.y
             self.robot_yaw = msg.twist.angular.z
-            self.append_robot_path(self.robot_x, self.robot_y)
+            if not self.is_geospatial_plot():
+                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def robot_pose_odom_cb(self, msg: Odometry):
@@ -458,7 +520,8 @@ class RealtimeRobotPlotter(Node):
                 msg.pose.pose.orientation.z,
                 msg.pose.pose.orientation.w
             )
-            self.append_robot_path(self.robot_x, self.robot_y)
+            if not self.is_geospatial_plot():
+                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def target_point_cb(self, msg: Point):
@@ -520,17 +583,132 @@ class RealtimeRobotPlotter(Node):
             self.current_move_type = msg.data
         self.mark_seen('move_type')
 
+    def image_cb(self, msg: Image):
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except CvBridgeError as e:
+            self.get_logger().warn(f'Failed to convert image from {self.image_topic}: {e}')
+            return
+
+        with self.lock:
+            self.latest_image = cv_image
+            self.latest_image_stamp = time.time()
+            self.latest_image_size = (msg.width, msg.height)
+        self.mark_seen('image')
+
     def gps_cb(self, msg: NavSatFix):
         with self.lock:
             self.gps_lat = msg.latitude
             self.gps_lon = msg.longitude
+            if self.is_geospatial_plot():
+                self.append_robot_path(self.gps_lon, self.gps_lat)
         self.mark_seen('gps')
 
     # ---------------- Helpers ----------------
     def append_robot_path(self, x, y):
+        if self.robot_path and self.robot_path[-1] == (x, y):
+            return
         self.robot_path.append((x, y))
         if len(self.robot_path) > self.trail_length:
             self.robot_path.pop(0)
+
+    def refresh_image_topics(self):
+        image_topics = []
+        for topic_name, topic_types in self.get_topic_names_and_types():
+            if 'sensor_msgs/msg/Image' in topic_types:
+                image_topics.append(topic_name)
+
+        image_topics = sorted(set(image_topics))
+        if self.image_topic and self.image_topic not in image_topics:
+            image_topics.insert(0, self.image_topic)
+
+        self.image_topics = image_topics
+        if hasattr(self, 'image_topic_combo'):
+            self.image_topic_combo['values'] = self.image_topics
+            if self.image_topic:
+                self.image_topic_var.set(self.image_topic)
+        self.last_image_topic_refresh = time.time()
+
+    def on_image_topic_selected(self, _event=None):
+        selected_topic = self.image_topic_var.get().strip()
+        if selected_topic:
+            self.set_image_topic(selected_topic)
+
+    def set_image_topic(self, topic_name):
+        if topic_name == self.image_topic:
+            return
+
+        try:
+            self.destroy_subscription(self.image_sub)
+        except Exception:
+            pass
+
+        self.image_topic = topic_name
+        self.topic_configs['image'] = topic_name
+        self.image_sub = self.create_subscription(
+            Image, self.image_topic, self.image_cb, 10
+        )
+
+        with self.lock:
+            self.latest_image = None
+            self.latest_image_stamp = None
+            self.latest_image_size = None
+
+        if hasattr(self, 'image_topic_var'):
+            self.image_topic_var.set(topic_name)
+
+        self.get_logger().info(f'Switched image topic to {topic_name}')
+
+    def render_camera_feed(self):
+        canvas_width = max(160, self.image_canvas.winfo_width())
+        canvas_height = max(120, self.image_canvas.winfo_height())
+        self.image_canvas.delete('all')
+
+        with self.lock:
+            frame = None if self.latest_image is None else self.latest_image.copy()
+            image_stamp = self.latest_image_stamp
+            image_size = self.latest_image_size
+
+        if frame is None:
+            self.image_status_label.config(text=f'Topic: {self.image_topic} | Image: waiting for frames')
+            self.image_canvas.create_text(
+                canvas_width / 2,
+                canvas_height / 2,
+                text='Waiting for image frames',
+                fill='white',
+                font=('TkDefaultFont', 12)
+            )
+            return
+
+        frame_height, frame_width = frame.shape[:2]
+        if frame_width <= 0 or frame_height <= 0:
+            return
+
+        scale = min(canvas_width / frame_width, canvas_height / frame_height)
+        draw_width = max(1, int(frame_width * scale))
+        draw_height = max(1, int(frame_height * scale))
+
+        resized = cv2.resize(frame, (draw_width, draw_height), interpolation=cv2.INTER_AREA)
+        rgb_image = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+        ppm_header = f'P6\n{draw_width} {draw_height}\n255\n'.encode('ascii')
+        ppm_data = ppm_header + rgb_image.tobytes()
+        self.latest_image_tk = tk.PhotoImage(data=ppm_data, format='PPM')
+
+        offset_x = (canvas_width - draw_width) / 2
+        offset_y = (canvas_height - draw_height) / 2
+        self.image_canvas.create_image(offset_x, offset_y, anchor='nw', image=self.latest_image_tk)
+
+        age_text = '--'
+        if image_stamp is not None:
+            age_text = f'{time.time() - image_stamp:.1f}s ago'
+
+        size_text = '--'
+        if image_size is not None:
+            size_text = f'{image_size[0]}x{image_size[1]}'
+
+        self.image_status_label.config(
+            text=f'Topic: {self.image_topic} | Image: {size_text} | Last frame: {age_text}'
+        )
 
     def quaternion_to_yaw(self, x, y, z, w):
         siny_cosp = 2.0 * (w * z + x * y)
@@ -553,6 +731,7 @@ class RealtimeRobotPlotter(Node):
             ('state', 'state'),
             ('gps', 'gps'),
             ('move_type', 'move'),
+            ('image', 'image'),
         ]
         for key, label in display_order:
             last = self.last_seen[key]
@@ -572,6 +751,7 @@ class RealtimeRobotPlotter(Node):
             ('state', 'state'),
             ('gps', 'gps'),
             ('move_type', 'move'),
+            ('image', 'image'),
         ]
         for key, label in display_order:
             topic = self.topic_configs[key]
@@ -608,6 +788,9 @@ class RealtimeRobotPlotter(Node):
         y_span = max(1e-6, self.world_y_max - self.world_y_min)
         return x_span, y_span
 
+    def is_geospatial_plot(self):
+        return self.world_x_label_name == 'Longitude' and self.world_y_label_name == 'Latitude'
+
     def world_to_canvas(self, x, y):
         canvas_width, canvas_height = self.get_canvas_size()
         x_span, y_span = self.current_world_spans()
@@ -642,7 +825,14 @@ class RealtimeRobotPlotter(Node):
     def compute_robot_world_size(self):
         x_span, y_span = self.current_world_spans()
         base = 0.025 * min(x_span, y_span)
+        if self.is_geospatial_plot():
+            return max(0.00001, base)
         return max(0.8, base)
+
+    def format_axis_value(self, value, axis_name):
+        if axis_name in ('Latitude', 'Longitude'):
+            return f'{value:.6f}'
+        return f'{value:.1f}'
 
     # ---------------- Logging ----------------
     def start_logging(self):
@@ -725,7 +915,13 @@ class RealtimeRobotPlotter(Node):
             self.canvas.create_line(cx, 0, cx, canvas_height, fill=color, width=width)
 
             if 0 <= cx <= canvas_width:
-                self.canvas.create_text(cx + 15, 12, text=f'{x:.1f}', fill='gray35', font=('TkDefaultFont', 8))
+                self.canvas.create_text(
+                    cx + 22,
+                    12,
+                    text=self.format_axis_value(x, self.world_x_label_name),
+                    fill='gray35',
+                    font=('TkDefaultFont', 8)
+                )
             x += x_step
 
         y0 = math.floor(self.world_y_min / y_step) * y_step
@@ -737,10 +933,21 @@ class RealtimeRobotPlotter(Node):
             self.canvas.create_line(0, cy, canvas_width, cy, fill=color, width=width)
 
             if 0 <= cy <= canvas_height:
-                self.canvas.create_text(30, cy - 8, text=f'{y:.1f}', fill='gray35', font=('TkDefaultFont', 8))
+                self.canvas.create_text(
+                    42,
+                    cy - 8,
+                    text=self.format_axis_value(y, self.world_y_label_name),
+                    fill='gray35',
+                    font=('TkDefaultFont', 8)
+                )
             y += y_step
 
-        self.grid_label.config(text=f'Grid step: dx={x_step:.2f}, dy={y_step:.2f}')
+        self.grid_label.config(
+            text=(
+                f'Grid step: {self.world_x_label_name}={self.format_axis_value(x_step, self.world_x_label_name)}, '
+                f'{self.world_y_label_name}={self.format_axis_value(y_step, self.world_y_label_name)}'
+            )
+        )
 
     def draw_border(self):
         canvas_width, canvas_height = self.get_canvas_size()
@@ -811,12 +1018,17 @@ class RealtimeRobotPlotter(Node):
         self.canvas.create_line(cx, cy, hx, hy, fill='black', width=2, arrow=tk.LAST)
         self.canvas.create_text(cx + 22, cy + 15, text='Robot', fill='red')
 
-        self.robot_size_label.config(text=f'Robot size (world): {robot_world_size:.2f}')
+        self.robot_size_label.config(
+            text=f'Robot size (world): {self.format_axis_value(robot_world_size, self.world_x_label_name)}'
+        )
 
     # ---------------- UI ----------------
     def update_ui(self):
         if self._closing:
             return
+
+        if time.time() - self.last_image_topic_refresh > 3.0:
+            self.refresh_image_topics()
 
         self.maybe_log_row()
         self.maybe_emit_debug_log()
@@ -846,15 +1058,19 @@ class RealtimeRobotPlotter(Node):
         self.draw_border()
         self.draw_waypoints()
         self.draw_robot_path()
+        self.render_camera_feed()
+
+        plot_robot_x = gps_lon if gps_lon is not None else robot_x
+        plot_robot_y = gps_lat if gps_lat is not None else robot_y
 
         if target_x is not None and target_y is not None:
             self.draw_target(target_x, target_y)
 
-        if robot_x is not None and robot_y is not None:
-            self.draw_robot(robot_x, robot_y, robot_yaw)
+        if plot_robot_x is not None and plot_robot_y is not None:
+            self.draw_robot(plot_robot_x, plot_robot_y, robot_yaw)
 
-        self.robot_x_label.config(text=f'X: {robot_x:.3f}' if robot_x is not None else 'X: --')
-        self.robot_y_label.config(text=f'Y: {robot_y:.3f}' if robot_y is not None else 'Y: --')
+        self.robot_x_label.config(text=f'Longitude: {gps_lon:.7f}' if gps_lon is not None else 'Longitude: --')
+        self.robot_y_label.config(text=f'Latitude: {gps_lat:.7f}' if gps_lat is not None else 'Latitude: --')
         self.robot_yaw_label.config(text=f'Yaw: {robot_yaw:.3f} rad')
         self.speed_label.config(text=f'Speed: {speed:.3f} m/s')
         self.gps_lat_label.config(text=f'GPS Lat: {gps_lat:.7f}' if gps_lat is not None else 'GPS Lat: --')
@@ -884,13 +1100,18 @@ class RealtimeRobotPlotter(Node):
         self.bounds_label.config(
             text=(
                 f'Bounds:\n'
-                f'X [{self.world_x_min:.2f}, {self.world_x_max:.2f}]\n'
-                f'Y [{self.world_y_min:.2f}, {self.world_y_max:.2f}]'
+                f'{self.world_x_label_name} [{self.format_axis_value(self.world_x_min, self.world_x_label_name)}, '
+                f'{self.format_axis_value(self.world_x_max, self.world_x_label_name)}]\n'
+                f'{self.world_y_label_name} [{self.format_axis_value(self.world_y_min, self.world_y_label_name)}, '
+                f'{self.format_axis_value(self.world_y_max, self.world_y_label_name)}]'
             )
         )
 
         canvas_width, canvas_height = self.get_canvas_size()
         self.canvas_size_label.config(text=f'Canvas: {canvas_width} x {canvas_height}')
+        self.image_status_label.config(wraplength=max(220, self.image_canvas.winfo_width() - 20))
+        self.topic_health_label.config(wraplength=max(220, self.side_frame.winfo_width() - 20))
+        self.publisher_health_label.config(wraplength=max(220, self.side_frame.winfo_width() - 20))
 
         self.logging_status_label.config(text=f'Logging: {"ON" if self.is_logging else "OFF"}')
         self.log_count_label.config(text=f'Rows logged: {len(self.logged_rows)}')

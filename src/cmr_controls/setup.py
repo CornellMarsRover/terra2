@@ -28,6 +28,7 @@ setup(
         'console_scripts': [
             # PHOBOS_APPEND
             'swerve_controller_node = cmr_controls.swerve_controller_node:main',
+            'swerve_test_node = cmr_controls.swerve_test_node:main',
             'arm_controller_node = cmr_controls.arm_controller_node:main',
             'ik_node = cmr_controls.ik_node:main',
             'keyboard_controller_node = cmr_controls.keyboard_controller_node:main'

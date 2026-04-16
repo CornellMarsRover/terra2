@@ -176,12 +176,33 @@ async def query_one(ctrl, motor_id: int, label: str, timeout_s: float) -> QueryR
     return QueryResult(motor_id, label, True, None, values)
 
 
-async def query_all(controllers, timeout_s: float) -> list[QueryResult]:
-    tasks = [
-        query_one(ctrl, motor_id, label, timeout_s)
-        for motor_id, (label, ctrl) in controllers.items()
-    ]
-    return await asyncio.gather(*tasks)
+async def query_all(
+    controllers,
+    timeout_s: float,
+    retries: int = 2,
+    retry_delay_s: float = 0.05,
+) -> list[QueryResult]:
+    """
+    Query controllers one at a time.
+
+    This is intentionally conservative. Sending queries to every moteus at once
+    can produce false "missing" results on a shared CAN bus or through a single
+    fdcanusb transport, even when the controller is actually reachable.
+    """
+    results: list[QueryResult] = []
+
+    for motor_id, (label, ctrl) in controllers.items():
+        last_result: QueryResult | None = None
+        for attempt in range(retries + 1):
+            last_result = await query_one(ctrl, motor_id, label, timeout_s)
+            if last_result.ok:
+                break
+            if attempt < retries:
+                await asyncio.sleep(retry_delay_s)
+
+        results.append(last_result or QueryResult(motor_id, label, False, "unknown error", {}))
+
+    return results
 
 
 def print_table(results: list[QueryResult], min_voltage: float):
@@ -434,7 +455,12 @@ async def main_async(args):
     for sample in range(args.samples):
         if args.samples > 1:
             print(f"\nSample {sample + 1}/{args.samples}")
-        results = await query_all(controllers, args.timeout)
+        results = await query_all(
+            controllers,
+            args.timeout,
+            retries=args.retries,
+            retry_delay_s=args.retry_delay,
+        )
         print_table(results, args.min_voltage)
         all_results = results
         if sample + 1 < args.samples:
@@ -459,7 +485,12 @@ async def main_async(args):
             args.steer_velocity_limit,
         )
         print("\nFinal status after motion test:")
-        final_results = await query_all(controllers, args.timeout)
+        final_results = await query_all(
+            controllers,
+            args.timeout,
+            retries=args.retries,
+            retry_delay_s=args.retry_delay,
+        )
         print_table(final_results, args.min_voltage)
         summarize(final_results, ids, args.min_voltage)
 
@@ -482,6 +513,18 @@ def main():
         ),
     )
     parser.add_argument("--timeout", type=float, default=0.20, help="Per-command timeout seconds.")
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=2,
+        help="Retries for each ID before reporting it missing. Default: 2",
+    )
+    parser.add_argument(
+        "--retry-delay",
+        type=float,
+        default=0.05,
+        help="Seconds to wait between retries for a timed-out ID. Default: 0.05",
+    )
     parser.add_argument("--samples", type=int, default=1, help="Number of query samples.")
     parser.add_argument("--interval", type=float, default=0.50, help="Seconds between samples.")
     parser.add_argument("--min-voltage", type=float, default=18.0, help="Flag voltage below this value.")

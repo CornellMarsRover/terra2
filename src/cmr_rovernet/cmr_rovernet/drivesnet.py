@@ -54,6 +54,7 @@ class CmdVelSubscriber(Node):
         self.last_motion_log = None
         self.last_cmd_vel_log = None
         self.last_buttons_log = None
+        self.last_motor_cmd_log = None
 
         drives_net_table = parse_toml("drivesnet")
         drives_net_node = drives_net_table["node"]
@@ -137,6 +138,12 @@ class CmdVelSubscriber(Node):
             self.logger.info(summary)
             self.last_buttons_log = summary
 
+    def log_motor_commands(self, drive_cmds, swerve_cmds):
+        summary = f"motor_cmds drive={drive_cmds} swerve={swerve_cmds}"
+        if summary != self.last_motor_cmd_log:
+            self.logger.info(summary)
+            self.last_motor_cmd_log = summary
+
     def stop_all_motors(self):
         for motor_id, controller in self.drive_controllers.items():
             send_moteus_stop_sync(controller, motor=motor_id, logger=self.logger)
@@ -177,12 +184,32 @@ class CmdVelSubscriber(Node):
         ws3 = round(ws3, 3)
         ws4 = round(ws4, 3)
 
-        wa1 = round(wa1, 3) / 360 * 50
-        wa2 = round(wa2, 3) / 360 * 50
-        wa3 = round(wa3, 3) / 360 * 50
-        wa4 = round(wa4, 3) / 360 * 50
+        # Keep steering modules in a short-turn range to avoid long flips.
+        # If a wheel angle would exceed +/-90 deg, rotate to the equivalent angle
+        # and reverse wheel velocity.
+        def bound_wheels(angle_deg, speed):
+            bounded = angle_deg
+            adjusted_speed = speed
+            if abs(angle_deg) > 90:
+                if angle_deg < 0:
+                    bounded = 180 + angle_deg
+                else:
+                    bounded = angle_deg - 180
+                adjusted_speed *= -1
+            return bounded, adjusted_speed
 
-        return ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4
+        a1, s1 = bound_wheels(wa1, ws1)
+        a2, s2 = bound_wheels(wa2, ws2)
+        a3, s3 = bound_wheels(wa3, ws3)
+        a4, s4 = bound_wheels(wa4, ws4)
+
+        wa1 = round(a1, 3) / 360 * 50
+        wa2 = round(a2, 3) / 360 * 50
+        wa3 = round(a3, 3) / 360 * 50
+        wa4 = round(a4, 3) / 360 * 50
+
+        # Match sign convention used in cmr_controls/swerve_controller_node.py.
+        return -s1, s2, s3, -s4, wa1, wa2, wa3, wa4
 
     def listener_callback(self, msg: TwistStamped):
         try:
@@ -224,11 +251,25 @@ class CmdVelSubscriber(Node):
             },
         )
 
+        drive_cmds = {
+            1: round(drive_speed * ws2, 3),
+            2: round(drive_speed * ws3, 3),
+            3: round(drive_speed * ws4, 3),
+            4: round(drive_speed * ws1, 3),
+        }
+        swerve_cmds = {
+            5: round(wa2, 3),
+            6: round(wa3, 3),
+            7: round(wa1, 3),
+            8: round(wa4, 3),
+        }
+        self.log_motor_commands(drive_cmds, swerve_cmds)
+
         send_moteus_command_sync(
             controller=self.drive_controllers[1],
             motor=1,
             position=math.nan,
-            drives_velocity=(-drive_speed * ws2),
+            drives_velocity=(drive_speed * ws2),
             maximum_torque=self.MAX_TORQUE,
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,
@@ -239,7 +280,7 @@ class CmdVelSubscriber(Node):
             controller=self.drive_controllers[2],
             motor=2,
             position=math.nan,
-            drives_velocity=(-drive_speed * ws3),
+            drives_velocity=(drive_speed * ws3),
             maximum_torque=self.MAX_TORQUE,
             velocity_limit=self.MOTOR_MAX_SPEED,
             accel_limit=self.MAX_ACCELERATION,

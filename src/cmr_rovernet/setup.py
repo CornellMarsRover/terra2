@@ -23,6 +23,7 @@ setup(
             "armnet_node = cmr_rovernet.armnet:main",
             # PHOBOS_APPEND
             'drivesnet_node = cmr_rovernet.drivesnet:main',
+            'ackermann_keyboard_node = cmr_rovernet.ackermann_keyboard:main',
             'cmr_read_node = cmr_rovernet.ccb_read:main',
             'debug_node = cmr_rovernet.debug:main'
         ],

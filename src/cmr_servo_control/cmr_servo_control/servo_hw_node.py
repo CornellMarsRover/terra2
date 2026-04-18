@@ -9,14 +9,15 @@ from sensor_msgs.msg import JointState
 from .CMR_CANFD import FdCanInterface, ServoController
 
 SERVO_NAMES = ['ee13', 'ee14', 'ee8']
-SERVO_IDS = {'ee13': 13, 'ee14': 14, 'ee8': 8}
+# Logical names on the ROS side mapped to the physical servo IDs found by probing.
+SERVO_IDS = {'ee13': 15, 'ee14': 14, 'ee8': 12}
 
 
 class ServoHwNode(Node):
     def __init__(self):
         super().__init__('servo_hw_node')
 
-        self.declare_parameter('can_port', '/dev/ttyTHS1')
+        self.declare_parameter('can_port', '/dev/ttyACM0')
         self.declare_parameter('baud', 115200)
         self.declare_parameter('servo_can_id', 24)
 
@@ -31,7 +32,9 @@ class ServoHwNode(Node):
         self.loop_thread.start()
 
         self.fd = FdCanInterface(port=self.can_port, baud=self.baud)
+        self.fd.rx_callback = self._handle_rx_frame
         self.servos: Dict[str, ServoController] = {}
+        self._read_loop_future = None
 
         startup_future = asyncio.run_coroutine_threadsafe(self._startup(), self.loop)
         startup_future.result(timeout=10.0)
@@ -47,12 +50,18 @@ class ServoHwNode(Node):
     async def _startup(self):
         await self.fd.open()
         await self.fd.configure_bus()
+        self._read_loop_future = asyncio.create_task(self.fd.read_loop())
         for name in SERVO_NAMES:
             self.servos[name] = ServoController(
                 can=self.fd,
                 servo_id=SERVO_IDS[name],
                 can_id=self.servo_can_id,
             )
+
+    def _handle_rx_frame(self, can_id: int, data_hex: str, flags: list[str]):
+        self.get_logger().info(
+            f'RX frame ID=0x{can_id:X} data={data_hex} flags={flags}'
+        )
 
     def command_callback(self, msg: JointState):
         positions = {name: pos for name, pos in zip(msg.name, msg.position)}
@@ -71,6 +80,8 @@ class ServoHwNode(Node):
     def destroy_node(self):
         if hasattr(self, 'fd') and self.fd is not None:
             self.get_logger().info('Shutting down CAN interface')
+            if self._read_loop_future is not None:
+                self._read_loop_future.cancel()
             close_future = asyncio.run_coroutine_threadsafe(self.fd.close(), self.loop)
             try:
                 close_future.result(timeout=5.0)

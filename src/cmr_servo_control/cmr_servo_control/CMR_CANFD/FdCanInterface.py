@@ -1,6 +1,7 @@
 import asyncio
 import serial_asyncio
 
+
 class FdCanInterface:
     """
     Async interface for CAN-FD via mjbots usbcanfd device.
@@ -15,6 +16,7 @@ class FdCanInterface:
         self.reader = None
         self.writer = None
         self._seq = 0
+        self.rx_callback = None
 
     async def open(self):
         self.reader, self.writer = await serial_asyncio.open_serial_connection(
@@ -61,6 +63,7 @@ class FdCanInterface:
 
     async def write_frame(self, std_id: int, data_hex: str, flags='FB'):
         cmd = f'can std {std_id:X} {data_hex} {flags}'
+        print(f'TX ID=0x{std_id:X}, data={data_hex}, flags={flags}')
         self.writer.write((cmd + '\n').encode('ascii'))
         try:
             await asyncio.wait_for(self.writer.drain(), timeout=1.0)
@@ -79,6 +82,11 @@ class FdCanInterface:
                 data_hex = parts[2]
                 flags = parts[3:]
                 print(f'RX ID=0x{can_id:X}, data={data_hex}, flags={flags}')
+                if self.rx_callback is not None:
+                    try:
+                        self.rx_callback(can_id, data_hex, flags)
+                    except Exception as exc:
+                        print(f'RX callback error: {exc}')
 
     async def request_response(self,
                                std_id: int,

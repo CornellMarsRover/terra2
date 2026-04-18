@@ -56,6 +56,20 @@ STEER_SIGN = {
     8: 1.0,  # BR steer
 }
 
+SPIN_STEER_SIGN = {
+    5: 1.0,
+    6: -1.0,
+    7: -1.0,
+    8: 1.0,
+}
+
+SPIN_DRIVE_SIGN = {
+    1: 1.0,   # FL forward for CW
+    2: 1.0,   # BL forward for CW
+    3: -1.0,  # FR backward for CW
+    4: -1.0,  # BR backward for CW
+}
+
 
 async def query_drive_motors_async(
     port_arg: str,
@@ -215,6 +229,31 @@ async def command_orbit_motors_async(
     return port
 
 
+async def command_spin_motors_async(
+    port_arg: str,
+    timeout_s: float,
+    drive_rps: float,
+    max_torque: float,
+    spin_direction: float,
+    watchdog_timeout: float,
+):
+    port, controllers = make_transport_and_controllers(port_arg, DRIVE_IDS)
+    for motor_id in DRIVE_IDS:
+        _label, ctrl = controllers[motor_id]
+        signed_velocity = spin_direction * SPIN_DRIVE_SIGN[motor_id] * drive_rps
+        await asyncio.wait_for(
+            ctrl.set_position(
+                position=math.nan,
+                velocity=signed_velocity,
+                maximum_torque=max_torque,
+                accel_limit=5.0,
+                watchdog_timeout=max(0.25, watchdog_timeout),
+            ),
+            timeout=timeout_s,
+        )
+    return port
+
+
 async def command_steer_motors_async(
     port_arg: str,
     timeout_s: float,
@@ -235,6 +274,55 @@ async def command_steer_motors_async(
         await asyncio.wait_for(
             ctrl.set_position(
                 position=target_position,
+                velocity_limit=velocity_limit,
+                maximum_torque=max_torque,
+                watchdog_timeout=max(0.25, watchdog_timeout),
+            ),
+            timeout=timeout_s,
+        )
+    return port
+
+
+def build_custom_steer_targets(
+    angle_deg_by_motor: dict[int, float],
+    center_offsets: dict[int, float],
+) -> dict[int, float]:
+    targets: dict[int, float] = {}
+    for motor_id in STEER_IDS:
+        steer_delta = angle_deg_by_motor[motor_id] * STEER_DEGREES_TO_POSITION
+        targets[motor_id] = center_offsets[motor_id] + (
+            STEER_SIGN[motor_id] * steer_delta
+        )
+    return targets
+
+
+def build_spin_steer_targets(
+    spin_angle_deg: float,
+    center_offsets: dict[int, float],
+) -> dict[int, float]:
+    return build_custom_steer_targets(
+        {
+            motor_id: SPIN_STEER_SIGN[motor_id] * spin_angle_deg
+            for motor_id in STEER_IDS
+        },
+        center_offsets,
+    )
+
+
+async def command_custom_steer_targets_async(
+    port_arg: str,
+    timeout_s: float,
+    target_positions: dict[int, float],
+    max_torque: float,
+    velocity_limit: float,
+    watchdog_timeout: float,
+):
+    port, controllers = make_transport_and_controllers(port_arg, STEER_IDS)
+    for motor_id in STEER_IDS:
+        _label, ctrl = controllers[motor_id]
+        await asyncio.wait_for(
+            ctrl.set_position(
+                position=target_positions[motor_id],
                 velocity_limit=velocity_limit,
                 maximum_torque=max_torque,
                 watchdog_timeout=max(0.25, watchdog_timeout),
@@ -270,6 +358,7 @@ class DriveBumpGuiApp:
         self.status_query_pending = False
         self.current_drive_direction = 0.0
         self.current_orbit_direction = 0.0
+        self.current_spin_direction = 0.0
         self.current_steer_direction = 0.0
         self.current_steer_angle_deg = 0.0
         self.steer_button_direction = 0.0
@@ -278,9 +367,11 @@ class DriveBumpGuiApp:
         self.keyboard_drive_action_active: str | None = None
         self.keyboard_steer_action_active: str | None = None
         self.keyboard_orbit_action_active: str | None = None
+        self.keyboard_spin_action_active: str | None = None
         self.current_joystick_label = "Center"
         self.current_drive_button_label = "Center"
         self.current_orbit_button_label = "Center"
+        self.current_spin_button_label = "Center"
         self.current_steer_button_label = "Center"
         self.steer_center_offsets = dict(STEER_CENTER_OFFSETS)
         self.direction_buttons: dict[str, ttk.Button] = {}
@@ -464,6 +555,41 @@ class DriveBumpGuiApp:
             lambda _event: self._on_orbit_button_release("Orbit East"),
         )
 
+        self.direction_buttons["Spin Orient"] = ttk.Button(
+            buttons_frame,
+            text="Spin Orient",
+            command=self.orient_spin_steering,
+        )
+        self.direction_buttons["Spin Orient"].grid(row=4, column=1, padx=4, pady=4, sticky="ew")
+
+        self.direction_buttons["Spin CW"] = ttk.Button(
+            buttons_frame,
+            text="Spin CW",
+        )
+        self.direction_buttons["Spin CW"].grid(row=5, column=0, padx=4, pady=4, sticky="ew")
+        self.direction_buttons["Spin CW"].bind(
+            "<ButtonPress-1>",
+            lambda _event: self._on_spin_button_press("Spin CW", 1.0),
+        )
+        self.direction_buttons["Spin CW"].bind(
+            "<ButtonRelease-1>",
+            lambda _event: self._on_spin_button_release("Spin CW"),
+        )
+
+        self.direction_buttons["Spin CCW"] = ttk.Button(
+            buttons_frame,
+            text="Spin CCW",
+        )
+        self.direction_buttons["Spin CCW"].grid(row=5, column=2, padx=4, pady=4, sticky="ew")
+        self.direction_buttons["Spin CCW"].bind(
+            "<ButtonPress-1>",
+            lambda _event: self._on_spin_button_press("Spin CCW", -1.0),
+        )
+        self.direction_buttons["Spin CCW"].bind(
+            "<ButtonRelease-1>",
+            lambda _event: self._on_spin_button_release("Spin CCW"),
+        )
+
         ttk.Button(buttons_frame, text="Center", command=self.reset_direction_toggle).grid(
             row=1,
             column=1,
@@ -477,7 +603,7 @@ class DriveBumpGuiApp:
 
         ttk.Label(
             outer,
-            text="Use buttons or keyboard: W=North, S=South, A=West, D=East, J=Orbit East, L=Orbit West.",
+            text="Use buttons or keyboard: W=North, S=South, A=West, D=East, J=Orbit East, L=Orbit West, Q=Spin Orient, E=Spin CW, R=Spin CCW.",
             padding=(0, 10, 0, 4),
         ).pack(anchor="w")
 
@@ -574,7 +700,7 @@ class DriveBumpGuiApp:
         ttk.Label(outer, textvariable=self.status_var, padding=(0, 8, 0, 0)).pack(anchor="w")
 
     def _bind_keyboard_controls(self):
-        for key in ["w", "W", "s", "S", "a", "A", "d", "D", "j", "J", "l", "L"]:
+        for key in ["w", "W", "s", "S", "a", "A", "d", "D", "j", "J", "l", "L", "q", "Q", "e", "E", "r", "R"]:
             self.root.bind(f"<KeyPress-{key}>", lambda event, k=key: self._on_key_press(k))
             self.root.bind(f"<KeyRelease-{key}>", lambda event, k=key: self._on_key_release(k))
 
@@ -617,6 +743,28 @@ class DriveBumpGuiApp:
                 self._on_orbit_button_release("Orbit West")
             self.keyboard_orbit_action_active = None
 
+        spin_action = None
+        if "e" in self.keyboard_pressed:
+            spin_action = ("spin_cw", "Spin CW", 1.0)
+        elif "r" in self.keyboard_pressed:
+            spin_action = ("spin_ccw", "Spin CCW", -1.0)
+
+        if spin_action is not None:
+            action_id, label, direction = spin_action
+            if self.keyboard_spin_action_active != action_id:
+                self.keyboard_spin_action_active = action_id
+                self._on_spin_button_press(label, direction)
+        else:
+            if self.keyboard_spin_action_active == "spin_cw":
+                self._on_spin_button_release("Spin CW")
+            elif self.keyboard_spin_action_active == "spin_ccw":
+                self._on_spin_button_release("Spin CCW")
+            self.keyboard_spin_action_active = None
+
+        if "q" in self.keyboard_pressed:
+            if self.keyboard_spin_action_active is None and self.current_spin_button_label != "Spin Orient":
+                self.orient_spin_steering()
+
         steer_action = None
         if "a" in self.keyboard_pressed:
             steer_action = ("west", "West", -1.0)
@@ -648,6 +796,7 @@ class DriveBumpGuiApp:
             is_active = (
                 label == self.current_drive_button_label
                 or label == self.current_orbit_button_label
+                or label == self.current_spin_button_label
                 or label == self.current_steer_button_label
             )
             if is_active:
@@ -690,6 +839,10 @@ class DriveBumpGuiApp:
 
 
     def _on_steer_button_press(self, label: str, direction: float):
+        self.current_orbit_button_label = "Center"
+        self.current_orbit_direction = 0.0
+        self.current_spin_button_label = "Center"
+        self.current_spin_direction = 0.0
         self.current_steer_button_label = label
         self.steer_button_direction = direction
         try:
@@ -722,6 +875,78 @@ class DriveBumpGuiApp:
             f"buttons drive={self.current_drive_button_label} steer=Center angle=0.0"
         )
         self.center_steering()
+
+    def _queue_spin_orientation(self, settings: dict[str, float | str], label: str):
+        target_positions = build_spin_steer_targets(
+            float(settings["steer_angle_deg"]),
+            self.steer_center_offsets,
+        )
+        self.task_queue.put(("start_custom_steering", label, target_positions, settings))
+
+    def orient_spin_steering(self):
+        try:
+            settings = self._get_settings()
+        except ValueError as exc:
+            self.status_var.set(f"Invalid numeric input: {exc}")
+            return
+
+        self.current_drive_button_label = "Center"
+        self.current_orbit_button_label = "Center"
+        self.current_spin_button_label = "Spin Orient"
+        self.current_drive_direction = 0.0
+        self.current_orbit_direction = 0.0
+        self.current_spin_direction = 0.0
+        self.current_steer_button_label = "Spin"
+        self.current_steer_direction = 0.0
+        self.current_steer_angle_deg = float(settings["steer_angle_deg"])
+        self.control_state_var.set("Spin Orient")
+        self.control_debug_var.set(
+            f"spin oriented angle={self.current_steer_angle_deg:.1f}"
+        )
+        self._refresh_direction_buttons()
+        self.status_var.set("Orienting wheels for spin")
+        self._queue_spin_orientation(settings, "spin orientation")
+
+    def _on_spin_button_press(self, label: str, spin_direction: float):
+        try:
+            settings = self._get_settings()
+        except ValueError as exc:
+            self.status_var.set(f"Invalid numeric input: {exc}")
+            return
+
+        self.current_drive_button_label = "Center"
+        self.current_orbit_button_label = "Center"
+        self.current_spin_button_label = label
+        self.current_drive_direction = 0.0
+        self.current_orbit_direction = 0.0
+        self.current_spin_direction = spin_direction
+        self.current_steer_button_label = "Spin"
+        self.current_steer_direction = 0.0
+        self.current_steer_angle_deg = float(settings["steer_angle_deg"])
+        self.control_state_var.set(label)
+        self.control_debug_var.set(
+            f"spin direction={spin_direction:+.1f} angle={self.current_steer_angle_deg:.1f}"
+        )
+        self._refresh_direction_buttons()
+        self._queue_spin_orientation(settings, label)
+        self.task_queue.put(("start_spin", label, spin_direction, settings))
+
+    def _on_spin_button_release(self, label: str):
+        if self.current_spin_button_label != label:
+            return
+
+        try:
+            settings = self._get_settings()
+        except ValueError as exc:
+            self.status_var.set(f"Invalid numeric input: {exc}")
+            return
+
+        self.current_spin_button_label = "Spin Orient"
+        self.current_spin_direction = 0.0
+        self.control_state_var.set("Spin Orient")
+        self.control_debug_var.set("spin motion stopped, orientation held")
+        self._refresh_direction_buttons()
+        self.task_queue.put(("stop_motion", settings))
 
     def _apply_active_state(
         self,
@@ -776,6 +1001,8 @@ class DriveBumpGuiApp:
 
     def _apply_joystick_state(self, label: str, drive_direction: float, steer_direction: float):
         self.current_drive_button_label = "Center"
+        self.current_orbit_button_label = "Center"
+        self.current_spin_button_label = "Center"
         self.current_steer_button_label = "Center"
         self._refresh_direction_buttons()
         self._apply_active_state(label, drive_direction, steer_direction)
@@ -795,6 +1022,8 @@ class DriveBumpGuiApp:
     def toggle_latched_direction(self, label: str, drive_direction: float, steer_direction: float):
         self.current_orbit_button_label = "Center"
         self.current_orbit_direction = 0.0
+        self.current_spin_button_label = "Center"
+        self.current_spin_direction = 0.0
         if self.current_drive_button_label == label:
             self.current_drive_button_label = "Center"
             drive_direction = 0.0
@@ -824,6 +1053,8 @@ class DriveBumpGuiApp:
         self.current_drive_button_label = "Center"
         self.current_orbit_button_label = label
         self.current_orbit_direction = orbit_direction
+        self.current_spin_button_label = "Center"
+        self.current_spin_direction = 0.0
         self.current_drive_direction = 0.0
         self.control_state_var.set(label)
         self.control_debug_var.set(f"orbit direction={orbit_direction:+.1f}")
@@ -842,6 +1073,8 @@ class DriveBumpGuiApp:
 
         self.current_orbit_button_label = "Center"
         self.current_orbit_direction = 0.0
+        self.current_spin_button_label = "Center"
+        self.current_spin_direction = 0.0
         self.current_drive_direction = 0.0
         self.control_state_var.set("Center")
         self.control_debug_var.set("orbit centered")
@@ -850,7 +1083,11 @@ class DriveBumpGuiApp:
 
     def reset_direction_toggle(self):
         self.current_drive_button_label = "Center"
+        self.current_orbit_button_label = "Center"
+        self.current_spin_button_label = "Center"
         self.current_steer_button_label = "Center"
+        self.current_orbit_direction = 0.0
+        self.current_spin_direction = 0.0
         self.steer_button_direction = 0.0
         self.current_steer_angle_deg = 0.0
         self._refresh_direction_buttons()
@@ -966,6 +1203,17 @@ class DriveBumpGuiApp:
                                     watchdog_timeout=settings["watchdog"],
                                 )
                             )
+                        elif label == "spin":
+                            port = asyncio.run(
+                                command_spin_motors_async(
+                                    port_arg=settings["port"],
+                                    timeout_s=settings["timeout"],
+                                    drive_rps=settings["drive_rps"],
+                                    max_torque=settings["max_torque"],
+                                    spin_direction=direction,
+                                    watchdog_timeout=settings["watchdog"],
+                                )
+                            )
                         else:
                             port = asyncio.run(
                                 command_drive_motors_async(
@@ -979,18 +1227,30 @@ class DriveBumpGuiApp:
                             )
                         self.result_queue.put(("motion_active", label, port, settings))
                     if active_steering is not None:
-                        label, steer_angle_deg, settings = active_steering
-                        port = asyncio.run(
-                            command_steer_motors_async(
-                                port_arg=settings["port"],
-                                timeout_s=settings["timeout"],
-                                steer_angle_deg=steer_angle_deg,
-                                max_torque=settings["steer_torque"],
-                                velocity_limit=settings["steer_vel_limit"],
-                                watchdog_timeout=settings["watchdog"],
-                                center_offsets=self.steer_center_offsets,
+                        steer_mode, label, steer_value, settings = active_steering
+                        if steer_mode == "custom":
+                            port = asyncio.run(
+                                command_custom_steer_targets_async(
+                                    port_arg=settings["port"],
+                                    timeout_s=settings["timeout"],
+                                    target_positions=steer_value,
+                                    max_torque=settings["steer_torque"],
+                                    velocity_limit=settings["steer_vel_limit"],
+                                    watchdog_timeout=settings["watchdog"],
+                                )
                             )
-                        )
+                        else:
+                            port = asyncio.run(
+                                command_steer_motors_async(
+                                    port_arg=settings["port"],
+                                    timeout_s=settings["timeout"],
+                                    steer_angle_deg=steer_value,
+                                    max_torque=settings["steer_torque"],
+                                    velocity_limit=settings["steer_vel_limit"],
+                                    watchdog_timeout=settings["watchdog"],
+                                    center_offsets=self.steer_center_offsets,
+                                )
+                            )
                         self.result_queue.put(("steering_active", label, port, settings))
                     continue
 
@@ -1069,9 +1329,23 @@ class DriveBumpGuiApp:
                         )
                     )
                     self.result_queue.put(("orbit_started", label, port, settings))
+                elif task[0] == "start_spin":
+                    _kind, label, spin_direction, settings = task
+                    active_motion = ("spin", spin_direction, settings)
+                    port = asyncio.run(
+                        command_spin_motors_async(
+                            port_arg=settings["port"],
+                            timeout_s=settings["timeout"],
+                            drive_rps=settings["drive_rps"],
+                            max_torque=settings["max_torque"],
+                            spin_direction=spin_direction,
+                            watchdog_timeout=settings["watchdog"],
+                        )
+                    )
+                    self.result_queue.put(("spin_started", label, port, settings))
                 elif task[0] == "start_steering":
                     _kind, label, steer_angle_deg, settings = task
-                    active_steering = (label, steer_angle_deg, settings)
+                    active_steering = ("uniform", label, steer_angle_deg, settings)
                     port = asyncio.run(
                         command_steer_motors_async(
                             port_arg=settings["port"],
@@ -1084,9 +1358,23 @@ class DriveBumpGuiApp:
                         )
                     )
                     self.result_queue.put(("steering_started", label, port, settings))
+                elif task[0] == "start_custom_steering":
+                    _kind, label, target_positions, settings = task
+                    active_steering = ("custom", label, target_positions, settings)
+                    port = asyncio.run(
+                        command_custom_steer_targets_async(
+                            port_arg=settings["port"],
+                            timeout_s=settings["timeout"],
+                            target_positions=target_positions,
+                            max_torque=settings["steer_torque"],
+                            velocity_limit=settings["steer_vel_limit"],
+                            watchdog_timeout=settings["watchdog"],
+                        )
+                    )
+                    self.result_queue.put(("steering_started", label, port, settings))
                 elif task[0] == "center_steering":
                     settings = task[1]
-                    active_steering = ("center", 0.0, settings)
+                    active_steering = ("uniform", "center", 0.0, settings)
                     port = asyncio.run(
                         command_steer_motors_async(
                             port_arg=settings["port"],
@@ -1190,12 +1478,14 @@ class DriveBumpGuiApp:
                 _kind, port, statuses = item
                 self.current_drive_direction = 0.0
                 self.current_orbit_direction = 0.0
+                self.current_spin_direction = 0.0
                 self.current_steer_direction = 0.0
                 self.current_steer_angle_deg = 0.0
                 self.steer_button_direction = 0.0
                 self.current_joystick_label = "Center"
                 self.current_drive_button_label = "Center"
                 self.current_orbit_button_label = "Center"
+                self.current_spin_button_label = "Center"
                 self.current_steer_button_label = "Center"
                 self.control_state_var.set("Center")
                 self.control_debug_var.set("keyboard/buttons centered")
@@ -1216,6 +1506,9 @@ class DriveBumpGuiApp:
                 if label == "orbit":
                     orbit_label = "orbiting east" if self.current_orbit_direction > 0.0 else "orbiting west"
                     self.status_var.set(f"{orbit_label.title()} on {port or 'default transport'}")
+                elif label == "spin":
+                    spin_label = "spinning cw" if self.current_spin_direction > 0.0 else "spinning ccw"
+                    self.status_var.set(f"{spin_label.title()} on {port or 'default transport'}")
                 else:
                     self.status_var.set(f"Driving {label} on {port or 'default transport'}")
             elif kind == "orbit_started":
@@ -1225,13 +1518,27 @@ class DriveBumpGuiApp:
                     f"{label}: speed={settings['drive_rps']:.2f} rev/s, "
                     f"watchdog={settings['watchdog']:.2f} s, torque={settings['max_torque']:.2f}"
                 )
+            elif kind == "spin_started":
+                _kind, label, port, settings = item
+                self.status_var.set(f"{label} on {port or 'default transport'}")
+                self._append_log(
+                    f"{label}: X-orientation angle={settings['steer_angle_deg']:.1f} deg, "
+                    f"speed={settings['drive_rps']:.2f} rev/s, "
+                    f"watchdog={settings['watchdog']:.2f} s, torque={settings['max_torque']:.2f}"
+                )
             elif kind == "steering_started":
                 _kind, label, port, settings = item
                 self.status_var.set(f"Steered {label} on {port or 'default transport'}")
-                self._append_log(
-                    f"Steer {label}: angle={settings['steer_angle_deg']:.1f} deg, "
-                    f"vel_limit={settings['steer_vel_limit']:.2f}, torque={settings['steer_torque']:.2f}"
-                )
+                if label in ("spin orientation", "Spin CW", "Spin CCW"):
+                    self._append_log(
+                        f"Steer {label}: X-orientation angle={settings['steer_angle_deg']:.1f} deg, "
+                        f"vel_limit={settings['steer_vel_limit']:.2f}, torque={settings['steer_torque']:.2f}"
+                    )
+                else:
+                    self._append_log(
+                        f"Steer {label}: angle={settings['steer_angle_deg']:.1f} deg, "
+                        f"vel_limit={settings['steer_vel_limit']:.2f}, torque={settings['steer_torque']:.2f}"
+                    )
             elif kind == "steering_active":
                 _kind, label, port, _settings = item
                 self.status_var.set(f"Steering held {label} on {port or 'default transport'}")
@@ -1247,6 +1554,9 @@ class DriveBumpGuiApp:
                 self.current_drive_button_label = "Center"
                 self.current_orbit_direction = 0.0
                 self.current_orbit_button_label = "Center"
+                self.current_spin_direction = 0.0
+                if self.current_spin_button_label != "Spin Orient":
+                    self.current_spin_button_label = "Center"
                 self.control_debug_var.set("keyboard/buttons centered")
                 self._refresh_direction_buttons()
                 self.status_var.set(f"Motion stopped on {port or 'default transport'}")

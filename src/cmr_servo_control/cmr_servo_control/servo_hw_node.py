@@ -16,7 +16,7 @@ class ServoHwNode(Node):
     def __init__(self):
         super().__init__('servo_hw_node')
 
-        self.declare_parameter('can_port', '/dev/ttyTHS0')
+        self.declare_parameter('can_port', '/dev/ttyTHS1')
         self.declare_parameter('baud', 115200)
         self.declare_parameter('servo_can_id', 24)
 

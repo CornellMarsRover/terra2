@@ -25,6 +25,9 @@ class CmdVelSubscriber(Node):
         super().__init__("drivesnet")
 
         self.create_subscription(
+        super().__init__("drivesnet")
+
+        self.create_subscription(
             TwistStamped,
             "/drives_controller/cmd_vel",
             self.listener_callback,
@@ -403,6 +406,8 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
+
+if __name__ == "__main__":
 
 if __name__ == "__main__":
     main()

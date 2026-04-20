@@ -51,6 +51,7 @@ class CmdVelPublisher(Node):
 
     self.mini_arm_publisher = self.create_publisher(MiniArmDegree, '/mini_arm_controller/cmd_pos', 10)
     self.timer = self.create_timer(0.1, self.publish_msg)
+    self._last_drive_button_state = None
 
     self.logger = self.get_logger()
     self.logger.info(
@@ -68,6 +69,7 @@ class CmdVelPublisher(Node):
           button_msg = self.create_button_message(button_array, dpad)
           self.publisher_.publish(msg)
           self.button_publisher_.publish(button_msg)
+          self.log_drive_button_changes(button_array)
           self.logger.info(
               f"Drive packet from {addr[0]}:{addr[1]} -> "
               f"lx={lx:.3f} ly={ly:.3f} rx={rx:.3f} ry={ry:.3f}",
@@ -161,6 +163,44 @@ class CmdVelPublisher(Node):
     button_msg.button_array = button_array
     return button_msg
 
+  def decode_drive_buttons(self, button_array):
+    buttons = list(button_array)
+    names = ["L1", "R1", "L2", "R2", "SQUARE", "X", "CIRCLE", "TRIANGLE"]
+    state = {name: 0 for name in names}
+
+    for index, name in enumerate(names):
+      if index < len(buttons):
+        state[name] = int(buttons[index])
+
+    return state
+
+  def log_drive_button_changes(self, button_array):
+    state = self.decode_drive_buttons(button_array)
+    if self._last_drive_button_state is None:
+      self._last_drive_button_state = state
+      pressed = [name for name, value in state.items() if value]
+      self.logger.info(
+          "Drive buttons initialized: "
+          f"pressed={pressed if pressed else ['none']} "
+          f"L2={state['L2']} R2={state['R2']}",
+          throttle_duration_sec=1.0,
+      )
+      return
+
+    changed = []
+    for name, value in state.items():
+      previous = self._last_drive_button_state.get(name, 0)
+      if value != previous:
+        if name in {"L2", "R2"}:
+          changed.append(f"{name}={value}")
+        else:
+          changed.append(f"{name}={'pressed' if value else 'released'}")
+
+    if changed:
+      self.logger.info("Drive button update: " + ", ".join(changed))
+
+    self._last_drive_button_state = state
+
   def parse_controller_data(self, raw_data):
 
     # Extract the first two bytes as linear and angular velocities
@@ -181,7 +221,7 @@ class CmdVelPublisher(Node):
     return float(lx), float(ly), float(rx), float(ry)
 
   def parse_button_data(self, raw_data):
-    buttons = raw_data[4:12]
+    buttons = list(raw_data[4:12])
     # dpad = raw_data[12]
     # dpad = directions.get(dpad, -1)
     # DPAD UNIMPLEMENTED

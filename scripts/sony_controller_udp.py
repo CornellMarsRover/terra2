@@ -93,7 +93,7 @@ def main() -> int:
             # common for Sony controllers in SDL / pygame.
             slow_button = joystick.get_button(4) if joystick.get_numbuttons() > 4 else 0
             boost_button = joystick.get_button(5) if joystick.get_numbuttons() > 5 else 0
-            stop_button = joystick.get_button(0) if joystick.get_numbuttons() > 0 else 0
+            cross_button = joystick.get_button(0) if joystick.get_numbuttons() > 0 else 0
             circle_button = joystick.get_button(1) if joystick.get_numbuttons() > 1 else 0
             triangle_button = joystick.get_button(2) if joystick.get_numbuttons() > 2 else 0
             square_button = joystick.get_button(3) if joystick.get_numbuttons() > 3 else 0
@@ -105,7 +105,7 @@ def main() -> int:
             if boost_button:
                 axis_scale *= args.boost_scale
 
-            if stop_button:
+            if cross_button:
                 left_x = 0.0
                 left_y = 0.0
                 right_x = 0.0
@@ -116,20 +116,22 @@ def main() -> int:
                 right_x *= axis_scale
                 right_y *= axis_scale
 
+            # Match cmr_msgs/ControllerReading button_array indices:
+            # L1, R1, L2, R2, SQUARE, X/CROSS, CIRCLE, TRIANGLE.
             packet = bytes(
                 [
                     axis_to_packet_byte(left_x),
                     axis_to_packet_byte(left_y),
                     axis_to_packet_byte(right_x),
                     axis_to_packet_byte(right_y),
-                    int(bool(stop_button)),
-                    int(bool(circle_button)),
-                    int(bool(triangle_button)),
-                    int(bool(square_button)),
                     int(bool(slow_button)),
                     int(bool(boost_button)),
                     int(bool(l2_button)),
                     int(bool(r2_button)),
+                    int(bool(square_button)),
+                    int(bool(cross_button)),
+                    int(bool(circle_button)),
+                    int(bool(triangle_button)),
                 ]
             ) + b"neutral\x00"
 
@@ -142,7 +144,9 @@ def main() -> int:
 
             sys.stdout.write(
                 f"\rlx={left_x:+.3f} ly={left_y:+.3f} rx={right_x:+.3f} ry={right_y:+.3f} "
-                f"slow={int(bool(slow_button))} boost={int(bool(boost_button))}{raw_axis_suffix}   "
+                f"l1={int(bool(slow_button))} r1={int(bool(boost_button))} "
+                f"l2={int(bool(l2_button))} r2={int(bool(r2_button))}"
+                f"{raw_axis_suffix}   "
             )
             sys.stdout.flush()
             time.sleep(period)

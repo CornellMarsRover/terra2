@@ -52,6 +52,11 @@ BTN_CROSS = 5
 BTN_CIRCLE = 6
 BTN_TRIANGLE = 7
 
+LEGACY_L1 = 1
+LEGACY_L2_MIN = 65536
+LEGACY_L2 = 16711680
+LEGACY_TRIANGLE = 16777216
+
 STICK_RANGE = 2.5
 TRIGGER_DEADBAND = 5
 TRIGGER_MAX = 255
@@ -213,26 +218,27 @@ class ZennyDrivesNode(Node):
 
     def _controller_buttons_cb(self, msg: ControllerReading) -> None:
         buttons = list(msg.button_array)
-        if len(buttons) < 8:
+        decoded = self._decode_controller_buttons(buttons)
+        if decoded is None:
             self.get_logger().warn(
-                f"/drives_controller/cmd_buttons expected 8 entries, got {len(buttons)}",
+                f"/drives_controller/cmd_buttons expected 2 or 8 entries, got {len(buttons)}",
                 throttle_duration_sec=2.0,
             )
             self._log_event(
                 "controller_cmd_buttons",
-                {"error": "button_array_too_short", "length": len(buttons), "values": buttons},
+                {"error": "button_array_invalid_length", "length": len(buttons), "values": buttons},
             )
             return
 
-        l1 = int(buttons[BTN_L1])
-        triangle = int(buttons[BTN_TRIANGLE])
-        l2 = int(buttons[BTN_L2])
-        r2 = int(buttons[BTN_R2])
+        l1 = decoded["l1"]
+        triangle = decoded["triangle"]
+        l2 = decoded["l2"]
+        r2 = decoded["r2"]
 
         estop_pressed = bool(l1) and bool(triangle)
         event = {
             "buttons": buttons,
-            "decoded": {"l1": l1, "triangle": triangle, "l2": l2, "r2": r2},
+            "decoded": decoded,
             "estop_pressed": estop_pressed,
         }
 
@@ -288,6 +294,51 @@ class ZennyDrivesNode(Node):
             "speed_rps": speed_rps,
         }
         self._log_event("controller_cmd_buttons", event)
+
+    def _decode_controller_buttons(self, buttons: list[int]) -> dict[str, int | str] | None:
+        if len(buttons) >= 8:
+            return {
+                "format": "expanded",
+                "l1": int(buttons[BTN_L1]),
+                "triangle": int(buttons[BTN_TRIANGLE]),
+                "l2": int(buttons[BTN_L2]),
+                "r2": int(buttons[BTN_R2]),
+            }
+
+        if len(buttons) >= 2:
+            trigger_val = int(buttons[0])
+            button_val = int(buttons[1])
+            return {
+                "format": "legacy_packed",
+                "trigger_val": trigger_val,
+                "button_val": button_val,
+                "l1": int(trigger_val == LEGACY_L1),
+                "triangle": int(button_val == LEGACY_TRIANGLE),
+                "l2": self._legacy_l2_value(trigger_val),
+                "r2": self._legacy_r2_value(trigger_val),
+            }
+
+        return None
+
+    @staticmethod
+    def _legacy_r2_value(trigger_val: int) -> int:
+        hex_value = hex(trigger_val & 0xFFFFFFFF)
+        first_two_hex = hex_value[2:4]
+        result_int = int(first_two_hex, 16)
+        if 0 <= result_int <= TRIGGER_MAX:
+            return result_int
+        return 0
+
+    @staticmethod
+    def _legacy_l2_value(trigger_val: int) -> int:
+        if LEGACY_L2_MIN <= trigger_val <= LEGACY_L2:
+            return int(
+                round(
+                    ((trigger_val - LEGACY_L2_MIN) / (LEGACY_L2 - LEGACY_L2_MIN))
+                    * TRIGGER_MAX
+                )
+            )
+        return 0
 
     def _autonomy_cmd_vel_cb(self, msg: Twist) -> None:
         autonomy_update = {

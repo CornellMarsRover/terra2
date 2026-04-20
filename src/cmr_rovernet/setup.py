@@ -23,6 +23,7 @@ setup(
             "armnet_node = cmr_rovernet.armnet:main",
             # PHOBOS_APPEND
             'drivesnet_node = cmr_rovernet.drivesnet:main',
+            'zenny_drives_node = cmr_rovernet.zenny_drives_node:main',
             'cmr_read_node = cmr_rovernet.ccb_read:main',
             'debug_node = cmr_rovernet.debug:main'
         ],

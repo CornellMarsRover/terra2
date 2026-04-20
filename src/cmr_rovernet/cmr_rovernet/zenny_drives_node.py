@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -59,8 +60,25 @@ ROVER_LENGTH = 39.0
 ROVER_WIDTH = 39.0
 SWERVE_RATIO = 50.0
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_LOG_ROOT = REPO_ROOT / "logs" / "driving_sessions"
+def _default_log_root() -> Path:
+    resolved = Path(__file__).resolve()
+    for parent in (resolved.parent, *resolved.parents):
+        if (parent / "src").exists() and (parent / "install").exists():
+            return parent / "logs" / "driving_sessions"
+        if (parent / "src").exists() and (parent / ".git").exists():
+            return parent / "logs" / "driving_sessions"
+
+    cmr_root = os.environ.get("CMR_ROOT")
+    if cmr_root:
+        cmr_path = Path(cmr_root).expanduser()
+        if cmr_path.name == "terra2":
+            return cmr_path / "logs" / "driving_sessions"
+        return cmr_path / "terra2" / "logs" / "driving_sessions"
+
+    return Path.cwd() / "logs" / "driving_sessions"
+
+
+DEFAULT_LOG_ROOT = _default_log_root()
 
 
 @dataclass
@@ -152,6 +170,7 @@ class ZennyDrivesNode(Node):
 
         self._transport = None
         self._controllers = {}
+        self._worker_event_loop = None
         self._worker = threading.Thread(target=self._worker_loop, daemon=True)
         self._worker.start()
 
@@ -220,15 +239,29 @@ class ZennyDrivesNode(Node):
         with self._lock:
             if estop_pressed and not self._estop_latched:
                 self._estop_latched = True
+                self._manual.vx = 0.0
+                self._manual.vy = 0.0
+                self._manual.omega = 0.0
                 self._manual.speed_rps = 0.0
                 self._manual.updated_at = time.time()
                 self.get_logger().warn("Drive estop latched from controller buttons")
-                event["result"] = {"estop_latched": True, "speed_rps": 0.0}
+                event["result"] = {
+                    "estop_latched": True,
+                    "vx": 0.0,
+                    "vy": 0.0,
+                    "omega": 0.0,
+                    "speed_rps": 0.0,
+                }
                 self._log_event("controller_cmd_buttons", event)
                 return
 
             if self._estop_latched and not bool(l1) and not bool(triangle):
                 self._estop_latched = False
+                self._manual.vx = 0.0
+                self._manual.vy = 0.0
+                self._manual.omega = 0.0
+                self._manual.speed_rps = 0.0
+                self._manual.updated_at = time.time()
                 self.get_logger().info("Drive estop released")
 
             if self._estop_latched:
@@ -282,52 +315,67 @@ class ZennyDrivesNode(Node):
         )
 
     def _worker_loop(self) -> None:
+        self._worker_event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._worker_event_loop)
         try:
-            asyncio.run(self._async_initialize_hardware())
+            self._worker_event_loop.run_until_complete(self._async_initialize_hardware())
         except Exception as exc:  # pragma: no cover - hardware path
             self.get_logger().error(f"Failed to initialize drive hardware: {exc!r}")
             self._log_event("worker_errors", {"stage": "initialize_hardware", "error": repr(exc)})
+            self._worker_event_loop.close()
+            self._worker_event_loop = None
             return
 
         refresh_period = 1.0 / max(self.refresh_rate_hz, 1.0)
-        while not self._shutdown.is_set():
-            try:
-                command = self._select_command()
-                self._log_event("selected_command", command)
-                query_state = self._should_query_state()
+        try:
+            while not self._shutdown.is_set():
+                try:
+                    command = self._select_command()
+                    self._log_event("selected_command", command)
+                    query_state = self._should_query_state()
 
-                if command["mode"] == "estop":
-                    if self._last_source != "estop":
-                        self.get_logger().warn("Applying drive estop")
-                    asyncio.run(self._async_stop_all())
-                    self._last_source = "estop"
-                elif command["mode"] == "idle":
-                    if self._last_source != "idle":
-                        self.get_logger().info("No recent drive command; stopping motors")
-                    asyncio.run(self._async_stop_all())
-                    self._last_source = "idle"
-                else:
-                    wheel_targets = self._command_to_wheels(command)
-                    self._log_event(
-                        "wheel_targets",
-                        {
-                            "source": command["source"],
-                            "mode": command["mode"],
-                            "query_state": query_state,
-                            "targets": wheel_targets,
-                        },
-                    )
-                    state_snapshot = asyncio.run(self._async_apply_wheels(wheel_targets, query_state=query_state))
-                    if state_snapshot is not None:
-                        self._log_event("wheel_state", state_snapshot)
-                    if command["source"] != self._last_source:
-                        self.get_logger().info(f"Drive command source switched to {command['source']}")
-                    self._last_source = command["source"]
+                    if command["mode"] == "estop":
+                        if self._last_source != "estop":
+                            self.get_logger().warn("Applying drive estop")
+                        self._worker_event_loop.run_until_complete(self._async_stop_all())
+                        self._last_source = "estop"
+                    elif command["mode"] == "idle":
+                        if self._last_source != "idle":
+                            self.get_logger().info("No recent drive command; stopping motors")
+                        self._worker_event_loop.run_until_complete(self._async_stop_all())
+                        self._last_source = "idle"
+                    else:
+                        wheel_targets = self._command_to_wheels(command)
+                        self._log_event(
+                            "wheel_targets",
+                            {
+                                "source": command["source"],
+                                "mode": command["mode"],
+                                "query_state": query_state,
+                                "targets": wheel_targets,
+                            },
+                        )
+                        state_snapshot = self._worker_event_loop.run_until_complete(
+                            self._async_apply_wheels(wheel_targets, query_state=query_state)
+                        )
+                        if state_snapshot is not None:
+                            self._log_event("wheel_state", state_snapshot)
+                        if command["source"] != self._last_source:
+                            self.get_logger().info(f"Drive command source switched to {command['source']}")
+                        self._last_source = command["source"]
+                except Exception as exc:  # pragma: no cover - hardware path
+                    self.get_logger().error(f"Drive worker error: {exc!r}")
+                    self._log_event("worker_errors", {"stage": "worker_loop", "error": repr(exc)})
+                finally:
+                    time.sleep(refresh_period)
+        finally:
+            try:
+                if self._transport and self._controllers:
+                    self._worker_event_loop.run_until_complete(self._async_stop_all())
             except Exception as exc:  # pragma: no cover - hardware path
-                self.get_logger().error(f"Drive worker error: {exc!r}")
-                self._log_event("worker_errors", {"stage": "worker_loop", "error": repr(exc)})
-            finally:
-                time.sleep(refresh_period)
+                self._log_event("worker_errors", {"stage": "worker_shutdown", "error": repr(exc)})
+            self._worker_event_loop.close()
+            self._worker_event_loop = None
 
     def _select_command(self) -> dict[str, object]:
         now = time.time()
@@ -767,16 +815,9 @@ class ZennyDrivesNode(Node):
         self._shutdown.set()
         try:
             if self._worker.is_alive():
-                self._worker.join(timeout=1.0)
+                self._worker.join(timeout=2.0)
         except RuntimeError:
             pass
-
-        if self._transport and self._controllers:
-            try:
-                asyncio.run(self._async_stop_all())
-            except Exception as exc:  # pragma: no cover - hardware path
-                self.get_logger().warn(f"Final drive stop failed: {exc!r}")
-                self._log_event("worker_errors", {"stage": "destroy_node", "error": repr(exc)})
 
         self._close_log_files()
         super().destroy_node()

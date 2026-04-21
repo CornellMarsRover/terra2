@@ -112,16 +112,26 @@ def send_moteus_stop_sync(
     )
     return future.result()  # block until done (or raise exception on error)
 
+# async def __async_initialize_moteus(servos: list):
+#     #transport = moteus.Fdcanusb()
+#     self.transport = moteus.Fdcanusb("/dev/ttyACM0")
+#     # 1, 2, 3, 4  = drives: front left, back left, front right, back right
+#     # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+#     s = {
+#         servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+#     }
+
+#     # reset servo positions
+#     await transport.cycle([x.make_stop() for x in s.values()])
+#     await transport.cycle([x.make_rezero() for x in s.values()])
+
 async def __async_initialize_moteus(servos: list):
-    #transport = moteus.Fdcanusb()
-    self.transport = moteus.Fdcanusb("/dev/ttyACM0")
-    # 1, 2, 3, 4  = drives: front left, back left, front right, back right
-    # 5, 6, 7, 8 = swerves: front left, back left, front right, back right
+    transport = moteus.Fdcanusb("/dev/ttyACM0")
     s = {
-        servo_id : moteus.Controller(id=servo_id, transport=transport) for servo_id in servos
+        servo_id: moteus.Controller(id=servo_id, transport=transport)
+        for servo_id in servos
     }
 
-    # reset servo positions
     await transport.cycle([x.make_stop() for x in s.values()])
     await transport.cycle([x.make_rezero() for x in s.values()])
     
@@ -147,6 +157,7 @@ async def _send_moteus_command_async(
     velocity_limit: float | None,
     accel_limit: float | None,
     ff_torque: float | None,
+    watchdog_timeout: float | None = None,
     logger: logging.Logger | None = None
 ):
     """
@@ -173,17 +184,44 @@ async def _send_moteus_command_async(
                     f"maximum_torque={maximum_torque}, velocity_limit={velocity_limit}, "
                     f"accel_limit={accel_limit}, feedforward_torque={ff_torque}")
 
-    # Use moteus "official" parameter names
-    result = await controller.set_position(
-        position=position,
-        velocity=drives_velocity,
-        maximum_torque=maximum_torque,
-        velocity_limit=velocity_limit,
-        accel_limit=accel_limit,
-        feedforward_torque=ff_torque
-    )
+    command_kwargs = {
+        "position": position,
+        "velocity": drives_velocity,
+        "maximum_torque": maximum_torque,
+        "velocity_limit": velocity_limit,
+        "accel_limit": accel_limit,
+        "feedforward_torque": ff_torque,
+    }
+    if watchdog_timeout is not None:
+        command_kwargs["watchdog_timeout"] = watchdog_timeout
 
-    logger.info(f"{result}")
+    try:
+        result = await controller.set_position(**command_kwargs)
+    except TypeError as exc:
+        if "watchdog_timeout" not in str(exc):
+            raise
+        command_kwargs.pop("watchdog_timeout", None)
+        result = await controller.set_position(**command_kwargs)
+
+    if logger:
+        logger.info(f"{result}")
+
+
+async def _query_moteus_async(controller: moteus.Controller):
+    return await controller.query()
+
+
+def query_moteus_sync(controller: moteus.Controller, timeout_s: float = 0.2):
+    """
+    Synchronous wrapper for querying a moteus controller on the shared event loop.
+    """
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(_query_moteus_async(controller), _moteus_loop)
+    return future.result(timeout=timeout_s)
+
 
 def send_moteus_command_sync(
     controller: moteus.Controller,
@@ -194,6 +232,7 @@ def send_moteus_command_sync(
     velocity_limit: float | None,
     accel_limit: float | None,
     ff_torque: float | None,
+    watchdog_timeout: float | None = None,
     logger: logging.Logger | None = None
 ):
     """
@@ -215,6 +254,7 @@ def send_moteus_command_sync(
             velocity_limit=velocity_limit,
             accel_limit=accel_limit,
             ff_torque=ff_torque,
+            watchdog_timeout=watchdog_timeout,
             logger=logger
         ),
         _moteus_loop
@@ -396,4 +436,3 @@ def drive_distance(speed, distance, wheel_diameter, serial_port):
     time_in_minutes = distance / ((pi * wheel_diameter) * speed)
     set_speed_forward_timed(speed, time_in_minutes*60, serial_port)
     
-

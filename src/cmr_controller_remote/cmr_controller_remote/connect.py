@@ -168,17 +168,23 @@ class CmdVelPublisher(Node):
     # Extract and decode the hat switch direction string
     # Assuming it starts from the 11th byte to the end
     hat_switch_data = raw_data[12:]
-    hat_switch = hat_switch_data.split(b'\x00')[0].decode('utf-8') # Split at null byte and decode
-    print("Hat Switch Direction:", hat_switch)
+    hat_switch = hat_switch_data.split(b'\x00')[0].decode('utf-8', errors='ignore')
     return float(lx), float(ly), float(rx), float(ry)
 
   def parse_button_data(self, raw_data):
-    buttons = raw_data[4:12]
-    # dpad = raw_data[12]
-    # dpad = directions.get(dpad, -1)
-    # DPAD UNIMPLEMENTED
+    # Joystick packet layout:
+    # bytes[4:8]  -> trigger bitfield (L1/R1/L2/R2)
+    # bytes[8:12] -> button bitfield (square/x/circle/triangle)
+    # drivesnet expects button_array = [trigger_bits, button_bits]
+    if len(raw_data) < 12:
+      return [0, 0], 0
+
+    trigger_bits = int.from_bytes(raw_data[4:8], byteorder='little', signed=True)
+    button_bits = int.from_bytes(raw_data[8:12], byteorder='little', signed=True)
+
+    # dpad is currently not consumed by drivesnet; keep zero for compatibility.
     dpad = 0
-    return buttons, dpad
+    return [trigger_bits, button_bits], dpad
   
   def parse_arm_data(self, raw_data):
       

@@ -1,316 +1,413 @@
 import math
-import asyncio
-import threading
-import concurrent.futures
-
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import TwistStamped
-from cmr_msgs.msg import ControllerReading
 
 import moteus
+import rclpy
+from geometry_msgs.msg import TwistStamped
+from rclpy.node import Node
 
+from cmr_msgs.msg import AutonomyDrive, ControllerReading
 from cmr_rovernet.rovernet_utils import (
-    parse_toml,
-    scale_value,
+    CIRCLE,
+    L1,
+    R1,
     ROVER_LENGTH,
     ROVER_WIDTH,
-    L1,
-    L2,
-    L2_MIN,
     TRIANGLE,
+    init_moteus_loop,
+    parse_toml,
+    send_moteus_command_sync,
+    send_moteus_stop_sync,
 )
 
 
-class DrivesNet(Node):
-    """
-    Minimal swerve drive node using explicit moteus transport on a dedicated asyncio loop.
-
-    Drive motors:
-      1 = FL
-      2 = BL
-      3 = FR
-      4 = BR
-
-    Swerve motors:
-      5 = FL
-      6 = BL
-      7 = FR
-      8 = BR
-    """
-
+class CmdVelSubscriber(Node):
     def __init__(self):
+        super().__init__("drivesnet")
+
+        self.create_subscription(
         super().__init__("drivesnet")
 
         self.create_subscription(
             TwistStamped,
             "/drives_controller/cmd_vel",
-            self.cmd_vel_callback,
+            self.listener_callback,
             10,
         )
         self.create_subscription(
             ControllerReading,
             "/drives_controller/cmd_buttons",
-            self.buttons_callback,
+            self.listener_button_callback,
+            10,
+        )
+        self.create_subscription(
+            AutonomyDrive,
+            "/autonomy_move",
+            self.autonomy_callback,
             10,
         )
 
         self.logger = self.get_logger()
+        self.turn_thread_lock = False
+        self.controller_command_lx = 0.0
+        self.controller_command_ly = 0.0
+        self.controller_command_rx = 0.0
+        self.controller_command_ry = 0.0
+        self.velocity_scale = 1.0
+        self.deadband = 0.1
+        self.last_motion_log = None
+        self.last_cmd_vel_log = None
+        self.last_buttons_log = None
+        self.last_motor_cmd_log = None
 
         drives_net_table = parse_toml("drivesnet")
-        node_cfg = drives_net_table["node"]
+        drives_net_node = drives_net_table["node"]
+        self.CONTROLLER_MAX_SPEED = 2.5
+        self.MOTOR_MAX_SPEED = float(drives_net_node["motor_max_speed"])
+        self.MAX_ACCELERATION = float(drives_net_node["acceleration_limit"])
+        self.MAX_TORQUE = float(drives_net_node["torque_limit"])
 
-        self.MOTOR_MAX_SPEED = float(node_cfg["motor_max_speed"])
-        self.MAX_ACCELERATION = float(node_cfg["acceleration_limit"])
-        self.MAX_TORQUE = float(node_cfg["torque_limit"])
+        qr = moteus.QueryResolution()
+        qr.mode = moteus.INT8
+        qr.position = moteus.F32
+        qr.velocity = moteus.F32
+        qr.torque = moteus.F32
+        qr.q_current = moteus.F32
 
-        self.velocity = 0.0
+        self.drive_controllers = {
+            1: moteus.Controller(id=1, query_resolution=qr),
+            2: moteus.Controller(id=2, query_resolution=qr),
+            3: moteus.Controller(id=3, query_resolution=qr),
+            4: moteus.Controller(id=4, query_resolution=qr),
+        }
+        self.swerve_controllers = {
+            5: moteus.Controller(id=5, query_resolution=qr),
+            6: moteus.Controller(id=6, query_resolution=qr),
+            7: moteus.Controller(id=7, query_resolution=qr),
+            8: moteus.Controller(id=8, query_resolution=qr),
+        }
 
-        self._last_send_future = None
-        self._moteus_ready = threading.Event()
-        self._shutdown = False
-
-        self._start_async_thread()
-        self._moteus_ready.wait(timeout=5.0)
-
-        if not self._moteus_ready.is_set():
-            raise RuntimeError("Timed out initializing moteus transport/controllers")
-
-        self.logger.info("drivesnet started with explicit Fdcanusb transport")
-
-    def _start_async_thread(self):
-        self._loop = asyncio.new_event_loop()
-        self._thread = threading.Thread(
-            target=self._async_thread_main,
-            daemon=True,
+        self.logger.info("Drivesnet teleop ready")
+        self.logger.info(
+            f"deadband={self.deadband}, controller_max={self.CONTROLLER_MAX_SPEED}, "
+            f"motor_max={self.MOTOR_MAX_SPEED}"
         )
-        self._thread.start()
+        self.logger.info("Teleop input topic: /drives_controller/cmd_vel")
+        self.logger.info("Buttons topic: /drives_controller/cmd_buttons")
+        self.logger.info("L1 + Triangle -> stop all motors")
+        self.logger.info("R1 -> full speed mode, L1 -> slow mode")
 
-    def _async_thread_main(self):
-        asyncio.set_event_loop(self._loop)
-        self._loop.create_task(self._async_init())
-        self._loop.run_forever()
+    def apply_deadband(self, value: float) -> float:
+        if abs(value) < self.deadband:
+            return 0.0
+        return value
 
-    async def _async_init(self):
+    def compute_drive_scale(self) -> float:
+        max_input = max(
+            abs(self.controller_command_lx),
+            abs(self.controller_command_ly),
+            abs(self.controller_command_rx),
+        )
+        normalized = min(1.0, max_input / self.CONTROLLER_MAX_SPEED)
+        return normalized * self.velocity_scale * self.MOTOR_MAX_SPEED
+
+    def log_motion_summary(self, drive_speed, wheel_speeds, wheel_angles):
+        summary = (
+            f"sticks raw: lx={self.controller_command_lx:.2f} "
+            f"ly={self.controller_command_ly:.2f} "
+            f"rx={self.controller_command_rx:.2f} "
+            f"ry={self.controller_command_ry:.2f} | "
+            f"drive_scale={drive_speed:.2f} vel_scale={self.velocity_scale:.2f} | "
+            f"wheel_speeds={wheel_speeds} | swerve={wheel_angles}"
+        )
+        if summary != self.last_motion_log:
+            self.logger.info(summary)
+            self.last_motion_log = summary
+
+    def log_cmd_vel(self, msg: TwistStamped):
+        summary = (
+            f"cmd_vel rx: lx={msg.twist.linear.x:.2f} ly={msg.twist.linear.y:.2f} "
+            f"rx={msg.twist.angular.x:.2f} ry={msg.twist.angular.y:.2f}"
+        )
+        if summary != self.last_cmd_vel_log:
+            self.logger.info(summary)
+            self.last_cmd_vel_log = summary
+
+    def log_buttons(self, msg: ControllerReading, trigger_val: int, button_val: int):
+        summary = (
+            "buttons rx: "
+            f"raw={list(msg.button_array)} trigger={trigger_val} button={button_val} dpad={msg.dpad}"
+        )
+        if summary != self.last_buttons_log:
+            self.logger.info(summary)
+            self.last_buttons_log = summary
+
+    def log_motor_commands(self, drive_cmds, swerve_cmds):
+        summary = f"motor_cmds drive={drive_cmds} swerve={swerve_cmds}"
+        if summary != self.last_motor_cmd_log:
+            self.logger.info(summary)
+            self.last_motor_cmd_log = summary
+
+    def stop_all_motors(self):
+        for motor_id, controller in self.drive_controllers.items():
+            send_moteus_stop_sync(controller, motor=motor_id, logger=self.logger)
+        for motor_id, controller in self.swerve_controllers.items():
+            send_moteus_stop_sync(controller, motor=motor_id, logger=self.logger)
+
+    def wheelAnglesAndSpeeds(self, vx, vy, omega, length, width):
+        r = math.sqrt(length**2 + width**2)
+
+        vx = round(vx, 2)
+        vy = round(vy, 2)
+        omega = round(omega, 2)
+
+        a = vy - omega * (length / r)
+        b = vy + omega * (length / r)
+        c = vx - omega * (width / r)
+        d = vx + omega * (width / r)
+
+        ws1 = math.sqrt(b**2 + c**2)
+        ws2 = math.sqrt(b**2 + d**2)
+        ws3 = math.sqrt(a**2 + d**2)
+        ws4 = math.sqrt(a**2 + c**2)
+
+        wa1 = math.atan2(b, c) * 180 / math.pi
+        wa2 = math.atan2(b, d) * 180 / math.pi
+        wa3 = math.atan2(a, d) * 180 / math.pi
+        wa4 = math.atan2(a, c) * 180 / math.pi
+
+        max_speed = max(ws1, ws2, ws3, ws4)
+        if max_speed > 1:
+            ws1 /= max_speed
+            ws2 /= max_speed
+            ws3 /= max_speed
+            ws4 /= max_speed
+
+        ws1 = round(ws1, 3)
+        ws2 = round(ws2, 3)
+        ws3 = round(ws3, 3)
+        ws4 = round(ws4, 3)
+
+        # Keep steering modules in a short-turn range to avoid long flips.
+        # If a wheel angle would exceed +/-90 deg, rotate to the equivalent angle
+        # and reverse wheel velocity.
+        def bound_wheels(angle_deg, speed):
+            bounded = angle_deg
+            adjusted_speed = speed
+            if abs(angle_deg) > 90:
+                if angle_deg < 0:
+                    bounded = 180 + angle_deg
+                else:
+                    bounded = angle_deg - 180
+                adjusted_speed *= -1
+            return bounded, adjusted_speed
+
+        a1, s1 = bound_wheels(wa1, ws1)
+        a2, s2 = bound_wheels(wa2, ws2)
+        a3, s3 = bound_wheels(wa3, ws3)
+        a4, s4 = bound_wheels(wa4, ws4)
+
+        wa1 = round(a1, 3) / 360 * 50
+        wa2 = round(a2, 3) / 360 * 50
+        wa3 = round(a3, 3) / 360 * 50
+        wa4 = round(a4, 3) / 360 * 50
+
+        # Match sign convention used in cmr_controls/swerve_controller_node.py.
+        return -s1, s2, s3, -s4, wa1, wa2, wa3, wa4
+
+    def listener_callback(self, msg: TwistStamped):
         try:
-            self.transport = moteus.Fdcanusb(path="/dev/ttyACM0")
+            self.handle_drive_command(msg)
+        except Exception as exc:
+            self.logger.error(f"Drive callback failed: {exc!r}")
+            self.stop_all_motors()
 
-            qr = moteus.QueryResolution()
-            qr.mode = moteus.INT8
-            qr.position = moteus.F32
-            qr.velocity = moteus.F32
-            qr.torque = moteus.F32
-            qr.q_current = moteus.F32
+    def handle_drive_command(self, msg: TwistStamped):
+        self.log_cmd_vel(msg)
 
-            self.drive_fl = moteus.Controller(id=1, transport=self.transport, query_resolution=qr)
-            self.drive_bl = moteus.Controller(id=2, transport=self.transport, query_resolution=qr)
-            self.drive_fr = moteus.Controller(id=3, transport=self.transport, query_resolution=qr)
-            self.drive_br = moteus.Controller(id=4, transport=self.transport, query_resolution=qr)
+        self.controller_command_ly = self.apply_deadband(msg.twist.linear.y)
+        self.controller_command_lx = self.apply_deadband(msg.twist.linear.x)
+        self.controller_command_ry = self.apply_deadband(msg.twist.angular.y)
+        self.controller_command_rx = self.apply_deadband(msg.twist.angular.x)
 
-            self.swerve_fl = moteus.Controller(id=5, transport=self.transport, query_resolution=qr)
-            self.swerve_bl = moteus.Controller(id=6, transport=self.transport, query_resolution=qr)
-            self.swerve_fr = moteus.Controller(id=7, transport=self.transport, query_resolution=qr)
-            self.swerve_br = moteus.Controller(id=8, transport=self.transport, query_resolution=qr)
-
-            self._moteus_ready.set()
-        except Exception as e:
-            self.logger.error(f"moteus async init failed: {e}")
-            self._moteus_ready.set()
-            raise
-
-    def deadband(self, value: float, threshold: float = 0.1) -> float:
-        return 0.0 if abs(value) < threshold else value
-
-    def angle_deg_to_moteus_pos(self, angle_deg: float) -> float:
-        # Preserve your current scaling behavior
-        return (angle_deg / 360.0) * 50.0
-
-    def wheel_angles_and_speeds(self, vx: float, vy: float, omega: float, L: float, W: float):
-        R = math.sqrt(L**2 + W**2)
-
-        A = vy - omega * (L / R)
-        B = vy + omega * (L / R)
-        C = vx - omega * (W / R)
-        D = vx + omega * (W / R)
-
-        ws1 = math.sqrt(B**2 + C**2)
-        ws2 = math.sqrt(B**2 + D**2)
-        ws3 = math.sqrt(A**2 + D**2)
-        ws4 = math.sqrt(A**2 + C**2)
-
-        wa1_deg = math.degrees(math.atan2(B, C))
-        wa2_deg = math.degrees(math.atan2(B, D))
-        wa3_deg = math.degrees(math.atan2(A, D))
-        wa4_deg = math.degrees(math.atan2(A, C))
-
-        max_ws = max(ws1, ws2, ws3, ws4)
-        if max_ws > 1.0:
-            ws1 /= max_ws
-            ws2 /= max_ws
-            ws3 /= max_ws
-            ws4 /= max_ws
-
-        wa1 = self.angle_deg_to_moteus_pos(wa1_deg)
-        wa2 = self.angle_deg_to_moteus_pos(wa2_deg)
-        wa3 = self.angle_deg_to_moteus_pos(wa3_deg)
-        wa4 = self.angle_deg_to_moteus_pos(wa4_deg)
-
-        return ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4
-
-    async def send_drive_async(self, controller, motor_id: int, velocity: float, name: str):
-        try:
-            await controller.set_position(
-                position=math.nan,
-                velocity=velocity,
-                maximum_torque=self.MAX_TORQUE,
-                accel_limit=self.MAX_ACCELERATION,
-                velocity_limit=self.MOTOR_MAX_SPEED,
-                query=True,
-            )
-        except Exception as e:
-            self.logger.error(f"drive send failed: {name} id={motor_id} vel={velocity} err={e}")
-
-    async def send_swerve_async(self, controller, motor_id: int, position: float, name: str):
-        try:
-            await controller.set_position(
-                position=position,
-                maximum_torque=10.0,
-                accel_limit=40.0,
-                velocity_limit=60.0,
-                query=True,
-            )
-        except Exception as e:
-            self.logger.error(f"swerve send failed: {name} id={motor_id} pos={position} err={e}")
-
-    async def stop_drive_async(self, controller, motor_id: int, name: str):
-        try:
-            await controller.set_stop()
-        except Exception as e:
-            self.logger.error(f"stop failed: {name} id={motor_id} err={e}")
-
-    async def send_all_async(self, ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4):
-        await self.send_drive_async(self.drive_fl, 1, -self.velocity * ws2, "FL drive")
-        await self.send_drive_async(self.drive_bl, 2, -self.velocity * ws3, "BL drive")
-        await self.send_drive_async(self.drive_fr, 3,  self.velocity * ws4, "FR drive")
-        await self.send_drive_async(self.drive_br, 4,  self.velocity * ws1, "BR drive")
-
-        await self.send_swerve_async(self.swerve_bl, 6, wa3, "BL swerve")
-        await self.send_swerve_async(self.swerve_fr, 7, wa1, "FR swerve")
-        await self.send_swerve_async(self.swerve_br, 8, wa4, "BR swerve")
-        await self.send_swerve_async(self.swerve_fl, 5, wa2, "FL swerve")
-
-    async def stop_all_drive_async(self):
-        await self.stop_drive_async(self.drive_fl, 1, "FL drive")
-        await self.stop_drive_async(self.drive_bl, 2, "BL drive")
-        await self.stop_drive_async(self.drive_fr, 3, "FR drive")
-        await self.stop_drive_async(self.drive_br, 4, "BR drive")
-
-    def submit_async(self, coro):
-        if self._shutdown:
-            return None
-        return asyncio.run_coroutine_threadsafe(coro, self._loop)
-
-    def cmd_vel_callback(self, msg: TwistStamped):
-        if not self._moteus_ready.is_set():
-            return
-
-        ly = self.deadband(msg.twist.linear.y)
-        lx = self.deadband(msg.twist.linear.x)
-        rx = self.deadband(msg.twist.angular.x)
-
-        ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheel_angles_and_speeds(
-            -ly,
-            lx,
-            rx,
+        drive_speed = self.compute_drive_scale()
+        ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4 = self.wheelAnglesAndSpeeds(
+            -self.controller_command_ly,
+            self.controller_command_lx,
+            self.controller_command_rx,
             ROVER_LENGTH,
             ROVER_WIDTH,
         )
 
+        self.log_motion_summary(
+            drive_speed,
+            {
+                "br": round(ws1, 3),
+                "fl": round(ws2, 3),
+                "bl": round(ws3, 3),
+                "fr": round(ws4, 3),
+            },
+            {
+                "fr": round(wa1, 3),
+                "fl": round(wa2, 3),
+                "bl": round(wa3, 3),
+                "br": round(wa4, 3),
+            },
+        )
+
+        drive_cmds = {
+            1: round(drive_speed * ws2, 3),
+            2: round(drive_speed * ws3, 3),
+            3: round(drive_speed * ws4, 3),
+            4: round(drive_speed * ws1, 3),
+        }
+        swerve_cmds = {
+            5: round(wa2, 3),
+            6: round(wa3, 3),
+            7: round(wa1, 3),
+            8: round(wa4, 3),
+        }
+        self.log_motor_commands(drive_cmds, swerve_cmds)
+
+        send_moteus_command_sync(
+            controller=self.drive_controllers[1],
+            motor=1,
+            position=math.nan,
+            drives_velocity=(drive_speed * ws2),
+            maximum_torque=self.MAX_TORQUE,
+            velocity_limit=self.MOTOR_MAX_SPEED,
+            accel_limit=self.MAX_ACCELERATION,
+            ff_torque=0,
+            logger=None,
+        )
+        send_moteus_command_sync(
+            controller=self.drive_controllers[2],
+            motor=2,
+            position=math.nan,
+            drives_velocity=(drive_speed * ws3),
+            maximum_torque=self.MAX_TORQUE,
+            velocity_limit=self.MOTOR_MAX_SPEED,
+            accel_limit=self.MAX_ACCELERATION,
+            ff_torque=0,
+            logger=None,
+        )
+        send_moteus_command_sync(
+            controller=self.drive_controllers[3],
+            motor=3,
+            position=math.nan,
+            drives_velocity=(drive_speed * ws4),
+            maximum_torque=self.MAX_TORQUE,
+            velocity_limit=self.MOTOR_MAX_SPEED,
+            accel_limit=self.MAX_ACCELERATION,
+            ff_torque=0,
+            logger=None,
+        )
+        send_moteus_command_sync(
+            controller=self.drive_controllers[4],
+            motor=4,
+            position=math.nan,
+            drives_velocity=(drive_speed * ws1),
+            maximum_torque=self.MAX_TORQUE,
+            velocity_limit=self.MOTOR_MAX_SPEED,
+            accel_limit=self.MAX_ACCELERATION,
+            ff_torque=0,
+            logger=None,
+        )
+
+        send_moteus_command_sync(
+            controller=self.swerve_controllers[6],
+            motor=6,
+            position=wa3,
+            drives_velocity=None,
+            maximum_torque=10,
+            velocity_limit=60,
+            accel_limit=40,
+            ff_torque=None,
+            logger=None,
+        )
+        send_moteus_command_sync(
+            controller=self.swerve_controllers[7],
+            motor=7,
+            position=wa1,
+            drives_velocity=None,
+            maximum_torque=10,
+            velocity_limit=60,
+            accel_limit=40,
+            ff_torque=None,
+            logger=None,
+        )
+        send_moteus_command_sync(
+            controller=self.swerve_controllers[8],
+            motor=8,
+            position=wa4,
+            drives_velocity=None,
+            maximum_torque=10,
+            velocity_limit=60,
+            accel_limit=40,
+            ff_torque=None,
+            logger=None,
+        )
+        send_moteus_command_sync(
+            controller=self.swerve_controllers[5],
+            motor=5,
+            position=wa2,
+            drives_velocity=None,
+            maximum_torque=10,
+            velocity_limit=60,
+            accel_limit=40,
+            ff_torque=None,
+            logger=None,
+        )
+
+    def autonomy_callback(self, msg: AutonomyDrive):
         self.logger.info(
-            f"vel={self.velocity:.3f} "
-            f"FR_drive={self.velocity * ws4:.3f} "
-            f"BL_swerve={wa3:.3f} "
-            f"FR_swerve={wa1:.3f}"
+            "Ignoring legacy /autonomy_move command; teleop uses /drives_controller/cmd_vel"
         )
 
-        # Optional: skip queuing if previous send still running
-        if self._last_send_future is not None and not self._last_send_future.done():
+    def listener_button_callback(self, msg: ControllerReading):
+        trigger_val = int(msg.button_array[0]) if len(msg.button_array) > 0 else 0
+        button_val = int(msg.button_array[1]) if len(msg.button_array) > 1 else 0
+        self.log_buttons(msg, trigger_val, button_val)
+
+        if trigger_val == L1 and button_val == TRIANGLE:
+            self.velocity_scale = 0.0
+            self.logger.info("L1+Triangle detected -> STOP ALL")
+            self.stop_all_motors()
             return
 
-        self._last_send_future = self.submit_async(
-            self.send_all_async(ws1, ws2, ws3, ws4, wa1, wa2, wa3, wa4)
-        )
+        if trigger_val == R1:
+            self.velocity_scale = 1.0
+            self.logger.info("R1 held -> full speed mode")
+        elif trigger_val == L1:
+            self.velocity_scale = 0.4
+            self.logger.info("L1 held -> slow mode")
 
-    def buttons_callback(self, msg: ControllerReading):
-        """
-        Expected layout:
-          [L1, R1, L2, R2, square, cross, circle, triangle]
-        """
-        if len(msg.button_array) < 8:
-            self.logger.warn("button_array too short")
-            return
-
-        l1 = msg.button_array[0]
-        l2 = msg.button_array[2]
-        r2 = msg.button_array[3]
-        triangle = msg.button_array[7]
-
-        if 0 <= r2 <= 255:
-            self.velocity = scale_value(float(r2), 0.0, 255.0, 0.0, self.MOTOR_MAX_SPEED)
-
-        if L2_MIN <= l2 <= L2:
-            self.velocity = -scale_value(float(l2), float(L2_MIN), float(L2), 0.0, self.MOTOR_MAX_SPEED)
-
-        if l1 == L1 and triangle == TRIANGLE:
-            self.velocity = 0.0
-            fut = self.submit_async(self.stop_all_drive_async())
-            self.logger.info("Drive stop requested")
-            if fut is not None:
-                try:
-                    fut.result(timeout=1.0)
-                except concurrent.futures.TimeoutError:
-                    self.logger.warn("Timed out waiting for stop commands")
-                except Exception as e:
-                    self.logger.error(f"stop batch failed: {e}")
-
-    def destroy_node(self):
-        self._shutdown = True
-
-        try:
-            fut = self.submit_async(self.stop_all_drive_async())
-            if fut is not None:
-                try:
-                    fut.result(timeout=1.0)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        try:
-            if hasattr(self, "_loop"):
-                self._loop.call_soon_threadsafe(self._loop.stop)
-        except Exception:
-            pass
-
-        try:
-            if hasattr(self, "_thread") and self._thread.is_alive():
-                self._thread.join(timeout=1.0)
-        except Exception:
-            pass
-
-        super().destroy_node()
+        if trigger_val == L1 and button_val == CIRCLE:
+            self.turn_thread_lock = not self.turn_thread_lock
+            if self.turn_thread_lock:
+                self.logger.info("Switching to Angular")
+            else:
+                self.logger.info("Switching to Linear")
+        elif trigger_val != 0 or button_val != 0:
+            self.logger.info("Button combo did not match a special action")
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = DrivesNet()
-
+    init_moteus_loop()
+    node = CmdVelSubscriber()
     try:
         rclpy.spin(node)
     finally:
+        try:
+            node.logger.info("drivesnet shutting down -> stopping all motors")
+            node.stop_all_motors()
+        except Exception as exc:
+            node.logger.error(f"Failed to stop motors during shutdown: {exc!r}")
         node.destroy_node()
         rclpy.shutdown()
 
+
+if __name__ == "__main__":
 
 if __name__ == "__main__":
     main()

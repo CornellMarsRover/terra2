@@ -12,7 +12,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "with_remote",
-                default_value="false",
+                default_value="true",
                 description="Also start the existing cmr_controller_remote UDP listener.",
             ),
             Node(
@@ -27,7 +27,15 @@ def generate_launch_description():
                 executable="gazebo_drive_bridge",
                 name="gazebo_drive_bridge",
                 output="screen",
-                parameters=[{"use_sim_time": True}],
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "output_mode": "twist",
+                        "twist_topic": "/drives/cmd_vel",
+                        "max_twist_linear": 1.2,
+                        "max_twist_angular": 0.9,
+                    }
+                ],
             ),
         ]
     )

@@ -45,6 +45,7 @@ class GazeboDriveBridge(Node):
         self.declare_parameter("use_scoped_joint_names", False)
         self.declare_parameter("controller_deadzone", 0.1)
         self.declare_parameter("wheelbase_m", 0.83)
+        self.declare_parameter("ackermann_angular_gain", 1.8)
         self.declare_parameter("command_timeout_s", 0.5)
         self.declare_parameter("publish_rate_hz", 8.0)
         self.declare_parameter("command_duration_s", 0.4)
@@ -64,6 +65,7 @@ class GazeboDriveBridge(Node):
         self.use_scoped_joint_names = bool(self.get_parameter("use_scoped_joint_names").value)
         self.controller_deadzone = float(self.get_parameter("controller_deadzone").value)
         self.wheelbase_m = float(self.get_parameter("wheelbase_m").value)
+        self.ackermann_angular_gain = float(self.get_parameter("ackermann_angular_gain").value)
         self.command_timeout_s = float(self.get_parameter("command_timeout_s").value)
         self.command_duration_s = float(self.get_parameter("command_duration_s").value)
         self.linear_effort_gain = float(self.get_parameter("linear_effort_gain").value)
@@ -84,7 +86,7 @@ class GazeboDriveBridge(Node):
         self.was_active = False
         self._joint_effort_failures = 0
         self._joint_effort_successes = 0
-        self.create_subscription(Twist, "/cmd_vel_drives", self.cmd_vel_callback, 10)
+        self.create_subscription(Twist, "/cmd_vel_drives", self.cmd_vel_drives_callback, 10)
         self.create_subscription(Twist, "/cmd_vel", self.cmd_vel_callback, 10)
         self.create_subscription(Twist, "/autonomy/move/point_turn", self.point_turn_callback, 10)
         self.create_subscription(AutonomyDrive, "/autonomy/move/ackerman", self.ackermann_callback, 10)
@@ -103,11 +105,20 @@ class GazeboDriveBridge(Node):
             f"output_mode={self.output_mode} twist_topic={self.twist_topic} "
             f"left={self.left_joints} right={self.right_joints} "
             f"with gains linear={self.linear_effort_gain} angular={self.angular_effort_gain}. "
+            f"ackermann_gain={self.ackermann_angular_gain} "
             f"scoped_names={self.use_scoped_joint_names} model={self.model_name}"
         )
 
-    def cmd_vel_callback(self, msg: Twist) -> None:
+    def cmd_vel_drives_callback(self, msg: Twist) -> None:
         self._set_target(msg.linear.x, msg.angular.z, "/cmd_vel_drives")
+        if abs(msg.linear.y) > 1e-3:
+            self.get_logger().warn(
+                "Ignoring lateral cmd_vel component for Gazebo bridge; the rover model is not holonomic.",
+                throttle_duration_sec=5.0,
+            )
+
+    def cmd_vel_callback(self, msg: Twist) -> None:
+        self._set_target(msg.linear.x, msg.angular.z, "/cmd_vel")
         if abs(msg.linear.y) > 1e-3:
             self.get_logger().warn(
                 "Ignoring lateral cmd_vel component for Gazebo bridge; the rover model is not holonomic.",
@@ -124,18 +135,19 @@ class GazeboDriveBridge(Node):
         steering_rad = math.radians(steering_deg)
         angular_z = 0.0
         if abs(steering_rad) > 1e-3:
-            angular_z = msg.vel * math.tan(steering_rad) / self.wheelbase_m
+            angular_z = (
+                self.ackermann_angular_gain * msg.vel * math.tan(steering_rad) / self.wheelbase_m
+            )
         self._set_target(msg.vel, angular_z, "/autonomy/move/ackerman")
 
     def drives_controller_callback(self, msg: TwistStamped) -> None:
         # The existing remote controller path publishes stick axes in a nonstandard
         # Twist layout: forward is linear.y (inverted), lateral is linear.x, and turn
-        # is usually angular.x. Fall back to standard Twist fields when available.
-        linear_x = msg.twist.linear.x
+        # is usually angular.x. For the drive bridge we intentionally ignore
+        # lateral stick motion because the simplified Gazebo rover is not holonomic.
+        linear_x = 0.0
         if abs(msg.twist.linear.y) > self.controller_deadzone:
             linear_x = -msg.twist.linear.y
-        elif abs(linear_x) < self.controller_deadzone:
-            linear_x = 0.0
 
         angular_z = msg.twist.angular.z
         if abs(angular_z) < self.controller_deadzone:

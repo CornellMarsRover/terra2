@@ -33,7 +33,10 @@ def generate_launch_description():
                         "output_mode": "twist",
                         "twist_topic": "/drives/cmd_vel",
                         "max_twist_linear": 1.2,
+                        "max_twist_lateral": 1.2,
                         "max_twist_angular": 0.9,
+                        "publish_joint_trajectory": True,
+                        "joint_command_topic": "/drives/joint_trajectory_cmd",
                     }
                 ],
             ),

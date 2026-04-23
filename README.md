@@ -40,6 +40,21 @@ Terra contains all the code that is part of a ROS codebase and implements the br
 
 ### Camera Integration: [cmr_cams](./src/cmr_cams)
 - **Description:** Contains the functiaonlity for using the Rover's cameras
+
+### GCS Bridge (Foxglove): [launch/gcs_bridge.launch.py](./launch/gcs_bridge.launch.py)
+- **Description:** Starts the Foxglove WebSocket bridge (`foxglove_bridge`) so
+  Foxglove Studio can connect to the rover. Used in place of `rosbridge_server`
+  — lower latency and speaks Foxglove's native WebSocket protocol.
+- **Install dep (Humble):** `sudo apt install ros-humble-foxglove-bridge`
+- **Launch:** `ros2 launch launch/gcs_bridge.launch.py`
+  - Optional args: `port:=8765 address:=0.0.0.0 tls:=false`
+- **Connection URL from Foxglove Studio:** `ws://<rover_ip>:8765`
+  (defaults; change with the `port` arg above).
+- **QoS overrides:** camera / image / point-cloud / IMU / pose topics are
+  forwarded with `BEST_EFFORT` and queue depth 1 so a stalled RF link cannot
+  back-pressure the bridge. Command and service topics stay on reliable QoS.
+  See the `BEST_EFFORT_TOPIC_REGEXES` list in the launch file.
+
 ## TODO Functionality
 
 - **Autonomous Navigation:** [cmr_navigation](./src/cmr_navigation/)

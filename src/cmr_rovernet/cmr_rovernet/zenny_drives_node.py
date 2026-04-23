@@ -135,6 +135,7 @@ class ZennyDrivesNode(Node):
         self.declare_parameter("command_timeout_s", 0.5)
         self.declare_parameter("refresh_rate_hz", 10.0)
         self.declare_parameter("autonomy_priority", True)
+        self.declare_parameter("manual_override_priority", True)
         self.declare_parameter("state_poll_hz", 2.0)
         self.declare_parameter("session_log_root", str(DEFAULT_LOG_ROOT))
 
@@ -149,6 +150,7 @@ class ZennyDrivesNode(Node):
         self.command_timeout_s = float(self.get_parameter("command_timeout_s").value)
         self.refresh_rate_hz = float(self.get_parameter("refresh_rate_hz").value)
         self.autonomy_priority = bool(self.get_parameter("autonomy_priority").value)
+        self.manual_override_priority = bool(self.get_parameter("manual_override_priority").value)
         self.state_poll_hz = float(self.get_parameter("state_poll_hz").value)
         self.session_log_root = Path(str(self.get_parameter("session_log_root").value)).expanduser()
 
@@ -444,6 +446,19 @@ class ZennyDrivesNode(Node):
             abs(manual.speed_rps) > 1e-3
             or any(abs(value) > self.controller_deadzone for value in (manual.vx, manual.vy, manual.omega))
         )
+        manual_is_newer = manual.updated_at >= autonomy.updated_at
+
+        if manual_active and self.manual_override_priority and manual_is_newer:
+            return {
+                "mode": "swerve",
+                "source": "controller_topics",
+                "vx": manual.vx,
+                "vy": manual.vy,
+                "omega": manual.omega,
+                "speed_scale": abs(manual.speed_rps),
+                "direction_sign": 1.0 if manual.speed_rps >= 0.0 else -1.0,
+                "selected_at": now,
+            }
 
         if autonomy_active and self.autonomy_priority:
             return {
@@ -741,6 +756,7 @@ class ZennyDrivesNode(Node):
                 "command_timeout_s": self.command_timeout_s,
                 "refresh_rate_hz": self.refresh_rate_hz,
                 "autonomy_priority": self.autonomy_priority,
+                "manual_override_priority": self.manual_override_priority,
                 "state_poll_hz": self.state_poll_hz,
                 "session_log_root": str(self.session_log_root),
             },

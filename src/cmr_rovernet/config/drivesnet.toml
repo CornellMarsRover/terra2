@@ -8,9 +8,22 @@ restart_attempts = 2
 restart_delay = 10
 
 [node]
-motor_max_speed = 40
-gradual_increase_rate = 10
-base_dynamic_ratio = 0.5
-acceleration_limit = 10.0
-torque_limit = 8.0
-feed_forward_torque_limit = 5.0
+can_port = "/dev/ttyACM0"
+
+motor_max_speed = 40.0
+
+drive_max_torque = 8.0
+drive_acceleration_limit = 10.0
+
+steer_max_torque = 10.0
+steer_velocity_limit = 60.0
+steer_acceleration_limit = 40.0
+
+controller_deadzone = 0.1
+command_timeout_s = 0.5
+refresh_rate_hz = 10.0
+
+autonomy_priority = true
+manual_override_priority = true
+
+state_poll_hz = 2.0

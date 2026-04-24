@@ -446,9 +446,7 @@ class ZennyDrivesNode(Node):
             abs(manual.speed_rps) > 1e-3
             or any(abs(value) > self.controller_deadzone for value in (manual.vx, manual.vy, manual.omega))
         )
-        manual_is_newer = manual.updated_at >= autonomy.updated_at
-
-        if manual_active and self.manual_override_priority and manual_is_newer:
+        if manual_active and self.manual_override_priority:
             return {
                 "mode": "swerve",
                 "source": "controller_topics",

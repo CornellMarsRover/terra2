@@ -24,6 +24,7 @@ setup(
             # PHOBOS_APPEND
             'drivesnet_node = cmr_rovernet.drivesnet:main',
             'zenny_drives_node = cmr_rovernet.zenny_drives_node:main',
+            'usama_control_testing_node = cmr_rovernet.usama_control_testing:ros_main',
             'cmr_read_node = cmr_rovernet.ccb_read:main',
             'debug_node = cmr_rovernet.debug:main'
         ],

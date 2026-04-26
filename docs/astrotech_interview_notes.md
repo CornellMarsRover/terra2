@@ -32,22 +32,34 @@ Last updated: 2026-04-26
   `docs/astrotech_canfd_library_notes.md`.
 
 **Pending — ask Caitlin** (does **not** block Phase 2b starting; does
-block the real driver wrapper inside Phase 2b):
+block the real driver wrapper inside Phase 2b). Ordered by impact —
+#1 determines whether `AugerState` and future feedback messages can
+have honest fields beyond commanded-only:
 
-- do you have a diagram of the final electrical layout? i need to
-  know which `(can_id, motor_id)` drives what: the auger, each pump,
-  the heater, and each mixing-chamber preset (s1, s2, co2_1, co2_2,
-  retract).
-- can the boards talk back to the jetson? does setting `query_data=1`
-  on a command frame return real telemetry (encoder counts, completion
-  ack, current), or is it a leftover bit?
-- the `duration` field is 7 bits, max 127. for pumps that run 5+
-  minutes, do i chain commands or is there a "run continuously until
-  stopped" mode?
-- do the boards send unsolicited fault frames (motor stalled,
-  over-current, etc.)? if yes, what's the wire format?
-- on the jetson, what device path does the usb-can dongle show up as?
-  is there a udev symlink, or do i just hardcode `/dev/ttyACM0`?
+1. can the boards talk back to the jetson? does setting `query_data=1`
+   on a command frame return real telemetry (encoder counts, completion
+   ack, current), or is it a leftover bit?
+2. diagram of the final electrical layout would help. specifically i
+   need:
+   - `(can_id, motor_id)` for the auger motor, each pump, and the
+     heater;
+   - `(can_id, motor_id)` for the mixing servo, plus the
+     angle/position value for each preset (s1, s2, co2_1, co2_2,
+     retract).
+3. the `duration` field is 7 bits, max 127. for pumps that run 5+
+   minutes, do i chain commands or is there a "run continuously until
+   stopped" mode?
+4. when bdc, servo, and any future boards share the same can-fd bus,
+   who owns bus initialization and who handles arbitration if two
+   coroutines want to send frames at once? should one ros 2 node own
+   the bus, or does the library handle multi-writer scenarios?
+5. do the boards send unsolicited fault frames (motor stalled,
+   over-current, etc.)? if yes, what's the wire format — and does the
+   existing library raise/log them, or just drop them?
+6. (minor) on the jetson, what device path does the usb-can dongle
+   show up as? udev symlink, or hardcode `/dev/ttyACM0`? probably
+   answerable with `lsusb`/`dmesg` once hardware is in front of me;
+   not a blocker.
 
 **Pending — confirm against URC 2026 rulebook** (only blocks competition
 freeze, not development):
@@ -66,27 +78,34 @@ freeze, not development):
 
 ## Slack draft to Caitlin
 
-Ready to copy-paste:
+Ready to copy-paste. Send all six together, don't drip-feed:
 
 > hey caitlin — wrapping the can-fd library as a ros node and have a
-> few questions, in priority order:
+> few questions, ordered by impact:
 >
-> 1. do you have a diagram of the final electrical layout? i need to
->    know which `(can_id, motor_id)` drives what — the auger, each
->    pump, the heater, and each mixing-chamber preset (s1, s2, co2_1,
->    co2_2, retract).
-> 2. can the boards talk back? does `query_data=1` on a command frame
+> 1. can the boards talk back? does `query_data=1` on a command frame
 >    actually return telemetry (encoder counts, completion ack,
->    current), or is it a leftover bit?
-> 3. the duration field is 7 bits = max 127. for pumps that run 5+
->    minutes, do i chain commands or is there a continuous-run mode?
->
-> lower priority, when you have time:
->
-> 4. do the boards send unsolicited fault frames (motor stalled,
->    over-current)? format?
-> 5. on the jetson, what device path does the usb-can dongle show up
->    as? udev symlink, or hardcoded `/dev/ttyACM0`?
+>    current), or is it a leftover bit? this one decides whether the
+>    gcs can show real motor state or just "we sent a command N
+>    seconds ago."
+> 2. a diagram of the final electrical layout would help. specifically
+>    i need `(can_id, motor_id)` for the auger motor, each pump, and
+>    the heater; plus `(can_id, motor_id)` for the mixing servo and
+>    the angle/position value for each preset (s1, s2, co2_1, co2_2,
+>    retract).
+> 3. the duration field on bdc commands is 7 bits, max 127. for pumps
+>    that run 5+ minutes, do i chain commands or is there a
+>    continuous-run mode?
+> 4. when the bdc and servo boards (and any others) share the can-fd
+>    bus, who owns initialization and arbitration? should one ros 2
+>    node own the bus, or does the library handle multi-writer
+>    scenarios?
+> 5. do the boards send unsolicited fault frames (motor stalled,
+>    over-current)? if yes, what's the format — and does the existing
+>    library raise/log them, or just drop them?
+> 6. minor: on the jetson, what device path does the usb-can dongle
+>    show up as? udev symlink, or hardcoded `/dev/ttyACM0`? happy to
+>    figure this out with `lsusb` once i have hardware.
 
 ---
 

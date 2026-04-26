@@ -158,7 +158,8 @@ it is hardcoded. Listing as a Phase 2 action item.
 
 ## Open items for bandwidth
 
-- Q6 in `open_questions.md`: confirm URC 2026 RF cap.
+- Confirm URC 2026 RF cap (tracked in `astrotech_interview_notes.md`
+  Current state → Pending — confirm against URC 2026 rulebook).
 - Measure actual `ros2 topic bw` for every topic once the rover is bring-up.
 - Check whether `usb_camera_publisher/publisher.py` should gain a rate param
   so the GCS can reduce fps under poor link conditions.

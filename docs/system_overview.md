@@ -77,5 +77,5 @@ all topic / service / action names stay the same.
 | The vendored CAN-FD library API | `astrotech_canfd_library_notes.md` |
 | Features deferred to after URC | `post_urc_backlog.md` |
 | How to bring up the mock rover locally | `../README.md` (top-level) |
-| Phase 1 GCS wiring (bridge, bandwidth, etc.) | `ros_interface_inventory.md`, `bandwidth_audit.md`, `feature_to_topic_map.md`, `foxglove_extension_plan.md` |
+| Phase 1 GCS wiring (bridge, bandwidth, etc.) | `ros_interface_inventory.md`, `bandwidth_audit.md` |
 | Open questions still tagged in code | grep `TODO(astrotech-q-` in `src/`, `gcs/`, `docs/` |

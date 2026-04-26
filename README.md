@@ -118,7 +118,7 @@ question text; repeated here only as a lookup table.)
 | Q6 — CO2/humidity driver message type | same shape as Q5: `env:` YAML block, `EnvSample.msg`, `drivers/env.py`, `Env` in `interfaces.ts` |
 
 Q7, Q8, Q9, Q11, Q12, Q13 are intentionally deferred — see
-`docs/open_questions.md` and `docs/post_urc_backlog.md`.
+`docs/post_urc_backlog.md`.
 
 ## TODO Functionality
 

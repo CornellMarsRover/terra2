@@ -42,6 +42,13 @@ block the real driver wrapper inside Phase 2b):
   the auger, the heater, each preset of the mixing chamber).
 - C1: persistent dongle device path on the Jetson.
 
+**Pending — confirm against URC 2026 rulebook** (only blocks competition
+freeze, not development):
+
+- URC 2026 RF bandwidth cap. `docs/bandwidth_audit.md` uses a 5 Mbps
+  working assumption from prior years. Confirm before we lock the
+  Foxglove topic whitelist.
+
 **Phase status**:
 
 - Phase 2a snapshot at SHA `eef937c`.

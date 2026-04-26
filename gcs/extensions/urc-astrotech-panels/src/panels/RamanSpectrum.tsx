@@ -11,9 +11,9 @@ import {
 import { Raman } from "../interfaces";
 
 // Phase 2a: show "last spectrum: N points received at T". No plot yet.
-// Phase 2b replaces this with a wavelength-on-X / intensity-on-Y chart
-// (Foxglove's built-in Plot is time-series-only — custom panel is required
-// per docs/foxglove_extension_plan.md).
+// Phase 2b replaces this with a wavelength-on-X / intensity-on-Y chart;
+// Foxglove's built-in Plot is time-series-only, so a custom panel is the
+// only option for spectrum rendering.
 function RamanPanel(props: { context: PanelExtensionContext }): ReactElement {
   const { context } = props;
   const [summary, setSummary] = useState<string>("no spectrum yet");

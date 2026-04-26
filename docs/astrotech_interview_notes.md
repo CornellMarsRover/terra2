@@ -136,3 +136,123 @@ Not yet asked. Send in priority order once Session 2 is resolved.
       deleted or parked on a branch?
 - F2. What's our total bandwidth budget across all subteams and is
       there a throttling priority scheme?
+
+---
+
+## Session 3 — 2026-04-26
+
+Confirmed answers received from Astrotech (paraphrased; lock these in
+the assumptions doc on next pass):
+
+### Sequence duration
+
+- Each analysis sequence runs **5–10 minutes** end to end.
+- Implication for Phase 2a mock: the 10-second linear-ramp placeholder
+  in `MockAnalysisSequencer` is meaningless at this scale. Replace
+  before any operator workflow review.
+
+### Pause / resume requirement
+
+- Sequences must be **resumable from approximately the same point**
+  if aborted mid-run.
+- "Approximately the same point" almost certainly means **step-level**
+  (resume the next fluidic step that hadn't reported success), but
+  this is **not yet confirmed** — open question for next Caitlin
+  exchange.
+- Implication: the `RunAnalysisSequence.action` shape is wrong.
+  Pause/resume need to be modelled — see `docs/phase_2a_overview.md §6.1`.
+
+### Sequence content
+
+- Sequences are **physical fluidic protocols**, not "run motor X for
+  N seconds in sequence." They orchestrate pumps, valves, mixing
+  chamber positions, heater on/off, and (probably) sensor reads.
+- The Ninhydrin chemistry path requires a **heater** that is currently
+  not represented anywhere in the GCS / mock rover. Add as a Phase 2b
+  deliverable.
+- Implication: feedback should expose `step_index / total_steps` and
+  a step-name (e.g. "Pump A 30 s", "Mixing chamber → CO2_1", "Heater
+  on, hold 60 s") rather than a raw progress percentage.
+
+### Hardware layer
+
+- **BDC boards** drive the brushed-DC motors used as fluidic pumps.
+  Each board addresses up to 6 motors over CAN-FD. Default board CAN
+  ID `2`; a second board would be `4`.
+- **Servo boards** drive hobby servos including the mixing chamber.
+  Each board addresses up to 16 servos. Default board CAN ID `1`; a
+  second board would be `3`.
+- Bus is **CAN-FD over a USB-CAN converter** (mjbots `usbcanfd`
+  dongle, hosted as a serial port).
+- An **asyncio Python library** already exists; it is now vendored
+  under `third_party/astrotech_canfd/`. See
+  `docs/astrotech_canfd_library_notes.md` for the API surface.
+
+### Sequence orchestration location
+
+- Confirmed: orchestration **must live on the main computer** (the
+  Jetson, in our ROS 2 graph), not in board firmware. Pause/resume
+  cannot be implemented on the boards because the boards' command
+  shape is "run motor X for N seconds, fire and forget" with no
+  intra-command pause.
+- Implication: the analysis sequencer node owns the sequence script,
+  the elapsed time per in-flight motor command, and is the only
+  authority that knows where in the protocol the rover currently is.
+
+---
+
+## Open with Caitlin (followups for Session 4)
+
+### Library API specifics
+
+- A1. Pause semantics: when the operator pauses, do we (a) `stop_motor`
+      every running BDC + `stop` every running servo and reissue
+      remaining duration on resume; (b) abandon the current step,
+      restart it from the beginning on resume; or (c) commit the
+      current step as failed and resume from the next?
+- A2. Maximum motor duration is 7 bits = 127 (seconds or ms). For 5–10
+      minute sequences, do we chain N × 127 s commands with bridging
+      `asyncio.sleep`, or is there a "run continuously until stopped"
+      mode we haven't documented?
+- A3. Does the command frame's `Query_data=1` bit actually generate a
+      board-side reply we can consume? If yes, what's the payload?
+- A4. Are unsolicited error / fault frames a thing the boards send?
+      If yes, what's the wire format?
+- A5. `control_mode` for the servo board reserves 2 bits but only 0
+      (position), 2 (stop), 3 (set-home) appear in code. Is `1`
+      reserved or undefined?
+
+### Hardware layout
+
+- B1. How many BDC boards and how many Servo boards on the rover at
+      competition, and what are their CAN IDs?
+- B2. Which BDC motor (board CAN ID + motor_id) drives the auger?
+      Which drives each fluidic pump? Need a table.
+- B3. Which servo (board CAN ID + servo_id + degrees) corresponds to
+      each named mixing-chamber preset (S1, S2, CO2_1, CO2_2, RETRACT)?
+- B4. Heater: BDC channel? Separate board? GPIO / I²C? What's the
+      command shape?
+
+### Bus / Linux integration
+
+- C1. On the Jetson, what's the persistent device path for the
+      `usbcanfd` dongle (a udev rule symlinking it to
+      `/dev/usbcanfd`, or do we hardcode `/dev/ttyACM0`)?
+- C2. Are simultaneous motor commands across different boards (e.g.
+      auger BDC + mixing servo at the same instant) a real use case
+      in any existing fluidic protocol, or do sequences always run
+      one actuator at a time?
+
+---
+
+## Status markers
+
+- **Phase 2a is committed** at SHA `eef937c` ("phase 2a: initial mock
+  rover (pre-Caitlin info)"). It does not reflect the Session 3
+  answers; the documents above call out which assumptions are now
+  invalid.
+- **Phase 2b** will revise the action interface
+  (`cmr_msgs/action/RunAnalysisSequence.action`), make
+  `MockAnalysisSequencer` stateful with pause / resume, and add a
+  real driver wrapper around the vendored CAN-FD library.
+

@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
 import serial
 import socket
 import threading
+import tkinter as tk
+from tkinter import ttk
 from pyubx2 import UBXReader, UBXMessage
-from pyubx2 import llh2ecef, ecef2llh
+from pyubx2 import ecef2llh
 import time
 
 class GPSBasestation(Node):
     def __init__(self):
 
         super().__init__('gps_basestation')
+        self.started = False
 
         # ------------------------
         # 1. Open serial port
@@ -26,17 +28,13 @@ class GPSBasestation(Node):
             return
         
         # ------------------------
-        # 2. Configure fixed mode for basestation
+        # 2. Get live base station coordinates and configure fixed mode
         # ------------------------
-        # LLH coordinates (lat/lon in decimal, height in meters) - 'LAT', 'LON', 'ALT'
-        self.fix = {
-            'LAT': 42.444344, #decimals
-            'LON': -76.483514,  # decimals
-            'ALT': 245.0,      # meters
-            'x': 110179824,
-            'y': -458339334,
-            'z': 428231903
-        }
+        self.fix = None
+        self.select_basestation_fix()
+        if self.fix is None:
+            self.get_logger().error("No base station coordinates were selected.")
+            return
         self.configure_fixed_mode()
 
         # ------------------------
@@ -59,7 +57,162 @@ class GPSBasestation(Node):
         self.read_thread = threading.Thread(target=self.read_gps_loop, daemon=True)
         self.read_thread.start()
 
-        self.get_logger().info("GPS Basestation node started in Survey-In mode.")
+        self.started = True
+        self.get_logger().info("GPS Basestation node started in Fixed mode.")
+
+    def configure_position_selection_mode(self):
+        """
+        Configure the ZED-F9P to report live survey coordinates before the user
+        chooses the fixed base station position.
+        """
+        transaction = 0
+        layers = 1
+
+        clear_keys = [
+            "CFG_UART1_BAUDRATE",
+            "CFG_TMODE_MODE",
+            "CFG_TMODE_POS_TYPE",
+        ]
+        msg = UBXMessage.config_del(layers, transaction, clear_keys)
+        self.ser.write(msg.serialize())
+
+        cfgData = []
+        cfgData.append(("CFG_UART1_BAUDRATE", 230400))
+        cfgData.append(("CFG_TMODE_POS_TYPE", 0))
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
+        self.ser.write(msg.serialize())
+
+        time.sleep(2)
+
+        cfgData.append(("CFG_TMODE_MODE", 1))
+        cfgData.append(("CFG_TMODE_SVIN_MIN_DUR", 60))
+        cfgData.append(("CFG_TMODE_SVIN_ACC_LIMIT", 100))
+        cfgData.append(("CFG_RATE_MEAS", 200))
+        cfgData.append(("CFG_USBOUTPROT_UBX", 1))
+        cfgData.append(("CFG_USBOUTPROT_NMEA", 1))
+        cfgData.append(("CFG_USBOUTPROT_RTCM3X", 0))
+        cfgData.append(("CFG_MSGOUT_UBX_NAV_SVIN_USB", 1))
+
+        msg = UBXMessage.config_set(layers, transaction, cfgData)
+        self.ser.write(msg.serialize())
+        self.get_logger().info("Showing live survey coordinates. Press Set to use the current fix.")
+
+    def select_basestation_fix(self):
+        """
+        Show a small Tkinter window with live survey coordinates. The Set button
+        stores the current coordinates and lets startup continue into fixed mode.
+        """
+        self.configure_position_selection_mode()
+        latest_fix = {}
+        latest_lock = threading.Lock()
+        stop_reader = threading.Event()
+
+        def read_live_coordinates():
+            while not stop_reader.is_set() and rclpy.ok():
+                try:
+                    msg = self.ubr.read()
+                    if msg[0] is None:
+                        continue
+
+                    parsed = msg[1]
+                    if parsed.identity != "NAV-SVIN":
+                        continue
+
+                    x_cm = parsed.meanX
+                    y_cm = parsed.meanY
+                    z_cm = parsed.meanZ
+                    lat, lon, alt = ecef2llh(x_cm / 100.0, y_cm / 100.0, z_cm / 100.0)
+                    fix = {
+                        'LAT': lat,
+                        'LON': lon,
+                        'ALT': alt,
+                        'x': x_cm,
+                        'y': y_cm,
+                        'z': z_cm,
+                        'dur': parsed.dur,
+                        'acc': parsed.meanAcc / 1e4,
+                    }
+                    with latest_lock:
+                        latest_fix.clear()
+                        latest_fix.update(fix)
+                except Exception as e:
+                    if not stop_reader.is_set():
+                        self.get_logger().error(f"Error reading live GPS coordinates: {e}")
+
+        reader = threading.Thread(target=read_live_coordinates, daemon=True)
+        reader.start()
+
+        root = tk.Tk()
+        root.title("Base Station Coordinates")
+        root.resizable(False, False)
+
+        fields = {
+            "Latitude": tk.StringVar(value="Waiting for GPS..."),
+            "Longitude": tk.StringVar(value="Waiting for GPS..."),
+            "Altitude": tk.StringVar(value="Waiting for GPS..."),
+            "ECEF X": tk.StringVar(value="Waiting for GPS..."),
+            "ECEF Y": tk.StringVar(value="Waiting for GPS..."),
+            "ECEF Z": tk.StringVar(value="Waiting for GPS..."),
+            "Survey Time": tk.StringVar(value="Waiting for GPS..."),
+            "Mean Accuracy": tk.StringVar(value="Waiting for GPS..."),
+        }
+        status = tk.StringVar(value="Waiting for live base station coordinates.")
+
+        frame = ttk.Frame(root, padding=12)
+        frame.grid(row=0, column=0, sticky="nsew")
+
+        for row, (label, value) in enumerate(fields.items()):
+            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=2)
+            ttk.Label(frame, textvariable=value, width=28).grid(row=row, column=1, sticky="e", pady=2)
+
+        ttk.Label(frame, textvariable=status).grid(
+            row=len(fields),
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(10, 6),
+        )
+
+        set_button = ttk.Button(frame, text="Set", state=tk.DISABLED)
+        set_button.grid(row=len(fields) + 1, column=1, sticky="e")
+
+        def refresh_window():
+            with latest_lock:
+                fix = dict(latest_fix)
+
+            if fix:
+                fields["Latitude"].set(f"{fix['LAT']:.8f} deg")
+                fields["Longitude"].set(f"{fix['LON']:.8f} deg")
+                fields["Altitude"].set(f"{fix['ALT']:.3f} m")
+                fields["ECEF X"].set(f"{fix['x']} cm")
+                fields["ECEF Y"].set(f"{fix['y']} cm")
+                fields["ECEF Z"].set(f"{fix['z']} cm")
+                fields["Survey Time"].set(f"{fix['dur']} s")
+                fields["Mean Accuracy"].set(f"{fix['acc']:.4f} m")
+                status.set("Press Set to use the currently displayed coordinates.")
+                set_button.configure(state=tk.NORMAL)
+
+            root.after(250, refresh_window)
+
+        def set_current_fix():
+            with latest_lock:
+                if not latest_fix:
+                    return
+                self.fix = dict(latest_fix)
+
+            stop_reader.set()
+            root.destroy()
+
+        def cancel_selection():
+            stop_reader.set()
+            root.destroy()
+
+        set_button.configure(command=set_current_fix)
+        root.protocol("WM_DELETE_WINDOW", cancel_selection)
+        refresh_window()
+        root.mainloop()
+        stop_reader.set()
+        reader.join(timeout=2.0)
 
     def configure_fixed_mode(self):
         """
@@ -72,18 +225,12 @@ class GPSBasestation(Node):
 
         # (A) Switch to Fixed mode
         cfgData.append(("CFG_TMODE_MODE", 2))         # 2 = Fixed mode
-        cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 0 = LLH (necessary for RTCM 1005)
+        cfgData.append(("CFG_TMODE_POS_TYPE", 0))       # 0 = ECEF
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
 
         cfgData = []
-        # (B) Set the base station's position using the known starting point
-        lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
-        x, y, z = llh2ecef(lat, lon, h)
-        x = int(x*100)
-        y = int(y*100)
-        z = int(z*100)
-        self.get_logger().info(f"ECEF coordinates: {x}  {y}  {z}")
+        # (B) Set the base station's position selected from the live survey window.
         x, y, z = self.fix['x'], self.fix['y'], self.fix['z']
         cfgData.append(("CFG_TMODE_ECEF_X", x))
         cfgData.append(("CFG_TMODE_ECEF_Y", y))
@@ -104,7 +251,7 @@ class GPSBasestation(Node):
         msg = UBXMessage.config_set(layers, transaction, cfgData)
         self.ser.write(msg.serialize())
         self.get_logger().info(f"Configured Fixed mode with coordinates: "
-                               f"ECEF: ({x}m, {y}m, {z}m)")
+                               f"ECEF: ({x}cm, {y}cm, {z}cm)")
 
     def read_gps_loop(self):
         """
@@ -128,6 +275,10 @@ class GPSBasestation(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = GPSBasestation()
+    if not node.started:
+        node.destroy_node()
+        rclpy.shutdown()
+        return
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

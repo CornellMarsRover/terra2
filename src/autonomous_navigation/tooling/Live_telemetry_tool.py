@@ -53,6 +53,7 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('canvas_height', 680)
         self.declare_parameter('ui_update_hz', 20.0)
         self.declare_parameter('trail_length', 800)
+        self.declare_parameter('zoom_factor', 1.0)
 
         # fallback bounds if no waypoints; for geospatial plotting, x=longitude and y=latitude
         self.declare_parameter('world_x_min', -76.484000)
@@ -78,6 +79,7 @@ class RealtimeRobotPlotter(Node):
         self.initial_canvas_height = int(self.get_parameter('canvas_height').value)
         self.ui_update_hz = float(self.get_parameter('ui_update_hz').value)
         self.trail_length = int(self.get_parameter('trail_length').value)
+        self.zoom_factor = max(0.05, float(self.get_parameter('zoom_factor').value))
 
         self.world_x_min = float(self.get_parameter('world_x_min').value)
         self.world_x_max = float(self.get_parameter('world_x_max').value)
@@ -85,11 +87,24 @@ class RealtimeRobotPlotter(Node):
         self.world_y_max = float(self.get_parameter('world_y_max').value)
         self.world_x_label_name = 'Longitude'
         self.world_y_label_name = 'Latitude'
+        self.data_world_x_min = self.world_x_min
+        self.data_world_x_max = self.world_x_max
+        self.data_world_y_min = self.world_y_min
+        self.data_world_y_max = self.world_y_max
+        self.base_world_x_min = self.world_x_min
+        self.base_world_x_max = self.world_x_max
+        self.base_world_y_min = self.world_y_min
+        self.base_world_y_max = self.world_y_max
+        self.pan_center_x = None
+        self.pan_center_y = None
+        self.gps_reference_lat = None
+        self.gps_reference_lon = None
 
         # ---------------- State ----------------
         self.robot_x = None
         self.robot_y = None
         self.robot_yaw = 0.0
+        self.robot_pose_frame_id = ''
 
         self.target_x = None
         self.target_y = None
@@ -228,19 +243,54 @@ class RealtimeRobotPlotter(Node):
         main_frame = ttk.Frame(self.root, padding=8)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        left_frame = ttk.Frame(main_frame)
-        left_frame.grid(row=0, column=0, sticky='nsew', padx=(0, 10))
+        self.main_pane = tk.PanedWindow(
+            main_frame,
+            orient=tk.HORIZONTAL,
+            sashwidth=8,
+            sashrelief=tk.RAISED,
+            showhandle=True,
+            bd=0
+        )
+        self.main_pane.pack(fill=tk.BOTH, expand=True)
+
+        left_frame = ttk.Frame(self.main_pane)
+        self.main_pane.add(left_frame, minsize=520, stretch='always')
+
+        self.left_pane = tk.PanedWindow(
+            left_frame,
+            orient=tk.VERTICAL,
+            sashwidth=8,
+            sashrelief=tk.RAISED,
+            showhandle=True,
+            bd=0
+        )
+        self.left_pane.grid(row=0, column=0, sticky='nsew')
+
+        map_box = ttk.LabelFrame(self.left_pane, text='Map', padding=4)
+
+        map_controls = ttk.Frame(map_box)
+        map_controls.pack(fill='x', pady=(0, 4))
+        ttk.Button(map_controls, text='Zoom +', command=self.zoom_in).pack(side='left', padx=(0, 4))
+        ttk.Button(map_controls, text='Zoom -', command=self.zoom_out).pack(side='left', padx=(0, 4))
+        ttk.Button(map_controls, text='Reset View', command=self.reset_view).pack(side='left')
+        self.zoom_label = ttk.Label(map_controls, text='Zoom: 1.00x')
+        self.zoom_label.pack(side='right')
 
         self.canvas = tk.Canvas(
-            left_frame,
+            map_box,
             width=self.initial_canvas_width,
             height=self.initial_canvas_height,
             bg='white'
         )
-        self.canvas.grid(row=0, column=0, sticky='nsew')
+        self.canvas.pack(fill='both', expand=True)
+        self.canvas.bind('<MouseWheel>', self.on_map_mousewheel)
+        self.canvas.bind('<Button-4>', self.on_map_mousewheel)
+        self.canvas.bind('<Button-5>', self.on_map_mousewheel)
 
-        camera_box = ttk.LabelFrame(left_frame, text='Camera Feed', padding=8)
-        camera_box.grid(row=1, column=0, sticky='nsew', pady=(10, 0))
+        self.left_pane.add(map_box, minsize=220, stretch='always')
+
+        camera_box = ttk.LabelFrame(self.left_pane, text='Camera Feed', padding=8)
+        self.left_pane.add(camera_box, minsize=180, stretch='always')
 
         camera_controls = ttk.Frame(camera_box)
         camera_controls.pack(fill='x', pady=(0, 6))
@@ -268,8 +318,35 @@ class RealtimeRobotPlotter(Node):
         self.image_status_label = ttk.Label(camera_box, text='Topic: -- | Image: waiting for frames', wraplength=700)
         self.image_status_label.pack(anchor='w')
 
-        self.side_frame = ttk.Frame(main_frame)
-        self.side_frame.grid(row=0, column=1, sticky='nsew')
+        self.side_container = ttk.Frame(self.main_pane)
+        self.main_pane.add(self.side_container, minsize=230, stretch='never')
+
+        self.side_canvas = tk.Canvas(self.side_container, highlightthickness=0, width=300)
+        self.side_scrollbar = ttk.Scrollbar(
+            self.side_container,
+            orient=tk.VERTICAL,
+            command=self.side_canvas.yview
+        )
+        self.side_canvas.configure(yscrollcommand=self.side_scrollbar.set)
+        self.side_canvas.grid(row=0, column=0, sticky='nsew')
+        self.side_scrollbar.grid(row=0, column=1, sticky='ns')
+        self.side_container.columnconfigure(0, weight=1)
+        self.side_container.rowconfigure(0, weight=1)
+
+        self.side_frame = ttk.Frame(self.side_canvas)
+        self.side_canvas_window = self.side_canvas.create_window(
+            (0, 0),
+            window=self.side_frame,
+            anchor='nw'
+        )
+        self.side_frame.bind('<Configure>', self.on_side_frame_configure)
+        self.side_canvas.bind('<Configure>', self.on_side_canvas_configure)
+        self.side_container.bind('<Enter>', self.bind_side_mousewheel)
+        self.side_container.bind('<Leave>', self.unbind_side_mousewheel)
+        self.side_canvas.bind('<Enter>', self.bind_side_mousewheel)
+        self.side_canvas.bind('<Leave>', self.unbind_side_mousewheel)
+        self.side_frame.bind('<Enter>', self.bind_side_mousewheel)
+        self.side_frame.bind('<Leave>', self.unbind_side_mousewheel)
 
         # ---- Robot box
         robot_box = ttk.LabelFrame(self.side_frame, text='Robot State', padding=8)
@@ -377,18 +454,47 @@ class RealtimeRobotPlotter(Node):
         self.status_label.pack(anchor='w')
 
         left_frame.columnconfigure(0, weight=1)
-        left_frame.rowconfigure(0, weight=3)
-        left_frame.rowconfigure(1, weight=2)
-
-        main_frame.columnconfigure(0, weight=3)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(0, weight=1)
+        left_frame.rowconfigure(0, weight=1)
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.ui_period_ms = max(1, int(1000.0 / max(self.ui_update_hz, 1.0)))
         self.refresh_image_topics()
+        self.root.after(100, self.set_initial_pane_sizes)
         self.root.after(self.ui_period_ms, self.update_ui)
+
+    def set_initial_pane_sizes(self):
+        try:
+            total_width = self.main_pane.winfo_width()
+            total_height = self.left_pane.winfo_height()
+            if total_width > 0:
+                self.main_pane.sash_place(0, max(520, total_width - 320), 0)
+            if total_height > 0:
+                self.left_pane.sash_place(0, 0, int(total_height * 0.58))
+        except Exception:
+            pass
+
+    def on_side_frame_configure(self, _event=None):
+        self.side_canvas.configure(scrollregion=self.side_canvas.bbox('all'))
+
+    def on_side_canvas_configure(self, event):
+        self.side_canvas.itemconfigure(self.side_canvas_window, width=event.width)
+
+    def bind_side_mousewheel(self, _event=None):
+        self.side_canvas.bind_all('<MouseWheel>', self.on_side_mousewheel)
+        self.side_canvas.bind_all('<Button-4>', self.on_side_mousewheel)
+        self.side_canvas.bind_all('<Button-5>', self.on_side_mousewheel)
+
+    def unbind_side_mousewheel(self, _event=None):
+        self.side_canvas.unbind_all('<MouseWheel>')
+        self.side_canvas.unbind_all('<Button-4>')
+        self.side_canvas.unbind_all('<Button-5>')
+
+    def on_side_mousewheel(self, event):
+        if getattr(event, 'num', None) == 4 or getattr(event, 'delta', 0) > 0:
+            self.side_canvas.yview_scroll(-3, 'units')
+        else:
+            self.side_canvas.yview_scroll(3, 'units')
 
     # ---------------- Canvas helpers ----------------
     def get_canvas_size(self):
@@ -423,13 +529,19 @@ class RealtimeRobotPlotter(Node):
                 return
 
             if all(('latitude' in wp and 'longitude' in wp) for wp in loaded):
+                self.world_x_label_name = 'North (m)'
+                self.world_y_label_name = 'West (m)'
+                self.gps_reference_lat = float(loaded[0]['latitude'])
+                self.gps_reference_lon = float(loaded[0]['longitude'])
                 for wp in loaded:
-                    lon = float(wp['longitude'])
-                    lat = float(wp['latitude'])
-                    self.waypoints.append((lon, lat))
+                    north, west = self.gps_to_local_meters(
+                        float(wp['latitude']),
+                        float(wp['longitude'])
+                    )
+                    self.waypoints.append((north, west))
 
                 self.get_logger().info(
-                    f'Waypoints parsed successfully from GPS format: {len(self.waypoints)}'
+                    f'Waypoints parsed successfully from GPS format and converted to local meters: {len(self.waypoints)}'
                 )
                 self.auto_set_bounds_from_waypoints()
                 return
@@ -455,32 +567,149 @@ class RealtimeRobotPlotter(Node):
         min_y = min(ys)
         max_y = max(ys)
 
-        if self.is_geospatial_plot():
-            span_x = max(1e-6, max_x - min_x)
-            span_y = max(1e-6, max_y - min_y)
-        else:
-            span_x = max(1.0, max_x - min_x)
-            span_y = max(1.0, max_y - min_y)
-
-        if self.is_geospatial_plot():
-            margin_x = max(0.00005, 0.15 * span_x)
-            margin_y = max(0.00005, 0.15 * span_y)
-        else:
-            margin_x = max(5.0, 0.15 * span_x)
-            margin_y = max(5.0, 0.15 * span_y)
-
-        self.world_x_min = min_x - margin_x
-        self.world_x_max = max_x + margin_x
-        self.world_y_min = min_y - margin_y
-        self.world_y_max = max_y + margin_y
+        self.set_data_bounds(min_x, max_x, min_y, max_y)
 
         self.get_logger().info(
             f'Auto plot bounds from waypoints -> '
-            f'{self.world_x_label_name}:[{self.format_axis_value(self.world_x_min, self.world_x_label_name)}, '
-            f'{self.format_axis_value(self.world_x_max, self.world_x_label_name)}] '
-            f'{self.world_y_label_name}:[{self.format_axis_value(self.world_y_min, self.world_y_label_name)}, '
-            f'{self.format_axis_value(self.world_y_max, self.world_y_label_name)}]'
+            f'{self.world_x_label_name}:[{self.format_axis_value(self.base_world_x_min, self.world_x_label_name)}, '
+            f'{self.format_axis_value(self.base_world_x_max, self.world_x_label_name)}] '
+            f'{self.world_y_label_name}:[{self.format_axis_value(self.base_world_y_min, self.world_y_label_name)}, '
+            f'{self.format_axis_value(self.base_world_y_max, self.world_y_label_name)}]'
         )
+
+    def set_data_bounds(self, x_min, x_max, y_min, y_max):
+        self.data_world_x_min = x_min
+        self.data_world_x_max = x_max
+        self.data_world_y_min = y_min
+        self.data_world_y_max = y_max
+        self.recompute_base_bounds_from_data()
+        self.pan_center_x = (self.base_world_x_min + self.base_world_x_max) / 2.0
+        self.pan_center_y = (self.base_world_y_min + self.base_world_y_max) / 2.0
+        self.apply_zoom_to_bounds()
+
+    def recompute_base_bounds_from_data(self):
+        if self.is_geospatial_plot():
+            x_span = max(1e-6, self.data_world_x_max - self.data_world_x_min)
+            y_span = max(1e-6, self.data_world_y_max - self.data_world_y_min)
+            margin_x = max(0.00005, 0.15 * x_span)
+            margin_y = max(0.00005, 0.15 * y_span)
+        else:
+            x_span = max(1.0, self.data_world_x_max - self.data_world_x_min)
+            y_span = max(1.0, self.data_world_y_max - self.data_world_y_min)
+            margin_x = max(5.0, 0.15 * x_span)
+            margin_y = max(5.0, 0.15 * y_span)
+
+        self.base_world_x_min = self.data_world_x_min - margin_x
+        self.base_world_x_max = self.data_world_x_max + margin_x
+        self.base_world_y_min = self.data_world_y_min - margin_y
+        self.base_world_y_max = self.data_world_y_max + margin_y
+
+    def apply_zoom_to_bounds(self):
+        base_x_span = max(1e-6, self.base_world_x_max - self.base_world_x_min)
+        base_y_span = max(1e-6, self.base_world_y_max - self.base_world_y_min)
+        center_x = self.pan_center_x
+        center_y = self.pan_center_y
+        if center_x is None or center_y is None:
+            center_x = (self.base_world_x_min + self.base_world_x_max) / 2.0
+            center_y = (self.base_world_y_min + self.base_world_y_max) / 2.0
+
+        x_span = base_x_span / max(self.zoom_factor, 0.05)
+        y_span = base_y_span / max(self.zoom_factor, 0.05)
+        self.world_x_min = center_x - x_span / 2.0
+        self.world_x_max = center_x + x_span / 2.0
+        self.world_y_min = center_y - y_span / 2.0
+        self.world_y_max = center_y + y_span / 2.0
+
+    def zoom_in(self):
+        self.set_zoom(self.zoom_factor * 1.25)
+
+    def zoom_out(self):
+        self.set_zoom(self.zoom_factor / 1.25)
+
+    def reset_view(self):
+        self.zoom_factor = 1.0
+        self.pan_center_x = (self.base_world_x_min + self.base_world_x_max) / 2.0
+        self.pan_center_y = (self.base_world_y_min + self.base_world_y_max) / 2.0
+        self.apply_zoom_to_bounds()
+
+    def set_zoom(self, zoom_factor):
+        self.zoom_factor = min(80.0, max(0.05, zoom_factor))
+        self.apply_zoom_to_bounds()
+
+    def on_map_mousewheel(self, event):
+        if getattr(event, 'num', None) == 5 or getattr(event, 'delta', 0) < 0:
+            self.zoom_out()
+        else:
+            self.zoom_in()
+
+    def gps_to_local_meters(self, lat, lon):
+        if self.gps_reference_lat is None or self.gps_reference_lon is None:
+            return lon, lat
+
+        radius = 6378137.0
+        lat_rad = math.radians(lat)
+        ref_lat_rad = math.radians(self.gps_reference_lat)
+        lon_rad = math.radians(lon)
+        ref_lon_rad = math.radians(self.gps_reference_lon)
+        delta_lat = ref_lat_rad - lat_rad
+        delta_lon = ref_lon_rad - lon_rad
+        mean_lat = (lat_rad + ref_lat_rad) / 2.0
+
+        north = -1.0 * delta_lat * radius
+        west = delta_lon * radius * math.cos(mean_lat)
+        return north, west
+
+    def looks_like_lon_lat(self, x, y, frame_id=''):
+        frame_id = (frame_id or '').lower()
+        near_reference = False
+        if self.gps_reference_lat is not None and self.gps_reference_lon is not None:
+            near_reference = (
+                abs(x - self.gps_reference_lon) < 1.0
+                and abs(y - self.gps_reference_lat) < 1.0
+            )
+        return (
+            'gps' in frame_id
+            or 'navsat' in frame_id
+            or near_reference
+        )
+
+    def normalize_position_for_plot(self, x, y, frame_id=''):
+        if x is None or y is None:
+            return None, None
+
+        if self.gps_reference_lat is not None and self.looks_like_lon_lat(x, y, frame_id):
+            return self.gps_to_local_meters(y, x)
+
+        return x, y
+
+    def expand_base_bounds_to_include(self, points):
+        valid_points = [(x, y) for x, y in points if x is not None and y is not None]
+        if not valid_points:
+            return
+
+        min_x = min([self.data_world_x_min] + [p[0] for p in valid_points])
+        max_x = max([self.data_world_x_max] + [p[0] for p in valid_points])
+        min_y = min([self.data_world_y_min] + [p[1] for p in valid_points])
+        max_y = max([self.data_world_y_max] + [p[1] for p in valid_points])
+
+        changed = (
+            min_x < self.data_world_x_min
+            or max_x > self.data_world_x_max
+            or min_y < self.data_world_y_min
+            or max_y > self.data_world_y_max
+        )
+        if not changed:
+            return
+
+        self.data_world_x_min = min_x
+        self.data_world_x_max = max_x
+        self.data_world_y_min = min_y
+        self.data_world_y_max = max_y
+        self.recompute_base_bounds_from_data()
+        if self.zoom_factor <= 1.01:
+            self.pan_center_x = (self.base_world_x_min + self.base_world_x_max) / 2.0
+            self.pan_center_y = (self.base_world_y_min + self.base_world_y_max) / 2.0
+        self.apply_zoom_to_bounds()
 
     # ---------------- ROS Callbacks ----------------
     def mark_seen(self, key):
@@ -491,37 +720,34 @@ class RealtimeRobotPlotter(Node):
         with self.lock:
             self.robot_x = msg.pose.position.x
             self.robot_y = msg.pose.position.y
+            self.robot_pose_frame_id = msg.header.frame_id
             self.robot_yaw = self.quaternion_to_yaw(
                 msg.pose.orientation.x,
                 msg.pose.orientation.y,
                 msg.pose.orientation.z,
                 msg.pose.orientation.w
             )
-            if not self.is_geospatial_plot():
-                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def robot_pose_twist_stamped_cb(self, msg: TwistStamped):
         with self.lock:
             self.robot_x = msg.twist.linear.x
             self.robot_y = msg.twist.linear.y
+            self.robot_pose_frame_id = msg.header.frame_id
             self.robot_yaw = msg.twist.angular.z
-            if not self.is_geospatial_plot():
-                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def robot_pose_odom_cb(self, msg: Odometry):
         with self.lock:
             self.robot_x = msg.pose.pose.position.x
             self.robot_y = msg.pose.pose.position.y
+            self.robot_pose_frame_id = msg.header.frame_id
             self.robot_yaw = self.quaternion_to_yaw(
                 msg.pose.pose.orientation.x,
                 msg.pose.pose.orientation.y,
                 msg.pose.pose.orientation.z,
                 msg.pose.pose.orientation.w
             )
-            if not self.is_geospatial_plot():
-                self.append_robot_path(self.robot_x, self.robot_y)
         self.mark_seen('robot_pose')
 
     def target_point_cb(self, msg: Point):
@@ -600,8 +826,6 @@ class RealtimeRobotPlotter(Node):
         with self.lock:
             self.gps_lat = msg.latitude
             self.gps_lon = msg.longitude
-            if self.is_geospatial_plot():
-                self.append_robot_path(self.gps_lon, self.gps_lat)
         self.mark_seen('gps')
 
     # ---------------- Helpers ----------------
@@ -1037,6 +1261,7 @@ class RealtimeRobotPlotter(Node):
             robot_x = self.robot_x
             robot_y = self.robot_y
             robot_yaw = self.robot_yaw
+            robot_pose_frame_id = self.robot_pose_frame_id
             target_x = self.target_x
             target_y = self.target_y
             speed = self.speed
@@ -1053,6 +1278,22 @@ class RealtimeRobotPlotter(Node):
             gps_lat = self.gps_lat
             gps_lon = self.gps_lon
 
+        plot_robot_x, plot_robot_y = self.normalize_position_for_plot(
+            robot_x,
+            robot_y,
+            robot_pose_frame_id
+        )
+        gps_plot_x, gps_plot_y = self.normalize_position_for_plot(gps_lon, gps_lat, 'gps')
+        if plot_robot_x is None or plot_robot_y is None:
+            plot_robot_x = gps_plot_x
+            plot_robot_y = gps_plot_y
+
+        plot_target_x, plot_target_y = self.normalize_position_for_plot(target_x, target_y)
+        self.expand_base_bounds_to_include([
+            (plot_robot_x, plot_robot_y),
+            (plot_target_x, plot_target_y),
+        ])
+
         self.canvas.delete('all')
         self.draw_grid()
         self.draw_border()
@@ -1060,26 +1301,33 @@ class RealtimeRobotPlotter(Node):
         self.draw_robot_path()
         self.render_camera_feed()
 
-        plot_robot_x = gps_lon if gps_lon is not None else robot_x
-        plot_robot_y = gps_lat if gps_lat is not None else robot_y
-
-        if target_x is not None and target_y is not None:
-            self.draw_target(target_x, target_y)
+        if plot_target_x is not None and plot_target_y is not None:
+            self.draw_target(plot_target_x, plot_target_y)
 
         if plot_robot_x is not None and plot_robot_y is not None:
+            self.append_robot_path(plot_robot_x, plot_robot_y)
             self.draw_robot(plot_robot_x, plot_robot_y, robot_yaw)
 
-        self.robot_x_label.config(text=f'Longitude: {gps_lon:.7f}' if gps_lon is not None else 'Longitude: --')
-        self.robot_y_label.config(text=f'Latitude: {gps_lat:.7f}' if gps_lat is not None else 'Latitude: --')
+        self.robot_x_label.config(
+            text=f'{self.world_x_label_name}: {plot_robot_x:.3f}' if plot_robot_x is not None else f'{self.world_x_label_name}: --'
+        )
+        self.robot_y_label.config(
+            text=f'{self.world_y_label_name}: {plot_robot_y:.3f}' if plot_robot_y is not None else f'{self.world_y_label_name}: --'
+        )
         self.robot_yaw_label.config(text=f'Yaw: {robot_yaw:.3f} rad')
         self.speed_label.config(text=f'Speed: {speed:.3f} m/s')
         self.gps_lat_label.config(text=f'GPS Lat: {gps_lat:.7f}' if gps_lat is not None else 'GPS Lat: --')
         self.gps_lon_label.config(text=f'GPS Lon: {gps_lon:.7f}' if gps_lon is not None else 'GPS Lon: --')
 
-        self.target_x_label.config(text=f'Target X: {target_x:.3f}' if target_x is not None else 'Target X: --')
-        self.target_y_label.config(text=f'Target Y: {target_y:.3f}' if target_y is not None else 'Target Y: --')
+        self.target_x_label.config(text=f'Target X: {plot_target_x:.3f}' if plot_target_x is not None else 'Target X: --')
+        self.target_y_label.config(text=f'Target Y: {plot_target_y:.3f}' if plot_target_y is not None else 'Target Y: --')
 
-        dist = self.compute_distance_to_target()
+        dist = None
+        if (
+            plot_robot_x is not None and plot_robot_y is not None
+            and plot_target_x is not None and plot_target_y is not None
+        ):
+            dist = math.sqrt((plot_target_x - plot_robot_x) ** 2 + (plot_target_y - plot_robot_y) ** 2)
         self.dist_label.config(text=f'Distance: {dist:.3f} m' if dist is not None else 'Distance: --')
 
         self.cmd_vx_label.config(text=f'vx: {cmd_vx:.3f} m/s')
@@ -1109,6 +1357,7 @@ class RealtimeRobotPlotter(Node):
 
         canvas_width, canvas_height = self.get_canvas_size()
         self.canvas_size_label.config(text=f'Canvas: {canvas_width} x {canvas_height}')
+        self.zoom_label.config(text=f'Zoom: {self.zoom_factor:.2f}x')
         self.image_status_label.config(wraplength=max(220, self.image_canvas.winfo_width() - 20))
         self.topic_health_label.config(wraplength=max(220, self.side_frame.winfo_width() - 20))
         self.publisher_health_label.config(wraplength=max(220, self.side_frame.winfo_width() - 20))

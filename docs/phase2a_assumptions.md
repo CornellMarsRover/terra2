@@ -23,7 +23,7 @@ verification audit; keep them stable even when questions get answered.
 | Q6 | Does a CO2/humidity driver already exist elsewhere? | unknown | OPEN |
 | Q7 | Snapshot naming / storage / retention? | out of scope for Phase 2a | DEFERRED |
 | Q8 | URC 2026 RF bandwidth cap? | 5 Mbps working assumption | DEFERRED |
-| Q9 | USB `/dev/videoN` → logical camera mapping? | placeholder: cam 0 = auger, cam 2 = site, cam 4 = analysis | OPEN |
+| Q9 | USB `/dev/videoN` → logical camera mapping? | (camera work moved to a separate branch; not represented in Phase 2a) | DEFERRED |
 | Q10 | H.264 vs CompressedImage for cameras? | **H.264** (team confirmed by using existing pipeline) | ANSWERED |
 | Q11 | Fabric-manage the foxglove bridge? | no — plain `launch_ros.Node` | ANSWERED |
 | Q12 | External cam packages (`cmr_cv`, etc.) | not needed for mock rover | DEFERRED |
@@ -31,10 +31,9 @@ verification audit; keep them stable even when questions get answered.
 
 ## Namespace convention
 
-All Astrotech topics/services/actions sit under **`/astrotech/…`**. Cameras
-keep the existing `camera_<id>/h264` naming from `usb_camera_publisher` so
-the GCS bridge launch file's best-effort QoS whitelist matches out of the
-box.
+All Astrotech topics/services/actions sit under **`/astrotech/…`**.
+Camera feeds (separate branch) reuse the existing `camera_<id>/h264`
+naming from `usb_camera_publisher`.
 
 ## Auger — `TODO(astrotech-q-1)`
 
@@ -104,19 +103,10 @@ box.
   driver exists it likely has its own message type, rename across the same
   four locations.
 
-## Cameras — `TODO(astrotech-q-9)`
+## Cameras
 
-- Three logical cameras, all publishing `foxglove_msgs/CompressedVideo` on
-  `camera_<id>/h264` at 15 fps:
-  - `camera_0/h264` → logical "auger_cam" *(placeholder)*.
-  - `camera_2/h264` → logical "site_cam" *(placeholder)*.
-  - `camera_4/h264` → logical "analysis_cam" *(placeholder)*.
-- Camera IDs 0/2/4 come from the `usb_camera_publisher` default list
-  (`[0,2,4,6,8,10]`). Phase 2b will swap logical-name → id mapping in one
-  place.
-- **Assumption pinned at `TODO(astrotech-q-9)`**: id-to-role mapping. When
-  resolved, only the YAML `cameras:` block and the Foxglove layout change;
-  no driver code.
+Camera feeds are not part of Phase 2a. That work lives on a separate
+branch and will merge into `astrotech-gui` later.
 
 ## Full interface table (copy into `astrotech_interfaces.yaml`)
 
@@ -146,7 +136,8 @@ analysis:
     - id: 2
       action: /astrotech/analysis/run_sequence_2
   action_type: cmr_msgs/RunAnalysisSequence
-  mock_duration_sec: 10.0                 # TODO(astrotech-q-3)
+  num_steps: 5                            # TODO(astrotech-q-3)
+  step_duration_sec: 2.0
 
 raman:
   topic: /astrotech/raman/spectrum
@@ -162,25 +153,14 @@ env:
   type: cmr_msgs/EnvSample
   rate_hz: 1.0
 
-cameras:
-  topic_type: foxglove_msgs/CompressedVideo
-  fps: 15
-  feeds:
-    - id: 0                               # TODO(astrotech-q-9)
-      role: auger_cam
-      topic: /camera_0/h264
-    - id: 2                               # TODO(astrotech-q-9)
-      role: site_cam
-      topic: /camera_2/h264
-    - id: 4                               # TODO(astrotech-q-9)
-      role: analysis_cam
-      topic: /camera_4/h264
+# (Camera feeds intentionally absent — separate branch.)
 ```
 
 ## Out of scope for Phase 2a (recorded to prevent scope creep)
 
 - Snapshot service (Q7).
-- Camera id → logical name remap at ROS level (Q9 — handled in Foxglove only for 2a).
+- Pause/resume for sequences — see `docs/post_urc_backlog.md`.
+- Camera feeds (separate branch).
 - Real panel widgets (Phase 2b).
 - Fabric-managed bridge (Q11).
 - CI wiring for the smoke test.

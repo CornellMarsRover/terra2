@@ -67,13 +67,12 @@ Terra contains all the code that is part of a ROS codebase and implements the br
 One-time setup:
 
 ```bash
-# 1. Build the workspace (only the GCS-relevant packages are strictly needed).
 colcon build --symlink-install --packages-select cmr_msgs urc_mock_rover
-
-# 2. Generate the sample H.264 video the mock cameras loop over.
-#    Requires ffmpeg on PATH.
-./scripts/fetch_sample_video.sh
 ```
+
+> Camera feeds are not part of `urc_mock_rover`; that work lives on a
+> separate branch and will merge in later. The Foxglove layout in
+> Phase 2a does not include camera panels.
 
 Then, each dev session:
 
@@ -113,14 +112,13 @@ question text; repeated here only as a lookup table.)
 |---|---|
 | Q1 — auger controller | `docs/phase2a_assumptions.md`; `src/urc_mock_rover/config/astrotech_interfaces.yaml` (`auger:`); `src/urc_mock_rover/urc_mock_rover/drivers/auger.py`; `src/cmr_msgs/msg/AugerState.msg`; `gcs/extensions/urc-astrotech-panels/src/interfaces.ts` (`Auger`); `gcs/extensions/urc-astrotech-panels/src/panels/AugerControl.tsx` |
 | Q2 — mixing servo controller | `astrotech_interfaces.yaml` (`mixing_servo:`); `drivers/mixing_servo.py`; `interfaces.ts` (`MixingServo`); `panels/MixingServo.tsx` |
-| Q3 — BDC sequence controller, duration, step names | `astrotech_interfaces.yaml` (`analysis.mock_duration_sec`); `drivers/analysis_sequencer.py` (`_PHASES`) |
+| Q3 — BDC sequence controller, real step set | `astrotech_interfaces.yaml` (`analysis.num_steps`, `analysis.step_duration_sec`); `drivers/analysis_sequencer.py` |
 | Q4 — `sequence_id` vs. `site_num` naming | `src/cmr_msgs/action/RunAnalysisSequence.action`; `drivers/analysis_sequencer.py`; `interfaces.ts` (`Analysis`); `panels/AnalysisSequence.tsx` (button labels) |
 | Q5 — Raman driver message type | `astrotech_interfaces.yaml` (`raman.type`); `src/cmr_msgs/msg/RamanSpectrum.msg` (delete if replaced); `drivers/raman.py`; `interfaces.ts` (`Raman`); `panels/RamanSpectrum.tsx` |
 | Q6 — CO2/humidity driver message type | same shape as Q5: `env:` YAML block, `EnvSample.msg`, `drivers/env.py`, `Env` in `interfaces.ts` |
-| Q9 — camera id → logical role mapping | `astrotech_interfaces.yaml` (`cameras.feeds`); `interfaces.ts` (`Cameras`); `gcs/layouts/urc_astrotech_dashboard.json` (Image panel `imageTopic` fields) |
 
-Q7, Q8, Q11, Q12, Q13 are intentionally deferred per Phase 1 — see
-`docs/open_questions.md`.
+Q7, Q8, Q9, Q11, Q12, Q13 are intentionally deferred — see
+`docs/open_questions.md` and `docs/post_urc_backlog.md`.
 
 ## TODO Functionality
 

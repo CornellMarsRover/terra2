@@ -35,14 +35,7 @@ log "sourcing install/setup.bash"
 # shellcheck source=/dev/null
 source install/setup.bash
 
-# --- Step 2: sample video must exist (camera replayer loads it from disk) ---
-ASSET="src/urc_mock_rover/urc_mock_rover/assets/sample_video.h264"
-if [[ ! -s "${ASSET}" ]]; then
-    log "sample video missing; running scripts/fetch_sample_video.sh"
-    bash scripts/fetch_sample_video.sh
-fi
-
-# --- Step 3: launch the mock rover in the background ---
+# --- Step 2: launch the mock rover in the background ---
 LOG_DIR="$(mktemp -d)"
 LAUNCH_LOG="${LOG_DIR}/mock_launch.log"
 log "launching mock.launch.py (logs in ${LAUNCH_LOG})"
@@ -60,15 +53,12 @@ trap cleanup EXIT
 log "waiting 5 s for nodes to come up"
 sleep 5
 
-# --- Step 4: every expected topic must be advertised ---
+# --- Step 3: every expected topic must be advertised ---
 EXPECTED_TOPICS=(
     "/astrotech/auger/state"
     "/astrotech/mixing_servo/state"
     "/astrotech/raman/spectrum"
     "/astrotech/env/sample"
-    "/camera_0/h264"
-    "/camera_2/h264"
-    "/camera_4/h264"
 )
 log "listing topics..."
 ALL_TOPICS="$(ros2 topic list)"
@@ -80,22 +70,7 @@ for t in "${EXPECTED_TOPICS[@]}"; do
     log "  ok: ${t}"
 done
 
-# --- Step 5: rate check — camera must be 10 < Hz < 30 ---
-log "measuring /camera_0/h264 rate for 3 s"
-CAM_HZ_OUT="$(timeout 4 ros2 topic hz /camera_0/h264 2>&1 | head -n 20 || true)"
-echo "${CAM_HZ_OUT}"
-CAM_RATE="$(grep -Eo 'average rate: [0-9.]+' <<<"${CAM_HZ_OUT}" | tail -n 1 | awk '{print $3}')"
-if [[ -z "${CAM_RATE}" ]]; then
-    fail "could not parse rate from ros2 topic hz output for /camera_0/h264"
-fi
-# Integer comparison via awk to avoid floating-point shell headaches.
-if awk "BEGIN{exit !(${CAM_RATE} > 10 && ${CAM_RATE} < 30)}"; then
-    log "  ok: /camera_0/h264 = ${CAM_RATE} Hz (10 < rate < 30)"
-else
-    fail "/camera_0/h264 rate ${CAM_RATE} Hz out of range (10, 30)"
-fi
-
-# --- Step 6: rate check — Raman must be > 0.5 Hz ---
+# --- Step 4: rate check — Raman must be > 0.5 Hz ---
 log "measuring /astrotech/raman/spectrum rate for 3 s"
 RAMAN_HZ_OUT="$(timeout 4 ros2 topic hz /astrotech/raman/spectrum 2>&1 | head -n 20 || true)"
 echo "${RAMAN_HZ_OUT}"
@@ -109,7 +84,7 @@ else
     fail "/astrotech/raman/spectrum rate ${RAMAN_RATE} Hz <= 0.5"
 fi
 
-# --- Step 7: service call returns success on a valid preset ---
+# --- Step 5: service call returns success on a valid preset ---
 log "calling /astrotech/mixing_servo/set_preset with preset_name=S1"
 SVC_OUT="$(ros2 service call /astrotech/mixing_servo/set_preset \
     cmr_msgs/srv/SetMixingServoPreset \

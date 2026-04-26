@@ -20,21 +20,6 @@
       "legendDisplay": "top",
       "followingViewWidth": 60
     },
-    "Image!auger_cam": {
-      "imageMode": {
-        "imageTopic": "/camera_0/h264"
-      }
-    },
-    "Image!site_cam": {
-      "imageMode": {
-        "imageTopic": "/camera_2/h264"
-      }
-    },
-    "Image!analysis_cam": {
-      "imageMode": {
-        "imageTopic": "/camera_4/h264"
-      }
-    },
     "Log!rosout": {
       "searchTerms": [],
       "minLogLevel": 1,
@@ -57,38 +42,23 @@
       "first": "Plot!env",
       "second": {
         "direction": "row",
-        "first": "Image!auger_cam",
-        "second": "urc.auger_control!auger",
+        "first": "urc.auger_control!auger",
+        "second": "urc.analysis_sequence!analysis",
         "splitPercentage": 50
       },
       "splitPercentage": 33.33
     },
     "second": {
-      "direction": "column",
-      "first": {
-        "direction": "row",
-        "first": "Image!site_cam",
-        "second": {
-          "direction": "row",
-          "first": "urc.raman_spectrum!raman",
-          "second": "urc.analysis_sequence!analysis",
-          "splitPercentage": 50
-        },
-        "splitPercentage": 33.33
-      },
+      "direction": "row",
+      "first": "urc.raman_spectrum!raman",
       "second": {
         "direction": "row",
-        "first": "Image!analysis_cam",
-        "second": {
-          "direction": "row",
-          "first": "Log!rosout",
-          "second": "urc.mixing_servo!mixing",
-          "splitPercentage": 50
-        },
-        "splitPercentage": 33.33
+        "first": "urc.mixing_servo!mixing",
+        "second": "Log!rosout",
+        "splitPercentage": 50
       },
-      "splitPercentage": 50
+      "splitPercentage": 33.33
     },
-    "splitPercentage": 33.33
+    "splitPercentage": 50
   }
 }

@@ -51,14 +51,8 @@ export const Env = {
   type: "cmr_msgs/EnvSample",
 } as const;
 
-// TODO(astrotech-q-9): camera id -> logical role mapping is a placeholder.
-export const Cameras = {
-  feeds: [
-    { id: 0, role: "auger_cam", topic: "/camera_0/h264" },
-    { id: 2, role: "site_cam", topic: "/camera_2/h264" },
-    { id: 4, role: "analysis_cam", topic: "/camera_4/h264" },
-  ],
-  type: "foxglove_msgs/CompressedVideo",
-} as const;
+// Camera feeds: handled on a separate branch and merged in later.
+// Foxglove uses its built-in Image panel for whichever topics that
+// branch exposes; the extension does not own a camera registry today.
 
 export type MixingServoPreset = (typeof MixingServo.presets)[number];

@@ -72,4 +72,4 @@ from file*.
 - Real action client for `run_sequence_N` with progress display.
 - Real service client for `mixing_servo/set_preset` with busy state.
 - Actual Plot (wavenumbers vs. intensities) for Raman.
-- Camera-name mapping once Q9 is resolved.
+- (Camera feeds: handled on a separate branch; not owned by this extension.)

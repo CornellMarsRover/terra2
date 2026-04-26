@@ -1,18 +1,21 @@
 """Mock analysis-sequence action server(s).
 
-One action server per sequence id from the YAML. Each goal is served by
-linearly ramping ``progress_pct`` from 0 to 100 over the configured mock
-duration, then returning success. Cancelable.
+One action server per sequence id from the YAML. Each goal runs N fake
+steps of fixed duration; feedback is published once per second with the
+current step index, total steps, a step description, and elapsed seconds.
 
-TODO(astrotech-q-3): duration + step names are placeholders. Real BDC-driven
-sequences have discrete phases (e.g. "arm pre-position", "lower auger",
-"drill", "retract", "mix", "scan"); the panel design assumes whatever
-strings we put in ``current_step`` show up in the GCS. Replace here when
-real sequence steps are known.
+Cancel = hard abort. The action returns ``success=false`` with a
+"cancelled at step N" message. The rover is left in whatever state it
+was in. There is no pause / resume; that is deferred to post-URC
+(see docs/post_urc_backlog.md).
 
-TODO(astrotech-q-4): the goal field is named ``sequence_id``. If the team
-decides ``site_num`` / "site id" is the correct semantic, rename the field
-in ``action/RunAnalysisSequence.action`` and the references in this file.
+The sequencer is **stateless across goals**. No resume token, no
+persistent step index. Each new goal starts at step 1.
+
+TODO(astrotech-q-3): real fluidic-protocol step set is unknown; mock
+uses generic placeholder names.
+
+TODO(astrotech-q-4): `sequence_id` semantics still unconfirmed.
 """
 
 from __future__ import annotations
@@ -28,24 +31,7 @@ from rclpy.node import Node
 from cmr_msgs.action import RunAnalysisSequence
 
 
-# Mock phases. Not real; see TODO(astrotech-q-3).
-_PHASES = [
-    (0.0, "starting"),
-    (25.0, "running"),
-    (75.0, "finalizing"),
-    (100.0, "done"),
-]
-
-_TICK_HZ = 5.0  # feedback rate while a sequence is running
-
-
-def _phase_for(progress_pct: float) -> str:
-    """Return the current-step label for a progress value."""
-    label = _PHASES[0][1]
-    for threshold, name in _PHASES:
-        if progress_pct >= threshold:
-            label = name
-    return label
+_FEEDBACK_HZ = 1.0  # one feedback message per second while running
 
 
 class MockAnalysisSequencer:
@@ -53,14 +39,13 @@ class MockAnalysisSequencer:
 
     def __init__(self, node: Node, cfg: dict) -> None:
         self._node = node
-        self._duration_s = float(cfg["mock_duration_sec"])
-        self._servers: Dict[int, ActionServer] = {}
-        # Guard against concurrent goals across the (currently two) servers:
-        # the mock is single-threaded at heart, so reject a new goal if any
-        # sequence is already running.
+        self._num_steps = int(cfg.get("num_steps", 5))
+        self._step_duration_s = float(cfg.get("step_duration_sec", 2.0))
+
         self._busy_lock = threading.Lock()
         self._busy = False
 
+        self._servers: Dict[int, ActionServer] = {}
         for seq_cfg in cfg["sequences"]:
             seq_id = int(seq_cfg["id"])
             action_name = seq_cfg["action"]
@@ -73,7 +58,9 @@ class MockAnalysisSequencer:
                 cancel_callback=self._cancel_callback,
             )
             node.get_logger().info(
-                f"MockAnalysisSequencer up: action={action_name} id={seq_id}"
+                f"MockAnalysisSequencer up: action={action_name} id={seq_id} "
+                f"(steps={self._num_steps}, "
+                f"step_duration={self._step_duration_s} s)"
             )
 
     def _goal_callback(self, _goal_request) -> GoalResponse:
@@ -97,14 +84,14 @@ class MockAnalysisSequencer:
         self, seq_id: int, goal_handle: ServerGoalHandle
     ) -> RunAnalysisSequence.Result:
         request = goal_handle.request
-        # TODO(astrotech-q-4): validate sequence_id against accepted values.
         if int(request.sequence_id) != seq_id:
             result = RunAnalysisSequence.Result()
             result.success = False
-            result.result_message = (
+            result.message = (
                 f"sequence_id {request.sequence_id} does not match "
                 f"server id {seq_id}"
             )
+            result.last_completed_step = 0
             goal_handle.abort()
             return result
 
@@ -120,33 +107,48 @@ class MockAnalysisSequencer:
         self, seq_id: int, goal_handle: ServerGoalHandle
     ) -> RunAnalysisSequence.Result:
         self._node.get_logger().info(
-            f"analysis seq {seq_id}: starting ({self._duration_s} s)"
+            f"analysis seq {seq_id}: starting "
+            f"({self._num_steps} steps × {self._step_duration_s} s)"
         )
+
         feedback = RunAnalysisSequence.Feedback()
+        feedback.total_steps = self._num_steps
+
         result = RunAnalysisSequence.Result()
+        start_time = time.monotonic()
+        feedback_period = 1.0 / _FEEDBACK_HZ
 
-        start = time.monotonic()
-        tick = 1.0 / _TICK_HZ
-        while True:
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                result.success = False
-                result.result_message = f"sequence {seq_id} canceled"
-                self._node.get_logger().info(result.result_message)
-                return result
+        for step in range(1, self._num_steps + 1):
+            step_start = time.monotonic()
+            feedback.current_step = step
+            feedback.current_step_description = (
+                f"step {step}/{self._num_steps}: mock step {step}"
+            )
 
-            elapsed = time.monotonic() - start
-            pct = min(100.0, 100.0 * elapsed / self._duration_s)
-            feedback.progress_pct = float(pct)
-            feedback.current_step = _phase_for(pct)
-            goal_handle.publish_feedback(feedback)
+            while True:
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                    result.success = False
+                    result.message = (
+                        f"cancelled at step {step}/{self._num_steps}"
+                    )
+                    result.last_completed_step = step - 1
+                    self._node.get_logger().info(result.message)
+                    return result
 
-            if pct >= 100.0:
-                break
-            time.sleep(tick)
+                feedback.elapsed_seconds = float(
+                    time.monotonic() - start_time
+                )
+                goal_handle.publish_feedback(feedback)
+
+                step_elapsed = time.monotonic() - step_start
+                if step_elapsed >= self._step_duration_s:
+                    break
+                time.sleep(min(feedback_period, self._step_duration_s - step_elapsed))
 
         goal_handle.succeed()
         result.success = True
-        result.result_message = f"sequence {seq_id} complete"
-        self._node.get_logger().info(result.result_message)
+        result.message = f"sequence {seq_id} complete"
+        result.last_completed_step = self._num_steps
+        self._node.get_logger().info(result.message)
         return result

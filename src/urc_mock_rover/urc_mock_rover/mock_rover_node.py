@@ -25,10 +25,12 @@ from rclpy.node import Node
 
 from urc_mock_rover.drivers.analysis_sequencer import MockAnalysisSequencer
 from urc_mock_rover.drivers.auger import MockAugerDriver
-from urc_mock_rover.drivers.camera_replayer import MockCameraReplayer
 from urc_mock_rover.drivers.env import MockEnvPublisher
 from urc_mock_rover.drivers.mixing_servo import MockMixingServoDriver
 from urc_mock_rover.drivers.raman import MockRamanPublisher
+
+# Camera feeds intentionally absent: that work lives on a separate
+# branch and will merge into astrotech-gui later.
 
 
 _PACKAGE = "urc_mock_rover"
@@ -66,12 +68,6 @@ class MockRoverNode(Node):
         self._analysis = MockAnalysisSequencer(self, cfg["analysis"])
         self._raman = MockRamanPublisher(self, cfg["raman"])
         self._env = MockEnvPublisher(self, cfg["env"])
-
-        cam_fps = float(cfg["cameras"]["fps"])
-        self._cameras = [
-            MockCameraReplayer(self, feed, fps=cam_fps)
-            for feed in cfg["cameras"]["feeds"]
-        ]
 
         self.get_logger().info("mock rover ready")
 

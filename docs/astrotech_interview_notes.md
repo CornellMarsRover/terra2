@@ -4,7 +4,51 @@ Running log of questions asked to the Astrotech subteam and their
 answers. Source of truth for what the GCS and mock rover are being
 built against. If it isn't written here, it wasn't agreed.
 
-Last updated: 2026-04-23
+Last updated: 2026-04-26
+
+---
+
+## Current state (read me first)
+
+**Decided** (will not change without going back to the team):
+
+- Sequences are **5–10 minutes long, run-to-completion with hard
+  abort**. Cancel returns the action with `success=false` and leaves
+  the rover wherever it stopped. Pause/resume is **deferred to
+  post-URC** (`docs/post_urc_backlog.md`).
+- Sequence orchestration **lives on the main computer** (the Jetson,
+  in our ROS 2 graph), not on the BDC boards. The boards are
+  fire-and-forget "run motor X for D seconds" devices.
+- Telemetry messages are **commanded-only** when no real feedback is
+  available. The CAN-FD library exposes none, so `AugerState.msg`
+  carries `last_command_kind` / `commanded_duration` / `commanded_at`
+  rather than fictional encoder counts.
+- **Cameras are off this branch.** Camera feed work happens on a
+  separate branch that will merge in later.
+- **Hardware**: custom **BDC boards** (BDC motors / pumps) and
+  **Servo boards** (hobby servos / mixing chamber) on a CAN-FD bus
+  via an mjbots `usbcanfd` USB-CAN dongle. Library at
+  `third_party/astrotech_canfd/` — see
+  `docs/astrotech_canfd_library_notes.md`.
+
+**Pending — ask Caitlin** (does **not** block Phase 2b starting; does
+block the real driver wrapper inside Phase 2b):
+
+- A2: max motor duration (7-bit field = 127). Chunk-and-rearm or is
+  there a "run continuously" mode?
+- A3: does `Query_data=1` produce real board telemetry?
+- A4: are unsolicited error frames a thing? Wire format?
+- B1–B4: per-actuator addressing (`can_id`, `motor_id` for each pump,
+  the auger, the heater, each preset of the mixing chamber).
+- C1: persistent dongle device path on the Jetson.
+
+**Phase status**:
+
+- Phase 2a snapshot at SHA `eef937c`.
+- Phase 2a revision (this commit) drops pause/resume from the action,
+  swaps `AugerState` to commanded-only, and removes camera scaffolding.
+- Phase 2b will introduce a real CAN-FD driver wrapper plus build the
+  panel widgets. Still pending the open questions above.
 
 ---
 
@@ -247,12 +291,68 @@ the assumptions doc on next pass):
 
 ## Status markers
 
-- **Phase 2a is committed** at SHA `eef937c` ("phase 2a: initial mock
-  rover (pre-Caitlin info)"). It does not reflect the Session 3
-  answers; the documents above call out which assumptions are now
-  invalid.
-- **Phase 2b** will revise the action interface
-  (`cmr_msgs/action/RunAnalysisSequence.action`), make
-  `MockAnalysisSequencer` stateful with pause / resume, and add a
-  real driver wrapper around the vendored CAN-FD library.
+- **Phase 2a snapshot** committed at SHA `eef937c` ("phase 2a: initial
+  mock rover (pre-Caitlin info)"). Pre-revision; pause/resume still in
+  the action shape, `AugerState` still had fictional encoder fields.
+- **Phase 2a revision pass** (this commit) drops pause/resume,
+  rewrites `AugerState` to commanded-only, removes camera scaffolding,
+  and compresses docs.
+- **Phase 2b** will introduce a real CAN-FD driver wrapper plus build
+  the panel widgets, pending the open library questions below.
+
+---
+
+## Session 4 — 2026-04-26 (decisions only — no new questions answered)
+
+After internal scoping discussion, the team made the following calls
+about how to handle the open Session 3 ambiguity given URC timing:
+
+### Decision 1: run-to-completion with hard abort
+
+- Sequences run start-to-finish; cancel returns the action with
+  `success=false` and leaves the rover wherever it stopped. Recovery
+  is the operator's problem.
+- Reason: the CAN-FD library exposes no motor feedback, so any
+  pause/resume design today would be guessing about elapsed-vs-
+  commanded time. A 5–10 minute redo is acceptable.
+- Code change: `RunAnalysisSequence.action` revised to drop
+  `progress_pct`; new feedback is `current_step / total_steps /
+  current_step_description / elapsed_seconds`; new result field
+  `last_completed_step`.
+
+### Decision 2: telemetry messages are commanded-only when there's no real feedback
+
+- `AugerState.msg` rewritten to `last_command_kind` /
+  `commanded_duration` / `commanded_at`. No fictional encoder counts.
+- Other custom messages audited: `RamanSpectrum`, `EnvSample`,
+  `SetMixingServoPreset` survive unchanged (they describe sensor
+  measurements or service-accept-success, not motor feedback).
+
+### Decision 3: pause/resume deferred to post-URC
+
+- Logged in `docs/post_urc_backlog.md` with three implementation
+  options ranked. Re-open after URC.
+
+### Decision 4: camera feed work merging from a different branch
+
+- All Phase 2a camera scaffolding (mock replayer, NAL splitter,
+  fetch script, sample H.264 asset, camera entries in YAML / TS
+  mirror / Foxglove layout, Q9 tags) removed from `astrotech-gui`.
+- Reason: avoid merge conflicts with the camera branch. The Foxglove
+  layout drops to a 2×3 grid; `Image` panels can be re-added when
+  the branches merge.
+
+### Open with Caitlin (unchanged from Session 3)
+
+These are not blockers for Phase 2b's *start* but **are** blockers for
+the real CAN-FD driver wrapper inside Phase 2b. Same as the "Pending"
+list at the top of this file:
+
+- A2: max single-command duration vs. continuous-run mode.
+- A3: feedback availability via `Query_data=1`.
+- A4: unsolicited error/fault frames.
+- B1–B4: per-actuator addressing (board CAN ID + motor/servo id) for
+  every pump, the auger, the heater, each preset of the mixing
+  chamber.
+- C1: persistent dongle device path on the Jetson.
 

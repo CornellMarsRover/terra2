@@ -427,6 +427,7 @@ class UsamaControlRosNode(Node):
         self._lock = threading.Lock()
         self._shutdown = threading.Event()
         self._steer_center_offsets = dict(STEER_CENTER_OFFSETS)
+        self._last_manual_drive_axis_sign = 1.0
 
         self.create_subscription(TwistStamped, "/drives_controller/cmd_vel", self._controller_cmd_vel_cb, 10)
         self.create_subscription(
@@ -652,14 +653,21 @@ class UsamaControlRosNode(Node):
         return {"mode": "idle", "source": "idle"}
 
     def _manual_command(self, manual: ManualCommandState) -> dict[str, object]:
+        drive_axis_sign = self._manual_drive_axis_sign(manual.vx)
+        speed_rps = abs(manual.speed_rps) * drive_axis_sign
         return {
             "mode": "swerve",
             "source": "controller_topics",
-            "vx": manual.vx,
+            "vx": abs(manual.vx),
             "vy": manual.vy,
             "omega": manual.omega,
-            "speed_rps": manual.speed_rps,
+            "speed_rps": speed_rps,
         }
+
+    def _manual_drive_axis_sign(self, vx: float) -> float:
+        if abs(vx) > self.controller_deadzone:
+            self._last_manual_drive_axis_sign = 1.0 if vx >= 0.0 else -1.0
+        return self._last_manual_drive_axis_sign
 
     def _autonomy_command(self, autonomy: AutonomyCommandState) -> dict[str, object]:
         return {

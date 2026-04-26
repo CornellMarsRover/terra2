@@ -16,10 +16,10 @@ def generate_launch_description():
         # Start drives node
         launch_ros.actions.Node(
             package='cmr_controls',
-            executable='swerve_controller_node',
-            name='swerve_controller_node',
+            executable='new_swerve_node',
+            name='new_swerve_node',
             output='screen',
-            parameters=[{}]
+            parameters=[{'drive_rps': 22.0}]
         ),
 
         # Start state machine node

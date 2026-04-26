@@ -5,8 +5,8 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='cmr_controls',
-            executable='swerve_controller_node',
-            name='swerve_controller_node',
+            executable='new_swerve_node',
+            name='new_swerve_node',
             output='screen',
         ),
     ])

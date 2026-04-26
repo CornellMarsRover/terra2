@@ -15,6 +15,9 @@ class GPSBasestation(Node):
 
         super().__init__('gps_basestation')
         self.started = False
+        self.ser = None
+        self.server_socket = None
+        self.client_socket = None
 
         # ------------------------
         # 1. Open serial port
@@ -40,15 +43,19 @@ class GPSBasestation(Node):
         # ------------------------
         # 3. Set up TCP socket for broadcast
         # ------------------------
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.server_address = ('0.0.0.0', 4990)  # All IPs
-        self.server_socket.bind(self.server_address)
-        self.server_socket.listen(1)  # Only one connection (rover)
+        if not self.setup_server_socket():
+            self.close_resources()
+            return
+
         self.get_logger().info(f"Waiting for rover to connect on {self.server_address}...")
 
         # Accept connection from rover (this blocks until rover connects)
-        self.client_socket, self.client_address = self.server_socket.accept()
+        try:
+            self.client_socket, self.client_address = self.server_socket.accept()
+        except Exception as e:
+            self.get_logger().error(f"Failed while waiting for rover connection: {e}")
+            self.close_resources()
+            return
         self.get_logger().info(f"Rover connected from {self.client_address}")
         
         # ------------------------
@@ -59,6 +66,32 @@ class GPSBasestation(Node):
 
         self.started = True
         self.get_logger().info("GPS Basestation node started in Fixed mode.")
+
+    def setup_server_socket(self):
+        self.server_address = ('0.0.0.0', 4990)  # All IPs
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        try:
+            self.server_socket.bind(self.server_address)
+            self.server_socket.listen(1)  # Only one connection (rover)
+        except OSError as e:
+            self.get_logger().error(
+                f"Could not open basestation TCP server on {self.server_address}: {e}. "
+                "Stop any old basestation/rover process using port 4990, then launch again."
+            )
+            return False
+
+        return True
+
+    def close_resources(self):
+        for resource in (self.client_socket, self.server_socket, self.ser):
+            if resource is None:
+                continue
+            try:
+                resource.close()
+            except Exception:
+                pass
 
     def configure_position_selection_mode(self):
         """
@@ -111,7 +144,7 @@ class GPSBasestation(Node):
             while not stop_reader.is_set() and rclpy.ok():
                 try:
                     msg = self.ubr.read()
-                    if msg[0] is None:
+                    if msg[0] is None or msg[1] is None:
                         continue
 
                     parsed = msg[1]
@@ -262,7 +295,7 @@ class GPSBasestation(Node):
         while rclpy.ok():
             try:
                 msg = self.ubr.read()
-                if msg[0] is None:
+                if msg[0] is None or msg[1] is None:
                     continue
                 raw, parsed = msg[0], msg[1]
                 self.get_logger().info(f"{parsed}")
@@ -276,10 +309,12 @@ def main(args=None):
     rclpy.init(args=args)
     node = GPSBasestation()
     if not node.started:
+        node.close_resources()
         node.destroy_node()
         rclpy.shutdown()
         return
     rclpy.spin(node)
+    node.close_resources()
     node.destroy_node()
     rclpy.shutdown()
 

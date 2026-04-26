@@ -1,0 +1,80 @@
+# Astrotech GCS interface contract (Phase 2a).
+#
+# Single source of truth for every topic, service, and action name the mock
+# rover advertises and the Foxglove extension subscribes to. Nothing in this
+# file is hardware-confirmed — see docs/phase2a_assumptions.md for the full
+# assumption list and the TODO(astrotech-q-N) map.
+#
+# When an answer arrives, edit this file first, then grep
+# `TODO(astrotech-q-N)` for code that consumes the changed section.
+#
+# The TypeScript mirror of this file lives at
+# gcs/extensions/urc-astrotech-panels/src/interfaces.ts. Keep the two in sync
+# manually — the file is small (<50 lines of TS) and runtime YAML parsing in
+# the browser is not worth the dependency.
+
+auger:
+  # TODO(astrotech-q-1): cmd_type assumes a single Twist carrying both
+  # linear-Z (up/down) and angular-Z (spin). If the real driver splits these
+  # into two topics or uses different units, change cmd_type/cmd_topic here
+  # and in drivers/auger.py.
+  cmd_topic: /astrotech/auger/cmd
+  cmd_type: geometry_msgs/Twist
+  state_topic: /astrotech/auger/state
+  state_type: cmr_msgs/AugerState
+  state_rate_hz: 20
+
+mixing_servo:
+  # TODO(astrotech-q-2): controller family unknown; preset names are labels
+  # only. Mock stores the last preset as state.
+  set_preset_service: /astrotech/mixing_servo/set_preset
+  set_preset_type: cmr_msgs/SetMixingServoPreset
+  state_topic: /astrotech/mixing_servo/state
+  state_type: std_msgs/String
+  state_rate_hz: 5
+  presets: [S1, S2, CO2_1, CO2_2, RETRACT]
+
+analysis:
+  # TODO(astrotech-q-3): duration and step semantics are placeholders.
+  # TODO(astrotech-q-4): sequence_id vs. site_num naming unresolved.
+  action_type: cmr_msgs/RunAnalysisSequence
+  mock_duration_sec: 10.0
+  sequences:
+    - id: 1
+      action: /astrotech/analysis/run_sequence_1
+    - id: 2
+      action: /astrotech/analysis/run_sequence_2
+
+raman:
+  # TODO(astrotech-q-5): if a real driver exists in another repo with its
+  # own message type, replace `type` here, regenerate the TS mirror, and
+  # delete cmr_msgs/msg/RamanSpectrum.msg.
+  topic: /astrotech/raman/spectrum
+  type: cmr_msgs/RamanSpectrum
+  rate_hz: 1.0
+  wavenumber_min: 200.0
+  wavenumber_max: 2000.0
+  n_points: 1024
+  mock_peaks_cm_inv: [1085.0, 1332.0, 1580.0]
+
+env:
+  # TODO(astrotech-q-6): same as Q5 — swap to external type if one exists.
+  topic: /astrotech/env/sample
+  type: cmr_msgs/EnvSample
+  rate_hz: 1.0
+
+cameras:
+  topic_type: foxglove_msgs/CompressedVideo
+  fps: 15
+  feeds:
+    # TODO(astrotech-q-9): id → role mapping is a placeholder. Phase 2b
+    # will resolve from a device-lookup config file or udev rules.
+    - id: 0
+      role: auger_cam
+      topic: /camera_0/h264
+    - id: 2
+      role: site_cam
+      topic: /camera_2/h264
+    - id: 4
+      role: analysis_cam
+      topic: /camera_4/h264

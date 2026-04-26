@@ -29,6 +29,10 @@ rosidl_generate_interfaces(
   msg/IMUSensorData.msg
   msg/Int16ArrayStamped.msg
   msg/GroundPlaneStamped.msg
+  # Astrotech (URC 2026) — see docs/phase2a_assumptions.md
+  msg/RamanSpectrum.msg
+  msg/EnvSample.msg
+  msg/AugerState.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv
@@ -36,7 +40,9 @@ rosidl_generate_interfaces(
   srv/ReleaseDependency.srv
   srv/NotifyDeactivate.srv
   srv/SiteAnalyze.srv
+  srv/SetMixingServoPreset.srv
   action/TestTargetPosition.action
+  action/RunAnalysisSequence.action
   DEPENDENCIES
   std_msgs
   geometry_msgs)

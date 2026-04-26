@@ -55,6 +55,73 @@ Terra contains all the code that is part of a ROS codebase and implements the br
   back-pressure the bridge. Command and service topics stay on reliable QoS.
   See the `BEST_EFFORT_TOPIC_REGEXES` list in the launch file.
 
+### Astrotech Mock Rover: [src/urc_mock_rover](./src/urc_mock_rover)
+- **Description:** Fake rover node that publishes every Astrotech GCS
+  topic/service/action described in
+  [`src/urc_mock_rover/config/astrotech_interfaces.yaml`](./src/urc_mock_rover/config/astrotech_interfaces.yaml).
+  Lets GCS development happen with no real hardware.
+- **Assumptions and Q-number map:** [docs/phase2a_assumptions.md](./docs/phase2a_assumptions.md).
+
+## Developing the Astrotech GCS without the rover
+
+One-time setup:
+
+```bash
+# 1. Build the workspace (only the GCS-relevant packages are strictly needed).
+colcon build --symlink-install --packages-select cmr_msgs urc_mock_rover
+
+# 2. Generate the sample H.264 video the mock cameras loop over.
+#    Requires ffmpeg on PATH.
+./scripts/fetch_sample_video.sh
+```
+
+Then, each dev session:
+
+```bash
+source install/setup.bash
+ros2 launch urc_mock_rover mock.launch.py
+```
+
+That single command starts the mock rover plus the Foxglove bridge on
+`ws://localhost:8765`. In Foxglove Studio:
+
+1. **Open Connection** → `ws://localhost:8765`.
+2. **Layouts → Import from file** →
+   [`gcs/layouts/urc_astrotech_dashboard.json`](./gcs/layouts/urc_astrotech_dashboard.json).
+3. (First time only) install the custom panels extension:
+
+```bash
+cd gcs/extensions/urc-astrotech-panels
+npm install
+npm run build
+npm run local-install
+# Fully quit + relaunch Foxglove Studio for panels to appear.
+```
+
+A smoke test that builds, launches, checks expected topics and rates, and
+calls a service is at [`scripts/smoke_test.sh`](./scripts/smoke_test.sh).
+Run from the repo root on a ROS 2 Humble machine.
+
+### When `astrotech-q-N` is answered — files to change
+
+Every assumption currently baked into the mock is tagged in source with
+`TODO(astrotech-q-N)`. When the team gives an answer, grep the tag and
+update these files in lockstep. (`docs/phase2a_assumptions.md` holds the
+question text; repeated here only as a lookup table.)
+
+| Q | What to change |
+|---|---|
+| Q1 — auger controller | `docs/phase2a_assumptions.md`; `src/urc_mock_rover/config/astrotech_interfaces.yaml` (`auger:`); `src/urc_mock_rover/urc_mock_rover/drivers/auger.py`; `src/cmr_msgs/msg/AugerState.msg`; `gcs/extensions/urc-astrotech-panels/src/interfaces.ts` (`Auger`); `gcs/extensions/urc-astrotech-panels/src/panels/AugerControl.tsx` |
+| Q2 — mixing servo controller | `astrotech_interfaces.yaml` (`mixing_servo:`); `drivers/mixing_servo.py`; `interfaces.ts` (`MixingServo`); `panels/MixingServo.tsx` |
+| Q3 — BDC sequence controller, duration, step names | `astrotech_interfaces.yaml` (`analysis.mock_duration_sec`); `drivers/analysis_sequencer.py` (`_PHASES`) |
+| Q4 — `sequence_id` vs. `site_num` naming | `src/cmr_msgs/action/RunAnalysisSequence.action`; `drivers/analysis_sequencer.py`; `interfaces.ts` (`Analysis`); `panels/AnalysisSequence.tsx` (button labels) |
+| Q5 — Raman driver message type | `astrotech_interfaces.yaml` (`raman.type`); `src/cmr_msgs/msg/RamanSpectrum.msg` (delete if replaced); `drivers/raman.py`; `interfaces.ts` (`Raman`); `panels/RamanSpectrum.tsx` |
+| Q6 — CO2/humidity driver message type | same shape as Q5: `env:` YAML block, `EnvSample.msg`, `drivers/env.py`, `Env` in `interfaces.ts` |
+| Q9 — camera id → logical role mapping | `astrotech_interfaces.yaml` (`cameras.feeds`); `interfaces.ts` (`Cameras`); `gcs/layouts/urc_astrotech_dashboard.json` (Image panel `imageTopic` fields) |
+
+Q7, Q8, Q11, Q12, Q13 are intentionally deferred per Phase 1 — see
+`docs/open_questions.md`.
+
 ## TODO Functionality
 
 - **Autonomous Navigation:** [cmr_navigation](./src/cmr_navigation/)

@@ -1,14 +1,25 @@
-# Honest, commanded-only telemetry. The Astrotech CAN-FD library exposes no
-# motor feedback (no encoder, current, or completion ack), so anything beyond
-# "what we last commanded and when" would be fabricated.
-# See docs/astrotech_canfd_library_notes.md §5.
+# State for the moteus-driven auger.
+# lead_screw (id=15): vertical motion. auger (id=16): rotation.
+#
+# These fields are real closed-loop telemetry: moteus controllers
+# expose position/velocity/torque/temperature/mode/fault on every
+# cycle, unlike the BDC and servo boards on Caitlin's library which
+# stay open-loop.
 
-uint8 COMMAND_KIND_NONE = 0
-uint8 COMMAND_KIND_UP = 1
-uint8 COMMAND_KIND_DOWN = 2
-uint8 COMMAND_KIND_SPIN_FORWARD = 3
-uint8 COMMAND_KIND_SPIN_BACKWARD = 4
+builtin_interfaces/Time stamp
 
-uint8 last_command_kind
-float32 commanded_duration
-builtin_interfaces/Time commanded_at
+# Lead screw
+float32 lead_screw_position_rev
+float32 lead_screw_velocity_rev_s
+float32 lead_screw_torque_Nm
+float32 lead_screw_temperature_C
+uint8   lead_screw_mode
+uint8   lead_screw_fault
+
+# Auger
+float32 auger_position_rev
+float32 auger_velocity_rev_s
+float32 auger_torque_Nm
+float32 auger_temperature_C
+uint8   auger_mode
+uint8   auger_fault

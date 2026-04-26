@@ -35,17 +35,21 @@ All Astrotech topics/services/actions sit under **`/astrotech/…`**.
 Camera feeds (separate branch) reuse the existing `camera_<id>/h264`
 naming from `usb_camera_publisher`.
 
-## Auger — `TODO(astrotech-q-1)`
+## Auger — moteus stack (Session 5)
 
-- Command topic: **`/astrotech/auger/cmd`** — `geometry_msgs/Twist`.
-  - `linear.z` = vertical velocity (positive = up, negative = down).
-  - `angular.z` = spin velocity (positive = forward, negative = reverse).
-  - Other fields ignored.
-- State topic: **`/astrotech/auger/state`** — `cmr_msgs/AugerState` — 20 Hz.
-- **Assumption pinned at `TODO(astrotech-q-1)`**: one `Twist` carrying both
-  linear and spin velocity. If the hardware driver ends up splitting them
-  into two topics, or changing units (rev/s → rad/s), the tag is on every
-  line that has to change.
+The auger is on **moteus**, not Caitlin's CAN-FD library — two
+controllers (id=15 lead screw, id=16 auger). Reference pattern at
+`docs/reference/auger_keys_test_harness.py`.
+
+- Command topic: **`/astrotech/auger/cmd_vel`** — `cmr_msgs/AugerCommand`
+  (`lead_screw_velocity_rev_s` / `lead_screw_max_torque_Nm` /
+  `auger_velocity_rev_s` / `auger_max_torque_Nm`). Hold-to-act:
+  GCS publishes at 10 Hz while a button is held; driver applies a
+  200 ms watchdog.
+- State topic: **`/astrotech/auger/state`** — `cmr_msgs/AugerState` —
+  20 Hz mock, 50 Hz real (moteus watchdog cadence). Closed-loop fields
+  for both motors: position / velocity / torque / temperature / mode /
+  fault.
 
 ## Mixing servo — `TODO(astrotech-q-2)`
 
@@ -115,8 +119,10 @@ Pseudo-YAML form; the real YAML file is at
 
 ```yaml
 auger:
-  cmd_topic: /astrotech/auger/cmd
-  cmd_type: geometry_msgs/Twist          # TODO(astrotech-q-1)
+  # moteus stack (lead screw id=15, auger id=16); not Caitlin's library.
+  cmd_topic: /astrotech/auger/cmd_vel
+  cmd_type: cmr_msgs/AugerCommand
+  cmd_watchdog_ms: 200
   state_topic: /astrotech/auger/state
   state_type: cmr_msgs/AugerState
   state_rate_hz: 20

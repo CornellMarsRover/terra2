@@ -19,10 +19,11 @@ Last updated: 2026-04-26
 - Sequence orchestration **lives on the main computer** (the Jetson,
   in our ROS 2 graph), not on the BDC boards. The boards are
   fire-and-forget "run motor X for D seconds" devices.
-- Telemetry messages are **commanded-only** when no real feedback is
-  available. The CAN-FD library exposes none, so `AugerState.msg`
-  carries `last_command_kind` / `commanded_duration` / `commanded_at`
-  rather than fictional encoder counts.
+- Telemetry messages are **commanded-only when no real feedback is
+  available, closed-loop where it is.** The BDC / servo / heater
+  stack on Caitlin's library exposes no feedback (commanded-only);
+  the auger is on moteus and has full closed-loop telemetry — see
+  Session 5.
 - **Cameras are off this branch.** Camera feed work happens on a
   separate branch that will merge in later.
 - **Hardware**: custom **BDC boards** (BDC motors / pumps) and
@@ -31,28 +32,22 @@ Last updated: 2026-04-26
   `third_party/astrotech_canfd/` — see
   `docs/astrotech_canfd_library_notes.md`.
 
-**Pending — ask Caitlin** (does **not** block Phase 2b starting; does
-block the real driver wrapper inside Phase 2b). Ordered by impact —
-#1 determines whether `AugerState` and future feedback messages can
-have honest fields beyond commanded-only:
+**Pending — ask Caitlin** (BDC + servo + heater stack only; the auger
+moved to moteus per Session 5 and has its own questions below):
 
 1. can the boards talk back to the jetson? does setting `query_data=1`
    on a command frame return real telemetry (encoder counts, completion
    ack, current), or is it a leftover bit?
-2. diagram of the final electrical layout would help. specifically i
-   need:
-   - `(can_id, motor_id)` for the auger motor, each pump, and the
-     heater;
-   - `(can_id, motor_id)` for the mixing servo, plus the
-     angle/position value for each preset (s1, s2, co2_1, co2_2,
-     retract).
+2. diagram of the final electrical layout for the can-fd stack —
+   `(can_id, motor_id)` for each pump and the heater, plus
+   `(can_id, motor_id)` for the mixing servo and the angle/position
+   value for each preset (s1, s2, co2_1, co2_2, retract).
 3. the `duration` field is 7 bits, max 127. for pumps that run 5+
    minutes, do i chain commands or is there a "run continuously until
    stopped" mode?
-4. when bdc, servo, and any future boards share the same can-fd bus,
-   who owns bus initialization and who handles arbitration if two
-   coroutines want to send frames at once? should one ros 2 node own
-   the bus, or does the library handle multi-writer scenarios?
+4. when bdc and servo boards share the same can-fd bus, who owns bus
+   initialization and arbitration? should one ros 2 node own the bus,
+   or does the library handle multi-writer scenarios?
 5. do the boards send unsolicited fault frames (motor stalled,
    over-current, etc.)? if yes, what's the wire format — and does the
    existing library raise/log them, or just drop them?
@@ -61,6 +56,18 @@ have honest fields beyond commanded-only:
    answerable with `lsusb`/`dmesg` once hardware is in front of me;
    not a blocker.
 
+**Pending — ask project lead / hardware lead** (auger / moteus side):
+
+- are the moteus controllers (lead screw id=15, auger id=16) on a
+  separate `fdcanusb` / pi3hat from the bdc-and-servo can-fd bus, or
+  do they share one transport?
+- gear ratios for lead screw and auger (motor revolutions →
+  physical output: mm of vertical travel for the lead screw, real
+  rev/s of the auger flutes after gear reduction)?
+- safe operating ranges for torque, velocity, and lead-screw
+  position — what hard limits should the panel and the driver enforce
+  before we trust an operator to hold a button?
+
 **Pending — confirm against URC 2026 rulebook** (only blocks competition
 freeze, not development):
 
@@ -68,13 +75,11 @@ freeze, not development):
   working assumption from prior years. Confirm before we lock the
   Foxglove topic whitelist.
 
-**Phase status**:
-
-- Phase 2a snapshot at SHA `eef937c`.
-- Phase 2a revision (`6bd8fcf`) drops pause/resume from the action,
-  swaps `AugerState` to commanded-only, removes camera scaffolding.
-- Phase 2b will introduce a real CAN-FD driver wrapper plus build the
-  panel widgets. Pending the open questions above.
+**Phase status**: Phase 2a snapshot at `eef937c`; revision pass at
+`6bd8fcf` (dropped pause/resume, removed cameras); auger pass (this
+commit) restored closed-loop `AugerState` and added `AugerCommand`
+after Session 5. Phase 2b will wrap **two** driver stacks: moteus
+(auger) and Caitlin's CAN-FD library (pumps + servo + heater).
 
 ## Slack draft to Caitlin
 
@@ -125,191 +130,115 @@ pre-programmed routine.
 
 ## Session 2 — Asked
 
-### Q2. Sequence behavior — step by step
-
-**Asked:** Walk me through what Seq 1 and Seq 2 actually do, step by
-step. Rough description is fine ("servo moves to S1, auger drops, BDC
-motor A runs for N seconds, then...").
-
-**Answer:** _(still pending)_ — partly subsumed by Session 3
-(sequences are fluidic protocols orchestrating pumps + servo + heater)
-but no specific step list yet.
-
----
-
-### Q3. Sequence duration
-
-**Resolved in Session 3:** 5–10 minutes end to end.
-
----
-
-### Q4. Cancellable mid-run?
-
-**Resolved in Session 4:** run-to-completion with hard abort. Cancel
-returns the action with `success=false`; rover stays in whatever state
-it was in. Pause/resume deferred to `docs/post_urc_backlog.md`.
-
----
-
-### Q5. Sequence logic location
-
-**Resolved in Session 3:** main computer (Jetson, in our ROS 2 graph).
-Boards are fire-and-forget; the host has to be the sequencer.
-
----
-
-### Q6. BDC board hardware and comms
-
-**Resolved in Session 3:** custom CMR PCBs, CAN-FD over an mjbots
-`usbcanfd` USB-CAN dongle. Library at `third_party/astrotech_canfd/`.
+| # | Question | Status |
+|---|---|---|
+| Q2 | Sequence behavior — step by step ("servo moves to S1, auger drops, BDC motor A runs N s, …") | **Still pending.** Partly subsumed by Session 3 (sequences are fluidic protocols) but no specific step list yet. |
+| Q3 | Sequence duration | **Resolved (Session 3):** 5–10 minutes end to end. |
+| Q4 | Cancellable mid-run? | **Resolved (Session 4):** run-to-completion with hard abort. Pause/resume → `post_urc_backlog.md`. |
+| Q5 | Sequence logic location | **Resolved (Session 3):** main computer (Jetson). Boards are fire-and-forget. |
+| Q6 | BDC board hardware and comms | **Resolved (Session 3):** custom CMR PCBs, CAN-FD over an mjbots `usbcanfd` dongle. Library at `third_party/astrotech_canfd/`. |
 
 ---
 
 ## Future sessions — still open after Sessions 1–4
 
-Held questions that haven't been answered or migrated to the Pending
-list at the top. Resolved/superseded items have been pruned; what
-remains:
+Held questions not migrated to the top-of-file Pending list. Resolved
+/ superseded items pruned (A1/A2, C1, D, F2 — see end of section).
 
-### Cluster B — Sensors
-- B1. Raman unit make/model. Does a vendor SDK publish to ROS 2, or
-      do we write the driver? What does one capture return (array
-      length, x-axis units, y-axis scale)?
-- B2. CO2 + humidity sensor part number. Response time, sampling rate.
-      Combined sensor or two separate?
+- **B1.** Raman unit make/model. Vendor SDK with ROS 2 support, or do
+  we write the driver? Capture-return shape (array length, x-axis
+  units, y-axis scale)?
+- **B2.** CO2 + humidity sensor part number. Response time / sampling
+  rate. Combined sensor or two separate?
+- **C2.** Who calibrates the mixing-chamber preset values when the
+  mechanism changes?
+- **C3.** Do presets live in rover-side config (YAML) or in firmware?
+- **E1.** Is the GCS layout for the Science Mission specifically, or
+  a universal operator view across all four URC missions?
+- **E2.** Who operates the GCS during the mission window — fixed or
+  rotating student?
+- **E3.** Sample-analysis walkthrough: who commands the mixing servo
+  at each step, operator or sequence?
+- **F1.** Was there previous Astrotech ROS 2 work that got deleted or
+  parked on a branch?
 
-### Cluster C — Mixing chamber servo presets
-- C2. Who calibrates and owns updating preset values when the
-      mechanism changes?
-- C3. Do presets live in a rover-side config (yaml) or hardcoded in
-      firmware?
-
-### Cluster D — Snapshots
-Deferred to `docs/post_urc_backlog.md` §4. Re-open after URC if the
-science-writeup workflow needs them.
-
-### Cluster E — Mission scope
-- E1. Is this GCS layout specifically for the Science Mission, or a
-      universal operator view across all four URC missions?
-- E2. During the mission window, who operates the GCS? Same student
-      every time, or rotating?
-- E3. Complete sample-analysis walkthrough: who commands the mixing
-      servo at each step, operator or sequence?
-
-### Cluster F — Team / repo hygiene
-- F1. Was there previous work on Astrotech ROS 2 nodes that got
-      deleted or parked on a branch?
-
-(Resolved or absorbed elsewhere: A1/A2 — moteus + servo board on
-CAN-FD per Session 3; C1 — folded into the diagram-of-electrical-
-layout question at the top; F2 — RF cap is now in the URC rulebook
-pending bucket.)
+(Resolved/absorbed: A1/A2 — moteus + servo board on CAN-FD per
+Session 3; C1 — folded into the electrical-layout question at top;
+D1–D3 → `post_urc_backlog.md` §4; F2 → URC rulebook pending bucket.)
 
 ---
 
 ## Session 3 — 2026-04-26
 
-Confirmed answers received from Astrotech (paraphrased; lock these in
-the assumptions doc on next pass):
+Confirmed by Astrotech (the canonical statements; the *implications*
+have all been folded into Current state at the top of this file):
 
-### Sequence duration
-
-- Each analysis sequence runs **5–10 minutes** end to end.
-- Implication for Phase 2a mock: the 10-second linear-ramp placeholder
-  in `MockAnalysisSequencer` is meaningless at this scale. Replace
-  before any operator workflow review.
-
-### Pause / resume requirement
-
-- Sequences must be **resumable from approximately the same point**
-  if aborted mid-run.
-- "Approximately the same point" almost certainly means **step-level**
-  (resume the next fluidic step that hadn't reported success), but
-  this is **not yet confirmed** — open question for next Caitlin
-  exchange.
-- Implication: the `RunAnalysisSequence.action` shape is wrong.
-  Pause/resume need to be modelled — see `docs/phase_2a_overview.md §6.1`.
-
-### Sequence content
-
-- Sequences are **physical fluidic protocols**, not "run motor X for
-  N seconds in sequence." They orchestrate pumps, valves, mixing
-  chamber positions, heater on/off, and (probably) sensor reads.
-- The Ninhydrin chemistry path requires a **heater** that is currently
-  not represented anywhere in the GCS / mock rover. Add as a Phase 2b
-  deliverable.
-- Implication: feedback should expose `step_index / total_steps` and
-  a step-name (e.g. "Pump A 30 s", "Mixing chamber → CO2_1", "Heater
-  on, hold 60 s") rather than a raw progress percentage.
-
-### Hardware layer
-
-- **BDC boards** drive the brushed-DC motors used as fluidic pumps.
-  Each board addresses up to 6 motors over CAN-FD. Default board CAN
-  ID `2`; a second board would be `4`.
-- **Servo boards** drive hobby servos including the mixing chamber.
-  Each board addresses up to 16 servos. Default board CAN ID `1`; a
-  second board would be `3`.
-- Bus is **CAN-FD over a USB-CAN converter** (mjbots `usbcanfd`
-  dongle, hosted as a serial port).
-- An **asyncio Python library** already exists; it is now vendored
-  under `third_party/astrotech_canfd/`. See
-  `docs/astrotech_canfd_library_notes.md` for the API surface.
-
-### Sequence orchestration location
-
-- Confirmed: orchestration **must live on the main computer** (the
-  Jetson, in our ROS 2 graph), not in board firmware. Pause/resume
-  cannot be implemented on the boards because the boards' command
-  shape is "run motor X for N seconds, fire and forget" with no
-  intra-command pause.
-- Implication: the analysis sequencer node owns the sequence script,
-  the elapsed time per in-flight motor command, and is the only
-  authority that knows where in the protocol the rover currently is.
+- **Sequence duration:** 5–10 minutes end to end.
+- **Pause/resume:** must be resumable from approximately the same
+  point if aborted. (Later overruled by Session 4 → run-to-completion;
+  the resume requirement is in `docs/post_urc_backlog.md`.)
+- **Sequence content:** physical fluidic protocols — pumps, valves,
+  mixing-chamber positions, heater on/off, sensor reads. The
+  Ninhydrin path needs a heater (not yet represented in GCS / mock).
+- **Hardware (BDC + servo stack):** custom **BDC boards** (≤6 motors,
+  default CAN id 2) and **Servo boards** (≤16 servos, default CAN id
+  1) over **CAN-FD via mjbots `usbcanfd` dongle**. Asyncio Python
+  library at `third_party/astrotech_canfd/` (see
+  `docs/astrotech_canfd_library_notes.md`).
+- **Orchestration location:** main computer (Jetson, in our ROS 2
+  graph), not board firmware. Boards are fire-and-forget
+  `move_motor_for_N_seconds` devices.
 
 ---
 
 ## Session 4 — 2026-04-26 (decisions only — no new questions answered)
 
-After internal scoping discussion, the team made the following calls
-about how to handle the open Session 3 ambiguity given URC timing:
+Team scoping calls in response to Session 3, given URC timing. All
+four are now reflected in Current state at the top; recapped briefly
+for the historical record.
 
-### Decision 1: run-to-completion with hard abort
+1. **Run-to-completion with hard abort.** Cancel returns
+   `success=false`; rover stays put. Pause/resume → `post_urc_backlog`.
+2. **Commanded-only telemetry where no feedback exists.**
+   `RamanSpectrum`, `EnvSample`, `SetMixingServoPreset` already
+   honest; `AugerState` was rewritten to commanded-only. _(Session 5
+   later overrode this for the auger only — moteus does provide real
+   telemetry. The BDC + servo + heater stack stays open-loop.)_
+3. **Pause/resume deferred to post-URC.** Three implementation
+   options ranked in `docs/post_urc_backlog.md`.
+4. **Cameras off this branch.** All Phase 2a camera scaffolding
+   removed from `astrotech-gui` to avoid merge conflicts with the
+   parallel camera branch.
 
-- Sequences run start-to-finish; cancel returns the action with
-  `success=false` and leaves the rover wherever it stopped. Recovery
-  is the operator's problem.
-- Reason: the CAN-FD library exposes no motor feedback, so any
-  pause/resume design today would be guessing about elapsed-vs-
-  commanded time. A 5–10 minute redo is acceptable.
-- Code change: `RunAnalysisSequence.action` revised to drop
-  `progress_pct`; new feedback is `current_step / total_steps /
-  current_step_description / elapsed_seconds`; new result field
-  `last_completed_step`.
+---
 
-### Decision 2: telemetry messages are commanded-only when there's no real feedback
+## Session 5 — 2026-04-26 (auger is on moteus, not Caitlin's library)
 
-- `AugerState.msg` rewritten to `last_command_kind` /
-  `commanded_duration` / `commanded_at`. No fictional encoder counts.
-- Other custom messages audited: `RamanSpectrum`, `EnvSample`,
-  `SetMixingServoPreset` survive unchanged (they describe sensor
-  measurements or service-accept-success, not motor feedback).
+Astrotech sent over `auger_keys.py`, a hand-rolled keyboard test
+script (now vendored at `docs/reference/auger_keys_test_harness.py`).
+The script uses Josh Pieper's `moteus` Python library against two
+controllers — id=15 (lead screw, vertical), id=16 (auger, rotation) —
+on `moteus.get_singleton_transport()`. Velocity-mode commands are
+issued as `make_position(position=NaN, velocity=X, maximum_torque=Y)`
+on a 50 Hz watchdog loop while a key is held. moteus exposes
+position, velocity, torque, temperature, mode, and fault per cycle,
+so closed-loop telemetry is real for the auger.
 
-### Decision 3: pause/resume deferred to post-URC
+Resulting changes (this commit):
 
-- Logged in `docs/post_urc_backlog.md` with three implementation
-  options ranked. Re-open after URC.
+- `cmr_msgs/msg/AugerState.msg` rewritten to closed-loop fields for
+  both lead screw and auger (overrides Session 4 Decision 2 for the
+  auger only — the BDC + servo + heater stack stays open-loop).
+- `cmr_msgs/msg/AugerCommand.msg` added: hold-to-act velocity
+  command with per-motor max-torque limits, 200 ms watchdog at the
+  driver.
+- Mock auger driver rewritten to publish 20 Hz simulated telemetry
+  with first-order velocity tracking, random-walk torque, and slow
+  thermal drift.
+- Foxglove auger panel rewritten as hold-to-act with live telemetry
+  readout. Defaults match the test script: lead screw ±100 rev/s
+  @ 2.0 N·m, auger +10 rev/s forward / −50 rev/s reverse @ 1.0 N·m.
 
-### Decision 4: camera feed work merging from a different branch
-
-- All Phase 2a camera scaffolding (mock replayer, NAL splitter,
-  fetch script, sample H.264 asset, camera entries in YAML / TS
-  mirror / Foxglove layout, Q9 tags) removed from `astrotech-gui`.
-- Reason: avoid merge conflicts with the camera branch. The Foxglove
-  layout drops to a 2×3 grid; `Image` panels can be re-added when
-  the branches merge.
-
-(Open questions for Caitlin live at the top of this file under
-"Current state → Pending — ask Caitlin", with a copy-paste Slack
-draft right after.)
-
+The Caitlin pending list at the top is now scoped to the BDC + servo
+stack only. Question 1 (`query_data=1` telemetry) and question 4
+(bus arbitration) no longer apply to the auger.

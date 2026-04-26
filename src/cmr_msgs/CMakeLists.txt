@@ -33,6 +33,7 @@ rosidl_generate_interfaces(
   msg/RamanSpectrum.msg
   msg/EnvSample.msg
   msg/AugerState.msg
+  msg/AugerCommand.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv

@@ -49,12 +49,15 @@ override that maps to (3). Skip (2) until board feedback exists.
   buttons, wire to the new service / goal field.
 - `docs/phase2a_assumptions.md`: re-add the pause/resume row.
 
-## 2. Real motor feedback
+## 2. Real motor feedback for the BDC + servo + heater stack
 
-**Why deferred.** The current Astrotech library doesn't read board
-replies. Adding a feedback path is a hardware-firmware-host ladder
-that needs Caitlin (and possibly hardware revisions to the BDC /
-Servo board firmware).
+**Scope.** The auger is on moteus and *already* has closed-loop
+telemetry; this item is **only** about the BDC pumps, mixing servo,
+and heater on Caitlin's CAN-FD library.
+
+**Why deferred.** The library doesn't read board replies. Adding a
+feedback path is a hardware-firmware-host ladder that needs Caitlin
+(and possibly firmware revisions to the BDC / Servo boards).
 
 **What we'd want.**
 
@@ -66,10 +69,9 @@ Servo board firmware).
 
 **What to change when feedback exists.**
 
-- `cmr_msgs/msg/AugerState.msg` regains real fields (replace or
-  extend the commanded-only set).
-- The Phase 2b driver wrapper consumes `rcv` lines and decodes board
-  telemetry into ROS topics.
+- The Phase 2b CAN-FD driver wrapper consumes `rcv` lines and decodes
+  board telemetry into ROS topics.
+- New / extended state messages for pumps and the mixing servo.
 - Pause/resume option (2) becomes feasible.
 
 ## 3. CI integration of `scripts/smoke_test.sh`

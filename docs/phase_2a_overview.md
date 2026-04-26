@@ -7,10 +7,11 @@ reference-detail companion.
 
 ## What was built
 
-- **`src/cmr_msgs/`** — five new interfaces, all listed in
+- **`src/cmr_msgs/`** — six new interfaces, all listed in
   `CMakeLists.txt`:
-  - `msg/RamanSpectrum.msg`, `msg/EnvSample.msg`, `msg/AugerState.msg`
-    (commanded-only after the post-Caitlin revision).
+  - `msg/RamanSpectrum.msg`, `msg/EnvSample.msg`.
+  - `msg/AugerState.msg` (closed-loop, moteus telemetry shape) +
+    `msg/AugerCommand.msg` (hold-to-act velocity command).
   - `srv/SetMixingServoPreset.srv`.
   - `action/RunAnalysisSequence.action` (post-revision: int8 goal,
     `last_completed_step` in result, `current_step / total_steps /
@@ -19,7 +20,8 @@ reference-detail companion.
 - **`src/urc_mock_rover/`** — ament_python package. Single coordinator
   node (`mock_rover_node`) loads `config/astrotech_interfaces.yaml` and
   spins one driver per feature area:
-  - `drivers/auger.py` — commanded-only `AugerState` echo.
+  - `drivers/auger.py` — closed-loop `AugerState` simulation (moteus
+    stack, lead-screw + auger).
   - `drivers/mixing_servo.py` — preset service + state echo.
   - `drivers/analysis_sequencer.py` — stateless action server, N fake
     steps × per-step duration (default 5 × 2 s).
@@ -121,7 +123,6 @@ question text and the latest answer status.
 
 | Q | In source | Topic |
 |---|---|---|
-| Q1 | `auger.py`, `AugerState.msg`, `astrotech_interfaces.yaml`, `interfaces.ts`, `panels/AugerControl.tsx` | Auger controller cmd shape (currently `geometry_msgs/Twist`). Moteus confirmed; final wire shape still unconfirmed. |
 | Q2 | `astrotech_interfaces.yaml`, `mixing_servo.py`, `interfaces.ts`, `panels/MixingServo.tsx` | Mixing servo controller family. |
 | Q3 | `astrotech_interfaces.yaml`, `analysis_sequencer.py` | Real sequence step set + durations. Mock uses 5 generic steps. |
 | Q4 | `RunAnalysisSequence.action`, `analysis_sequencer.py` | `sequence_id` vs `site_num` semantics. |
@@ -169,16 +170,22 @@ service taking a preset name) is correct; the driver-side topology is
 a Phase 2b problem, owned by whichever ROS 2 node wraps the
 vendored library.
 
-### 6.4 `AugerState` exposed encoder fields that don't exist
+### 6.4 `AugerState` — the right answer changed twice
 
-The CAN-FD library has zero feedback (no encoder, current, completion
-ack). Phase 2a's `AugerState` had `position_rev`, `velocity_rev_s`,
-`is_moving` — all fabricated.
+Phase 2a originally had `position_rev` / `velocity_rev_s` / `is_moving`
+under the assumption the auger lived on Caitlin's CAN-FD library
+(zero feedback). The first revision swapped to commanded-only
+(`last_command_kind` / `commanded_duration` / `commanded_at`) — a
+correct simplification under that wrong assumption.
 
-**Revision-pass decision (this commit):** rewrote to commanded-only
-fields: `last_command_kind` (enum), `commanded_duration`,
-`commanded_at`. `MockAugerDriver` was rewritten to publish these
-honestly; no integration of fake position over time.
+**Final shape (Session 5):** Astrotech sent a working test script
+showing the auger is on **moteus**, not Caitlin's library. moteus
+exposes per-cycle position, velocity, torque, temperature, mode, and
+fault, so closed-loop fields are honest after all. `AugerState` is
+now a closed-loop message covering both lead-screw and auger motors;
+`MockAugerDriver` publishes plausible simulated telemetry at 20 Hz
+(real driver will run at the moteus 50 Hz watchdog cadence). See
+`docs/reference/auger_keys_test_harness.py` for the source pattern.
 
 ### 6.5 Heater (Ninhydrin) is not represented
 

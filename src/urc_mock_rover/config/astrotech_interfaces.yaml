@@ -14,12 +14,14 @@
 # the browser is not worth the dependency.
 
 auger:
-  # TODO(astrotech-q-1): cmd_type assumes a single Twist carrying both
-  # linear-Z (up/down) and angular-Z (spin). If the real driver splits these
-  # into two topics or uses different units, change cmd_type/cmd_topic here
-  # and in drivers/auger.py.
-  cmd_topic: /astrotech/auger/cmd
-  cmd_type: geometry_msgs/Twist
+  # The auger lives on TWO moteus controllers (id=15 lead_screw, id=16 auger)
+  # using Josh Pieper's `moteus` library — *not* Caitlin's CAN-FD library.
+  # See docs/reference/auger_keys_test_harness.py for the upstream pattern.
+  # Hold-to-act: GCS publishes AugerCommand at 10 Hz while a button is held;
+  # the driver applies a 200 ms watchdog and zeros velocities on silence.
+  cmd_topic: /astrotech/auger/cmd_vel
+  cmd_type: cmr_msgs/AugerCommand
+  cmd_watchdog_ms: 200
   state_topic: /astrotech/auger/state
   state_type: cmr_msgs/AugerState
   state_rate_hz: 20

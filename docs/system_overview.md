@@ -28,8 +28,8 @@ via `foxglove_bridge` over WebSocket.
   registering four custom panel types as **stubs** — clicks log to
   the browser console; Phase 2b lights them up.
 - New custom interfaces in `cmr_msgs`: `RamanSpectrum`, `EnvSample`,
-  `AugerState` (commanded-only), `SetMixingServoPreset`,
-  `RunAnalysisSequence`.
+  `AugerState` + `AugerCommand` (closed-loop, moteus stack),
+  `SetMixingServoPreset`, `RunAnalysisSequence`.
 
 ## What's not built
 
@@ -37,9 +37,16 @@ via `foxglove_bridge` over WebSocket.
   later.
 - **Pause/resume on analysis sequences** — deferred to post-URC. Today
   is run-to-completion with hard abort. See `post_urc_backlog.md`.
-- **Real driver wrapper for Caitlin's CAN-FD library** — Phase 2b.
-  Pending answers to a few questions in `astrotech_interview_notes.md`
-  (chunking long durations, board feedback, board addressing).
+- **Real driver wrappers** — Phase 2b. Astrotech actuators split
+  across **two independent CAN-FD stacks**:
+  - **moteus** for the auger (lead screw id=15, auger id=16) — uses
+    Josh Pieper's pip-installable `moteus` library; closed-loop
+    telemetry available. Reference pattern at
+    `reference/auger_keys_test_harness.py`.
+  - **Caitlin's library** at `third_party/astrotech_canfd/` for the
+    pumps, mixing servo, and heater — open-loop, no feedback today.
+  These are separate driver nodes in the eventual real implementation.
+  Pending questions for Caitlin: `astrotech_interview_notes.md`.
 
 ## Data flow
 

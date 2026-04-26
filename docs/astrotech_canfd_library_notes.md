@@ -85,10 +85,14 @@ motor, a reset board, or a successfully-completed move from the
 library alone. Hence:
 
 - Run-to-completion + hard abort is the only honest behaviour today
-  (which is exactly what Phase 2a's revision settled on).
-- `AugerState.msg` is commanded-only.
+  for sequences (which is exactly what Phase 2a's revision settled on).
+- Pump / mixing-servo / heater telemetry stays commanded-only.
 - Pause/resume needs board-side feedback to be more than a guess about
   elapsed-vs-commanded; that's the post-URC backlog item.
+
+(The auger is on moteus, not this library, so `AugerState.msg`
+exposes real closed-loop telemetry — see Session 5 in
+`docs/astrotech_interview_notes.md`.)
 
 ## Error handling — there is none
 

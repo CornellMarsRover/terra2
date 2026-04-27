@@ -1,5 +1,5 @@
 package = "cmr_rovernet"
-executable = "drivesnet_node"
+executable = "usama_control_testing_node"
 name = "drivesnet"
 dependencies = []
 
@@ -8,9 +8,28 @@ restart_attempts = 2
 restart_delay = 10
 
 [node]
+can_port = "/dev/ttyACM0"
+
+# Legacy tuning values are still kept here for compatibility with older tools.
 motor_max_speed = 40
 gradual_increase_rate = 10
 base_dynamic_ratio = 0.5
 acceleration_limit = 10.0
 torque_limit = 8.0
 feed_forward_torque_limit = 5.0
+
+timeout_s = 0.30
+drive_rps = 4.0
+watchdog_timeout_s = 0.5
+
+drive_max_torque = 2.0
+steer_max_torque = 3.0
+steer_velocity_limit = 6.0
+
+controller_deadzone = 0.1
+command_timeout_s = 0.5
+refresh_rate_hz = 10.0
+
+autonomy_priority = true
+manual_override_priority = true
+capture_steer_zero_on_start = true

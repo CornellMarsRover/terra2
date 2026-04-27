@@ -10,6 +10,11 @@ from pyubx2 import llh2ecef  # assumes this returns (x, y, z) in meters
 class RTKLocalization(Node):
     def __init__(self):
         super().__init__('rtk_localization_node')
+        self.declare_parameter('yaw_offset_degrees', 0.0)
+        self.declare_parameter('diagnostic_logging', True)
+        self.yaw_offset_degrees = self.get_parameter('yaw_offset_degrees').get_parameter_value().double_value
+        self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
+
         # Subscribers for GPS and IMU data
         self.sub_gps = self.create_subscription(
             NavSatFix,
@@ -40,6 +45,11 @@ class RTKLocalization(Node):
         self.gps_noise = 1.0  # horizontal std. deviation from GPS
 
         self.yaw = 0.0
+        self.raw_yaw_degrees = 0.0
+
+        self.get_logger().info(
+            f"RTK localization initialized with yaw_offset_degrees={self.yaw_offset_degrees:+.2f}"
+        )
 
     def gps_callback(self, msg: NavSatFix):
         """
@@ -54,6 +64,9 @@ class RTKLocalization(Node):
         if self.initial_lat is None:
             self.initial_lat = lat
             self.initial_lon = lon
+            self.get_logger().info(
+                f"GPS origin captured lat={self.initial_lat:.8f} lon={self.initial_lon:.8f}"
+            )
             return
         
         n, w = self.get_north_west_meters(lat, lon)
@@ -68,7 +81,8 @@ class RTKLocalization(Node):
           - gyroz: angular velocity in rad/s
           - anglez: yaw angle in degrees (convert to radians)
         """
-        self.yaw = math.radians(msg.anglez)
+        self.raw_yaw_degrees = msg.anglez
+        self.yaw = math.radians(msg.anglez - self.yaw_offset_degrees)
 
     def timer_callback(self):
         """
@@ -80,7 +94,15 @@ class RTKLocalization(Node):
         twist_msg.twist.linear.y = self.gps_w
         twist_msg.twist.angular.z = self.yaw
         self.pub.publish(twist_msg)
-        #self.get_logger().info(f"Pose:\nx: {self.gps_n}m\ny: {self.gps_w}m\nyaw: {math.degrees(self.yaw)}deg")
+        if self.diagnostic_logging:
+            self.get_logger().info(
+                "rtk_pose "
+                f"north={self.gps_n:+.2f}m west={self.gps_w:+.2f}m "
+                f"raw_yaw={self.raw_yaw_degrees:+.1f}deg "
+                f"yaw_offset={self.yaw_offset_degrees:+.1f}deg "
+                f"published_yaw={math.degrees(self.yaw):+.1f}deg",
+                throttle_duration_sec=1.0,
+            )
 
     #--------------------------------------------------------------------------
     # Helpers

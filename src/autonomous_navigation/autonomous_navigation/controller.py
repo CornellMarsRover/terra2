@@ -15,7 +15,9 @@ class ControllerNode(Node):
         super().__init__('controller_node')
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
+        self.declare_parameter('diagnostic_logging', True)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
+        self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -57,6 +59,10 @@ class ControllerNode(Node):
         # Next waypoint in path
         self.waypoint = None
         self.use_stanley = False   # Will be set by the 3rd element in the waypoint array
+        self.last_command_mode = 'none'
+        self.last_command_velocity = 0.0
+        self.last_command_steer_deg = 0.0
+        self.last_point_turn_z = 0.0
 
         # Stanley controller parameters
         self.k_stanley = 1.0       # Gain for cross-track error term
@@ -92,6 +98,10 @@ class ControllerNode(Node):
         heading_error = math.atan2(math.sin(heading_error), math.cos(heading_error))
         angle_error_deg = math.degrees(heading_error)
         #self.get_logger().info(f"Heading error: {angle_error_deg}")
+        command_mode = 'ackerman_stanley' if self.use_stanley else 'ackerman_heading'
+        command_velocity = self.ackerman_velocity
+        command_steer_deg = angle_error_deg
+        point_turn_z = 0.0
         
         # If large angle error to next waypoint, use point-turn
         if abs(angle_error_deg) > self.point_turn_threshold:
@@ -101,16 +111,33 @@ class ControllerNode(Node):
             #self.get_logger().info(f"dt: {dt}")
             if self.last_movement == "ackerman" and dt < self.min_wait:
                 # Just publish a tiny turn command
-                self.publish_point_turn(0.00001)
+                point_turn_z = 0.00001
+                command_mode = 'point_turn_wait'
+                command_velocity = 0.0
+                self.publish_point_turn(point_turn_z)
             else:
                 # Actual point turn
                 turn_sign = 1.0 if angle_error_deg < 0 else -1.0
                 if self.real:
                     turn_sign *= -1.0
-                self.publish_point_turn(turn_sign * self.point_turn_velocity)
+                point_turn_z = turn_sign * self.point_turn_velocity
+                command_mode = 'point_turn'
+                command_velocity = 0.0
+                self.publish_point_turn(point_turn_z)
                 self.last_movement = 'point_turn'
                 self.last_command_time = curr_time
             self.publish_movement(self.last_movement)
+            self.log_navigation_diagnostics(
+                x_error,
+                y_error,
+                distance_to_wp,
+                angle_to_target,
+                heading_error,
+                command_mode,
+                command_velocity,
+                command_steer_deg,
+                point_turn_z,
+            )
             return
 
         # If angle error is not large, use either the original ackerman or Stanley
@@ -143,12 +170,15 @@ class ControllerNode(Node):
             stanley_steer = heading_error + math.atan2(self.k_stanley * cross_track_error, speed)
             # Convert to degrees
             steer_angle_deg = math.degrees(stanley_steer)
+            command_steer_deg = steer_angle_deg
 
             # Publish ackerman with stanley_steer
             curr_time = self.get_clock().now().to_msg()
             dt = self.compute_time_delta(curr_time, self.last_command_time)
             if self.last_movement == 'point_turn' and dt < self.min_wait:
                 # Wait after a point turn
+                command_mode = 'ackerman_stanley_wait'
+                command_velocity = 0.0
                 self.publish_ackerman(0.0, steer_angle_deg)
             else:
                 self.publish_ackerman(self.ackerman_velocity, steer_angle_deg)
@@ -163,6 +193,8 @@ class ControllerNode(Node):
 
             # If we just point turned, wait
             if self.last_movement == 'point_turn' and dt < self.min_wait:
+                command_mode = 'ackerman_heading_wait'
+                command_velocity = 0.0
                 self.publish_ackerman(0.0, math.degrees(heading_error))
             else:
                 self.publish_ackerman(self.ackerman_velocity, math.degrees(heading_error))
@@ -170,6 +202,18 @@ class ControllerNode(Node):
                 self.last_command_time = curr_time
 
             self.publish_movement(self.last_movement)
+
+        self.log_navigation_diagnostics(
+            x_error,
+            y_error,
+            distance_to_wp,
+            angle_to_target,
+            heading_error,
+            command_mode,
+            command_velocity,
+            command_steer_deg,
+            point_turn_z,
+        )
 
     def publish_movement(self, movement):
         """
@@ -183,6 +227,10 @@ class ControllerNode(Node):
         """
         Publishes point turn message
         """
+        self.last_command_mode = 'point_turn'
+        self.last_command_velocity = 0.0
+        self.last_command_steer_deg = 0.0
+        self.last_point_turn_z = point_turn_velocity
         point_turn_msg = Twist()
         point_turn_msg.angular.z = point_turn_velocity
         self.point_turn_publisher.publish(point_turn_msg)
@@ -191,6 +239,10 @@ class ControllerNode(Node):
         """
         Publish ackerman drive message (steer_angle in degrees)
         """
+        self.last_command_mode = 'ackerman'
+        self.last_command_velocity = vel
+        self.last_command_steer_deg = steer_angle_deg
+        self.last_point_turn_z = 0.0
         drive_msg = AutonomyDrive()
         drive_msg.vel = vel
         drive_msg.fl_angle = steer_angle_deg
@@ -226,6 +278,36 @@ class ControllerNode(Node):
             self.use_stanley = (msg.data[2] == 1.0)  # 1.0 means True
         else:
             self.use_stanley = False
+
+    def log_navigation_diagnostics(
+        self,
+        x_error,
+        y_error,
+        distance_to_wp,
+        angle_to_target,
+        heading_error,
+        command_mode,
+        command_velocity,
+        command_steer_deg,
+        point_turn_z,
+    ):
+        if not self.diagnostic_logging:
+            return
+
+        self.get_logger().info(
+            "nav_diag "
+            f"pose=({self.robot_position[0]:+.2f}N,{self.robot_position[1]:+.2f}W) "
+            f"yaw={math.degrees(self.yaw):+.1f}deg "
+            f"wp=({self.waypoint[0]:+.2f}N,{self.waypoint[1]:+.2f}W) "
+            f"err=({x_error:+.2f}N,{y_error:+.2f}W) "
+            f"dist={distance_to_wp:.2f}m "
+            f"target_bearing={math.degrees(angle_to_target):+.1f}deg "
+            f"heading_error={math.degrees(heading_error):+.1f}deg "
+            f"use_stanley={self.use_stanley} "
+            f"cmd={command_mode} vel={command_velocity:+.3f} "
+            f"steer={command_steer_deg:+.1f}deg point_turn_z={point_turn_z:+.3f}",
+            throttle_duration_sec=1.0,
+        )
 
     def compute_time_delta(self, current_stamp, last_stamp):
         """

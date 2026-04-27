@@ -685,7 +685,7 @@ class UsamaControlRosNode(Node):
         try:
             if self._worker.is_alive():
                 self._worker.join(timeout=2.0)
-        except RuntimeError:
+        except (RuntimeError, KeyboardInterrupt):
             pass
         super().destroy_node()
 

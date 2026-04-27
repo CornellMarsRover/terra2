@@ -10,6 +10,15 @@ restart_delay = 10
 [node]
 can_port = "/dev/ttyACM0"
 
+# Legacy drive tuning values are still imported by rovernet_utils.py and the
+# old drivesnet node, even when this config launches usama_control_testing_node.
+motor_max_speed = 40
+gradual_increase_rate = 10
+base_dynamic_ratio = 0.5
+acceleration_limit = 10.0
+torque_limit = 8.0
+feed_forward_torque_limit = 5.0
+
 timeout_s = 0.30
 drive_rps = 4.0
 watchdog_timeout_s = 0.5

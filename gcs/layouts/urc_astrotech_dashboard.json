@@ -20,15 +20,15 @@
       "legendDisplay": "top",
       "followingViewWidth": 60
     },
-    "Log!rosout": {
+    "RosOut!rosout": {
       "searchTerms": [],
       "minLogLevel": 1,
       "nameFilter": {}
     },
-    "urc.auger_control!auger": {},
-    "urc.raman_spectrum!raman": {},
-    "urc.analysis_sequence!analysis": {},
-    "urc.mixing_servo!mixing": {}
+    "URC Astrotech Panels.urc.auger_control!auger": {},
+    "URC Astrotech Panels.urc.raman_spectrum!raman": {},
+    "URC Astrotech Panels.urc.analysis_sequence!analysis": {},
+    "URC Astrotech Panels.urc.mixing_servo!mixing": {}
   },
   "globalVariables": {},
   "userNodes": {},
@@ -42,19 +42,19 @@
       "first": "Plot!env",
       "second": {
         "direction": "row",
-        "first": "urc.auger_control!auger",
-        "second": "urc.analysis_sequence!analysis",
+        "first": "URC Astrotech Panels.urc.auger_control!auger",
+        "second": "URC Astrotech Panels.urc.analysis_sequence!analysis",
         "splitPercentage": 50
       },
       "splitPercentage": 33.33
     },
     "second": {
       "direction": "row",
-      "first": "urc.raman_spectrum!raman",
+      "first": "URC Astrotech Panels.urc.raman_spectrum!raman",
       "second": {
         "direction": "row",
-        "first": "urc.mixing_servo!mixing",
-        "second": "Log!rosout",
+        "first": "URC Astrotech Panels.urc.mixing_servo!mixing",
+        "second": "RosOut!rosout",
         "splitPercentage": 50
       },
       "splitPercentage": 33.33

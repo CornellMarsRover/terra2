@@ -11,15 +11,15 @@ builtin_interfaces/Time stamp
 # Lead screw
 float32 lead_screw_position_rev
 float32 lead_screw_velocity_rev_s
-float32 lead_screw_torque_Nm
-float32 lead_screw_temperature_C
+float32 lead_screw_torque_nm
+float32 lead_screw_temperature_c
 uint8   lead_screw_mode
 uint8   lead_screw_fault
 
 # Auger
 float32 auger_position_rev
 float32 auger_velocity_rev_s
-float32 auger_torque_Nm
-float32 auger_temperature_C
+float32 auger_torque_nm
+float32 auger_temperature_c
 uint8   auger_mode
 uint8   auger_fault

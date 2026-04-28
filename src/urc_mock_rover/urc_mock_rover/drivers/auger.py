@@ -46,8 +46,8 @@ class _MotorSim:
         self.velocity_rev_s = 0.0   # filtered; what the publisher reports
         self.cmd_velocity_rev_s = 0.0  # raw target from the last command
         self.cmd_max_torque = 0.0
-        self.torque_Nm = 0.0
-        self.temperature_C = 25.0
+        self.torque_nm = 0.0
+        self.temperature_c = 25.0
 
     def step(self, dt: float) -> None:
         # First-order velocity tracking.
@@ -61,16 +61,16 @@ class _MotorSim:
         is_active = abs(self.cmd_velocity_rev_s) > 1e-6
         scale = 0.4 if is_active else 0.05
         cap = max(0.05, self.cmd_max_torque) if is_active else 0.3
-        self.torque_Nm += self._rng.uniform(-scale, scale) * dt
-        self.torque_Nm = max(-cap, min(cap, self.torque_Nm))
+        self.torque_nm += self._rng.uniform(-scale, scale) * dt
+        self.torque_nm = max(-cap, min(cap, self.torque_nm))
 
         # Temperature: drift up when active, slowly relax otherwise.
         if is_active:
-            self.temperature_C += 0.5 * dt  # ~0.5 °C/s under load (mock).
+            self.temperature_c += 0.5 * dt  # ~0.5 °C/s under load (mock).
         else:
-            self.temperature_C += (25.0 - self.temperature_C) * 0.02 * dt
+            self.temperature_c += (25.0 - self.temperature_c) * 0.02 * dt
         # Soft cap so it doesn't run away during long-held commands.
-        self.temperature_C = min(self.temperature_C, 90.0)
+        self.temperature_c = min(self.temperature_c, 90.0)
 
 
 class MockAugerDriver:
@@ -111,9 +111,9 @@ class MockAugerDriver:
 
     def _on_cmd(self, msg: AugerCommand) -> None:
         self._lead_screw.cmd_velocity_rev_s = float(msg.lead_screw_velocity_rev_s)
-        self._lead_screw.cmd_max_torque = float(msg.lead_screw_max_torque_Nm)
+        self._lead_screw.cmd_max_torque = float(msg.lead_screw_max_torque_nm)
         self._auger.cmd_velocity_rev_s = float(msg.auger_velocity_rev_s)
-        self._auger.cmd_max_torque = float(msg.auger_max_torque_Nm)
+        self._auger.cmd_max_torque = float(msg.auger_max_torque_nm)
         self._last_cmd_time = time.monotonic()
 
     def _tick(self) -> None:
@@ -134,15 +134,15 @@ class MockAugerDriver:
 
         out.lead_screw_position_rev = float(self._lead_screw.position_rev)
         out.lead_screw_velocity_rev_s = float(self._lead_screw.velocity_rev_s)
-        out.lead_screw_torque_Nm = float(self._lead_screw.torque_Nm)
-        out.lead_screw_temperature_C = float(self._lead_screw.temperature_C)
+        out.lead_screw_torque_nm = float(self._lead_screw.torque_nm)
+        out.lead_screw_temperature_c = float(self._lead_screw.temperature_c)
         out.lead_screw_mode = 0
         out.lead_screw_fault = 0
 
         out.auger_position_rev = float(self._auger.position_rev)
         out.auger_velocity_rev_s = float(self._auger.velocity_rev_s)
-        out.auger_torque_Nm = float(self._auger.torque_Nm)
-        out.auger_temperature_C = float(self._auger.temperature_C)
+        out.auger_torque_nm = float(self._auger.torque_nm)
+        out.auger_temperature_c = float(self._auger.temperature_c)
         out.auger_mode = 0
         out.auger_fault = 0
 

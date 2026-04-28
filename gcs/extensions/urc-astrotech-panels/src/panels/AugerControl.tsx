@@ -26,16 +26,16 @@ const ZERO_HELD: Held = { up: false, down: false, spinFwd: false, spinBack: fals
 
 interface AugerCommandMessage {
   lead_screw_velocity_rev_s: number;
-  lead_screw_max_torque_Nm: number;
+  lead_screw_max_torque_nm: number;
   auger_velocity_rev_s: number;
-  auger_max_torque_Nm: number;
+  auger_max_torque_nm: number;
 }
 
 const ZERO_CMD: AugerCommandMessage = {
   lead_screw_velocity_rev_s: 0.0,
-  lead_screw_max_torque_Nm: Auger.defaults.leadScrewMaxTorqueNm,
+  lead_screw_max_torque_nm: Auger.defaults.leadScrewMaxTorqueNm,
   auger_velocity_rev_s: 0.0,
-  auger_max_torque_Nm: Auger.defaults.augerMaxTorqueNm,
+  auger_max_torque_nm: Auger.defaults.augerMaxTorqueNm,
 };
 
 function commandFromHeld(held: Held): AugerCommandMessage {
@@ -49,23 +49,23 @@ function commandFromHeld(held: Held): AugerCommandMessage {
 
   return {
     lead_screw_velocity_rev_s: leadVel,
-    lead_screw_max_torque_Nm: Auger.defaults.leadScrewMaxTorqueNm,
+    lead_screw_max_torque_nm: Auger.defaults.leadScrewMaxTorqueNm,
     auger_velocity_rev_s: augerVel,
-    auger_max_torque_Nm: Auger.defaults.augerMaxTorqueNm,
+    auger_max_torque_nm: Auger.defaults.augerMaxTorqueNm,
   };
 }
 
 interface AugerStateMessage {
   lead_screw_position_rev: number;
   lead_screw_velocity_rev_s: number;
-  lead_screw_torque_Nm: number;
-  lead_screw_temperature_C: number;
+  lead_screw_torque_nm: number;
+  lead_screw_temperature_c: number;
   lead_screw_mode: number;
   lead_screw_fault: number;
   auger_position_rev: number;
   auger_velocity_rev_s: number;
-  auger_torque_Nm: number;
-  auger_temperature_C: number;
+  auger_torque_nm: number;
+  auger_temperature_c: number;
   auger_mode: number;
   auger_fault: number;
 }
@@ -327,12 +327,12 @@ function Telemetry(props: { state?: AugerStateMessage }): ReactElement {
           <div>{fmt(s.auger_velocity_rev_s)}</div>
 
           <div>torque (N·m)</div>
-          <div>{fmt(s.lead_screw_torque_Nm)}</div>
-          <div>{fmt(s.auger_torque_Nm)}</div>
+          <div>{fmt(s.lead_screw_torque_nm)}</div>
+          <div>{fmt(s.auger_torque_nm)}</div>
 
           <div>temp (°C)</div>
-          <div>{fmt(s.lead_screw_temperature_C, 1)}</div>
-          <div>{fmt(s.auger_temperature_C, 1)}</div>
+          <div>{fmt(s.lead_screw_temperature_c, 1)}</div>
+          <div>{fmt(s.auger_temperature_c, 1)}</div>
 
           <div>mode / fault</div>
           <div>

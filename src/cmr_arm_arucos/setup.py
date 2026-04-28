@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/aruco_detection.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,7 +22,8 @@ setup(
     entry_points={
         'console_scripts': [
             # PHOBOS_APPEND
-            'arm_aruco_detection = cmr_arm_arucos.aruco_detection_node:main'
+            'arm_aruco_detection = cmr_arm_arucos.aruco_detection_node:main',
+            'simple_camera_node = cmr_arm_arucos.simple_camera_node:main'
         ],
     },
 )

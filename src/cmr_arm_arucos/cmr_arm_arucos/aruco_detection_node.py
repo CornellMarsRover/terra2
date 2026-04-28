@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
@@ -9,6 +10,7 @@ import math
 from std_msgs.msg import Float32MultiArray, Int32MultiArray
 from collections import Counter
 import time
+import threading
 
 class ArucoDetectionNode(Node):
     def __init__(self):
@@ -16,7 +18,7 @@ class ArucoDetectionNode(Node):
 
         self.subscription = self.create_subscription(Image, '/zed/image_left', self.image_callback, 10)
         self.plane_subscription = self.create_subscription(
-            Float32MultiArray, '/zed/plane/angles', self.plane_callback, 10
+            Float32MultiArray, '/zed/plane/equation', self.plane_callback, 10
         )
         
         self.bridge = CvBridge()
@@ -35,6 +37,15 @@ class ArucoDetectionNode(Node):
                                        [0.0, 657.27652417, 343.9524918],
                                        [0.0, 0.0, 1.0]])
         self.dist_coeffs = np.array([0.34688736, 0.07662388, 0.14965771, 0.01600403])
+
+        self.marker_length = 0.1
+        half = self.marker_length / 2.0
+        self.marker_obj_points = np.array([
+            [-half,  half, 0],
+            [ half,  half, 0],
+            [ half, -half, 0],
+            [-half, -half, 0],
+        ], dtype=np.float32)
 
         # Joint info log (computed from relavent aruco tag/angle)
         # Key - joint index (0 is base joint, 5 is last joint)
@@ -63,92 +74,63 @@ class ArucoDetectionNode(Node):
                                 2: {'yaw': [], 'pitch': [], 'roll': []},
                                 3: {'yaw': [], 'pitch': [], 'roll': []}}
 
-        self.count = 0
         self.rotations_cache = {0: {'yaw': [], 'pitch': [], 'roll': []},
                                 1: {'yaw': [], 'pitch': [], 'roll': []},
                                 2: {'yaw': [], 'pitch': [], 'roll': []},
                                 3: {'yaw': [], 'pitch': [], 'roll': []}}
 
-        # Publisher to send joint angle increments to ArmControllerNode
-        self.joint_increment_publisher = self.create_publisher(
-            Float32MultiArray, '/arm/joint_increment', 10)
-
         self.get_logger().info("Arm Aruco Detection Node has started.")
 
     def image_callback(self, msg):
-        
-        #try:
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            annotated_image = self.detect_aruco_markers(cv_image)
 
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        annotated_image = self.detect_aruco_markers(cv_image, self.camera_matrix, self.dist_coeffs)
-        
-        if (annotated_image is not None):
-            self.detected_publisher.publish(self.bridge.cv2_to_imgmsg(annotated_image, encoding='bgr8'))
+            if annotated_image is not None:
+                self.detected_publisher.publish(self.bridge.cv2_to_imgmsg(annotated_image, encoding='bgr8'))
+        except Exception as e:
+            self.get_logger().error(f"Failed to process image: {e}")
 
-        #except Exception as e:
-            #self.get_logger().error(f"Failed to process image: {e}")
-
-    def detect_aruco_markers(self, image, camera_matrix, dist_coeffs, dictionary=cv2.aruco.DICT_6X6_50):
+    def detect_aruco_markers(self, image, dictionary=cv2.aruco.DICT_6X6_50):
         if image is None or image.size == 0:
-            print("Invalid image. Skipping marker detection.")
-            return []
+            self.get_logger().warn("Invalid image. Skipping marker detection.")
+            return None
 
-        if image.shape[-1] == 4:  # Convert RGBA to BGR
+        if image.shape[-1] == 4:
             image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
 
-        
         aruco_dict = cv2.aruco.getPredefinedDictionary(dictionary)
         parameters = cv2.aruco.DetectorParameters()
+        detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        corners, ids, _ = cv2.aruco.detectMarkers(gray, aruco_dict, parameters=parameters)
+        corners, ids, _ = detector.detectMarkers(gray)
 
-        camera_matrix = self.camera_matrix
-        dist_coeffs = self.dist_coeffs
-        angles = {}
         ids_in_frame = []
         if ids is not None:
-            
             cv2.aruco.drawDetectedMarkers(image, corners, ids)
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, 0.1, camera_matrix, dist_coeffs)
 
             for i in range(len(ids)):
-                if ids[i][0] not in self.aruco_rotations.keys():
+                if ids[i][0] not in self.aruco_rotations:
                     continue
 
                 ids_in_frame.append(ids[i][0])
-                # Calculate centerpoint of marker
-                marker_corners = corners[i][0]  # Corners are stored as a (1, 4, 2) array
-                center_x = int(np.mean(marker_corners[:, 0]))  # Average of x-coordinates
-                center_y = int(np.mean(marker_corners[:, 1]))  # Average of y-coordinates
+                marker_corners = corners[i][0]
+                center_x = int(np.mean(marker_corners[:, 0]))
+                center_y = int(np.mean(marker_corners[:, 1]))
                 self.current_detections[ids[i][0]] = (center_x, center_y)
-                '''rotation_matrix, _ = cv2.Rodrigues(rvecs[i][0])
-                yaw, pitch, roll = self.rotation_matrix_to_euler_angles(rotation_matrix)
-                angles[ids[i][0]] = {}
-                angles[ids[i][0]]['yaw'] = yaw
-                angles[ids[i][0]]['pitch'] = pitch
-                angles[ids[i][0]]['roll'] = roll
-                # Extract unit vectors for X, Y, Z axes
-                x_axis = rotation_matrix[:, 0]  # X-axis unit vector
-                y_axis = rotation_matrix[:, 1]  # Y-axis unit vector
-                z_axis = rotation_matrix[:, 2]  # Z-axis unit vector
-                f_desired = (np.array([1, 0, 0]), np.array([0, 0, 1]), np.array([0, -1, 0]))
-                f_current = (np.array(x_axis), np.array(y_axis), np.array(z_axis))
 
-                yaw, _, _ = self.compute_euler_angles(f_desired, f_current)
-                f_desired = self.transform_coordinate_frame(f_desired, (yaw, 0, 0))
-                _, _, roll = self.compute_euler_angles(f_desired, f_current)
+                success, rvec, tvec = cv2.solvePnP(
+                    self.marker_obj_points, corners[i][0],
+                    self.camera_matrix, self.dist_coeffs)
+                if success:
+                    cv2.drawFrameAxes(image, self.camera_matrix, self.dist_coeffs, rvec, tvec, 0.1)
 
-                self.get_logger().info(f"Z axis: {z_axis}")
-                self.get_logger().info(f"Base rotation: {yaw}    Shoulder rotation: {roll}")'''
-                cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, rvecs[i][0], tvecs[i][0], 0.1)
-            
             if len(ids_in_frame) != 4:
                 self.get_logger().info(f"Not all arucos in frame. Arucos currently in frame: {ids_in_frame}")
-
             elif self.arm_homing:
                 self.request_planes()
-            
+
         return image
     
     def request_planes(self):
@@ -178,37 +160,50 @@ class ArucoDetectionNode(Node):
         self.plane_requester.publish(pixel_msg)
     '''
 
-    def plane_callback(self,msg):
+    def plane_callback(self, msg):
         """
-        Store the aruco rotations requested from the ZED
+        Store the aruco rotations derived from plane equations returned by the ZED.
+        Data arrives in groups of 5: [marker_id, a, b, c, d] where ax+by+cz=d.
         """
-        angles = msg.data
-        
-        for i in range(0, len(angles), 4):
-            id = int(angles[i])
-            yaw = angles[i+1]
-            pitch = angles[i+2]
-            roll = angles[i+3]
-            self.aruco_rotations[id]['yaw'].append(yaw)
-            self.aruco_rotations[id]['pitch'].append(pitch)
-            self.aruco_rotations[id]['roll'].append(roll)
-        
-        home = True
-        if self.arm_homing:
-            for marker in self.aruco_rotations.keys():
+        data = msg.data
 
-                if len(self.aruco_rotations[marker]['yaw']) < self.required_count:
-                    home = False
-                    self.get_logger().info(f"Marker {marker}, angles collected: {len(self.aruco_rotations[marker]['yaw'])}")
-                    break
+        for i in range(0, len(data), 5):
+            marker_id = int(data[i])
+            a, b, c = data[i + 1], data[i + 2], data[i + 3]
+            normal = np.array([a, b, c])
+            roll, pitch, yaw = self.compute_roll_pitch_yaw_from_normal(normal)
 
-            if home:
-                self.arm_homing = False
-                self.execute_arm_homing()
+            if marker_id not in self.aruco_rotations:
+                continue
+            self.aruco_rotations[marker_id]['yaw'].append(yaw)
+            self.aruco_rotations[marker_id]['pitch'].append(pitch)
+            self.aruco_rotations[marker_id]['roll'].append(roll)
 
+        if not self.arm_homing:
+            return
+
+        for marker in self.aruco_rotations:
+            if len(self.aruco_rotations[marker]['yaw']) < self.required_count:
+                self.get_logger().info(f"Marker {marker}, angles collected: {len(self.aruco_rotations[marker]['yaw'])}")
+                return
+
+        self.arm_homing = False
+        threading.Thread(target=self.execute_arm_homing, daemon=True).start()
+
+
+    def compute_roll_pitch_yaw_from_normal(self, normal):
+        """
+        Compute roll, pitch, yaw from a plane normal vector, matching the
+        ZED publisher's compute_roll_pitch_yaw convention.
+        """
+        normal = normal / np.linalg.norm(normal)
+        nx, ny, nz = normal
+        pitch = math.degrees(np.arcsin(-nx))
+        yaw = math.degrees(np.arctan2(ny, nz))
+        roll = 0.0
+        return roll, pitch, yaw
 
     def execute_arm_homing(self):
-        
         self.get_logger().info("HOMING ARM")
         # Get the joint correction angles
         corrections = self.filter_detections()
@@ -264,9 +259,8 @@ class ArucoDetectionNode(Node):
         self.offset_publisher.publish(elbow_msg)
         time.sleep(5.0)'''
 
-        # Clear the detection cache
-        for id in self.aruco_rotations.keys():
-            self.aruco_rotations[id] = {'yaw': [], 'pitch': [], 'roll': []}
+        for marker_id in self.aruco_rotations:
+            self.aruco_rotations[marker_id] = {'yaw': [], 'pitch': [], 'roll': []}
 
         
 
@@ -383,46 +377,6 @@ class ArucoDetectionNode(Node):
         return math.degrees(yaw), math.degrees(pitch), math.degrees(roll)
     
             
-    def move_joint_to_pos(self, joint, pos):
-        """
-        Moves joint to position relative to current (in degrees)
-        """
-        
-        joint_increment_msg = Float32MultiArray()
-        # Assuming joint index 0 is the base joint
-        swap = self.joint_info[joint][3]
-        increments = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-        increments[joint] = math.radians(pos*swap)
-
-        joint_increment_msg.data = increments
-        self.joint_increment_publisher.publish(joint_increment_msg)
-
-    def increment_joint(self):
-        """
-        Publishes a message to increment joint angles.
-
-        :param joint: Which joint to increment.
-        """
-
-        joint = self.current_joint
-        joint_increment_msg = Float32MultiArray()
-        # Assuming joint index 0 is the base joint
-        swap = self.joint_info[joint][3]
-        increments = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        if self.curr_offset == self.search_start:
-            increments[joint] = math.radians(swap * self.search_start)
-            self.curr_offset += 1.0
-        elif self.curr_offset >= self.search_end:
-            self.get_best_offset()
-            return
-        else:
-            self.curr_offset += 1.0
-            increments[joint] = math.radians(swap)
-
-        joint_increment_msg.data = increments
-        self.joint_increment_publisher.publish(joint_increment_msg)
-
     def round_and_find_most_common(self, array):
         """
         Rounds all elements of a numpy array to the nearest ones place
@@ -536,31 +490,6 @@ class ArucoDetectionNode(Node):
         return x_new, y_new, z_new
 
 
-    def rotation_matrix_to_euler_angles(self, R):
-        """
-        Convert a rotation matrix to Euler angles (yaw, pitch, roll).
-        Assumes ZYX rotation order.
-
-        Parameters:
-            R (np.ndarray): 3x3 rotation matrix.
-
-        Returns:
-            tuple: (yaw, pitch, roll) in radians.
-        """
-        sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
-        singular = sy < 1e-6
-
-        if not singular:
-            yaw = np.arctan2(R[2, 1], R[2, 2])
-            pitch = np.arctan2(-R[2, 0], sy)
-            roll = np.arctan2(R[1, 0], R[0, 0])
-        else:
-            yaw = np.arctan2(-R[1, 2], R[1, 1])
-            pitch = np.arctan2(-R[2, 0], sy)
-            roll = 0
-
-        return yaw, pitch, roll
-
     def rotate_v2_to_plane(self, v1, v2, v3):
         """
         Rotate v2 about v1 until v2 lies in the plane defined by v1 and v3.
@@ -599,8 +528,10 @@ class ArucoDetectionNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ArucoDetectionNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

@@ -35,7 +35,7 @@ class YOLOv8DetectionNode(Node):
         # Parameters
         self.declare_parameter('conf_threshold', 0.25)
         self.declare_parameter('max_det', 100)
-        self.declare_parameter('model_file', 'urc_objects_v8.pt')
+        self.declare_parameter('model_file', 'urc_objects_v9.pt')
         self.declare_parameter('process_every_n_frames', 5)
 
         conf_threshold = self.get_parameter('conf_threshold').value

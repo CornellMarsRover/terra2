@@ -34,6 +34,19 @@ class ArmCoordinator(Node):
     def __init__(self):
         super().__init__("arm_coordinator")
 
+        self.declare_parameter("target_frame", "base_link")
+        self.declare_parameter("key_pose_topic", "/key_location")
+        self.declare_parameter("target_pose_topic", "/target_pose")
+        self.declare_parameter("state_topic", "/coordinator_state")
+        self.declare_parameter("preapproach_offset_z", self.PREAPPROACH_OFFSET_Z)
+        self.declare_parameter("press_offset_z", self.PRESS_OFFSET_Z)
+        self.declare_parameter("variance_threshold", self.VARIANCE_THRESHOLD)
+
+        self.target_frame = self.get_parameter("target_frame").value
+        self.preapproach_offset_z = self.get_parameter("preapproach_offset_z").value
+        self.press_offset_z = self.get_parameter("press_offset_z").value
+        self.variance_threshold = self.get_parameter("variance_threshold").value
+
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
@@ -41,12 +54,20 @@ class ArmCoordinator(Node):
         self.locked_pose = None
         self.state_start = None
 
-        self.target_pose_pub = self.create_publisher(PoseStamped, "/target_pose", 10)
-        self.state_pub = self.create_publisher(String, "/coordinator_state", 10)
+        self.target_pose_pub = self.create_publisher(
+            PoseStamped,
+            self.get_parameter("target_pose_topic").value,
+            10,
+        )
+        self.state_pub = self.create_publisher(
+            String,
+            self.get_parameter("state_topic").value,
+            10,
+        )
 
         self.key_sub = self.create_subscription(
             PoseWithCovarianceStamped,
-            "/key_location",
+            self.get_parameter("key_pose_topic").value,
             self.key_callback,
             10,
         )
@@ -54,7 +75,8 @@ class ArmCoordinator(Node):
         self.timer = self.create_timer(0.1, self.state_machine_tick)
 
         self.get_logger().info(
-            "Arm coordinator started in Servo target-pose mode; waiting for high-confidence key pose."
+            "Arm coordinator started in Servo target-pose mode; "
+            f"waiting for high-confidence key pose in target frame '{self.target_frame}'."
         )
 
     def key_callback(self, msg: PoseWithCovarianceStamped):
@@ -63,7 +85,7 @@ class ArmCoordinator(Node):
 
         var_x = msg.pose.covariance[0]
         var_y = msg.pose.covariance[7]
-        if max(var_x, var_y) > self.VARIANCE_THRESHOLD:
+        if max(var_x, var_y) > self.variance_threshold:
             self.get_logger().debug(
                 f"Low confidence (var_x={var_x:.3f}, var_y={var_y:.3f}), still waiting."
             )
@@ -73,19 +95,22 @@ class ArmCoordinator(Node):
         pose_in_camera.header = msg.header
         pose_in_camera.pose = msg.pose.pose
 
-        try:
-            pose_in_base = self.tf_buffer.transform(
-                pose_in_camera,
-                "base_link",
-                timeout=rclpy.duration.Duration(seconds=0.5),
-            )
-        except Exception as e:
-            self.get_logger().warn(f"TF transform failed: {e}")
-            return
+        if pose_in_camera.header.frame_id == self.target_frame:
+            pose_in_base = pose_in_camera
+        else:
+            try:
+                pose_in_base = self.tf_buffer.transform(
+                    pose_in_camera,
+                    self.target_frame,
+                    timeout=rclpy.duration.Duration(seconds=0.5),
+                )
+            except Exception as e:
+                self.get_logger().warn(f"TF transform failed: {e}")
+                return
 
         self.locked_pose = pose_in_base
         self.get_logger().info(
-            "Pose locked in base_link: "
+            f"Pose locked in {self.target_frame}: "
             f"x={pose_in_base.pose.position.x:.3f} "
             f"y={pose_in_base.pose.position.y:.3f} "
             f"z={pose_in_base.pose.position.z:.3f}"
@@ -132,7 +157,7 @@ class ArmCoordinator(Node):
 
     def _get_preapproach_pose(self) -> PoseStamped:
         pose = self._copy_locked_pose()
-        pose.pose.position.z += self.PREAPPROACH_OFFSET_Z
+        pose.pose.position.z += self.preapproach_offset_z
         return pose
 
     def _get_approach_pose(self) -> PoseStamped:
@@ -140,12 +165,12 @@ class ArmCoordinator(Node):
 
     def _get_press_pose(self) -> PoseStamped:
         pose = self._copy_locked_pose()
-        pose.pose.position.z += self.PRESS_OFFSET_Z
+        pose.pose.position.z += self.press_offset_z
         return pose
 
     def _copy_locked_pose(self) -> PoseStamped:
         pose = copy.deepcopy(self.locked_pose)
-        pose.header.frame_id = "base_link"
+        pose.header.frame_id = self.target_frame
         pose.header.stamp = self.get_clock().now().to_msg()
         return pose
 

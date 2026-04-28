@@ -23,6 +23,7 @@ setup(
         "console_scripts": [
             'autonomous_typing = autonomous_typing_package.typing_mission_ros:main',
             'arm_coordinator   = autonomous_typing_package.arm_coordinator:main',
+            'manual_key_pose_pub = autonomous_typing_package.manual_key_pose_pub:main',
         ],
     },
 )

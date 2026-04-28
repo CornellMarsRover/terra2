@@ -49,6 +49,11 @@ class TypingMission(Node):
     def __init__(self):
         super().__init__('typing_mission')
 
+        self.declare_parameter("camera_index", 0)
+        self.declare_parameter("camera_device", "")
+        self.camera_index = self.get_parameter("camera_index").value
+        self.camera_device = self.get_parameter("camera_device").value
+
         # Load key positions from JSON
         self.key_positions = load_key_positions("key_position.json")
 
@@ -212,10 +217,30 @@ class TypingMission(Node):
     # Main loop
     # ------------------------------------------------------------------
 
+    def get_camera_source(self):
+        if self.camera_device:
+            return str(self.camera_device)
+
+        try:
+            return int(self.camera_index)
+        except (TypeError, ValueError):
+            self.get_logger().warn(
+                f"Invalid camera_index '{self.camera_index}', falling back to /dev/video0."
+            )
+            return 0
+
     def run(self):
-        cap = cv2.VideoCapture(0)
+        camera_source = self.get_camera_source()
+        camera_name = (
+            f"/dev/video{camera_source}"
+            if isinstance(camera_source, int)
+            else camera_source
+        )
+
+        self.get_logger().info(f"Opening camera {camera_name}")
+        cap = cv2.VideoCapture(camera_source, cv2.CAP_V4L2)
         if not cap.isOpened():
-            self.get_logger().error("Could not open camera.")
+            self.get_logger().error(f"Could not open camera {camera_name}.")
             return
 
         keys_to_type = self.hardcoded_key

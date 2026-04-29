@@ -44,7 +44,6 @@ def generate_launch_description():
                 parameters=[{'real': True}],
                 remappings=[
                     ('/gps/fix', '/rtk/navsatfix_data'),
-                    ('/imu/data', '/imu'),
                 ],
             ),
         ],

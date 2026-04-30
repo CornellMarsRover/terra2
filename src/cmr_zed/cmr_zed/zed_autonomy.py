@@ -6,11 +6,9 @@ from rclpy.node import Node
 import pyzed.sl as sl
 import numpy as np
 import math
-import cv2
-from cv_bridge import CvBridge
 
 from cmr_msgs.msg import GroundPlaneStamped
-from sensor_msgs.msg import PointCloud2, PointField, NavSatFix, Image
+from sensor_msgs.msg import PointCloud2, PointField, NavSatFix
 from geometry_msgs.msg import TwistWithCovarianceStamped, TransformStamped, TwistStamped
 from std_msgs.msg import Header, Float32MultiArray, MultiArrayDimension
 from tf_transformations import euler_from_quaternion
@@ -24,13 +22,9 @@ class ZedAutonomy(Node):
         # Publishers
         self.pointcloud_publisher = self.create_publisher(PointCloud2, '/camera/points', 10)
         self.ground_publisher = self.create_publisher(GroundPlaneStamped, '/camera/ground_plane', 10)
-        # Publish on /zed/image_left to match the existing zed_publisher_node and
-        # the Live_telemetry_tool default — one feed serves telemetry + YOLO.
-        self.image_publisher = self.create_publisher(Image, '/zed/image_left', 10)
 
         self.pose_publisher = self.create_publisher(TwistStamped, '/zed/pose', 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
-        self.bridge = CvBridge()
 
         # Initialize and open the ZED camera
         self.zed = sl.Camera()
@@ -60,7 +54,6 @@ class ZedAutonomy(Node):
         # Resolution for retrieving the point cloud
         self.res = sl.Resolution(width=720, height=404)
         self.point_cloud = sl.Mat(self.res.width, self.res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
-        self.image_left = sl.Mat()
         self.current_pose = sl.Pose()
         self.ground_plane = sl.Plane()  # Detected ground plane
 
@@ -100,7 +93,7 @@ class ZedAutonomy(Node):
                     return
 
     def publish_pointcloud(self):
-        """Captures the point cloud + left image and publishes them."""
+        """Captures the point cloud and publishes it."""
         #self.publish_transform()
         if self.zed.grab() == sl.ERROR_CODE.SUCCESS:
             self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, self.res)
@@ -109,18 +102,6 @@ class ZedAutonomy(Node):
             self.get_logger().info(f"PC count: {self.pc_count}\n{self.get_clock().now().to_msg()}")
             self.pointcloud_publisher.publish(pc2_msg)
             self.publish_ground_plane()
-            self.publish_image()
-
-    def publish_image(self):
-        """Retrieves the left image and publishes it as bgr8 for downstream YOLO."""
-        self.zed.retrieve_image(self.image_left, sl.VIEW.LEFT)
-        # ZED returns BGRA; YOLO/cv_bridge consumers expect BGR.
-        bgra = self.image_left.get_data()
-        bgr = cv2.cvtColor(bgra, cv2.COLOR_BGRA2BGR)
-        msg = self.bridge.cv2_to_imgmsg(bgr, encoding='bgr8')
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'zed_camera_frame'
-        self.image_publisher.publish(msg)
 
     def convert_sl_mat_to_pointcloud2(self, sl_mat):
         """Convert an sl.Mat (F32_C4) to a sensor_msgs/PointCloud2."""

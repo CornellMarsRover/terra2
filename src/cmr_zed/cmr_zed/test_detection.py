@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import rclpy
 from rclpy.node import Node
 
@@ -8,22 +9,41 @@ from cv_bridge import CvBridge, CvBridgeError
 import cv2
 from ultralytics import YOLO
 
+from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
+
+
+def _default_model_path() -> str:
+    """Resolve the bundled URC YOLO model from cmr_cams' share dir, falling back
+    to a string the user can override via the model_path parameter."""
+    try:
+        share = get_package_share_directory('cmr_cams')
+        candidate = os.path.join(share, 'config', 'urc_objects_v9.pt')
+        if os.path.exists(candidate):
+            return candidate
+    except PackageNotFoundError:
+        pass
+    return 'urc_objects_v9.pt'
+
+
 class YOLOv8DetectionNode(Node):
     def __init__(self):
         super().__init__('yolov8_detection_node')
 
         # --- parameters ---
-        self.declare_parameter('model_path', 'best.pt')
+        self.declare_parameter('model_path', _default_model_path())
         self.declare_parameter('conf_threshold', 0.25)
         self.declare_parameter('max_det', 100)
+        self.declare_parameter('image_topic', '/zed/image_left')
+        self.declare_parameter('output_topic', '/detection_test/image')
 
-        model_path    = self.get_parameter('model_path').value
+        model_path     = self.get_parameter('model_path').value
         conf_threshold = self.get_parameter('conf_threshold').value
         max_det        = self.get_parameter('max_det').value
+        image_topic    = self.get_parameter('image_topic').value
+        output_topic   = self.get_parameter('output_topic').value
 
         # --- load the YOLOv8 model ---
         self.model = YOLO(model_path)
-        # override defaults if you like
         self.model.conf = conf_threshold
         self.model.max_det = max_det
 
@@ -33,17 +53,19 @@ class YOLOv8DetectionNode(Node):
         # --- subscriber: raw ZED images ---
         self.sub = self.create_subscription(
             Image,
-            '/zed/image',
+            image_topic,
             self.image_callback,
             10)
 
         # --- publisher: annotated image ---
         self.pub = self.create_publisher(
             Image,
-            '/detection_test/image',
+            output_topic,
             10)
 
-        self.get_logger().info(f'Loaded YOLOv8 model from "{model_path}"')
+        self.get_logger().info(
+            f'Loaded YOLO model from "{model_path}" '
+            f'(sub: {image_topic} -> pub: {output_topic})')
 
     def image_callback(self, msg: Image):
         # 1) convert to OpenCV

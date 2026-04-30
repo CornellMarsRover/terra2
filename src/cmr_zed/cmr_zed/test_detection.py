@@ -3,8 +3,9 @@
 Minimal YOLO viz node for testing models against the live ZED feed.
 
 Subscribes to /zed/image_left (bgra8 from zed_autonomy), runs inference, and
-republishes annotated frames on /detection_test/image. Defaults to the bundled
-urc_objects_v9.pt in cmr_cams' share dir; override via the model_path or
+republishes annotated frames on /detection_test/image. Defaults to
+urc_objects_v9.pt found in the workspace's src/cmr_cams/config dir (so this
+node works even when cmr_cams isn't built). Override via the model_path or
 model_file parameter.
 """
 import os
@@ -17,22 +18,50 @@ from cv_bridge import CvBridge, CvBridgeError
 import cv2
 from ultralytics import YOLO
 
-from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
+try:
+    from ament_index_python.packages import (
+        get_package_share_directory,
+        PackageNotFoundError,
+    )
+except ImportError:  # pragma: no cover
+    get_package_share_directory = None
+    PackageNotFoundError = Exception
+
+
+def _candidate_model_paths(model_file: str):
+    """Yield plausible locations for the model file, in priority order."""
+    # 1) cmr_cams' installed share dir (only works when cmr_cams is built)
+    if get_package_share_directory is not None:
+        try:
+            share = get_package_share_directory('cmr_cams')
+            yield os.path.join(share, 'config', model_file)
+        except PackageNotFoundError:
+            pass
+
+    # 2) Walk up from this file looking for src/cmr_cams/config/<model_file>.
+    #    Handles both source-tree runs and symlink-installed builds (since the
+    #    installed test_detection.py is symlinked back into the repo).
+    here = os.path.realpath(__file__)
+    cur = os.path.dirname(here)
+    for _ in range(8):
+        candidate = os.path.join(cur, 'src', 'cmr_cams', 'config', model_file)
+        yield candidate
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+
+    # 3) Common terra2 workspace location as a last guess
+    yield os.path.expanduser(f'~/terra2/src/cmr_cams/config/{model_file}')
 
 
 def _resolve_model_path(model_path: str, model_file: str) -> str:
-    """Prefer absolute model_path if it exists, else look up model_file in
-    cmr_cams' share/config dir."""
-    if model_path:
-        if os.path.exists(model_path):
-            return model_path
-    try:
-        share = get_package_share_directory('cmr_cams')
-        candidate = os.path.join(share, 'config', model_file)
+    """Prefer absolute model_path if it exists, else search candidate locations."""
+    if model_path and os.path.exists(model_path):
+        return model_path
+    for candidate in _candidate_model_paths(model_file):
         if os.path.exists(candidate):
             return candidate
-    except PackageNotFoundError:
-        pass
     # Fallback: return whatever was requested so YOLO raises a clear error.
     return model_path or model_file
 

@@ -348,6 +348,16 @@ class RealtimeRobotPlotter(Node):
         self.side_frame.bind('<Enter>', self.bind_side_mousewheel)
         self.side_frame.bind('<Leave>', self.unbind_side_mousewheel)
 
+        # ---- Drive Direction box
+        dir_box = ttk.LabelFrame(self.side_frame, text='Drive Direction', padding=8)
+        dir_box.pack(fill='x', pady=4)
+        self.direction_canvas = tk.Canvas(dir_box, width=120, height=120, bg='#1e1e1e',
+                                          highlightthickness=1, highlightbackground='#555555')
+        self.direction_canvas.pack(anchor='center', pady=(2, 4))
+        self.direction_label = ttk.Label(dir_box, text='Stopped', font=('TkFixedFont', 11, 'bold'),
+                                         anchor='center')
+        self.direction_label.pack(fill='x')
+
         # ---- Robot box
         robot_box = ttk.LabelFrame(self.side_frame, text='Robot State', padding=8)
         robot_box.pack(fill='x', pady=4)
@@ -1208,6 +1218,66 @@ class RealtimeRobotPlotter(Node):
         self.canvas.create_line(cx, cy - s, cx, cy + s, fill='green4', width=2)
         self.canvas.create_text(cx + 24, cy - 12, text='Target', fill='green4')
 
+    def compute_drive_direction(self, move_type, speed, fl, fr, pt_wz):
+        mt = move_type.lower() if move_type else ''
+        if 'point_turn' in mt:
+            if abs(pt_wz) < 0.01:
+                return 'Stopped', None
+            return ('Rotating Left', None) if pt_wz > 0 else ('Rotating Right', None)
+        if 'ackerman' in mt or 'stanley' in mt:
+            if abs(speed) < 0.01:
+                return 'Stopped', None
+            steer = (fl + fr) / 2.0
+            angle_deg = steer if speed > 0 else (180.0 + steer)
+            # map angle to 8-sector label (0° = forward, CW positive)
+            sectors = [
+                'Front', 'Front-Right', 'Right', 'Back-Right',
+                'Back', 'Back-Left', 'Left', 'Front-Left',
+            ]
+            idx = int((angle_deg % 360 + 22.5) / 45.0) % 8
+            return sectors[idx], angle_deg
+        return 'Stopped', None
+
+    def draw_direction_compass(self, direction, angle_deg):
+        c = self.direction_canvas
+        c.delete('all')
+        cx, cy, r = 60, 60, 48
+        labels = ['F', 'FR', 'R', 'BR', 'B', 'BL', 'L', 'FL']
+        colors = {
+            'Front': '#2ecc71', 'Front-Right': '#2ecc71', 'Right': '#2ecc71',
+            'Back-Right': '#e74c3c', 'Back': '#e74c3c', 'Back-Left': '#e74c3c',
+            'Left': '#3498db', 'Front-Left': '#3498db',
+            'Rotating Left': '#f39c12', 'Rotating Right': '#f39c12',
+            'Stopped': '#95a5a6',
+        }
+        highlight = colors.get(direction, '#95a5a6')
+        sector_map = {
+            'Front': 0, 'Front-Right': 1, 'Right': 2, 'Back-Right': 3,
+            'Back': 4, 'Back-Left': 5, 'Left': 6, 'Front-Left': 7,
+        }
+        for i, lbl in enumerate(labels):
+            theta = math.radians(-90 + i * 45)
+            lx = cx + (r - 10) * math.cos(theta)
+            ly = cy + (r - 10) * math.sin(theta)
+            seg_active = sector_map.get(direction) == i
+            c.create_text(lx, ly, text=lbl, font=('TkFixedFont', 7, 'bold'),
+                          fill=highlight if seg_active else '#aaaaaa')
+        c.create_oval(cx - r, cy - r, cx + r, cy + r, outline='#555555', width=1)
+        # draw arrow
+        if direction in ('Rotating Left', 'Rotating Right'):
+            arc_start = 30 if direction == 'Rotating Left' else 120
+            c.create_arc(cx - 28, cy - 28, cx + 28, cy + 28,
+                         start=arc_start, extent=300, style=tk.ARC,
+                         outline=highlight, width=2)
+            tip_theta = math.radians(-90 + (300 if direction == 'Rotating Left' else -300))
+        elif angle_deg is not None:
+            arrow_theta = math.radians(-90 + angle_deg)
+            ax = cx + (r - 14) * math.cos(arrow_theta)
+            ay = cy + (r - 14) * math.sin(arrow_theta)
+            c.create_line(cx, cy, ax, ay, fill=highlight, width=3, arrow=tk.LAST)
+        if direction == 'Stopped':
+            c.create_text(cx, cy, text='●', fill='#95a5a6', font=('TkFixedFont', 14))
+
     def draw_robot_path(self):
         if len(self.robot_path) < 2:
             return
@@ -1329,6 +1399,12 @@ class RealtimeRobotPlotter(Node):
         ):
             dist = math.sqrt((plot_target_x - plot_robot_x) ** 2 + (plot_target_y - plot_robot_y) ** 2)
         self.dist_label.config(text=f'Distance: {dist:.3f} m' if dist is not None else 'Distance: --')
+
+        direction, angle_deg = self.compute_drive_direction(
+            current_move_type, ackermann_speed, ackermann_fl, ackermann_fr, point_turn_wz
+        )
+        self.direction_label.config(text=direction)
+        self.draw_direction_compass(direction, angle_deg)
 
         self.cmd_vx_label.config(text=f'vx: {cmd_vx:.3f} m/s')
         self.cmd_vy_label.config(text=f'vy: {cmd_vy:.3f} m/s')

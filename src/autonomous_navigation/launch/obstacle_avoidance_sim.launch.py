@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -10,8 +12,9 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     autonomy_share = get_package_share_directory("autonomous_navigation")
     gazebo_share = get_package_share_directory("gazebo_ros")
+    workspace_root = Path(autonomy_share).resolve().parents[3]
 
-    robot_file = f"{autonomy_share}/urdf/autonomy_obstacle_bot.urdf"
+    robot_file = str(workspace_root / "src/rover_gazebo/urdf/drives.urdf")
     obstacle_file = f"{autonomy_share}/models/obstacle_box.sdf"
 
     gui = LaunchConfiguration("gui")
@@ -29,7 +32,7 @@ def generate_launch_description():
     spawn_robot = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
-        arguments=["-entity", "autonomy_bot", "-file", robot_file, "-x", "0.0", "-y", "0.0", "-z", "0.05"],
+        arguments=["-entity", "drives", "-file", robot_file, "-x", "0.0", "-y", "0.0", "-z", "0.05"],
         output="screen",
     )
 
@@ -88,6 +91,7 @@ def generate_launch_description():
                 {
                     "use_sim_time": use_sim_time,
                     "mode": "auto",
+                    "image_topic": "/camera1/image_raw",
                     "obstacle_x": obstacle_x,
                     "obstacle_y": obstacle_y,
                 }

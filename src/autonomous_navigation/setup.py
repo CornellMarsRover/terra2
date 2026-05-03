@@ -23,7 +23,6 @@ setup(
         ('share/' + package_name + '/config', ['config/sim_waypoints_condensed.yaml']),
         ('share/' + package_name + '/tooling', ['tooling/Live_telemetry_tool.py']),
         ('share/' + package_name + '/tooling', ['tooling/test_script.py']),
-        ('share/' + package_name + '/urdf', glob('urdf/*.urdf')),
         ('share/' + package_name + '/models', glob('models/*.sdf')),
     ],
     install_requires=['setuptools'],

@@ -21,7 +21,7 @@ class HWT905Publisher(Node):
 
         self.declare_parameter("serial_port", DEFAULT_SERIAL_PORT)
         self.declare_parameter("baud", 9600)
-        self.declare_parameter("frame_topic", "/hwt905/imu")
+        self.declare_parameter("frame_topic", "/imu")
         self.declare_parameter("publish_rate_hz", 10.0)
         self.declare_parameter("yaw_offset_degrees", 0.0)
         self.declare_parameter("auto_zero_yaw", False)

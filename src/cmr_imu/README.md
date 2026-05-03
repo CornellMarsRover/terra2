@@ -11,7 +11,7 @@ Default settings:
 
 - Serial port: `/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0`
 - Baud: `9600`
-- Publish topic: `/hwt905/imu`
+- Publish topic: `/imu` (canonical IMU topic for the autonomy stack)
 
 Run manually:
 
@@ -24,13 +24,13 @@ Override the serial port if needed:
 ```bash
 ros2 run cmr_imu imu_node --ros-args \
   -p serial_port:=/dev/ttyUSB0 \
-  -p frame_topic:=/hwt905/imu
+  -p frame_topic:=/imu
 ```
 
 Check output:
 
 ```bash
-ros2 topic echo /hwt905/imu
+ros2 topic echo /imu
 ```
 
 ## HWT905-RS232 bench test

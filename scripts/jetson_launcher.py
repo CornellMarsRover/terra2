@@ -37,6 +37,12 @@ JETSON_WORKSPACE = "~/cmr/terra2"
 # setting the JETSON_SSH_PASSWORD env var.
 JETSON_PASSWORD = "CHANGE_ME"
 
+# Force a specific terminal emulator. Set to None to auto-detect, or to one of
+# "xterm", "xfce4-terminal", "konsole", "gnome-terminal".
+# Tip: if gnome-terminal throws DBus / "org.gnome.Terminal" errors, set this to
+# "xterm" (sudo apt install xterm) -- it has no client/server dance and just works.
+PREFERRED_TERMINAL = None
+
 # (button label, remote command, source install/setup.bash before running?)
 COMMANDS = [
     (
@@ -70,8 +76,17 @@ COMMANDS = [
 # --- Terminal handling -------------------------------------------------------
 
 def find_terminal():
-    """Pick the first available terminal emulator. Returns its name or None."""
-    for binary in ("gnome-terminal", "konsole", "xfce4-terminal", "xterm"):
+    """Pick a terminal emulator. Honors PREFERRED_TERMINAL; otherwise tries
+    xterm first (most reliable), then falls back to GUI-y ones."""
+    if PREFERRED_TERMINAL:
+        if shutil.which(PREFERRED_TERMINAL):
+            return PREFERRED_TERMINAL
+        print(
+            f"Warning: PREFERRED_TERMINAL={PREFERRED_TERMINAL!r} not installed, "
+            f"falling back to auto-detect.",
+            file=sys.stderr,
+        )
+    for binary in ("xterm", "xfce4-terminal", "konsole", "gnome-terminal"):
         if shutil.which(binary):
             return binary
     return None

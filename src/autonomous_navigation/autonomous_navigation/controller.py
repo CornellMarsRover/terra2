@@ -99,6 +99,10 @@ class ControllerNode(Node):
           5. If 'use_stanley' is False, use your original "ackerman" approach.
         """
         if self.waypoint is None:
+            if self.last_command_mode != 'idle_stop':
+                self.publish_ackerman(0.0, 0.0)
+                self.publish_movement('idle')
+                self.last_command_mode = 'idle_stop'
             return
 
         if self.avoidance_override_is_active():

@@ -12,6 +12,7 @@ from cmr_msgs.msg import GroundPlaneStamped
 from cv_bridge import CvBridge
 import numpy as np
 import math
+import time
 from collections import deque
 import heapq  # For priority queue in A*
 
@@ -30,6 +31,8 @@ class LocalPlannerNode(Node):
         self.declare_parameter('diagnostic_logging', True)
         self.declare_parameter('replan_confirmation_cycles', 2)
         self.declare_parameter('validation_horizon_segments', 2)
+        self.declare_parameter('replan_cooldown_s', 1.0)
+        self.declare_parameter('goal_tolerance', 0.75)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
         self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
@@ -38,6 +41,12 @@ class LocalPlannerNode(Node):
         )
         self.validation_horizon_segments = int(
             self.get_parameter('validation_horizon_segments').get_parameter_value().integer_value
+        )
+        self.replan_cooldown_s = float(
+            self.get_parameter('replan_cooldown_s').get_parameter_value().double_value
+        )
+        self.goal_tolerance = float(
+            self.get_parameter('goal_tolerance').get_parameter_value().double_value
         )
         if self.visualize and rr is None:
             self.get_logger().warn("Rerun not installed; disabling visualization")
@@ -96,8 +105,9 @@ class LocalPlannerNode(Node):
         self.costmap_size = 40.0
 
         self.previous_target = (0.0, 0.0)  # [north (m), west (m)]
-        self.next_target = (0.0, 0.0)
+        self.next_target = None
         self.target_yaw = None
+        self.goal_reached = False
 
         # Cache of discretized obstacle *positions* and a dict of all cell costs
         self.obstacles = set()  
@@ -117,6 +127,7 @@ class LocalPlannerNode(Node):
         self.waypoint_threshold = 0.6
         self.invalidation_count = 0
         self.invalidated_segments = dict()
+        self.last_replan_wall_time = 0.0
         # Timers
         self.path_check_timer = self.create_timer(0.5, self.validate_path)
         self.publish_waypoint_timer = self.create_timer(0.1, self.publish_waypoint)
@@ -260,7 +271,9 @@ class LocalPlannerNode(Node):
         new_target = (msg.data[0], msg.data[1])
         if self.next_target != new_target:
             self.next_target = new_target
+            self.goal_reached = False
             self.current_path = deque()
+            self.invalidated_segments = dict()
             if self.costs:
                 self.compute_path()
                 self.smooth_path()
@@ -281,17 +294,27 @@ class LocalPlannerNode(Node):
         self.robot_position = (msg.twist.linear.x, msg.twist.linear.y)
         self.yaw = msg.twist.angular.z
 
+        if self.next_target is not None:
+            goal_dx = self.next_target[0] - self.robot_position[0]
+            goal_dy = self.next_target[1] - self.robot_position[1]
+            if math.sqrt(goal_dx**2 + goal_dy**2) < self.goal_tolerance:
+                self.goal_reached = True
+                self.current_path.clear()
+                self.next_waypoint = None
+                return
+
         if self.next_waypoint is not None:
             dx = self.next_waypoint[0] - self.robot_position[0]
             dy = self.next_waypoint[1] - self.robot_position[1]
             distance = math.sqrt(dx**2 + dy**2)
             if distance < self.waypoint_threshold:
                 self.invalidated_segments = dict()
+                if self.current_path:
+                    self.previous_points.append(self.current_path.popleft())
                 if len(self.current_path) == 0:
-                    self.next_waypoint = self.next_target
+                    self.next_waypoint = None
                 else:
                     self.next_waypoint = self.current_path[0]
-                    self.previous_points.append(self.current_path.popleft())
     # -------------------------------------------------------------------------
     # Path Checking and Publishing
     # -------------------------------------------------------------------------
@@ -303,7 +326,9 @@ class LocalPlannerNode(Node):
         If any segment has a cost above self.max_cell_threshold, we will re-plan
         from that segment's start, preserving the valid prior segments.
         """
-        if not self.current_path or self.next_target is None:
+        if self.goal_reached or not self.current_path or self.next_target is None:
+            return
+        if (time.monotonic() - self.last_replan_wall_time) < self.replan_cooldown_s:
             return
 
         # Build a list of points including the robot position at front
@@ -344,6 +369,7 @@ class LocalPlannerNode(Node):
                     # Now self.current_path is the newly computed path from start_pt to self.next_target
                     # Prepend the valid portion to the front
                     self.current_path = deque(list(valid_portion) + list(self.current_path))
+                    self.last_replan_wall_time = time.monotonic()
 
                     # Make sure next_waypoint is set
                     if self.next_target is not None and (len(self.current_path) == 0 or self.current_path[-1] != self.next_target):
@@ -366,9 +392,10 @@ class LocalPlannerNode(Node):
         Publish the next waypoint plus a flag for using Stanley vs. pure pursuit.
         """
         #self.get_logger().info("PUBLISHING WAYPOINT")
+        if self.goal_reached or self.next_target is None:
+            return
+
         if self.next_waypoint is None:
-            if self.next_target is None:
-                return
             self.next_waypoint = self.next_target
 
         if len(self.current_path) == 0 or self.current_path[-1] != self.next_target:

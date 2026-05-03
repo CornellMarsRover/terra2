@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -30,29 +31,26 @@ def generate_launch_description():
         launch_arguments={"gui": gui, "world": world_file}.items(),
     )
 
-    spawn_robot = Node(
-        package="gazebo_ros",
-        executable="spawn_entity.py",
-        arguments=["-entity", "drives", "-file", robot_file, "-x", "0.0", "-y", "0.0", "-z", "0.05"],
+    spawn_entities = Node(
+        package="autonomous_navigation",
+        executable="spawn_demo_entities",
+        name="spawn_demo_entities",
         output="screen",
-    )
-
-    spawn_obstacle = Node(
-        package="gazebo_ros",
-        executable="spawn_entity.py",
-        arguments=[
-            "-entity",
-            "obstacle_box",
-            "-file",
-            obstacle_file,
-            "-x",
-            obstacle_x,
-            "-y",
-            obstacle_y,
-            "-z",
-            "0.5",
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "robot_entity": "drives",
+                "robot_file": robot_file,
+                "robot_x": 0.0,
+                "robot_y": 0.0,
+                "robot_z": 0.05,
+                "obstacle_file": obstacle_file,
+                "obstacle_entities": ["obstacle_box"],
+                "obstacle_xs": [obstacle_x],
+                "obstacle_ys": [obstacle_y],
+                "obstacle_zs": [0.5],
+            }
         ],
-        output="screen",
     )
 
     autonomy_nodes = [
@@ -123,6 +121,9 @@ def generate_launch_description():
                     "visualize": False,
                     "use_sim_time": use_sim_time,
                     "replan_confirmation_cycles": 1,
+                    "validation_horizon_segments": 1,
+                    "replan_cooldown_s": 1.5,
+                    "goal_tolerance": 0.7,
                 }
             ],
         ),
@@ -158,8 +159,12 @@ def generate_launch_description():
             DeclareLaunchArgument("obstacle_x", default_value="2.5"),
             DeclareLaunchArgument("obstacle_y", default_value="0.0"),
             gazebo,
-            TimerAction(period=2.0, actions=[spawn_robot]),
-            TimerAction(period=3.0, actions=[spawn_obstacle]),
-            TimerAction(period=4.0, actions=autonomy_nodes),
+            spawn_entities,
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=spawn_entities,
+                    on_exit=autonomy_nodes,
+                )
+            ),
         ]
     )

@@ -53,6 +53,7 @@ setup(
             'sim_goal_publisher = autonomous_navigation.sim_goal_publisher:main',
             'sim_vision_obstacle_detector = autonomous_navigation.sim_vision_obstacle_detector:main',
             'sim_obstacle_pointcloud = autonomous_navigation.sim_obstacle_pointcloud:main',
+            'spawn_demo_entities = autonomous_navigation.spawn_demo_entities:main',
         ],
     },
 )

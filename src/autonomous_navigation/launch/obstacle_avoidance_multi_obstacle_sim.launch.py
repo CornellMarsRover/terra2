@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.actions import IncludeLaunchDescription, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
@@ -28,34 +29,27 @@ def generate_launch_description():
         launch_arguments={"gui": "false", "world": world_file}.items(),
     )
 
-    spawn_robot = Node(
-        package="gazebo_ros",
-        executable="spawn_entity.py",
-        arguments=["-entity", "drives", "-file", robot_file, "-x", "0.0", "-y", "0.0", "-z", "0.05"],
+    spawn_entities = Node(
+        package="autonomous_navigation",
+        executable="spawn_demo_entities",
+        name="spawn_demo_entities",
         output="screen",
+        parameters=[
+            {
+                "use_sim_time": True,
+                "robot_entity": "drives",
+                "robot_file": robot_file,
+                "robot_x": 0.0,
+                "robot_y": 0.0,
+                "robot_z": 0.05,
+                "obstacle_file": obstacle_file,
+                "obstacle_entities": [spec["entity"] for spec in obstacle_specs],
+                "obstacle_xs": [spec["north"] for spec in obstacle_specs],
+                "obstacle_ys": [spec["west"] for spec in obstacle_specs],
+                "obstacle_zs": [0.5 for _ in obstacle_specs],
+            }
+        ],
     )
-
-    obstacle_spawners = []
-    for spec in obstacle_specs:
-        obstacle_spawners.append(
-            Node(
-                package="gazebo_ros",
-                executable="spawn_entity.py",
-                arguments=[
-                    "-entity",
-                    spec["entity"],
-                    "-file",
-                    obstacle_file,
-                    "-x",
-                    str(spec["north"]),
-                    "-y",
-                    str(spec["west"]),
-                    "-z",
-                    "0.5",
-                ],
-                output="screen",
-            )
-        )
 
     autonomy_nodes = [
         Node(
@@ -121,6 +115,9 @@ def generate_launch_description():
                     "visualize": False,
                     "use_sim_time": True,
                     "replan_confirmation_cycles": 1,
+                    "validation_horizon_segments": 1,
+                    "replan_cooldown_s": 1.5,
+                    "goal_tolerance": 0.7,
                 }
             ],
         ),
@@ -150,8 +147,12 @@ def generate_launch_description():
     return LaunchDescription(
         [
             gazebo,
-            TimerAction(period=2.0, actions=[spawn_robot]),
-            TimerAction(period=3.0, actions=obstacle_spawners),
-            TimerAction(period=4.0, actions=autonomy_nodes),
+            spawn_entities,
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=spawn_entities,
+                    on_exit=autonomy_nodes,
+                )
+            ),
         ]
     )

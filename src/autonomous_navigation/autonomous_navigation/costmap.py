@@ -27,7 +27,9 @@ class CostmapNode(Node):
         super().__init__('costmap_node')
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
+        self.declare_parameter('diagnostic_logging', True)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
+        self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
         #self.real = True
 
         if self.real and Polygon is not None:
@@ -249,6 +251,20 @@ class CostmapNode(Node):
                 data.extend([x, y, float(cost)])
         msg.data = data
         self.new_obstacle_publisher.publish(msg)
+        if self.diagnostic_logging:
+            occupied = len(data) // 3
+            nearest = None
+            for i in range(0, len(data), 3):
+                dx = data[i] - self.north
+                dy = data[i + 1] - self.west
+                dist = math.sqrt((dx ** 2) + (dy ** 2))
+                nearest = dist if nearest is None else min(nearest, dist)
+            nearest_text = "none" if nearest is None else f"{nearest:.2f}m"
+            self.get_logger().info(
+                f"costmap_diag occupied_cells={occupied} nearest_obstacle={nearest_text} "
+                f"pose=({self.north:+.2f},{self.west:+.2f}) yaw={math.degrees(self.yaw):+.1f}deg",
+                throttle_duration_sec=1.0,
+            )
 
     def decay_cost(self):
         """

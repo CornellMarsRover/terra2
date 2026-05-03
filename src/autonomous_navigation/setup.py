@@ -52,6 +52,7 @@ setup(
             'obstacle_guard = autonomous_navigation.obstacle_guard:main',
             'sim_goal_publisher = autonomous_navigation.sim_goal_publisher:main',
             'sim_vision_obstacle_detector = autonomous_navigation.sim_vision_obstacle_detector:main',
+            'sim_obstacle_pointcloud = autonomous_navigation.sim_obstacle_pointcloud:main',
         ],
     },
 )

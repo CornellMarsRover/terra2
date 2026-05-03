@@ -85,18 +85,25 @@ def generate_launch_description():
         ),
         Node(
             package="autonomous_navigation",
-            executable="sim_vision_obstacle_detector",
-            name="sim_vision_obstacle_detector",
+            executable="sim_obstacle_pointcloud",
+            name="sim_obstacle_pointcloud",
             output="screen",
             parameters=[
                 {
                     "use_sim_time": use_sim_time,
-                    "mode": "auto",
-                    "image_topic": "/camera1/image_raw",
-                    "obstacle_x": obstacle_x,
-                    "obstacle_y": obstacle_y,
+                    "obstacle_norths": [obstacle_x],
+                    "obstacle_wests": [obstacle_y],
+                    "obstacle_size_norths": [0.8],
+                    "obstacle_size_wests": [0.8],
                 }
             ],
+        ),
+        Node(
+            package="autonomous_navigation",
+            executable="costmap",
+            name="costmap",
+            output="screen",
+            parameters=[{"real": False, "use_sim_time": use_sim_time}],
         ),
         Node(
             package="autonomous_navigation",
@@ -110,14 +117,28 @@ def generate_launch_description():
             executable="local_planner",
             name="local_planner",
             output="screen",
-            parameters=[{"real": False, "visualize": False, "use_sim_time": use_sim_time}],
+            parameters=[
+                {
+                    "real": False,
+                    "visualize": False,
+                    "use_sim_time": use_sim_time,
+                    "replan_confirmation_cycles": 1,
+                }
+            ],
         ),
         Node(
             package="autonomous_navigation",
             executable="obstacle_guard",
             name="obstacle_guard",
             output="screen",
-            parameters=[{"use_sim_time": use_sim_time}],
+            parameters=[
+                {
+                    "use_sim_time": use_sim_time,
+                    "lookahead_distance": 1.0,
+                    "hard_stop_distance": 0.35,
+                    "corridor_half_width": 0.45,
+                }
+            ],
         ),
         Node(
             package="autonomous_navigation",

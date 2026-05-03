@@ -27,8 +27,18 @@ class LocalPlannerNode(Node):
         # If we want to visualize with Rerun
         self.declare_parameter('visualize', True)  # Shows rerun visualization if true
         self.declare_parameter('real', True)  # False if running sim
+        self.declare_parameter('diagnostic_logging', True)
+        self.declare_parameter('replan_confirmation_cycles', 2)
+        self.declare_parameter('validation_horizon_segments', 2)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
+        self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
+        self.replan_confirmation_cycles = int(
+            self.get_parameter('replan_confirmation_cycles').get_parameter_value().integer_value
+        )
+        self.validation_horizon_segments = int(
+            self.get_parameter('validation_horizon_segments').get_parameter_value().integer_value
+        )
         if self.visualize and rr is None:
             self.get_logger().warn("Rerun not installed; disabling visualization")
             self.visualize = False
@@ -251,9 +261,17 @@ class LocalPlannerNode(Node):
         if self.next_target != new_target:
             self.next_target = new_target
             self.current_path = deque()
-            self.current_path.append(self.next_target)
-            self.next_waypoint = self.next_target
+            if self.costs:
+                self.compute_path()
+                self.smooth_path()
+            if not self.current_path:
+                self.current_path.append(self.next_target)
+            self.next_waypoint = self.current_path[0]
             self.get_logger().info(f"New next target: {self.next_target}")
+            if self.diagnostic_logging:
+                self.get_logger().info(
+                    f"path_diag event=new_target target=({self.next_target[0]:+.2f},{self.next_target[1]:+.2f})"
+                )
 
     def update_pose(self, msg):
         """
@@ -292,7 +310,8 @@ class LocalPlannerNode(Node):
         path_points = [self.robot_position] + list(self.current_path)
 
         # Check every segment in the path
-        for i in range(len(path_points) - 1):
+        segments_to_check = min(len(path_points) - 1, max(1, self.validation_horizon_segments))
+        for i in range(segments_to_check):
             start_pt = path_points[i]
             end_pt = path_points[i + 1]
             max_cell, total = self.compute_segment_cost(start_pt, end_pt)
@@ -301,7 +320,7 @@ class LocalPlannerNode(Node):
 
             if max_cell > self.max_cell_threshold:
                 self.invalidated_segments[(i, i+1)] = 1 + self.invalidated_segments.get((i, i+1), 0)
-                if self.invalidated_segments[(i, i+1)] >= 4:
+                if self.invalidated_segments[(i, i+1)] >= self.replan_confirmation_cycles:
                     self.get_logger().info(
                         f"Segment from {start_pt} to {end_pt} above threshold with cost {max_cell}. "
                         f"Re-planning from {start_pt} to final target."
@@ -333,6 +352,12 @@ class LocalPlannerNode(Node):
                         self.next_waypoint = self.current_path[0]
                     else:
                         self.current_path.append((self.next_target[0], self.next_target[1]))
+                    if self.diagnostic_logging:
+                        self.get_logger().info(
+                            "path_diag "
+                            f"event=replan invalid_segment=({start_pt[0]:+.2f},{start_pt[1]:+.2f})->"
+                            f"({end_pt[0]:+.2f},{end_pt[1]:+.2f}) new_waypoints={len(self.current_path)}"
+                        )
                     break  # We only re-plan once per validation cycle
 
 
@@ -589,6 +614,12 @@ class LocalPlannerNode(Node):
         self.current_path.popleft()
         if len(self.current_path) > 0:
             self.next_waypoint = self.current_path[0]
+        if self.diagnostic_logging:
+            preview = list(self.current_path)[:4]
+            self.get_logger().info(
+                f"path_diag event=compute_path waypoints={len(self.current_path)} preview={preview}",
+                throttle_duration_sec=1.0,
+            )
 
     # -------------------------------------------------------------------------
     # Improved Smoothing

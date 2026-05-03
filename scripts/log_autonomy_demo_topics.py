@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import rclpy
+from cmr_msgs.msg import AutonomyDrive
+from geometry_msgs.msg import Twist
 from geometry_msgs.msg import TwistStamped
 from rclpy.node import Node
 from std_msgs.msg import Bool, Float32MultiArray
@@ -28,6 +30,8 @@ class DemoTopicLogger(Node):
         self.avoidance_active = False
         self.all_obstacles: List[float] = []
         self.visible_obstacles: List[float] = []
+        self.ackermann_cmd: Optional[Dict[str, float]] = None
+        self.point_turn_cmd: Optional[Dict[str, float]] = None
 
         self.create_subscription(
             TwistStamped, "/autonomy/pose/robot/global", self.pose_callback, 10
@@ -52,6 +56,12 @@ class DemoTopicLogger(Node):
         )
         self.create_subscription(
             Float32MultiArray, "/autonomy/sim_obstacles/visible", self.visible_obstacles_callback, 10
+        )
+        self.create_subscription(
+            AutonomyDrive, "/autonomy/move/ackerman", self.ackermann_callback, 10
+        )
+        self.create_subscription(
+            Twist, "/autonomy/move/point_turn", self.point_turn_callback, 10
         )
 
         self.timer = self.create_timer(1.0 / sample_rate_hz, self.sample_once)
@@ -87,6 +97,18 @@ class DemoTopicLogger(Node):
     def visible_obstacles_callback(self, msg: Float32MultiArray) -> None:
         self.visible_obstacles = [float(value) for value in msg.data]
 
+    def ackermann_callback(self, msg: AutonomyDrive) -> None:
+        self.ackermann_cmd = {
+            "vel": float(msg.vel),
+            "fl": float(msg.fl_angle),
+            "fr": float(msg.fr_angle),
+            "bl": float(msg.bl_angle),
+            "br": float(msg.br_angle),
+        }
+
+    def point_turn_callback(self, msg: Twist) -> None:
+        self.point_turn_cmd = {"angular_z": float(msg.angular.z)}
+
     def sample_once(self) -> None:
         t = self.elapsed()
         sample = {
@@ -99,6 +121,8 @@ class DemoTopicLogger(Node):
             "avoidance_active": self.avoidance_active,
             "all_obstacles": self.all_obstacles,
             "visible_obstacles": self.visible_obstacles,
+            "ackermann_cmd": self.ackermann_cmd,
+            "point_turn_cmd": self.point_turn_cmd,
         }
         self.samples.append(sample)
         if t >= self.duration_s:

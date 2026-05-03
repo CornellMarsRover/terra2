@@ -42,7 +42,7 @@ class GlobalPlannerNode(Node):
         # Variables
         self.robot_position = [0.0, 0.0]
         self.yaw = 0.0
-        self.curr_target = [0.0, 0.0]
+        self.curr_target = None
         self.waypoints = deque()
         self.publish_timer = self.create_timer(0.5, self.publish_waypoint)
         self.get_logger().info("Global Planner Node initialized")
@@ -56,6 +56,8 @@ class GlobalPlannerNode(Node):
         self.curr_target = [float(msg.data[0]), float(msg.data[1])]
         
     def publish_waypoint(self):
+        if self.curr_target is None:
+            return
         waypoint = Float32MultiArray()
         waypoint.data = self.curr_target
         self.waypoint_publisher.publish(waypoint)

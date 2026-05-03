@@ -90,3 +90,48 @@ def filter_visible_obstacles(
         covered_spans.append(span)
 
     return accepted
+
+
+def sample_box_pointcloud(
+    local_forward: float,
+    local_left: float,
+    size_north: float,
+    size_west: float,
+    lateral_step_m: float = 0.2,
+    depth_step_m: float = 0.2,
+    vertical_levels: Sequence[float] = (0.2, 0.6, 1.0),
+) -> List[Tuple[float, float, float]]:
+    """Generate obstacle points in the sim camera frame.
+
+    Costmap sim mode interprets PointCloud2 values as:
+    - point[2] -> forward distance
+    - point[0] -> lateral offset to the robot's right
+    - point[1] -> downwards axis used to infer obstacle height
+
+    The returned tuples therefore use:
+    - x = right
+    - y = down
+    - z = forward
+    """
+    points: List[Tuple[float, float, float]] = []
+    half_forward = size_north / 2.0
+    half_left = size_west / 2.0
+
+    forward_start = max(0.05, local_forward - half_forward)
+    forward_end = local_forward + half_forward
+    left_start = local_left - half_left
+    left_end = local_left + half_left
+
+    forward_steps = max(1, int(math.ceil((forward_end - forward_start) / max(depth_step_m, 1e-3))))
+    lateral_steps = max(1, int(math.ceil((left_end - left_start) / max(lateral_step_m, 1e-3))))
+
+    for fi in range(forward_steps + 1):
+        forward = forward_start + min(fi * depth_step_m, forward_end - forward_start)
+        for li in range(lateral_steps + 1):
+            left = left_start + min(li * lateral_step_m, left_end - left_start)
+            right = -left
+            for height in vertical_levels:
+                down = 1.0 - height
+                points.append((right, down, forward))
+
+    return points

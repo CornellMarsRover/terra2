@@ -16,7 +16,7 @@ The implementation keeps the existing autonomy flow intact:
 The new pieces added on top are:
 - `sim_drive_bridge`: bridges autonomy motion outputs into Gazebo motion commands
 - `odom_to_autonomy_pose`: converts Gazebo odometry into the autonomy pose topic
-- `sim_vision_obstacle_detector`: publishes obstacle costmap data from simulated vision input
+- `sim_obstacle_pointcloud`: publishes simulated `/camera/points` obstacle returns into the normal costmap pipeline
 - `obstacle_guard`: adds a close-range safety layer that can stop or turn the rover when an obstacle is too close
 - `obstacle_avoidance_sim.launch.py`: repeatable end-to-end Gazebo launch for obstacle avoidance testing
 - `obstacle_avoidance_multi_obstacle_sim.launch.py`: multi-obstacle Gazebo scenario for testing visibility and rerouting behavior
@@ -45,6 +45,7 @@ No merge, rebase, or unrelated branch history from `gazebo_sim` was brought over
 - `src/autonomous_navigation/autonomous_navigation/sim_goal_publisher.py`
 - `src/autonomous_navigation/autonomous_navigation/sim_vision_obstacle_core.py`
 - `src/autonomous_navigation/autonomous_navigation/sim_vision_obstacle_detector.py`
+- `src/autonomous_navigation/autonomous_navigation/sim_obstacle_pointcloud.py`
 - `src/autonomous_navigation/launch/obstacle_avoidance_sim.launch.py`
 - `src/autonomous_navigation/worlds/obstacle_avoidance_demo.world`
 - `drives.urdf`
@@ -76,8 +77,9 @@ No merge, rebase, or unrelated branch history from `gazebo_sim` was brought over
 - `odom_to_autonomy_pose` republishes `/drives/odom` as `/autonomy/pose/robot/global`
 
 ### Obstacle pipeline
-- `sim_vision_obstacle_detector` publishes `/autonomy/costmap`
-- `sim_vision_obstacle_detector` also publishes:
+- `sim_obstacle_pointcloud` publishes synthetic obstacle returns on `/camera/points`
+- `costmap` consumes `/camera/points` and produces `/autonomy/costmap`
+- `sim_obstacle_pointcloud` also publishes debug topics:
   - `/autonomy/sim_obstacles/all`
   - `/autonomy/sim_obstacles/visible`
 - `local_planner` uses `/autonomy/costmap` to invalidate blocked segments and replan
@@ -90,18 +92,20 @@ This gives two layers of behavior:
 - medium-range: local planner reroutes around the obstacle
 - close-range: guard can stop or point-turn if needed
 
-## Simulated Vision Input
-The detector supports an `auto` mode.
+## Simulated Sensor Input
+The repeatable simulation path now feeds obstacle perception into the real autonomy costmap path instead of publishing a parallel sim-only costmap.
 
-In `auto` mode:
-- if ROS camera images are available, the detector can use image-based color segmentation
-- if ROS camera images are not available, it falls back to synthetic obstacle visibility based on robot pose, obstacle pose, field of view, and range
+The setup is:
+- `sim_obstacle_pointcloud` computes which configured blocks are currently visible
+- it publishes those returns as a synthetic `PointCloud2` on `/camera/points`
+- the existing `costmap` node converts that sensor data into `/autonomy/costmap`
+- the rest of the autonomy stack consumes that costmap unchanged
 
-In the current devcontainer/Gazebo setup, ROS camera image publishing from Gazebo was not reliable, so the repeatable simulation path uses the synthetic-vision fallback.
+This keeps Gazebo as a realistic harness for the rover autonomy graph:
+- sim adapters are limited to odometry, drive bridging, and synthetic sensor publication
+- planning, costmap generation, control, and emergency guard logic remain shared autonomy code
 
-This still satisfies the initial feature goal of obstacle detection from camera or simulated vision input while keeping the autonomy branch independent from the Gazebo branch.
-
-The autonomy simulation now uses the exact same root-level rover asset as `gazebo_sim` by spawning `drives.urdf`, which references `meshes/rover_26.stl`.
+The autonomy simulation uses the exact same root-level rover asset as `gazebo_sim` by spawning `drives.urdf`, which references `meshes/rover_26.stl`.
 
 ## How To Run In Simulation
 From the ROS container:
@@ -186,3 +190,25 @@ Artifacts:
 - Make the Gazebo camera ROS plugin path reliable so the detector can exercise true image-based CV in sim by default.
 - Add a goal-reached state to suppress end-of-goal point-turn oscillation.
 - Add a recorded validation artifact or scripted integration check for CI if the Gazebo environment becomes stable enough for it.
+
+## Logging and Recording
+The updated stack logs clean debug lines from the shared autonomy path:
+- `sim_obstacle_pointcloud`: visible obstacle set and point count
+- `costmap`: occupied cell count, nearest obstacle distance, rover pose, yaw
+- `local_planner`: target changes, blocked segments, replans, path previews
+- `controller`: waypoint error, heading error, and final motion commands
+- `obstacle_guard`: close-range corridor summary and emergency intervention status
+
+Useful topic recording command:
+
+```bash
+ros2 bag record \
+  /camera/points \
+  /autonomy/costmap \
+  /autonomy/path/next_waypoint \
+  /autonomy/move/ackerman \
+  /autonomy/move/point_turn \
+  /autonomy/pose/robot/global \
+  /autonomy/sim_obstacles/all \
+  /autonomy/sim_obstacles/visible
+```

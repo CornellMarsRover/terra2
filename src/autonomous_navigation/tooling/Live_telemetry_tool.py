@@ -50,7 +50,7 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('debug_logging', True)
 
         self.declare_parameter('canvas_width', 950)
-        self.declare_parameter('canvas_height', 680)
+        self.declare_parameter('canvas_height', 820)
         self.declare_parameter('ui_update_hz', 20.0)
         self.declare_parameter('trail_length', 800)
         self.declare_parameter('zoom_factor', 1.0)
@@ -132,6 +132,12 @@ class RealtimeRobotPlotter(Node):
 
         self.robot_path = []
         self.waypoints = []
+        # If the YAML uses (latitude, longitude) format, we stash the raw
+        # pairs here and defer conversion to local meters until the first
+        # GPS fix lands -- that way the telemetry frame is anchored at the
+        # rover's actual starting GPS, matching state_machine and
+        # rtk_localization (instead of waypoints[0]).
+        self.waypoint_gps_pairs = []
         self.msg_counts = {
             'robot_pose': 0,
             'target': 0,
@@ -480,7 +486,7 @@ class RealtimeRobotPlotter(Node):
             if total_width > 0:
                 self.main_pane.sash_place(0, max(520, total_width - 320), 0)
             if total_height > 0:
-                self.left_pane.sash_place(0, 0, int(total_height * 0.58))
+                self.left_pane.sash_place(0, 0, int(total_height * 0.72))
         except Exception:
             pass
 
@@ -541,19 +547,20 @@ class RealtimeRobotPlotter(Node):
             if all(('latitude' in wp and 'longitude' in wp) for wp in loaded):
                 self.world_x_label_name = 'North (m)'
                 self.world_y_label_name = 'West (m)'
-                self.gps_reference_lat = float(loaded[0]['latitude'])
-                self.gps_reference_lon = float(loaded[0]['longitude'])
-                for wp in loaded:
-                    north, west = self.gps_to_local_meters(
-                        float(wp['latitude']),
-                        float(wp['longitude'])
-                    )
-                    self.waypoints.append((north, west))
-
+                # Stash raw (lat, lon) pairs and defer the conversion to
+                # local meters until gps_cb captures the rover's first GPS
+                # fix as the reference origin. self.waypoints stays empty
+                # until then, so the map renders without waypoints for the
+                # first second or two of operation.
+                self.waypoint_gps_pairs = [
+                    (float(wp['latitude']), float(wp['longitude']))
+                    for wp in loaded
+                ]
                 self.get_logger().info(
-                    f'Waypoints parsed successfully from GPS format and converted to local meters: {len(self.waypoints)}'
+                    f'Stashed {len(self.waypoint_gps_pairs)} GPS waypoint(s); '
+                    f'will convert to local meters once the first fix on '
+                    f'{self.gps_topic} sets the reference origin.'
                 )
-                self.auto_set_bounds_from_waypoints()
                 return
 
             self.get_logger().warn(
@@ -837,6 +844,42 @@ class RealtimeRobotPlotter(Node):
             self.gps_lat = msg.latitude
             self.gps_lon = msg.longitude
         self.mark_seen('gps')
+        self._maybe_capture_gps_reference(msg.latitude, msg.longitude)
+
+    def _maybe_capture_gps_reference(self, lat, lon):
+        """
+        On the first GPS fix, latch (lat, lon) as the local-frame origin.
+        This matches the rover's actual starting position used by
+        rtk_localization and state_machine, so plotted waypoints share the
+        same frame as the rover pose published on
+        /autonomy/pose/robot/global. If the YAML was in (lat, lon) form,
+        convert the stashed waypoints to local meters now.
+        """
+        if self.gps_reference_lat is not None:
+            return
+
+        self.gps_reference_lat = lat
+        self.gps_reference_lon = lon
+        self.get_logger().info(
+            f'Captured GPS reference origin from first fix on '
+            f'{self.gps_topic}: lat={lat:.7f} lon={lon:.7f}'
+        )
+
+        if self.waypoint_gps_pairs and not self.waypoints:
+            self._convert_waypoint_gps_to_local()
+            self.auto_set_bounds_from_waypoints()
+
+    def _convert_waypoint_gps_to_local(self):
+        """Convert the stashed (lat, lon) waypoint pairs to (north, west)
+        meters using gps_reference_lat/lon as the origin."""
+        self.waypoints = [
+            self.gps_to_local_meters(lat, lon)
+            for lat, lon in self.waypoint_gps_pairs
+        ]
+        self.get_logger().info(
+            f'Converted {len(self.waypoints)} GPS waypoint(s) to local meters '
+            f'against rover-start origin.'
+        )
 
     # ---------------- Helpers ----------------
     def append_robot_path(self, x, y):

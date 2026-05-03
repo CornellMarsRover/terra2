@@ -27,10 +27,14 @@ class StateMachineNode(Node):
         # Declare parameters
         self.declare_parameter('real', True)  # FALSE IF TESTING IN SIM
         self.declare_parameter('waypoint_tolerance', 2.0)  # meters
+        # GPS topic used purely for one-shot origin capture. Default matches the
+        # real rover (RTK driver). Override to '/navsatfix' for sim.
+        self.declare_parameter('gps_topic', '/rtk/navsatfix_data')
 
         # Get parameters
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.waypoint_tolerance = self.get_parameter('waypoint_tolerance').get_parameter_value().double_value
+        self.gps_topic = self.get_parameter('gps_topic').get_parameter_value().string_value
 
         # # Choose which waypoints file to load
         # if self.real:
@@ -43,8 +47,10 @@ class StateMachineNode(Node):
             waypoints_file = 'config/waypoints_long.yaml'
 
         self.get_logger().info(f"Waypoints file: {waypoints_file}")
-        # Load waypoints
-        # NOTE first coordinate is precise starting point
+        # Every entry in the YAML is treated as a real navigation target.
+        # The local-frame origin (north=0, west=0) is captured from the first
+        # GPS fix we receive, NOT from the YAML, so the rover's actual starting
+        # position defines the frame.
         self.waypoints = self.load_waypoints(waypoints_file)
 
         if not self.waypoints:
@@ -52,15 +58,15 @@ class StateMachineNode(Node):
             rclpy.shutdown()
             return
 
-        # First coordinate given is precise reference starting coordinate
-        starting_waypoint = self.waypoints[0]
-        self.initial_lat = starting_waypoint['latitude']
-        self.initial_lon = starting_waypoint['longitude']
-        self.previous_target_lat = self.initial_lat
-        self.previous_target_lon = self.initial_lon
+        # Local-frame origin is captured from the rover's first GPS fix in
+        # gps_callback below. Until then, next_coordinate is None and the
+        # control loop is a no-op.
+        self.initial_lat = None
+        self.initial_lon = None
+        self.origin_captured = False
 
-        # Define first target
-        self.current_waypoint_index = 1
+        # Drive every waypoint in the YAML, starting at index 0.
+        self.current_waypoint_index = 0
         self.next_waypoint = self.waypoints[self.current_waypoint_index]
         self.next_coordinate_lat = self.next_waypoint['latitude']
         self.next_coordinate_lon = self.next_waypoint['longitude']
@@ -72,6 +78,12 @@ class StateMachineNode(Node):
 
         self.get_logger().info(f'Loaded {len(self.waypoints)} waypoints.')
 
+
+        # One-shot subscriber that captures the rover's starting GPS as the
+        # local-frame origin. Same NavSatFix the localization node uses.
+        self.gps_subscription = self.create_subscription(
+            NavSatFix, self.gps_topic, self.gps_callback, 10
+        )
 
         # Subscriptions to localization and game object data
         self.pose_subscription = self.create_subscription(
@@ -86,34 +98,41 @@ class StateMachineNode(Node):
         self.previous_target_publisher = self.create_publisher(Float32MultiArray, '/autonomy/target/previous', 10)
         self.next_coordinate_publisher = self.create_publisher(Float32MultiArray, '/autonomy/target/global', 10)
         self.object_publisher = self.create_publisher(String, '/autonomy/target_object/name', 10)
+        # Rover starts at the local-frame origin, so the "previous target" we
+        # advertise to the local planner is (0, 0).
         self.previous_target = [0.0, 0.0]
-        n, w = self.get_north_west_meters(self.next_coordinate_lat, self.next_coordinate_lon)
-        self.next_coordinate = (n, w)
-        
-        # Targets for the mission with (object name, threshold, search_radius, radial step for search, angular step for search)
+        # Filled in once the GPS origin is captured.
+        self.next_coordinate = None
+
+        # Per-waypoint mission metadata, indexed by waypoint index (0-based).
+        # update_search_params falls back to a plain coordinate target if an
+        # index isn't listed here, so YAMLs with fewer entries than this map
+        # (e.g. eng-quad smoke tests) just drive coord-to-coord without any
+        # AR-marker search behavior.
+        # Tuple: (object_name, threshold_m, search_radius_m, r_step_m, theta_step_deg)
         self.targets = {
-            1: ('coordinate', 2.0, 0.0, 0.0, 0.0),
-            2: ('ar1', 1.5, 10.0, 0.2, 15.0),
-            3: ('ar2', 1.5, 15.0, 0.2, 15.0),
-            4: ('ar3', 1.5, 20.0, 0.2, 15.0), # 1
-            5: ('ar1', 1.5, 10.0, 0.2, 30.0),
-            6: ('ar2', 1.5, 15.0, 0.2, 30.0),
-            7: ('ar3', 1.5, 20.0, 0.2, 30.0), # 2
-            8: ('ar1', 1.5, 10.0, 0.2, 45.0),
-            9: ('ar2', 1.5, 15.0, 0.2, 45.0),
-            10: ('ar3', 1.5, 20.0, 0.2, 45.0), # 3
-            11: ('ar1', 1.5, 10.0, 0.4, 15.0),
-            12: ('ar2', 1.5, 15.0, 0.4, 15.0),
-            13: ('ar3', 1.5, 20.0, 0.4, 15.0), # 4
-            14: ('ar1', 1.5, 10.0, 0.4, 30.0),
-            15: ('ar2', 1.5, 15.0, 0.4, 30.0),
-            16: ('ar3', 1.5, 20.0, 0.4, 30.0), # 5
-            17: ('ar1', 1.5, 10.0, 0.4, 45.0),
-            18: ('ar2', 1.5, 15.0, 0.4, 45.0),
-            19: ('ar3', 1.5, 20.0, 0.4, 45.0),  # 6
-            20: ('ar1', 1.5, 10.0, 0.6, 30.0),
-            21: ('ar2', 1.5, 15.0, 0.6, 30.0),
-            22: ('ar3', 1.5, 20.0, 0.6, 30.0), # 7
+            0: ('coordinate', 2.0, 0.0, 0.0, 0.0),
+            1: ('ar1', 1.5, 10.0, 0.2, 15.0),
+            2: ('ar2', 1.5, 15.0, 0.2, 15.0),
+            3: ('ar3', 1.5, 20.0, 0.2, 15.0), # 1
+            4: ('ar1', 1.5, 10.0, 0.2, 30.0),
+            5: ('ar2', 1.5, 15.0, 0.2, 30.0),
+            6: ('ar3', 1.5, 20.0, 0.2, 30.0), # 2
+            7: ('ar1', 1.5, 10.0, 0.2, 45.0),
+            8: ('ar2', 1.5, 15.0, 0.2, 45.0),
+            9: ('ar3', 1.5, 20.0, 0.2, 45.0), # 3
+            10: ('ar1', 1.5, 10.0, 0.4, 15.0),
+            11: ('ar2', 1.5, 15.0, 0.4, 15.0),
+            12: ('ar3', 1.5, 20.0, 0.4, 15.0), # 4
+            13: ('ar1', 1.5, 10.0, 0.4, 30.0),
+            14: ('ar2', 1.5, 15.0, 0.4, 30.0),
+            15: ('ar3', 1.5, 20.0, 0.4, 30.0), # 5
+            16: ('ar1', 1.5, 10.0, 0.4, 45.0),
+            17: ('ar2', 1.5, 15.0, 0.4, 45.0),
+            18: ('ar3', 1.5, 20.0, 0.4, 45.0),  # 6
+            19: ('ar1', 1.5, 10.0, 0.6, 30.0),
+            20: ('ar2', 1.5, 15.0, 0.6, 30.0),
+            21: ('ar3', 1.5, 20.0, 0.6, 30.0), # 7
             #5: ('mallet', 1.5, 10.0),
             #6: ('water bottle', 1.5, 10.0)
         }
@@ -133,6 +152,24 @@ class StateMachineNode(Node):
 
         # Timer for control loop (10 Hz)
         self.timer = self.create_timer(0.1, self.control_loop)
+
+    def gps_callback(self, msg: NavSatFix):
+        """
+        Capture the rover's first GPS fix as the local-frame (north=0, west=0)
+        origin, then compute the local coords of the first waypoint. This is
+        a one-shot — we never update the origin again.
+        """
+        if self.origin_captured:
+            return
+        self.initial_lat = msg.latitude
+        self.initial_lon = msg.longitude
+        n, w = self.get_north_west_meters(self.next_coordinate_lat, self.next_coordinate_lon)
+        self.next_coordinate = (n, w)
+        self.origin_captured = True
+        self.get_logger().info(
+            f"GPS origin captured lat={self.initial_lat:.8f} lon={self.initial_lon:.8f} "
+            f"first target at (n={n:+.2f} m, w={w:+.2f} m)"
+        )
 
     def update_targets(self):
         """
@@ -202,6 +239,15 @@ class StateMachineNode(Node):
         """
         self.publish_state()
 
+        if not self.origin_captured:
+            # No GPS origin yet -> we don't know where we are in the local
+            # frame, so we can't navigate. Wait for the first fix.
+            self.get_logger().info(
+                f"Waiting for first GPS fix on {self.gps_topic} to set local-frame origin...",
+                throttle_duration_sec=2.0,
+            )
+            return
+
         if self.current_waypoint_index >= len(self.waypoints):
             self.get_logger().info('All waypoints reached.')
             return
@@ -258,9 +304,14 @@ class StateMachineNode(Node):
     
     def update_search_params(self):
         """
-        Update search params with the current waypoint index
+        Update search params with the current waypoint index. Falls back to a
+        plain coordinate target (no AR-marker search) for any index that isn't
+        explicitly listed in self.targets.
         """
-        t = self.targets[self.current_waypoint_index]
+        t = self.targets.get(
+            self.current_waypoint_index,
+            ('coordinate', self.waypoint_tolerance, 0.0, 0.0, 0.0),
+        )
         self.current_state = t[0]
         self.threshold = t[1]
         self.search_radius = t[2]

@@ -1,9 +1,10 @@
 # config/sim_waypoints_condensed.yaml
+#
+# NOTE: The local-frame origin is captured from the rover's first GPS fix
+# at runtime, so every entry below is a real target to drive to. Do NOT
+# put the rover's starting position here.
 
 waypoints:
-  - latitude: 38.161479
-    longitude: -122.454630
-    altitude: 488.0
   - latitude: 38.161569
     longitude: -122.454630
     altitude: 488.0
@@ -20,7 +21,6 @@ waypoints:
     longitude: -122.454744
     altitude: 488.0
   # NORTH = FORWARD and WEST = LEFT from starting orientation
-  # 0: starting position
   # 1st: 10m north 0m west
   # 2nd: 20m north 20m west
   # 3rd: 40m north 10m east

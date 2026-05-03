@@ -9,7 +9,13 @@ def generate_launch_description():
             executable='state_machine',
             name='state_machine',
             output='screen',
-            parameters=[{'real': False, 'use_sim_time': True}]
+            parameters=[{
+                'real': False,
+                'use_sim_time': True,
+                # state_machine uses this only to capture the rover's first
+                # GPS fix as the local-frame origin.
+                'gps_topic': '/navsatfix',
+            }]
         ),
         launch_ros.actions.Node(
             package='autonomous_navigation',

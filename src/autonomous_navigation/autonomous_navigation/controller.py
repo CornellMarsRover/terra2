@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TwistStamped
-from std_msgs.msg import Float32MultiArray, String
+from std_msgs.msg import Bool, Float32MultiArray, String
 import math
 import time
 
@@ -16,8 +16,10 @@ class ControllerNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.declare_parameter('diagnostic_logging', True)
+        self.declare_parameter('avoidance_timeout_s', 0.5)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
+        self.avoidance_timeout_s = self.get_parameter('avoidance_timeout_s').get_parameter_value().double_value
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -31,6 +33,18 @@ class ControllerNode(Node):
             Float32MultiArray,
             '/autonomy/path/next_waypoint',
             self.update_waypoint,
+            10
+        )
+        self.avoidance_override_subscription = self.create_subscription(
+            Twist,
+            '/autonomy/obstacle_avoidance/override',
+            self.update_avoidance_override,
+            10
+        )
+        self.avoidance_active_subscription = self.create_subscription(
+            Bool,
+            '/autonomy/obstacle_avoidance/active',
+            self.update_avoidance_active,
             10
         )
 
@@ -63,6 +77,9 @@ class ControllerNode(Node):
         self.last_command_velocity = 0.0
         self.last_command_steer_deg = 0.0
         self.last_point_turn_z = 0.0
+        self.avoidance_active = False
+        self.avoidance_override = Twist()
+        self.last_avoidance_time = None
 
         # Stanley controller parameters
         self.k_stanley = 1.0       # Gain for cross-track error term
@@ -82,6 +99,33 @@ class ControllerNode(Node):
           5. If 'use_stanley' is False, use your original "ackerman" approach.
         """
         if self.waypoint is None:
+            return
+
+        if self.avoidance_override_is_active():
+            point_turn_z = self.avoidance_override.angular.z
+            if abs(point_turn_z) > 1e-3:
+                self.publish_point_turn(point_turn_z)
+                self.last_movement = 'point_turn'
+                self.last_command_time = self.get_clock().now().to_msg()
+                self.publish_movement('obstacle_avoidance')
+                command_mode = 'obstacle_override_turn'
+            else:
+                self.publish_ackerman(0.0, 0.0)
+                self.last_movement = 'ackerman'
+                self.last_command_time = self.get_clock().now().to_msg()
+                self.publish_movement('obstacle_avoidance')
+                command_mode = 'obstacle_override_stop'
+            self.log_navigation_diagnostics(
+                0.0,
+                0.0,
+                0.0,
+                self.yaw,
+                0.0,
+                command_mode,
+                0.0,
+                0.0,
+                point_turn_z,
+            )
             return
 
         # Position difference to the waypoint
@@ -111,13 +155,13 @@ class ControllerNode(Node):
             #self.get_logger().info(f"dt: {dt}")
             if self.last_movement == "ackerman" and dt < self.min_wait:
                 # Just publish a tiny turn command
-                point_turn_z = 0.00001
+                point_turn_z = -0.00001 if angle_error_deg < 0 else 0.00001
                 command_mode = 'point_turn_wait'
                 command_velocity = 0.0
                 self.publish_point_turn(point_turn_z)
             else:
                 # Actual point turn
-                turn_sign = 1.0 if angle_error_deg < 0 else -1.0
+                turn_sign = -1.0 if angle_error_deg < 0 else 1.0
                 if self.real:
                     turn_sign *= -1.0
                 point_turn_z = turn_sign * self.point_turn_velocity
@@ -278,6 +322,22 @@ class ControllerNode(Node):
             self.use_stanley = (msg.data[2] == 1.0)  # 1.0 means True
         else:
             self.use_stanley = False
+
+    def update_avoidance_override(self, msg: Twist):
+        self.avoidance_override = msg
+        self.last_avoidance_time = self.get_clock().now()
+
+    def update_avoidance_active(self, msg: Bool):
+        self.avoidance_active = msg.data
+        self.last_avoidance_time = self.get_clock().now()
+
+    def avoidance_override_is_active(self):
+        if self.last_avoidance_time is None:
+            return False
+        dt = (self.get_clock().now() - self.last_avoidance_time).nanoseconds * 1e-9
+        if dt > self.avoidance_timeout_s:
+            return False
+        return self.avoidance_active
 
     def log_navigation_diagnostics(
         self,

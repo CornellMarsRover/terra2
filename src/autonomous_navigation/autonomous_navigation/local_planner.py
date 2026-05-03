@@ -15,7 +15,10 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
-import rerun as rr
+try:
+    import rerun as rr
+except ImportError:
+    rr = None
 
 class LocalPlannerNode(Node):
     def __init__(self):
@@ -26,7 +29,9 @@ class LocalPlannerNode(Node):
         self.declare_parameter('real', True)  # False if running sim
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
-        self.visualize = True
+        if self.visualize and rr is None:
+            self.get_logger().warn("Rerun not installed; disabling visualization")
+            self.visualize = False
         
         # ------------------------------------
         # Tunable parameters for cost-based path planning
@@ -212,9 +217,10 @@ class LocalPlannerNode(Node):
         """
         Costmap callback – updates local costs and "obstacles".
         """
+        self.costs = dict()
+        self.obstacles = set()
         if len(msg.data) == 0:
             return
-        self.costs = dict()
         for i in range(0, len(msg.data), 3):
             xx = msg.data[i]
             yy = msg.data[i+1]

@@ -1,6 +1,7 @@
 # setup.py
 
 from setuptools import setup
+from glob import glob
 
 package_name = 'autonomous_navigation'
 
@@ -15,12 +16,15 @@ setup(
         ('share/' + package_name + '/config', ['config/waypoints_duff.yaml']),
         ('share/' + package_name + '/launch', ['launch/localization_real.launch.py']),
         ('share/' + package_name + '/launch', ['launch/sim_autonomy.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/obstacle_avoidance_sim.launch.py']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_engquad.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_long.yaml']),
         ('share/' + package_name + '/config', ['config/sim_waypoints_condensed.yaml']),
         ('share/' + package_name + '/tooling', ['tooling/Live_telemetry_tool.py']),
         ('share/' + package_name + '/tooling', ['tooling/test_script.py']),
+        ('share/' + package_name + '/urdf', glob('urdf/*.urdf')),
+        ('share/' + package_name + '/models', glob('models/*.sdf')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -42,6 +46,11 @@ setup(
             'rtk_localization = autonomous_navigation.rtk_localization:main',
             'object_detection = autonomous_navigation.object_detection:main',
             'live_telemetry_tool = autonomous_navigation.live_telemetry_tool_runner:main',
+            'sim_drive_bridge = autonomous_navigation.sim_drive_bridge:main',
+            'odom_to_autonomy_pose = autonomous_navigation.odom_to_autonomy_pose:main',
+            'obstacle_guard = autonomous_navigation.obstacle_guard:main',
+            'sim_goal_publisher = autonomous_navigation.sim_goal_publisher:main',
+            'sim_vision_obstacle_detector = autonomous_navigation.sim_vision_obstacle_detector:main',
         ],
     },
 )

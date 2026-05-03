@@ -15,7 +15,11 @@ from cv_bridge import CvBridge
 
 import numpy as np
 import math
-from shapely.geometry import Point, Polygon
+try:
+    from shapely.geometry import Point, Polygon
+except ImportError:
+    Point = None
+    Polygon = None
 
 
 class CostmapNode(Node):
@@ -26,13 +30,15 @@ class CostmapNode(Node):
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         #self.real = True
 
-        if self.real:
+        if self.real and Polygon is not None:
             self.ground_plane_sub = self.create_subscription(
                 GroundPlaneStamped,
                 '/camera/ground_plane',
                 self.ground_plane_callback,
                 10
             )
+        elif self.real:
+            self.get_logger().warn("shapely not installed; ground-plane filtering disabled")
         
         self.pc_sub = self.create_subscription(
             PointCloud2,
@@ -215,6 +221,8 @@ class CostmapNode(Node):
         """
         if self.last_movement == "point_turn":
             return
+        if Polygon is None:
+            return
         pts = []
         north, west, R = self.interpolate_pose(msg.header.stamp)
         x = msg.x
@@ -285,7 +293,7 @@ class CostmapNode(Node):
         Returns if a grid cell (x, y) is in the most recently
         detected ground plane polygon given by the ZED
         """
-        if self.ground_plane is None:
+        if self.ground_plane is None or Point is None:
             return True
         if (x,y) in self.ground_dict:
             return self.ground_dict[(x,y)]

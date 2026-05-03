@@ -14,8 +14,6 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
-import rerun as rr
-
 class GlobalPlannerNode(Node):
     def __init__(self):
         super().__init__('global_planner_node')

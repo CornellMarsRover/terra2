@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 set -e
 
 cd ~/cmr/terra2
@@ -9,51 +8,45 @@ echo "Available video devices:"
 v4l2-ctl --list-devices || true
 echo
 
-echo "Enter video numbers to activate (ex: 0 2 4):"
-read video_nums
+echo "Enter cam numbers to activate (ex: 0 2 4):"
+read -r cam_nums
 
-if [ -z "$video_nums" ]; then
-  echo "No video devices entered."
+if [ -z "$cam_nums" ]; then
+  echo "No cams entered."
   exit 1
 fi
 
-echo "Finding camera nodes..."
-all_cams=$(ros2 node list | grep '^/cam')
+for num in $cam_nums; do
+  cam="/cam$num"
 
-selected_cams=""
+  echo
+  echo "=============================="
+  echo "Starting $cam"
+  echo "=============================="
 
-for num in $video_nums; do
-  dev="/dev/video$num"
+  echo "Current lifecycle state:"
+  ros2 lifecycle get "$cam" || {
+    echo "Could not contact $cam. Skipping."
+    continue
+  }
 
-  for node in $all_cams; do
-    value=$(ros2 param get "$node" video_device 2>/dev/null || true)
-    if echo "$value" | grep -q "$dev"; then
-      selected_cams="$selected_cams $node"
-    fi
-  done
-done
-
-if [ -z "$selected_cams" ]; then
-  echo "No matching camera nodes found."
-  exit 1
-fi
-
-echo
-echo "Camera nodes to activate:"
-echo "$selected_cams"
-echo
-
-for cam in $selected_cams; do
   echo "Configuring $cam ..."
-  ros2 lifecycle set "$cam" configure
-done
+  timeout 15s ros2 lifecycle set "$cam" configure || {
+    echo "Configure failed or timed out for $cam. Skipping activate."
+    continue
+  }
 
-sleep 2
+  sleep 1
 
-for cam in $selected_cams; do
   echo "Activating $cam ..."
-  ros2 lifecycle set "$cam" activate
+  timeout 15s ros2 lifecycle set "$cam" activate || {
+    echo "Activate failed or timed out for $cam."
+    continue
+  }
+
+  echo "$cam done."
+  sleep 1
 done
 
 echo
-echo "Done."
+echo "All requested cameras processed."

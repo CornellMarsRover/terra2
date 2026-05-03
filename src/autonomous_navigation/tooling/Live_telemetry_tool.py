@@ -54,12 +54,21 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('ui_update_hz', 20.0)
         self.declare_parameter('trail_length', 800)
         self.declare_parameter('zoom_factor', 1.0)
+        # Emergency override: if the displayed heading rotates the wrong
+        # direction vs. the physical rover (e.g. the IMU sign flip ever
+        # regresses), set this True to negate yaw at display time only.
+        # rtk_localization should publish CCW-positive yaw in the N/W frame
+        # (yaw=0 -> facing N, +pi/2 -> facing W); when that is true, leave
+        # this False.
+        self.declare_parameter('invert_display_yaw', False)
 
-        # fallback bounds if no waypoints; for geospatial plotting, x=longitude and y=latitude
-        self.declare_parameter('world_x_min', -76.484000)
-        self.declare_parameter('world_x_max', -76.483000)
-        self.declare_parameter('world_y_min', 42.443500)
-        self.declare_parameter('world_y_max', 42.444500)
+        # Fallback canvas bounds in local meters (East/North). The first
+        # GPS fix triggers auto-bounds-from-waypoints, so these only matter
+        # for the brief startup window before the fix lands.
+        self.declare_parameter('world_x_min', -25.0)
+        self.declare_parameter('world_x_max', 25.0)
+        self.declare_parameter('world_y_min', -25.0)
+        self.declare_parameter('world_y_max', 25.0)
 
         self.robot_pose_topic = self.get_parameter('robot_pose_topic').value
         self.target_topic = self.get_parameter('target_topic').value
@@ -81,12 +90,18 @@ class RealtimeRobotPlotter(Node):
         self.trail_length = int(self.get_parameter('trail_length').value)
         self.zoom_factor = max(0.05, float(self.get_parameter('zoom_factor').value))
 
+        self.invert_display_yaw = bool(self.get_parameter('invert_display_yaw').value)
+
         self.world_x_min = float(self.get_parameter('world_x_min').value)
         self.world_x_max = float(self.get_parameter('world_x_max').value)
         self.world_y_min = float(self.get_parameter('world_y_min').value)
         self.world_y_max = float(self.get_parameter('world_y_max').value)
-        self.world_x_label_name = 'Longitude'
-        self.world_y_label_name = 'Latitude'
+        # Canvas convention: world_x = East (m), world_y = North (m). This is a
+        # standard "north-up, east-right" map. The autonomy stack publishes the
+        # rover pose in (north, west, yaw_NWU_CCW); we convert to (east, north)
+        # at the entry points so the canvas stays in the conventional frame.
+        self.world_x_label_name = 'East (m)'
+        self.world_y_label_name = 'North (m)'
         self.data_world_x_min = self.world_x_min
         self.data_world_x_max = self.world_x_max
         self.data_world_y_min = self.world_y_min
@@ -101,13 +116,23 @@ class RealtimeRobotPlotter(Node):
         self.gps_reference_lon = None
 
         # ---------------- State ----------------
+        # Canvas-frame (East, North) for plotting. Computed from the autonomy
+        # pose msg (linear.x = north_m, linear.y = west_m) at the callback
+        # boundary so the rest of the rendering can stay in standard map coords.
         self.robot_x = None
         self.robot_y = None
+        # Native autonomy frame (North, West) kept around for the side panel
+        # readout so the user can cross-reference what state_machine sees.
+        self.robot_north = None
+        self.robot_west = None
         self.robot_yaw = 0.0
         self.robot_pose_frame_id = ''
 
+        # Canvas-frame (East, North) target. target_north/_west kept for panel.
         self.target_x = None
         self.target_y = None
+        self.target_north = None
+        self.target_west = None
         self.current_state = '--'
         self.current_move_type = '--'
         self.gps_lat = None
@@ -325,9 +350,9 @@ class RealtimeRobotPlotter(Node):
         self.image_status_label.pack(anchor='w')
 
         self.side_container = ttk.Frame(self.main_pane)
-        self.main_pane.add(self.side_container, minsize=230, stretch='never')
+        self.main_pane.add(self.side_container, minsize=260, stretch='never')
 
-        self.side_canvas = tk.Canvas(self.side_container, highlightthickness=0, width=300)
+        self.side_canvas = tk.Canvas(self.side_container, highlightthickness=0, width=340)
         self.side_scrollbar = ttk.Scrollbar(
             self.side_container,
             orient=tk.VERTICAL,
@@ -354,8 +379,25 @@ class RealtimeRobotPlotter(Node):
         self.side_frame.bind('<Enter>', self.bind_side_mousewheel)
         self.side_frame.bind('<Leave>', self.unbind_side_mousewheel)
 
-        # ---- Drive Direction box
-        dir_box = ttk.LabelFrame(self.side_frame, text='Drive Direction', padding=8)
+        # ---- Heading box (absolute heading from rtk_localization)
+        heading_box = ttk.LabelFrame(self.side_frame, text='Heading (absolute)', padding=8)
+        heading_box.pack(fill='x', pady=4)
+        self.heading_canvas = tk.Canvas(heading_box, width=120, height=120, bg='#1e1e1e',
+                                        highlightthickness=1, highlightbackground='#555555')
+        self.heading_canvas.pack(anchor='center', pady=(2, 4))
+        self.heading_label = ttk.Label(heading_box, text='Yaw: -- (--)',
+                                       font=('TkFixedFont', 11, 'bold'),
+                                       anchor='center')
+        self.heading_label.pack(fill='x')
+        self.heading_hint_label = ttk.Label(
+            heading_box,
+            text='N/W-frame, CCW-positive: 0=N, +90=W, -90=E',
+            wraplength=280, foreground='gray40'
+        )
+        self.heading_hint_label.pack(anchor='w')
+
+        # ---- Drive command direction (rover-relative)
+        dir_box = ttk.LabelFrame(self.side_frame, text='Drive Command Direction', padding=8)
         dir_box.pack(fill='x', pady=4)
         self.direction_canvas = tk.Canvas(dir_box, width=120, height=120, bg='#1e1e1e',
                                           highlightthickness=1, highlightbackground='#555555')
@@ -367,12 +409,16 @@ class RealtimeRobotPlotter(Node):
         # ---- Robot box
         robot_box = ttk.LabelFrame(self.side_frame, text='Robot State', padding=8)
         robot_box.pack(fill='x', pady=4)
-        self.robot_x_label = ttk.Label(robot_box, text='Longitude: --')
-        self.robot_x_label.pack(anchor='w')
-        self.robot_y_label = ttk.Label(robot_box, text='Latitude: --')
-        self.robot_y_label.pack(anchor='w')
-        self.robot_yaw_label = ttk.Label(robot_box, text='Yaw: --')
-        self.robot_yaw_label.pack(anchor='w')
+        # Autonomy-stack (north, west) frame -- matches rtk_localization,
+        # state_machine, controller logs.
+        self.robot_north_label = ttk.Label(robot_box, text='North: -- m')
+        self.robot_north_label.pack(anchor='w')
+        self.robot_west_label = ttk.Label(robot_box, text='West:  -- m')
+        self.robot_west_label.pack(anchor='w')
+        # Same position re-expressed in canvas (east, north) for cross-ref.
+        self.robot_canvas_label = ttk.Label(robot_box, text='Canvas (E, N): --',
+                                            foreground='gray40')
+        self.robot_canvas_label.pack(anchor='w')
         self.speed_label = ttk.Label(robot_box, text='Speed: -- m/s')
         self.speed_label.pack(anchor='w')
         self.gps_lat_label = ttk.Label(robot_box, text='GPS Lat: --')
@@ -380,15 +426,32 @@ class RealtimeRobotPlotter(Node):
         self.gps_lon_label = ttk.Label(robot_box, text='GPS Lon: --')
         self.gps_lon_label.pack(anchor='w')
 
+        # ---- GPS origin box
+        origin_box = ttk.LabelFrame(self.side_frame, text='GPS Origin', padding=8)
+        origin_box.pack(fill='x', pady=4)
+        self.origin_status_label = ttk.Label(origin_box, text='Origin: waiting for first fix...',
+                                             font=('TkDefaultFont', 9, 'bold'),
+                                             foreground='#c0392b')
+        self.origin_status_label.pack(anchor='w')
+        self.origin_lat_label = ttk.Label(origin_box, text='Lat: --')
+        self.origin_lat_label.pack(anchor='w')
+        self.origin_lon_label = ttk.Label(origin_box, text='Lon: --')
+        self.origin_lon_label.pack(anchor='w')
+
         # ---- Target box
         target_box = ttk.LabelFrame(self.side_frame, text='Target State', padding=8)
         target_box.pack(fill='x', pady=4)
-        self.target_x_label = ttk.Label(target_box, text='Target X: --')
-        self.target_x_label.pack(anchor='w')
-        self.target_y_label = ttk.Label(target_box, text='Target Y: --')
-        self.target_y_label.pack(anchor='w')
+        self.target_north_label = ttk.Label(target_box, text='Target North: --')
+        self.target_north_label.pack(anchor='w')
+        self.target_west_label = ttk.Label(target_box, text='Target West:  --')
+        self.target_west_label.pack(anchor='w')
+        self.target_canvas_label = ttk.Label(target_box, text='Canvas (E, N): --',
+                                             foreground='gray40')
+        self.target_canvas_label.pack(anchor='w')
         self.dist_label = ttk.Label(target_box, text='Distance: --')
         self.dist_label.pack(anchor='w')
+        self.bearing_label = ttk.Label(target_box, text='Bearing: --')
+        self.bearing_label.pack(anchor='w')
 
         # ---- Command box
         cmd_box = ttk.LabelFrame(self.side_frame, text='cmd_vel Telemetry', padding=8)
@@ -484,7 +547,9 @@ class RealtimeRobotPlotter(Node):
             total_width = self.main_pane.winfo_width()
             total_height = self.left_pane.winfo_height()
             if total_width > 0:
-                self.main_pane.sash_place(0, max(520, total_width - 320), 0)
+                # Reserve 360 px on the right for the telemetry side panel so
+                # the heading/state/origin readouts have room without clipping.
+                self.main_pane.sash_place(0, max(520, total_width - 360), 0)
             if total_height > 0:
                 self.left_pane.sash_place(0, 0, int(total_height * 0.72))
         except Exception:
@@ -545,8 +610,10 @@ class RealtimeRobotPlotter(Node):
                 return
 
             if all(('latitude' in wp and 'longitude' in wp) for wp in loaded):
-                self.world_x_label_name = 'North (m)'
-                self.world_y_label_name = 'West (m)'
+                # Canvas axes are East (right) and North (up); see the
+                # frame-convention comment in __init__.
+                self.world_x_label_name = 'East (m)'
+                self.world_y_label_name = 'North (m)'
                 # Stash raw (lat, lon) pairs and defer the conversion to
                 # local meters until gps_cb captures the rover's first GPS
                 # fix as the reference origin. self.waypoints stays empty
@@ -659,9 +726,12 @@ class RealtimeRobotPlotter(Node):
         else:
             self.zoom_in()
 
-    def gps_to_local_meters(self, lat, lon):
+    def gps_to_north_west(self, lat, lon):
+        """Match rtk_localization/state_machine: returns (north_m, west_m)
+        relative to the captured GPS reference. Used internally and for the
+        side-panel readouts that mirror the autonomy stack frame."""
         if self.gps_reference_lat is None or self.gps_reference_lon is None:
-            return lon, lat
+            return None, None
 
         radius = 6378137.0
         lat_rad = math.radians(lat)
@@ -675,6 +745,24 @@ class RealtimeRobotPlotter(Node):
         north = -1.0 * delta_lat * radius
         west = delta_lon * radius * math.cos(mean_lat)
         return north, west
+
+    def gps_to_canvas_xy(self, lat, lon):
+        """Return (east_m, north_m) for canvas plotting. east = -west so the
+        canvas's +x axis points east."""
+        north, west = self.gps_to_north_west(lat, lon)
+        if north is None:
+            # No reference yet -> fall back to raw (lon, lat) which is
+            # nonsensical for the canvas but matches the previous behavior.
+            return lon, lat
+        return -west, north
+
+    @staticmethod
+    def north_west_to_canvas_xy(north, west):
+        """Same flip used everywhere a (north, west) pair needs to be
+        rendered on the East/North canvas."""
+        if north is None or west is None:
+            return None, None
+        return -west, north
 
     def looks_like_lon_lat(self, x, y, frame_id=''):
         frame_id = (frame_id or '').lower()
@@ -695,7 +783,8 @@ class RealtimeRobotPlotter(Node):
             return None, None
 
         if self.gps_reference_lat is not None and self.looks_like_lon_lat(x, y, frame_id):
-            return self.gps_to_local_meters(y, x)
+            # x = longitude, y = latitude here (we pass them in that order).
+            return self.gps_to_canvas_xy(y, x)
 
         return x, y
 
@@ -733,57 +822,80 @@ class RealtimeRobotPlotter(Node):
         self.msg_counts[key] += 1
         self.last_seen[key] = time.time()
 
-    def robot_pose_pose_stamped_cb(self, msg: PoseStamped):
+    def _store_robot_pose_north_west(self, north, west, yaw, frame_id):
+        """Single sink for incoming pose msgs. The autonomy stack speaks
+        (north, west, yaw_NWU_CCW); the canvas speaks (east, north). Convert
+        once here so the rest of the rendering is unambiguous."""
+        canvas_east, canvas_north = self.north_west_to_canvas_xy(north, west)
         with self.lock:
-            self.robot_x = msg.pose.position.x
-            self.robot_y = msg.pose.position.y
-            self.robot_pose_frame_id = msg.header.frame_id
-            self.robot_yaw = self.quaternion_to_yaw(
-                msg.pose.orientation.x,
-                msg.pose.orientation.y,
-                msg.pose.orientation.z,
-                msg.pose.orientation.w
-            )
+            self.robot_north = north
+            self.robot_west = west
+            self.robot_x = canvas_east
+            self.robot_y = canvas_north
+            self.robot_pose_frame_id = frame_id
+            self.robot_yaw = yaw
         self.mark_seen('robot_pose')
+
+    def robot_pose_pose_stamped_cb(self, msg: PoseStamped):
+        # PoseStamped path is rarely used in the autonomy stack; treat
+        # position.x/y as (north, west) for consistency with the rest of
+        # the system (rtk_localization, state_machine, controller).
+        yaw = self.quaternion_to_yaw(
+            msg.pose.orientation.x,
+            msg.pose.orientation.y,
+            msg.pose.orientation.z,
+            msg.pose.orientation.w
+        )
+        self._store_robot_pose_north_west(
+            msg.pose.position.x,
+            msg.pose.position.y,
+            yaw,
+            msg.header.frame_id,
+        )
 
     def robot_pose_twist_stamped_cb(self, msg: TwistStamped):
-        with self.lock:
-            self.robot_x = msg.twist.linear.x
-            self.robot_y = msg.twist.linear.y
-            self.robot_pose_frame_id = msg.header.frame_id
-            self.robot_yaw = msg.twist.angular.z
-        self.mark_seen('robot_pose')
+        # rtk_localization packs (north, west, yaw_NWU_CCW) into
+        # (linear.x, linear.y, angular.z) of a TwistStamped on
+        # /autonomy/pose/robot/global.
+        self._store_robot_pose_north_west(
+            msg.twist.linear.x,
+            msg.twist.linear.y,
+            msg.twist.angular.z,
+            msg.header.frame_id,
+        )
 
     def robot_pose_odom_cb(self, msg: Odometry):
+        yaw = self.quaternion_to_yaw(
+            msg.pose.pose.orientation.x,
+            msg.pose.pose.orientation.y,
+            msg.pose.pose.orientation.z,
+            msg.pose.pose.orientation.w
+        )
+        self._store_robot_pose_north_west(
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            yaw,
+            msg.header.frame_id,
+        )
+
+    def _store_target_north_west(self, north, west):
+        """Mirror image of the rover-pose sink for incoming target msgs."""
+        canvas_east, canvas_north = self.north_west_to_canvas_xy(north, west)
         with self.lock:
-            self.robot_x = msg.pose.pose.position.x
-            self.robot_y = msg.pose.pose.position.y
-            self.robot_pose_frame_id = msg.header.frame_id
-            self.robot_yaw = self.quaternion_to_yaw(
-                msg.pose.pose.orientation.x,
-                msg.pose.pose.orientation.y,
-                msg.pose.pose.orientation.z,
-                msg.pose.pose.orientation.w
-            )
-        self.mark_seen('robot_pose')
+            self.target_north = north
+            self.target_west = west
+            self.target_x = canvas_east
+            self.target_y = canvas_north
+        self.mark_seen('target')
 
     def target_point_cb(self, msg: Point):
-        with self.lock:
-            self.target_x = msg.x
-            self.target_y = msg.y
-        self.mark_seen('target')
+        self._store_target_north_west(msg.x, msg.y)
 
     def target_twist_cb(self, msg: Twist):
-        with self.lock:
-            self.target_x = msg.linear.x
-            self.target_y = msg.linear.y
-        self.mark_seen('target')
+        self._store_target_north_west(msg.linear.x, msg.linear.y)
 
     def target_pose_stamped_cb(self, msg: PoseStamped):
-        with self.lock:
-            self.target_x = msg.pose.position.x
-            self.target_y = msg.pose.position.y
-        self.mark_seen('target')
+        self._store_target_north_west(msg.pose.position.x, msg.pose.position.y)
 
     def cmd_vel_cb(self, msg: Twist):
         with self.lock:
@@ -870,15 +982,16 @@ class RealtimeRobotPlotter(Node):
             self.auto_set_bounds_from_waypoints()
 
     def _convert_waypoint_gps_to_local(self):
-        """Convert the stashed (lat, lon) waypoint pairs to (north, west)
-        meters using gps_reference_lat/lon as the origin."""
+        """Convert the stashed (lat, lon) waypoint pairs to canvas-frame
+        (east_m, north_m) tuples using gps_reference_lat/lon as the origin.
+        The canvas uses East/North so this matches the rover-pose plot."""
         self.waypoints = [
-            self.gps_to_local_meters(lat, lon)
+            self.gps_to_canvas_xy(lat, lon)
             for lat, lon in self.waypoint_gps_pairs
         ]
         self.get_logger().info(
             f'Converted {len(self.waypoints)} GPS waypoint(s) to local meters '
-            f'against rover-start origin.'
+            f'(east, north) against rover-start origin.'
         )
 
     # ---------------- Helpers ----------------
@@ -992,6 +1105,60 @@ class RealtimeRobotPlotter(Node):
         cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
         return math.atan2(siny_cosp, cosy_cosp)
 
+    @staticmethod
+    def yaw_to_cardinal(yaw_radians):
+        """Map an N/W-frame yaw (CCW-positive, 0=N, +pi/2=W) to one of 8
+        cardinal labels. Sectors are 45 degrees wide and centered on each
+        cardinal."""
+        deg = math.degrees(yaw_radians) % 360.0
+        labels = ['N', 'NW', 'W', 'SW', 'S', 'SE', 'E', 'NE']
+        idx = int((deg + 22.5) // 45.0) % 8
+        return labels[idx]
+
+    @staticmethod
+    def normalize_yaw_degrees(yaw_radians):
+        """N/W-frame yaw in degrees, wrapped into (-180, 180]."""
+        deg = math.degrees(yaw_radians)
+        while deg > 180.0:
+            deg -= 360.0
+        while deg <= -180.0:
+            deg += 360.0
+        return deg
+
+    def draw_heading_compass(self, yaw_radians):
+        """Tiny absolute-heading compass: N is fixed up, W left, E right,
+        S down. Arrow rotates with the rover's heading."""
+        c = self.heading_canvas
+        c.delete('all')
+        cx, cy, r = 60, 60, 48
+        c.create_oval(cx - r, cy - r, cx + r, cy + r,
+                      outline='#666666', width=1, fill='#1e1e1e')
+
+        # Cardinal labels at fixed positions.
+        cardinals = [
+            ('N', 0,    '#e74c3c'),
+            ('E', 90,   '#aaaaaa'),
+            ('S', 180,  '#aaaaaa'),
+            ('W', 270,  '#aaaaaa'),
+        ]
+        for label, deg_from_north_cw, color in cardinals:
+            theta = math.radians(-90 + deg_from_north_cw)
+            lx = cx + (r - 10) * math.cos(theta)
+            ly = cy + (r - 10) * math.sin(theta)
+            c.create_text(lx, ly, text=label,
+                          font=('TkFixedFont', 9, 'bold'), fill=color)
+
+        # Arrow shows where the rover is pointing.
+        # N/W yaw -> compass position: N is up, W is left, E is right.
+        # Convert (-sin yaw, cos yaw) (east, north components) into screen
+        # pixel deltas (right, up) -> (right, -y) for tk canvas.
+        display_yaw = -yaw_radians if self.invert_display_yaw else yaw_radians
+        ax = cx + (r - 14) * (-math.sin(display_yaw))
+        ay = cy - (r - 14) * math.cos(display_yaw)
+        c.create_line(cx, cy, ax, ay, fill='#2ecc71', width=3, arrow=tk.LAST)
+        c.create_oval(cx - 3, cy - 3, cx + 3, cy + 3,
+                      fill='#2ecc71', outline='')
+
     def compute_distance_to_target(self):
         if self.robot_x is None or self.robot_y is None or self.target_x is None or self.target_y is None:
             return None
@@ -1045,13 +1212,18 @@ class RealtimeRobotPlotter(Node):
             return
 
         with self.lock:
+            yaw_deg = self.normalize_yaw_degrees(self.robot_yaw)
+            cardinal = self.yaw_to_cardinal(self.robot_yaw)
             summary = (
                 f"state={self.current_state} move={self.current_move_type} "
-                f"pose=({self.robot_x}, {self.robot_y}, yaw={self.robot_yaw:.3f}) "
-                f"target=({self.target_x}, {self.target_y}) "
+                f"pose_NW=(N={self.robot_north}, W={self.robot_west}) "
+                f"pose_canvas_EN=({self.robot_x}, {self.robot_y}) "
+                f"yaw={yaw_deg:+.1f}deg ({cardinal}) "
+                f"target_NW=(N={self.target_north}, W={self.target_west}) "
                 f"cmd_source={self.cmd_source} "
                 f"cmd=({self.cmd_vx:.3f}, {self.cmd_vy:.3f}, {self.cmd_wz:.3f}) "
                 f"gps=({self.gps_lat}, {self.gps_lon}) "
+                f"origin=({self.gps_reference_lat}, {self.gps_reference_lon}) "
                 f"counts={self.msg_counts}"
             )
 
@@ -1348,9 +1520,18 @@ class RealtimeRobotPlotter(Node):
             outline='black'
         )
 
+        # Heading arrow.
+        # yaw is published in the autonomy's N/W convention (CCW-positive
+        # looking down: 0 = facing N, +pi/2 = facing W). The canvas world
+        # frame is (east, north) with +x going right and +y going up, so the
+        # rover's facing-direction unit vector in canvas coords is:
+        #   east_component  = -sin(yaw)
+        #   north_component =  cos(yaw)
+        # Apply the canvas y-flip (cy decreases when going up on screen).
+        display_yaw = -yaw if self.invert_display_yaw else yaw
         heading_len = max(16, 1.2 * max(half_w_px, half_h_px))
-        hx = cx + heading_len * math.cos(yaw)
-        hy = cy - heading_len * math.sin(yaw)
+        hx = cx + heading_len * (-math.sin(display_yaw))
+        hy = cy - heading_len * math.cos(display_yaw)
 
         self.canvas.create_line(cx, cy, hx, hy, fill='black', width=2, arrow=tk.LAST)
         self.canvas.create_text(cx + 22, cy + 15, text='Robot', fill='red')
@@ -1371,12 +1552,16 @@ class RealtimeRobotPlotter(Node):
         self.maybe_emit_debug_log()
 
         with self.lock:
-            robot_x = self.robot_x
-            robot_y = self.robot_y
+            robot_x = self.robot_x          # canvas East (m)
+            robot_y = self.robot_y          # canvas North (m)
+            robot_north = self.robot_north  # autonomy frame North (m)
+            robot_west = self.robot_west    # autonomy frame West (m)
             robot_yaw = self.robot_yaw
             robot_pose_frame_id = self.robot_pose_frame_id
-            target_x = self.target_x
-            target_y = self.target_y
+            target_x = self.target_x          # canvas East (m)
+            target_y = self.target_y          # canvas North (m)
+            target_north = self.target_north  # autonomy frame North (m)
+            target_west = self.target_west    # autonomy frame West (m)
             speed = self.speed
             cmd_vx = self.cmd_vx
             cmd_vy = self.cmd_vy
@@ -1390,6 +1575,8 @@ class RealtimeRobotPlotter(Node):
             current_move_type = self.current_move_type
             gps_lat = self.gps_lat
             gps_lon = self.gps_lon
+            gps_origin_lat = self.gps_reference_lat
+            gps_origin_lon = self.gps_reference_lon
 
         plot_robot_x, plot_robot_y = self.normalize_position_for_plot(
             robot_x,
@@ -1421,27 +1608,81 @@ class RealtimeRobotPlotter(Node):
             self.append_robot_path(plot_robot_x, plot_robot_y)
             self.draw_robot(plot_robot_x, plot_robot_y, robot_yaw)
 
-        self.robot_x_label.config(
-            text=f'{self.world_x_label_name}: {plot_robot_x:.3f}' if plot_robot_x is not None else f'{self.world_x_label_name}: --'
+        # ---- Heading panel (absolute heading from rtk_localization)
+        yaw_deg = self.normalize_yaw_degrees(robot_yaw)
+        cardinal = self.yaw_to_cardinal(robot_yaw)
+        invert_note = ' (display inverted)' if self.invert_display_yaw else ''
+        self.heading_label.config(
+            text=f'Yaw: {yaw_deg:+6.1f}° ({cardinal}){invert_note}'
         )
-        self.robot_y_label.config(
-            text=f'{self.world_y_label_name}: {plot_robot_y:.3f}' if plot_robot_y is not None else f'{self.world_y_label_name}: --'
-        )
-        self.robot_yaw_label.config(text=f'Yaw: {robot_yaw:.3f} rad')
-        self.speed_label.config(text=f'Speed: {speed:.3f} m/s')
-        self.gps_lat_label.config(text=f'GPS Lat: {gps_lat:.7f}' if gps_lat is not None else 'GPS Lat: --')
-        self.gps_lon_label.config(text=f'GPS Lon: {gps_lon:.7f}' if gps_lon is not None else 'GPS Lon: --')
+        self.draw_heading_compass(robot_yaw)
 
-        self.target_x_label.config(text=f'Target X: {plot_target_x:.3f}' if plot_target_x is not None else 'Target X: --')
-        self.target_y_label.config(text=f'Target Y: {plot_target_y:.3f}' if plot_target_y is not None else 'Target Y: --')
+        # ---- Robot State (autonomy + canvas frames side by side)
+        if robot_north is not None and robot_west is not None:
+            self.robot_north_label.config(text=f'North: {robot_north:+7.2f} m')
+            self.robot_west_label.config(text=f'West:  {robot_west:+7.2f} m')
+            self.robot_canvas_label.config(
+                text=f'Canvas (E, N): ({-robot_west:+7.2f}, {robot_north:+7.2f}) m'
+            )
+        else:
+            self.robot_north_label.config(text='North: -- m')
+            self.robot_west_label.config(text='West:  -- m')
+            self.robot_canvas_label.config(text='Canvas (E, N): --')
+        self.speed_label.config(text=f'Speed: {speed:.3f} m/s')
+        self.gps_lat_label.config(
+            text=f'GPS Lat: {gps_lat:.7f}' if gps_lat is not None else 'GPS Lat: --'
+        )
+        self.gps_lon_label.config(
+            text=f'GPS Lon: {gps_lon:.7f}' if gps_lon is not None else 'GPS Lon: --'
+        )
+
+        # ---- GPS origin status box
+        if gps_origin_lat is not None and gps_origin_lon is not None:
+            self.origin_status_label.config(
+                text='Origin: captured', foreground='#27ae60'
+            )
+            self.origin_lat_label.config(text=f'Lat: {gps_origin_lat:.7f}')
+            self.origin_lon_label.config(text=f'Lon: {gps_origin_lon:.7f}')
+        else:
+            self.origin_status_label.config(
+                text='Origin: waiting for first fix...', foreground='#c0392b'
+            )
+            self.origin_lat_label.config(text='Lat: --')
+            self.origin_lon_label.config(text='Lon: --')
+
+        # ---- Target (autonomy + canvas frames + bearing)
+        if target_north is not None and target_west is not None:
+            self.target_north_label.config(text=f'Target North: {target_north:+7.2f} m')
+            self.target_west_label.config(text=f'Target West:  {target_west:+7.2f} m')
+            self.target_canvas_label.config(
+                text=f'Canvas (E, N): ({-target_west:+7.2f}, {target_north:+7.2f}) m'
+            )
+        else:
+            self.target_north_label.config(text='Target North: --')
+            self.target_west_label.config(text='Target West:  --')
+            self.target_canvas_label.config(text='Canvas (E, N): --')
 
         dist = None
+        bearing_deg = None
         if (
             plot_robot_x is not None and plot_robot_y is not None
             and plot_target_x is not None and plot_target_y is not None
         ):
-            dist = math.sqrt((plot_target_x - plot_robot_x) ** 2 + (plot_target_y - plot_robot_y) ** 2)
-        self.dist_label.config(text=f'Distance: {dist:.3f} m' if dist is not None else 'Distance: --')
+            dx_e = plot_target_x - plot_robot_x  # east
+            dy_n = plot_target_y - plot_robot_y  # north
+            dist = math.hypot(dx_e, dy_n)
+            # Bearing in NW frame (0=N, +90=W) so it matches the autonomy
+            # controller's heading_error math: angle_to_target = atan2(W,N).
+            bearing_deg = math.degrees(math.atan2(-dx_e, dy_n))
+        self.dist_label.config(
+            text=f'Distance: {dist:.3f} m' if dist is not None else 'Distance: --'
+        )
+        if bearing_deg is not None:
+            self.bearing_label.config(
+                text=f'Bearing (N/W): {bearing_deg:+6.1f}° ({self.yaw_to_cardinal(math.radians(bearing_deg))})'
+            )
+        else:
+            self.bearing_label.config(text='Bearing: --')
 
         direction, angle_deg = self.compute_drive_direction(
             current_move_type, ackermann_speed, ackermann_fl, ackermann_fr, point_turn_wz

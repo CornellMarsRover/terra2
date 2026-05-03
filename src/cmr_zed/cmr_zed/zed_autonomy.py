@@ -6,9 +6,8 @@ from rclpy.executors import MultiThreadedExecutor
 
 import pyzed.sl as sl
 import numpy as np
-import math
 
-from cmr_msgs.msg import GroundPlaneStamped, IMUSensorData
+from cmr_msgs.msg import GroundPlaneStamped
 from sensor_msgs.msg import PointCloud2, PointField, NavSatFix, Image
 from geometry_msgs.msg import TwistWithCovarianceStamped, TransformStamped, TwistStamped
 from std_msgs.msg import Header, Float32MultiArray, MultiArrayDimension
@@ -25,7 +24,6 @@ class ZedAutonomy(Node):
         self.pointcloud_publisher = self.create_publisher(PointCloud2, '/camera/points', 10)
         self.ground_publisher = self.create_publisher(GroundPlaneStamped, '/camera/ground_plane', 10)
         self.image_publisher = self.create_publisher(Image, '/zed/image_left', 10)
-        self.imu_publisher = self.create_publisher(IMUSensorData, '/imu', 10)
 
         self.pose_publisher = self.create_publisher(TwistStamped, '/zed/pose', 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
@@ -65,8 +63,6 @@ class ZedAutonomy(Node):
 
         # Timers for publishing data
         self.pointcloud_timer = self.create_timer(0.1, self.publish_pointcloud)
-        self.sensors_data = sl.SensorsData()
-        self.imu_timer = self.create_timer(0.1, self.publish_imu)
         self.get_logger().info('ZedAutonomy node has been started.')
         self.plane_parameters = sl.PlaneDetectionParameters()
         self.plane_parameters.normal_similarity_threshold = 6
@@ -236,33 +232,6 @@ class ZedAutonomy(Node):
 
         # Publish transform
         self.tf_broadcaster.sendTransform(t)
-    
-
-    def publish_imu(self):
-        """Reads ZED IMU sensors and publishes to /imu as IMUSensorData."""
-        if self.zed.get_sensors_data(self.sensors_data, sl.TIME_REFERENCE.CURRENT) != sl.ERROR_CODE.SUCCESS:
-            return
-        imu = self.sensors_data.get_imu_data()
-        lin_acc = imu.get_linear_acceleration()       # m/s²
-        ang_vel = imu.get_angular_velocity()           # deg/s
-        euler   = imu.get_pose().get_euler_angles(radian=False)  # [roll, pitch, yaw] degrees
-
-        msg = IMUSensorData()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.accx  = float(lin_acc[0])
-        msg.accy  = float(lin_acc[1])
-        msg.accz  = float(lin_acc[2])
-        msg.gyrox = math.radians(ang_vel[0])
-        msg.gyroy = math.radians(ang_vel[1])
-        msg.gyroz = math.radians(ang_vel[2])
-        msg.anglex = float(euler[0])
-        msg.angley = float(euler[1])
-        msg.anglez = float(euler[2])
-        msg.magx = 0
-        msg.magy = 0
-        msg.magz = 0
-        msg.temp = 0.0
-        self.imu_publisher.publish(msg)
 
     def destroy_node(self):
         self.zed.close()

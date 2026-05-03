@@ -1,202 +1,136 @@
-import rclpy
-from rclpy.node import Node
-from cmr_msgs.msg import IMUSensorData
-import time
-import datetime
-import platform
+#!/usr/bin/env python3
+
 import threading
-import cmr_imu.device_model as deviceModel
-from cmr_imu.jy901s_dataProcessor import JY901SDataProcessor
-from cmr_imu.protocol_485_resolver import Protocol485Resolver
+import time
 from queue import Queue
-import math
 
-data_queue = Queue()
+import rclpy
+import serial
+from cmr_msgs.msg import IMUSensorData
+from rclpy.node import Node
 
-#data_list = [temp, accX, accY, accZ, gyroX, gyroY, gyroZ, angleX, angleY, angleZ, magX, magY, magZ]
+from cmr_imu.hwt905_parser import HWT905Parser, HWT905Sample, normalize_degrees
 
 
-class IMUPublisher(Node):
+DEFAULT_SERIAL_PORT = "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"
+
+
+class HWT905Publisher(Node):
     def __init__(self):
-        super().__init__('number_publisher')
-        self.publisher_ = self.create_publisher(IMUSensorData, '/imu', 10)
-        self.timer_period = 0.1  # seconds
-        self.timer = self.create_timer(self.timer_period, self.publish_msg)
-        self.yaw_offset = None # yaw offset (z-angle reading when facing north)
-        self.initial_heading = 100.0 # direction imu is facing initially to calibrate offset
+        super().__init__("hwt905_imu_node")
 
-    def publish_msg(self):
-        if not data_queue.empty():
-            data_list = data_queue.get()
-            msg = IMUSensorData()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.temp = data_list[0]
-            # Adjust acceleration from g's to m/s^2
-            msg.accx = data_list[1] * 9.81
-            msg.accy = data_list[2] * 9.81
-            msg.accz = data_list[3] * 9.81
-            # Adjust angular velocity from deg/s to rad/s
-            msg.gyrox = math.radians(data_list[4])
-            msg.gyroy = math.radians(data_list[5])
-            msg.gyroz = math.radians(data_list[6])
-            msg.anglex = data_list[7]
-            msg.angley = data_list[8]
-            z = data_list[9]
-            if self.yaw_offset is None:
-                self.yaw_offset = z - self.initial_heading
-            z -= self.yaw_offset
-            msg.anglez = float((z + 180) % 360 - 180)
-            msg.magx = data_list[10]
-            msg.magy = data_list[11]
-            msg.magz = data_list[12]
-            #msg.data = self.number
-            self.publisher_.publish(msg)
+        self.declare_parameter("serial_port", DEFAULT_SERIAL_PORT)
+        self.declare_parameter("baud", 9600)
+        self.declare_parameter("frame_topic", "/imu")
+        self.declare_parameter("publish_rate_hz", 10.0)
+        self.declare_parameter("yaw_offset_degrees", 0.0)
+        self.declare_parameter("auto_zero_yaw", False)
+
+        self.serial_port = self.get_parameter("serial_port").get_parameter_value().string_value
+        self.baud = self.get_parameter("baud").get_parameter_value().integer_value
+        self.frame_topic = self.get_parameter("frame_topic").get_parameter_value().string_value
+        self.yaw_offset_degrees = self.get_parameter("yaw_offset_degrees").get_parameter_value().double_value
+        self.auto_zero_yaw = self.get_parameter("auto_zero_yaw").get_parameter_value().bool_value
+        publish_rate_hz = self.get_parameter("publish_rate_hz").get_parameter_value().double_value
+
+        if publish_rate_hz <= 0.0:
+            raise ValueError("publish_rate_hz must be positive")
+
+        self._samples = Queue()
+        self._stop_event = threading.Event()
+        self._yaw_zero = None
+        self._reader_thread = threading.Thread(target=self._read_serial, daemon=True)
+
+        self.publisher_ = self.create_publisher(IMUSensorData, self.frame_topic, 10)
+        self.timer = self.create_timer(1.0 / publish_rate_hz, self.publish_latest)
+
+        self._reader_thread.start()
+        self.get_logger().info(
+            f"Reading HWT905-RS232 from {self.serial_port} at {self.baud} baud; "
+            f"publishing {self.frame_topic}"
+        )
+
+    def publish_latest(self):
+        sample = self._get_latest_sample()
+        if sample is None:
+            return
+
+        msg = IMUSensorData()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.temp = float(sample.temp)
+        msg.accx = float(sample.accx)
+        msg.accy = float(sample.accy)
+        msg.accz = float(sample.accz)
+        msg.gyrox = float(sample.gyrox)
+        msg.gyroy = float(sample.gyroy)
+        msg.gyroz = float(sample.gyroz)
+        msg.anglex = float(sample.anglex)
+        msg.angley = float(sample.angley)
+        msg.anglez = self._correct_yaw(sample.anglez)
+        msg.magx = int(sample.magx)
+        msg.magy = int(sample.magy)
+        msg.magz = int(sample.magz)
+        self.publisher_.publish(msg)
+
+    def destroy_node(self):
+        self._stop_event.set()
+        self._reader_thread.join(timeout=1.0)
+        super().destroy_node()
+
+    def _get_latest_sample(self):
+        sample = None
+        while not self._samples.empty():
+            sample = self._samples.get()
+        return sample
+
+    def _correct_yaw(self, yaw_degrees: float) -> float:
+        if self.auto_zero_yaw and self._yaw_zero is None:
+            self._yaw_zero = yaw_degrees
+
+        offset = self.yaw_offset_degrees
+        if self._yaw_zero is not None:
+            offset += self._yaw_zero
+
+        return normalize_degrees(yaw_degrees - offset)
+
+    def _read_serial(self):
+        parser = HWT905Parser()
+
+        while not self._stop_event.is_set():
+            try:
+                with serial.Serial(self.serial_port, self.baud, timeout=1) as serial_port:
+                    self.get_logger().info(f"Opened {self.serial_port}")
+                    while not self._stop_event.is_set():
+                        data = serial_port.read(128)
+                        if not data:
+                            continue
+                        for sample in parser.parse(data):
+                            if is_publishable(sample):
+                                self._samples.put(sample)
+            except serial.SerialException as exc:
+                self.get_logger().error(
+                    f"Failed to read HWT905 on {self.serial_port}: {exc}; retrying in 1s",
+                    throttle_duration_sec=5.0,
+                )
+                time.sleep(1.0)
 
 
-_writeF = None                    #写文件  Write file
-_IsWriteF = False                 #写文件标识    Write file identification
-def readConfig(device):
-    """
-    读取配置信息示例    Example of reading configuration information
-    :param device: 设备模型 Device model
-    :return:
-    """
-    tVals = device.readReg(0x02,3)  #读取数据内容、回传速率、通讯速率   Read data content, return rate, communication rate
-    if (len(tVals)>0):
-        print("返回结果：" + str(tVals))
-    else:
-        print("无返回")
-    tVals = device.readReg(0x23,2)  #读取安装方向、算法  Read the installation direction and algorithm
-    if (len(tVals)>0):
-        print("返回结果：" + str(tVals))
-    else:
-        print("无返回")
+def is_publishable(sample: HWT905Sample) -> bool:
+    return sample.has_accel and sample.has_gyro and sample.has_angle and sample.has_mag
 
-def setConfig(device):
-    """
-    设置配置信息示例    Example setting configuration information
-    :param device: 设备模型 Device model
-    :return:
-    """
-    device.unlock()                # 解锁 unlock
-    time.sleep(0.1)                # 休眠100毫秒    Sleep 100ms
-    device.writeReg(0x03, 6)       # 设置回传速率为10HZ    Set the transmission back rate to 10HZ
-    time.sleep(0.1)                # 休眠100毫秒    Sleep 100ms
-    device.writeReg(0x23, 0)       # 设置安装方向:水平、垂直   Set the installation direction: horizontal and vertical
-    time.sleep(0.1)                # 休眠100毫秒    Sleep 100ms
-    device.writeReg(0x24, 0)       # 设置安装方向:九轴、六轴   Set the installation direction: nine axis, six axis
-    time.sleep(0.1)                # 休眠100毫秒    Sleep 100ms
-    device.save()                  # 保存 Save
 
-def AccelerationCalibration(device):
-    """
-    加计校准    Acceleration calibration
-    :param device: 设备模型 Device model
-    :return:
-    """
-    device.AccelerationCalibration()                 # Acceleration calibration
-    print("加计校准结束")
-
-def FiledCalibration(device):
-    """
-    磁场校准    Magnetic field calibration
-    :param device: 设备模型 Device model
-    :return:
-    """
-    device.BeginFiledCalibration()                   # 开始磁场校准   Starting field calibration
-    if input("请分别绕XYZ轴慢速转动一圈，三轴转圈完成后，结束校准（Y/N)？").lower()=="y":
-        device.EndFiledCalibration()                 # 结束磁场校准   End field calibration
-        print("结束磁场校准")
-
-def startRecord():
-    """
-    开始记录数据  Start recording data
-    :return:
-    """
-    global _IsWriteF
-    _IsWriteF = True                                                                        #标记写入标识
-    Tempstr = "Chiptime"
-    Tempstr +=  "\tax(g)\tay(g)\taz(g)"
-    Tempstr += "\twx(deg/s)\twy(deg/s)\twz(deg/s)"
-    Tempstr += "\tAngleX(deg)\tAngleY(deg)\tAngleZ(deg)"
-    Tempstr += "\tT(°)"
-    Tempstr += "\tmagx\tmagy\tmagz"
-    Tempstr += "\r\n"
-    print("开始记录数据")
-
-def endRecord():
-    """
-    结束记录数据  End record data
-    :return:
-    """
-    global _IsWriteF
-    _IsWriteF = False             
-
-def onUpdate(deviceModel):
-    """
-    数据更新事件  Data update event
-    :param deviceModel: 设备模型    Device model
-    :return:
-    """
-    # print("芯片时间:" + str(deviceModel.getDeviceData("Chiptime"))
-    #      , " 温度:" + str(deviceModel.getDeviceData("temperature"))
-    #      , " 加速度：" + str(deviceModel.getDeviceData("accX")) +","+  str(deviceModel.getDeviceData("accY")) +","+ str(deviceModel.getDeviceData("accZ"))
-    #      ,  " 角速度:" + str(deviceModel.getDeviceData("gyroX")) +","+ str(deviceModel.getDeviceData("gyroY")) +","+ str(deviceModel.getDeviceData("gyroZ"))
-    #      , " 角度:" + str(deviceModel.getDeviceData("angleX")) +","+ str(deviceModel.getDeviceData("angleY")) +","+ str(deviceModel.getDeviceData("angleZ"))
-    #     , " 磁场:" + str(deviceModel.getDeviceData("magX")) +","+ str(deviceModel.getDeviceData("magY"))+","+ str(deviceModel.getDeviceData("magZ"))
-    #       )
-    #setting up msg data to send
-    data = [deviceModel.getDeviceData("temperature"), 
-                 deviceModel.getDeviceData("accX"), deviceModel.getDeviceData("accY"), deviceModel.getDeviceData("accZ"), 
-                 deviceModel.getDeviceData("gyroX"), deviceModel.getDeviceData("gyroY"), deviceModel.getDeviceData("gyroZ"), 
-                 deviceModel.getDeviceData("angleX"), deviceModel.getDeviceData("angleY"), deviceModel.getDeviceData("angleZ"), 
-                 deviceModel.getDeviceData("magX"), deviceModel.getDeviceData("magY"), deviceModel.getDeviceData("magZ")]
-    data_queue.put(data)
-    # print(data_list)
-
-def LoopReadThead(device):
-    """
-    循环读取数据  Cyclic read data
-    :param device:
-    :return:
-    """
-    while(True):                            #循环读取数据 Cyclic read data
-        device.readReg(0x30, 41)            #读取 数据  Read data
-
-def main(args = None):
-    # Initialize Publisher Node
+def main(args=None):
     rclpy.init(args=args)
-    number_publisher = IMUPublisher()
+    node = HWT905Publisher()
 
-    device = deviceModel.DeviceModel(
-        "我的JY901",
-        Protocol485Resolver(),
-        JY901SDataProcessor(),
-        "51_0"
-    )
-    device.ADDR = 0x50  # 设置传感器ID Setting the Sensor ID
-    if (platform.system().lower() == 'linux'):
-        device.serialConfig.portName = "/dev/ttyUSB0"  # 设置串口 Set serial port
-    else:
-        device.serialConfig.portName = "COM82"  # 设置串口 Set serial port
-    device.serialConfig.baud = 9600  # 设置波特率 Set baud rate
-    device.openDevice()  # 打开串口 Open serial port
-    readConfig(device)  # 读取配置信息 Read configuration information
-    device.dataProcessor.onVarChanged.append(onUpdate)  # 数据更新事件 Data update event
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
-    startRecord()  # 开始记录数据 Start recording data
-    t = threading.Thread(target=LoopReadThead, args=(device,))  # 开启一个线程读取数据 Start a thread to read data
-    t.start()
 
-    # Spin the ROS node in a separate thread to prevent blocking
-    ros_thread = threading.Thread(target=rclpy.spin, args=(number_publisher,))
-    ros_thread.start()
-    
-    #device.closeDevice()
-    #endRecord()  # 结束记录数据 End record data
-    # number_publisher.destroy_node()
-    # rclpy.shutdown()
-
-if __name__ == '__main__':
-   main()
-    
+if __name__ == "__main__":
+    main()

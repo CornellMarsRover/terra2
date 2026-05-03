@@ -13,6 +13,21 @@ def generate_launch_description():
             parameters=[{}]
         ),
 
+        # Start HWT905-RS232 IMU node as the canonical /imu publisher for autonomy.
+        launch_ros.actions.Node(
+            package='cmr_imu',
+            executable='imu_node',
+            name='hwt905_imu',
+            output='screen',
+            parameters=[{
+                'serial_port': '/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0',
+                'baud': 9600,
+                'frame_topic': '/imu',
+                'yaw_offset_degrees': 0.0,
+                'auto_zero_yaw': False,
+            }]
+        ),
+
         # Start drives node
         launch_ros.actions.Node(
             package='cmr_controls',

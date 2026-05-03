@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import math
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 
 def global_to_local(
@@ -51,3 +51,42 @@ def expand_box_cluster(
             west = round(west / cell_size) * cell_size
             data.extend([north, west, cost_value])
     return data
+
+
+def obstacle_angular_span(
+    local_forward: float,
+    local_left: float,
+    size_north: float,
+    size_west: float,
+) -> Tuple[float, float]:
+    half_depth = size_north / 2.0
+    half_width = size_west / 2.0
+    nearest_forward = max(1e-3, local_forward - half_depth)
+    left_min = local_left - half_width
+    left_max = local_left + half_width
+    angle_min = math.atan2(left_min, nearest_forward)
+    angle_max = math.atan2(left_max, nearest_forward)
+    return min(angle_min, angle_max), max(angle_min, angle_max)
+
+
+def intervals_overlap(a: Tuple[float, float], b: Tuple[float, float], min_overlap_rad: float) -> bool:
+    overlap = min(a[1], b[1]) - max(a[0], b[0])
+    return overlap > min_overlap_rad
+
+
+def filter_visible_obstacles(
+    candidates: Sequence[Tuple[float, float, float, float, float, float]],
+    occlusion_overlap_deg: float = 8.0,
+) -> List[Tuple[float, float, float, float, float, float]]:
+    accepted: List[Tuple[float, float, float, float, float, float]] = []
+    covered_spans: List[Tuple[float, float]] = []
+    min_overlap = math.radians(occlusion_overlap_deg)
+
+    for candidate in sorted(candidates, key=lambda item: item[4]):
+        span = obstacle_angular_span(candidate[4], candidate[5], candidate[2], candidate[3])
+        if any(intervals_overlap(span, covered, min_overlap) for covered in covered_spans):
+            continue
+        accepted.append(candidate)
+        covered_spans.append(span)
+
+    return accepted

@@ -12,6 +12,7 @@ from std_msgs.msg import Float32MultiArray
 
 from autonomous_navigation.sim_vision_obstacle_core import (
     expand_box_cluster,
+    filter_visible_obstacles,
     global_to_local,
     visible_in_fov,
 )
@@ -45,7 +46,12 @@ class SimVisionObstacleDetector(Node):
         self.declare_parameter("obstacle_y", 0.0)
         self.declare_parameter("obstacle_size_x", 0.8)
         self.declare_parameter("obstacle_size_y", 0.8)
+        self.declare_parameter("obstacle_norths", [2.5])
+        self.declare_parameter("obstacle_wests", [0.0])
+        self.declare_parameter("obstacle_size_norths", [0.8])
+        self.declare_parameter("obstacle_size_wests", [0.8])
         self.declare_parameter("fov_deg", 72.0)
+        self.declare_parameter("synthetic_occlusion_overlap_deg", 8.0)
         self.declare_parameter("publish_rate_hz", 10.0)
         self.declare_parameter("image_fallback_timeout_s", 1.0)
 
@@ -65,14 +71,20 @@ class SimVisionObstacleDetector(Node):
         self.max_distance_m = float(self.get_parameter("max_distance_m").value)
         self.cost_value = float(self.get_parameter("cost_value").value)
         self.cell_size = float(self.get_parameter("cell_size").value)
-        self.obstacle_north = float(self.get_parameter("obstacle_x").value)
-        self.obstacle_west = float(self.get_parameter("obstacle_y").value)
-        self.obstacle_size_north = float(self.get_parameter("obstacle_size_x").value)
-        self.obstacle_size_west = float(self.get_parameter("obstacle_size_y").value)
         self.fov_deg = float(self.get_parameter("fov_deg").value)
+        self.synthetic_occlusion_overlap_deg = float(
+            self.get_parameter("synthetic_occlusion_overlap_deg").value
+        )
         self.image_fallback_timeout_s = float(self.get_parameter("image_fallback_timeout_s").value)
+        self.obstacles = self.load_obstacles()
 
         self.costmap_pub = self.create_publisher(Float32MultiArray, "/autonomy/costmap", 10)
+        self.all_obstacles_pub = self.create_publisher(
+            Float32MultiArray, "/autonomy/sim_obstacles/all", 10
+        )
+        self.visible_obstacles_pub = self.create_publisher(
+            Float32MultiArray, "/autonomy/sim_obstacles/visible", 10
+        )
         self.create_subscription(TwistStamped, "/autonomy/pose/robot/global", self.pose_callback, 10)
 
         if self.mode in {"auto", "image"}:
@@ -83,8 +95,32 @@ class SimVisionObstacleDetector(Node):
 
         self.get_logger().info(
             f"Sim vision obstacle detector mode={self.mode} image_topic={self.image_topic} "
-            f"obstacle=({self.obstacle_north:.2f}, {self.obstacle_west:.2f})"
+            f"obstacles={len(self.obstacles)}"
         )
+
+    def load_obstacles(self) -> List[List[float]]:
+        norths = [float(value) for value in self.get_parameter("obstacle_norths").value]
+        wests = [float(value) for value in self.get_parameter("obstacle_wests").value]
+        size_norths = [float(value) for value in self.get_parameter("obstacle_size_norths").value]
+        size_wests = [float(value) for value in self.get_parameter("obstacle_size_wests").value]
+
+        if norths and wests:
+            count = min(len(norths), len(wests))
+            if size_norths:
+                count = min(count, len(size_norths))
+            if size_wests:
+                count = min(count, len(size_wests))
+            return [
+                [norths[idx], wests[idx], size_norths[idx], size_wests[idx]]
+                for idx in range(count)
+            ]
+
+        return [[
+            float(self.get_parameter("obstacle_x").value),
+            float(self.get_parameter("obstacle_y").value),
+            float(self.get_parameter("obstacle_size_x").value),
+            float(self.get_parameter("obstacle_size_y").value),
+        ]]
 
     def pose_callback(self, msg: TwistStamped) -> None:
         self.robot_north = msg.twist.linear.x
@@ -164,12 +200,13 @@ class SimVisionObstacleDetector(Node):
         cluster = expand_box_cluster(
             global_north,
             global_west,
-            self.obstacle_size_north,
-            self.obstacle_size_west,
+            self.obstacles[0][2],
+            self.obstacles[0][3],
             self.cell_size,
             self.cost_value,
         )
         self.publish_costmap(cluster)
+        self.publish_visible_obstacles([[global_north, global_west, self.obstacles[0][2], self.obstacles[0][3]]])
         self.get_logger().info(
             f"image_obstacle distance={distance:.2f}m lateral={local_left:+.2f}m "
             f"global=({global_north:.2f}, {global_west:.2f}) pixels={int(area)}",
@@ -177,35 +214,70 @@ class SimVisionObstacleDetector(Node):
         )
 
     def publish_synthetic_detection(self) -> None:
-        local_forward, local_left = global_to_local(
-            self.robot_north,
-            self.robot_west,
-            self.robot_yaw,
-            self.obstacle_north,
-            self.obstacle_west,
+        self.publish_all_obstacles()
+
+        candidates = []
+        combined_cluster: List[float] = []
+
+        for obstacle_north, obstacle_west, size_north, size_west in self.obstacles:
+            local_forward, local_left = global_to_local(
+                self.robot_north,
+                self.robot_west,
+                self.robot_yaw,
+                obstacle_north,
+                obstacle_west,
+            )
+            if not visible_in_fov(
+                local_forward,
+                local_left,
+                self.fov_deg,
+                self.min_distance_m,
+                self.max_distance_m,
+            ):
+                continue
+
+            candidates.append(
+                (
+                    obstacle_north,
+                    obstacle_west,
+                    size_north,
+                    size_west,
+                    local_forward,
+                    local_left,
+                )
+            )
+
+        visible_candidates = filter_visible_obstacles(
+            candidates,
+            occlusion_overlap_deg=self.synthetic_occlusion_overlap_deg,
         )
-        if not visible_in_fov(
-            local_forward,
-            local_left,
-            self.fov_deg,
-            self.min_distance_m,
-            self.max_distance_m,
-        ):
+        visible_obstacles: List[List[float]] = []
+        for obstacle_north, obstacle_west, size_north, size_west, _, _ in visible_candidates:
+            visible_obstacles.append([obstacle_north, obstacle_west, size_north, size_west])
+            combined_cluster.extend(
+                expand_box_cluster(
+                    obstacle_north,
+                    obstacle_west,
+                    size_north,
+                    size_west,
+                    self.cell_size,
+                    self.cost_value,
+                )
+            )
+
+        if not visible_obstacles:
             self.publish_costmap([])
+            self.publish_visible_obstacles([])
             return
 
-        cluster = expand_box_cluster(
-            self.obstacle_north,
-            self.obstacle_west,
-            self.obstacle_size_north,
-            self.obstacle_size_west,
-            self.cell_size,
-            self.cost_value,
-        )
-        self.publish_costmap(cluster)
+        self.publish_costmap(combined_cluster)
+        self.publish_visible_obstacles(visible_obstacles)
         self.get_logger().info(
-            f"synthetic_obstacle visible forward={local_forward:.2f}m left={local_left:+.2f}m "
-            f"global=({self.obstacle_north:.2f}, {self.obstacle_west:.2f})",
+            "synthetic_obstacles visible="
+            + ", ".join(
+                f"({north:.2f},{west:.2f})"
+                for north, west, _, _ in visible_obstacles
+            ),
             throttle_duration_sec=1.0,
         )
 
@@ -213,6 +285,22 @@ class SimVisionObstacleDetector(Node):
         msg = Float32MultiArray()
         msg.data = data
         self.costmap_pub.publish(msg)
+
+    def publish_all_obstacles(self) -> None:
+        msg = Float32MultiArray()
+        flat: List[float] = []
+        for obstacle in self.obstacles:
+            flat.extend(obstacle)
+        msg.data = flat
+        self.all_obstacles_pub.publish(msg)
+
+    def publish_visible_obstacles(self, obstacles: List[List[float]]) -> None:
+        msg = Float32MultiArray()
+        flat: List[float] = []
+        for obstacle in obstacles:
+            flat.extend(obstacle)
+        msg.data = flat
+        self.visible_obstacles_pub.publish(msg)
 
 
 def main(args=None) -> None:

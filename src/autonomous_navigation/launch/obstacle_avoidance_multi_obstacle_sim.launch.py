@@ -1,9 +1,8 @@
 from pathlib import Path
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from ament_index_python.packages import get_package_share_directory
@@ -18,16 +17,15 @@ def generate_launch_description():
     obstacle_file = f"{autonomy_share}/models/obstacle_box.sdf"
     world_file = f"{autonomy_share}/worlds/obstacle_avoidance_demo.world"
 
-    gui = LaunchConfiguration("gui")
-    use_sim_time = LaunchConfiguration("use_sim_time")
-    goal_north = LaunchConfiguration("goal_north")
-    goal_west = LaunchConfiguration("goal_west")
-    obstacle_x = LaunchConfiguration("obstacle_x")
-    obstacle_y = LaunchConfiguration("obstacle_y")
+    obstacle_specs = [
+        {"entity": "obstacle_center", "north": 2.5, "west": 0.0, "size_north": 0.8, "size_west": 0.8},
+        {"entity": "obstacle_right", "north": 3.6, "west": -1.2, "size_north": 0.8, "size_west": 0.8},
+        {"entity": "obstacle_left", "north": 4.8, "west": 1.8, "size_north": 0.8, "size_west": 0.8},
+    ]
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(f"{gazebo_share}/launch/gazebo.launch.py"),
-        launch_arguments={"gui": gui, "world": world_file}.items(),
+        launch_arguments={"gui": "false", "world": world_file}.items(),
     )
 
     spawn_robot = Node(
@@ -37,23 +35,27 @@ def generate_launch_description():
         output="screen",
     )
 
-    spawn_obstacle = Node(
-        package="gazebo_ros",
-        executable="spawn_entity.py",
-        arguments=[
-            "-entity",
-            "obstacle_box",
-            "-file",
-            obstacle_file,
-            "-x",
-            obstacle_x,
-            "-y",
-            obstacle_y,
-            "-z",
-            "0.5",
-        ],
-        output="screen",
-    )
+    obstacle_spawners = []
+    for spec in obstacle_specs:
+        obstacle_spawners.append(
+            Node(
+                package="gazebo_ros",
+                executable="spawn_entity.py",
+                arguments=[
+                    "-entity",
+                    spec["entity"],
+                    "-file",
+                    obstacle_file,
+                    "-x",
+                    str(spec["north"]),
+                    "-y",
+                    str(spec["west"]),
+                    "-z",
+                    "0.5",
+                ],
+                output="screen",
+            )
+        )
 
     autonomy_nodes = [
         Node(
@@ -61,27 +63,21 @@ def generate_launch_description():
             executable="sim_drive_bridge",
             name="sim_drive_bridge",
             output="screen",
-            parameters=[{"use_sim_time": use_sim_time}],
+            parameters=[{"use_sim_time": True}],
         ),
         Node(
             package="autonomous_navigation",
             executable="odom_to_autonomy_pose",
             name="odom_to_autonomy_pose",
             output="screen",
-            parameters=[{"use_sim_time": use_sim_time}],
+            parameters=[{"use_sim_time": True}],
         ),
         Node(
             package="autonomous_navigation",
             executable="sim_goal_publisher",
             name="sim_goal_publisher",
             output="screen",
-            parameters=[
-                {
-                    "use_sim_time": use_sim_time,
-                    "goal_north": goal_north,
-                    "goal_west": goal_west,
-                }
-            ],
+            parameters=[{"use_sim_time": True, "goal_north": 6.0, "goal_west": 0.0}],
         ),
         Node(
             package="autonomous_navigation",
@@ -90,11 +86,15 @@ def generate_launch_description():
             output="screen",
             parameters=[
                 {
-                    "use_sim_time": use_sim_time,
-                    "mode": "auto",
+                    "use_sim_time": True,
+                    "mode": "synthetic",
                     "image_topic": "/camera1/image_raw",
-                    "obstacle_x": obstacle_x,
-                    "obstacle_y": obstacle_y,
+                    "fov_deg": 40.0,
+                    "synthetic_occlusion_overlap_deg": 10.0,
+                    "obstacle_norths": [spec["north"] for spec in obstacle_specs],
+                    "obstacle_wests": [spec["west"] for spec in obstacle_specs],
+                    "obstacle_size_norths": [spec["size_north"] for spec in obstacle_specs],
+                    "obstacle_size_wests": [spec["size_west"] for spec in obstacle_specs],
                 }
             ],
         ),
@@ -103,42 +103,36 @@ def generate_launch_description():
             executable="global_planner",
             name="global_planner",
             output="screen",
-            parameters=[{"real": False, "use_sim_time": use_sim_time}],
+            parameters=[{"real": False, "use_sim_time": True}],
         ),
         Node(
             package="autonomous_navigation",
             executable="local_planner",
             name="local_planner",
             output="screen",
-            parameters=[{"real": False, "visualize": False, "use_sim_time": use_sim_time}],
+            parameters=[{"real": False, "visualize": False, "use_sim_time": True}],
         ),
         Node(
             package="autonomous_navigation",
             executable="obstacle_guard",
             name="obstacle_guard",
             output="screen",
-            parameters=[{"use_sim_time": use_sim_time}],
+            parameters=[{"use_sim_time": True}],
         ),
         Node(
             package="autonomous_navigation",
             executable="controller",
             name="controller",
             output="screen",
-            parameters=[{"real": False, "use_sim_time": use_sim_time}],
+            parameters=[{"real": False, "use_sim_time": True}],
         ),
     ]
 
     return LaunchDescription(
         [
-            DeclareLaunchArgument("gui", default_value="false"),
-            DeclareLaunchArgument("use_sim_time", default_value="true"),
-            DeclareLaunchArgument("goal_north", default_value="6.0"),
-            DeclareLaunchArgument("goal_west", default_value="0.0"),
-            DeclareLaunchArgument("obstacle_x", default_value="2.5"),
-            DeclareLaunchArgument("obstacle_y", default_value="0.0"),
             gazebo,
             TimerAction(period=2.0, actions=[spawn_robot]),
-            TimerAction(period=3.0, actions=[spawn_obstacle]),
+            TimerAction(period=3.0, actions=obstacle_spawners),
             TimerAction(period=4.0, actions=autonomy_nodes),
         ]
     )

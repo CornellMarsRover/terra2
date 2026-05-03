@@ -19,6 +19,7 @@ The new pieces added on top are:
 - `sim_vision_obstacle_detector`: publishes obstacle costmap data from simulated vision input
 - `obstacle_guard`: adds a close-range safety layer that can stop or turn the rover when an obstacle is too close
 - `obstacle_avoidance_sim.launch.py`: repeatable end-to-end Gazebo launch for obstacle avoidance testing
+- `obstacle_avoidance_multi_obstacle_sim.launch.py`: multi-obstacle Gazebo scenario for testing visibility and rerouting behavior
 
 ## How Gazebo Branch Was Referenced
 The `gazebo_sim` branch was used only as a reference for:
@@ -29,9 +30,9 @@ The `gazebo_sim` branch was used only as a reference for:
 No merge, rebase, or branch-base change from `gazebo_sim` was performed.
 
 ## Files Manually Copied From Gazebo Branch
-To unify the rover asset across simulations, these shared sim assets were copied from `gazebo_sim` into `rover_gazebo`:
-- `src/rover_gazebo/urdf/drives.urdf`
-- `src/rover_gazebo/meshes/rover_26.stl`
+To keep the autonomy simulation on the exact same rover asset used in `gazebo_sim`, these files were copied directly from that branch into the workspace root:
+- `drives.urdf`
+- `meshes/rover_26.stl`
 
 No merge, rebase, or unrelated branch history from `gazebo_sim` was brought over.
 
@@ -45,11 +46,14 @@ No merge, rebase, or unrelated branch history from `gazebo_sim` was brought over
 - `src/autonomous_navigation/autonomous_navigation/sim_vision_obstacle_core.py`
 - `src/autonomous_navigation/autonomous_navigation/sim_vision_obstacle_detector.py`
 - `src/autonomous_navigation/launch/obstacle_avoidance_sim.launch.py`
-- `src/rover_gazebo/urdf/drives.urdf`
-- `src/rover_gazebo/meshes/rover_26.stl`
+- `src/autonomous_navigation/worlds/obstacle_avoidance_demo.world`
+- `drives.urdf`
+- `meshes/rover_26.stl`
 - `src/autonomous_navigation/models/obstacle_box.sdf`
 - `src/autonomous_navigation/test/test_obstacle_guard.py`
 - `src/autonomous_navigation/test/test_sim_vision_obstacle_detector.py`
+- `scripts/log_autonomy_demo_topics.py`
+- `scripts/render_autonomy_demo_map.py`
 
 ### Updated
 - `src/autonomous_navigation/autonomous_navigation/controller.py`
@@ -58,7 +62,6 @@ No merge, rebase, or unrelated branch history from `gazebo_sim` was brought over
 - `src/autonomous_navigation/autonomous_navigation/costmap.py`
 - `src/autonomous_navigation/setup.py`
 - `src/autonomous_navigation/package.xml`
-- `src/rover_gazebo/setup.py`
 
 ## Control / Perception Flow
 ### Motion pipeline
@@ -74,6 +77,9 @@ No merge, rebase, or unrelated branch history from `gazebo_sim` was brought over
 
 ### Obstacle pipeline
 - `sim_vision_obstacle_detector` publishes `/autonomy/costmap`
+- `sim_vision_obstacle_detector` also publishes:
+  - `/autonomy/sim_obstacles/all`
+  - `/autonomy/sim_obstacles/visible`
 - `local_planner` uses `/autonomy/costmap` to invalidate blocked segments and replan
 - `obstacle_guard` monitors the same costmap for close-range hazards
 - `controller` subscribes to:
@@ -95,7 +101,7 @@ In the current devcontainer/Gazebo setup, ROS camera image publishing from Gazeb
 
 This still satisfies the initial feature goal of obstacle detection from camera or simulated vision input while keeping the autonomy branch independent from the Gazebo branch.
 
-The autonomy simulation now uses the same shared rover mesh and URDF as the other Gazebo simulation work by spawning the canonical source asset at `src/rover_gazebo/urdf/drives.urdf`.
+The autonomy simulation now uses the exact same root-level rover asset as `gazebo_sim` by spawning `drives.urdf`, which references `meshes/rover_26.stl`.
 
 ## How To Run In Simulation
 From the ROS container:
@@ -118,6 +124,17 @@ ros2 launch autonomous_navigation obstacle_avoidance_sim.launch.py \
   obstacle_x:=2.5 \
   obstacle_y:=0.0
 ```
+
+Multi-obstacle scenario:
+
+```bash
+ros2 launch autonomous_navigation obstacle_avoidance_multi_obstacle_sim.launch.py
+```
+
+This scenario spawns:
+- one center obstacle directly in the nominal path
+- one right-side obstacle that is visible early in the run
+- one farther-left obstacle that starts outside the tighter FOV and becomes relevant later as the rover turns
 
 ## Expected Simulation Behavior
 Default scenario:
@@ -142,13 +159,23 @@ Expected behavior:
 - `python3 -m pytest src/autonomous_navigation/test/test_obstacle_guard.py src/autonomous_navigation/test/test_sim_vision_obstacle_detector.py -q`
 
 ### End-to-end sim validation
-Verified in Gazebo using the shared `src/rover_gazebo/urdf/drives.urdf` rover asset:
+Verified in Gazebo using the shared root-level `drives.urdf` rover asset:
 - rover starts from the launch origin
 - obstacle is spawned in front of the rover
 - detector publishes obstacle visibility logs
 - local planner logs segment invalidation and replanning
 - controller turns toward replanned detour waypoints
 - rover moves around the obstacle and continues toward the goal
+
+### Recorded demo artifact
+Generated a side-by-side demo video showing:
+- Gazebo simulation with the rover and obstacle in frame
+- a synchronized autonomy map view with perceived obstacle cells, FOV, path trail, and targets
+
+Artifacts:
+- `logs/autonomy_demo/autonomy_obstacle_avoidance_demo.mp4`
+- `logs/autonomy_demo/autonomy_obstacle_avoidance_frame.jpg`
+- `logs/autonomy_multi_demo/autonomy_multi_obstacle_demo.mp4`
 
 ## Known Limitations
 - The Gazebo ROS camera plugin path in this environment did not produce ROS image topics reliably, so the simulation currently uses synthetic vision fallback rather than true image-stream detection.

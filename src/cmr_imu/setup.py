@@ -14,7 +14,7 @@ setup(
         ('share/' + package_name + '/launch', ['launch/imu.launch.py']),
         ('share/' + package_name + '/config', ['config/imu.toml']),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "pyserial"],
     zip_safe=True,
     maintainer="CMR",
     maintainer_email="team@cornellmarsrover.org",
@@ -25,11 +25,7 @@ setup(
         "console_scripts": [
             # PHOBOS_APPEND
             'imu_node = cmr_imu.imu:main',
-            'device_model = cmr_imu.device_model',
-            'idp = cmr_imu.i_data_processor', 
-            'ipr = cmr_imu.i_protocol_resolver',
-            'jdp = cmr_imu.jy901s_dataProcessor',
-            'p4r = cmr_imu.protocol_485_resolver' 
+            'hwt905_bench_test = cmr_imu.hwt905_bench_test:main',
         ],
     },
 )

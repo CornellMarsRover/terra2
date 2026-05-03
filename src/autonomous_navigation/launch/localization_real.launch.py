@@ -13,6 +13,21 @@ def generate_launch_description():
             parameters=[{}]
         ),
 
+        # Start HWT905-RS232 IMU node on its own topic so it does not conflict with ZED /imu.
+        launch_ros.actions.Node(
+            package='cmr_imu',
+            executable='imu_node',
+            name='hwt905_imu',
+            output='screen',
+            parameters=[{
+                'serial_port': '/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0',
+                'baud': 9600,
+                'frame_topic': '/hwt905/imu',
+                'yaw_offset_degrees': 0.0,
+                'auto_zero_yaw': False,
+            }]
+        ),
+
         # Start drives node
         launch_ros.actions.Node(
             package='cmr_controls',
@@ -41,7 +56,7 @@ def generate_launch_description():
                 executable='rtk_localization',
                 name='rtk_localization',
                 output='screen',
-                parameters=[{'real': True}],
+                parameters=[{'real': True, 'imu_topic': '/hwt905/imu'}],
                 remappings=[
                     ('/gps/fix', '/rtk/navsatfix_data'),
                 ],

@@ -12,8 +12,10 @@ class RTKLocalization(Node):
         super().__init__('rtk_localization_node')
         self.declare_parameter('yaw_offset_degrees', 0.0)
         self.declare_parameter('diagnostic_logging', True)
+        self.declare_parameter('imu_topic', '/imu')
         self.yaw_offset_degrees = self.get_parameter('yaw_offset_degrees').get_parameter_value().double_value
         self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
+        self.imu_topic = self.get_parameter('imu_topic').get_parameter_value().string_value
 
         # Subscribers for GPS and IMU data
         self.sub_gps = self.create_subscription(
@@ -24,7 +26,7 @@ class RTKLocalization(Node):
         )
         self.sub_imu = self.create_subscription(
             IMUSensorData,
-            '/imu',
+            self.imu_topic,
             self.imu_callback,
             10
         )
@@ -48,7 +50,8 @@ class RTKLocalization(Node):
         self.raw_yaw_degrees = 0.0
 
         self.get_logger().info(
-            f"RTK localization initialized with yaw_offset_degrees={self.yaw_offset_degrees:+.2f}"
+            f"RTK localization initialized with imu_topic={self.imu_topic} "
+            f"yaw_offset_degrees={self.yaw_offset_degrees:+.2f}"
         )
 
     def gps_callback(self, msg: NavSatFix):

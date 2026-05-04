@@ -17,9 +17,11 @@ class ControllerNode(Node):
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.declare_parameter('diagnostic_logging', True)
         self.declare_parameter('avoidance_timeout_s', 0.5)
+        self.declare_parameter('arrival_tolerance_m', 0.2)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
         self.avoidance_timeout_s = self.get_parameter('avoidance_timeout_s').get_parameter_value().double_value
+        self.arrival_tolerance_m = self.get_parameter('arrival_tolerance_m').get_parameter_value().double_value
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -138,6 +140,22 @@ class ControllerNode(Node):
 
         # Distance
         distance_to_wp = math.sqrt(x_error**2 + y_error**2)
+
+        if distance_to_wp <= self.arrival_tolerance_m:
+            self.publish_ackerman(0.0, 0.0)
+            self.publish_movement('arrived')
+            self.log_navigation_diagnostics(
+                x_error,
+                y_error,
+                distance_to_wp,
+                self.yaw,
+                0.0,
+                'arrived_stop',
+                0.0,
+                0.0,
+                0.0,
+            )
+            return
 
         # Heading to target
         angle_to_target = math.atan2(y_error, x_error)

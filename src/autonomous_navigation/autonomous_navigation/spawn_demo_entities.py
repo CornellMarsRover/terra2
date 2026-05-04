@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 
 import rclpy
-from gazebo_msgs.srv import SpawnEntity
+from gazebo_msgs.srv import DeleteEntity, SpawnEntity
 from rclpy.node import Node
 
 
@@ -24,15 +24,20 @@ class DemoEntitySpawner(Node):
         self.declare_parameter("obstacle_zs", [0.5])
 
         self.client = self.create_client(SpawnEntity, "/spawn_entity")
+        self.delete_client = self.create_client(DeleteEntity, "/delete_entity")
         self.get_logger().info("Waiting for /spawn_entity service...")
         self.client.wait_for_service()
+        self.get_logger().info("Waiting for /delete_entity service...")
+        self.delete_client.wait_for_service()
 
     def spawn_all(self) -> int:
         robot_file = Path(str(self.get_parameter("robot_file").value))
         obstacle_file = Path(str(self.get_parameter("obstacle_file").value))
+        robot_entity = str(self.get_parameter("robot_entity").value)
 
+        self._delete_entity_if_present(robot_entity)
         self._spawn_from_file(
-            entity=str(self.get_parameter("robot_entity").value),
+            entity=robot_entity,
             file_path=robot_file,
             x=float(self.get_parameter("robot_x").value),
             y=float(self.get_parameter("robot_y").value),
@@ -47,9 +52,26 @@ class DemoEntitySpawner(Node):
         for entity, x, y, z in zip(obstacle_entities, obstacle_xs, obstacle_ys, obstacle_zs):
             if not entity:
                 continue
+            self._delete_entity_if_present(entity)
             self._spawn_from_file(entity=entity, file_path=obstacle_file, x=x, y=y, z=z)
 
         return 0
+
+    def _delete_entity_if_present(self, entity: str) -> None:
+        request = DeleteEntity.Request()
+        request.name = entity
+        future = self.delete_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        result = future.result()
+        if result is None:
+            self.get_logger().warn(f"DeleteEntity for {entity} returned no result; continuing")
+            return
+        status = getattr(result, "status_message", "")
+        success = bool(getattr(result, "success", False))
+        if success:
+            self.get_logger().info(f"Deleted stale entity {entity}: {status}")
+        elif "does not exist" not in status.lower():
+            self.get_logger().warn(f"DeleteEntity for {entity} reported: {status}")
 
     def _spawn_from_file(self, *, entity: str, file_path: Path, x: float, y: float, z: float) -> None:
         xml = file_path.read_text()

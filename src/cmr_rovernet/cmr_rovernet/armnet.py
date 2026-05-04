@@ -88,7 +88,7 @@ class JSInputSubscriber(Node):
     
     def translate_to_electrical(self, positions, velocities):
         output_pos = [-self.convert_angle_to_custom_range(positions[0], 100), 
-                      self.convert_angle_to_custom_range(positions[1], 100), 
+                      -self.convert_angle_to_custom_range(positions[1], 100), 
                       -self.convert_angle_to_custom_range(positions[2], 100), 
                       self.convert_angle_to_custom_range(positions[3], 50), 
                       self.convert_angle_to_custom_range(positions[4], 50), 
@@ -141,7 +141,7 @@ class JSInputSubscriber(Node):
 
     def listener_callback_mini(self, msg):  
         if not self.moveit_mode:
-            max_velocity = 6
+            max_velocity = 3
             print([msg.base_angle, msg.shoulder_angle, msg.elbow_angle, msg.first_rotate_angle, msg.tilt_angle, msg.second_rotate_angle])
             # base = byte_command_converter(ARM, ARM_BASE, msg.base_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
             # shoulder = byte_command_converter(ARM, ARM_SHOULDER, msg.shoulder_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
@@ -166,8 +166,8 @@ class JSInputSubscriber(Node):
             send_moteus_command_sync(controller=base, motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=shoulder, motor=10, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=elbow, motor=11, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=wrist_tilt, motor=13, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=wrist_tilt, motor=13, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
             send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
 
 
@@ -178,9 +178,11 @@ class JSInputSubscriber(Node):
             # self.logger.info(f'button_array: {msg.button_array[0]}')
             if trigger_val == L1 and button_val == SQUARE:
                 self.moveit_mode = 0
+                self.logger.info(f'Mini arm mode: {str(self.moveit_mode)}')
                 print("Mini arm mode: " + str(self.moveit_mode))
             if trigger_val == L1 and button_val == CIRCLE:
                 self.moveit_mode = 1
+                self.logger.info(f'IK mode: {str(self.moveit_mode)}')
                 print("MoveIt arm mode: " + str(self.moveit_mode))
             if trigger_val == R1 and button_val == SQUARE:
                 self.moveit_mode = 1

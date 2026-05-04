@@ -3,7 +3,6 @@ from os import listdir, path
 from toml import load
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 composition_ns = "rover"
 
@@ -15,7 +14,6 @@ def generate_launch_description():
                 package="cmr_fabric",
                 executable="fault_handler",
                 namespace=composition_ns,
-                # arguments=["--ros-args", "--log-level", "debug"],
             ),
             Node(
                 package="cmr_fabric",
@@ -36,7 +34,6 @@ def fabric_node(conf_path: str) -> Node:
     pkg = result["package"]
     executable = result["executable"]
     name = result["name"]
-
     return Node(
         package=pkg,
         executable=executable,
@@ -48,5 +45,4 @@ def fabric_node(conf_path: str) -> Node:
                 "composition_ns": composition_ns,
             }
         ],
-        # arguments=["--ros-args", "--log-level", "debug"],
     )

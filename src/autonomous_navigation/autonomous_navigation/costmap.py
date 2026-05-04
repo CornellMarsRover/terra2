@@ -28,8 +28,10 @@ class CostmapNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.declare_parameter('diagnostic_logging', True)
+        self.declare_parameter('obstacle_persistence_s', 1.5)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
+        self.obstacle_persistence_s = self.get_parameter('obstacle_persistence_s').get_parameter_value().double_value
         #self.real = True
 
         if self.real and Polygon is not None:
@@ -72,6 +74,7 @@ class CostmapNode(Node):
 
         # Grid with discretized coordinates
         self.grid_dict = dict()
+        self.grid_last_seen = dict()
 
         # Ground plane polygon received from the ZED
         self.ground_plane = None
@@ -123,7 +126,7 @@ class CostmapNode(Node):
         ])
 
         # Timer to decay cell costs
-        self.decay_timer = self.create_timer(5.0, self.decay_cost)
+        self.decay_timer = self.create_timer(0.2, self.decay_cost)
 
         # Timer to publish costmap
         self.pub_timer = self.create_timer(0.2, self.publish_obstacles)
@@ -215,6 +218,7 @@ class CostmapNode(Node):
         # increment cell cost if height seems to represent obstacle
         else:
             self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+2)
+            self.grid_last_seen[(x_new, y_new)] = self.get_clock().now().nanoseconds / 1e9
             curr_obstacles.add((x_new, y_new))
         return
 
@@ -248,6 +252,7 @@ class CostmapNode(Node):
             return
 
         inflation_steps = max(1, int(round(self.inflation_radius_m / self.cell_size)))
+        now_s = self.get_clock().now().nanoseconds / 1e9
         for x_obs, y_obs in curr_obstacles:
             for dx in range(-inflation_steps, inflation_steps + 1):
                 for dy in range(-inflation_steps, inflation_steps + 1):
@@ -274,6 +279,7 @@ class CostmapNode(Node):
                         self.grid_dict[(x_neighbor, y_neighbor)],
                         inflated_cost,
                     )
+                    self.grid_last_seen[(x_neighbor, y_neighbor)] = now_s
 
     def publish_obstacles(self):
         """
@@ -303,20 +309,16 @@ class CostmapNode(Node):
 
     def decay_cost(self):
         """
-        Linearly decay cost of grid cells if an 
-        obstacle not actively detected in that region
+        Drop stale obstacle cells once they have not been observed recently.
         """
-        d = set()
-        for (x, y) in self.grid_dict.keys():
-            #if (x, y) in self.curr_obstacles:
-            #    continue
-            self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
-            if self.grid_dict[(x, y)] == 0:
-                d.add((x,y))
-        # Delete all 0-cost cells
-        for c in d:
-            if c in self.grid_dict:
-                del self.grid_dict[c]
+        now_s = self.get_clock().now().nanoseconds / 1e9
+        stale_cells = [
+            cell for cell, last_seen_s in self.grid_last_seen.items()
+            if (now_s - last_seen_s) > self.obstacle_persistence_s
+        ]
+        for cell in stale_cells:
+            self.grid_last_seen.pop(cell, None)
+            self.grid_dict.pop(cell, None)
                 
     def update_last_movement(self, msg):
         """

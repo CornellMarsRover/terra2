@@ -95,7 +95,7 @@ def generate_launch_description():
             executable="costmap",
             name="costmap",
             output="screen",
-            parameters=[{"real": False, "use_sim_time": True}],
+            parameters=[{"real": False, "use_sim_time": True, "obstacle_persistence_s": 0.8}],
         ),
         Node(
             package="autonomous_navigation",

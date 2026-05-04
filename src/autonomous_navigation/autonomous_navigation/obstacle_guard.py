@@ -25,6 +25,8 @@ class ObstacleGuardNode(Node):
         self.declare_parameter("corridor_half_width", 0.55)
         self.declare_parameter("cost_threshold", 8.0)
         self.declare_parameter("turn_speed", 0.45)
+        self.declare_parameter("escape_reverse_speed", -0.05)
+        self.declare_parameter("escape_turn_speed", 0.35)
         self.declare_parameter("publish_rate_hz", 10.0)
 
         self.lookahead_distance = float(self.get_parameter("lookahead_distance").value)
@@ -32,6 +34,8 @@ class ObstacleGuardNode(Node):
         self.corridor_half_width = float(self.get_parameter("corridor_half_width").value)
         self.cost_threshold = float(self.get_parameter("cost_threshold").value)
         self.turn_speed = float(self.get_parameter("turn_speed").value)
+        self.escape_reverse_speed = float(self.get_parameter("escape_reverse_speed").value)
+        self.escape_turn_speed = float(self.get_parameter("escape_turn_speed").value)
 
         self.cost_entries: List[CostEntry] = []
         self.robot_north = 0.0
@@ -89,12 +93,15 @@ class ObstacleGuardNode(Node):
         override = Twist()
         if summary.blocked:
             if intervention_required:
-                override.angular.z = choose_turn_direction(summary) * self.turn_speed
+                turn_direction = choose_turn_direction(summary)
+                override.linear.x = self.escape_reverse_speed
+                override.angular.z = turn_direction * self.escape_turn_speed
             self.get_logger().info(
                 "obstacle_guard "
                 f"blocked={summary.blocked} nearest={summary.nearest_distance:.2f} "
                 f"left={summary.left_cost:.1f} center={summary.center_cost:.1f} right={summary.right_cost:.1f} "
-                f"intervene={intervention_required} override_turn={override.angular.z:+.3f}",
+                f"intervene={intervention_required} override_linear={override.linear.x:+.3f} "
+                f"override_turn={override.angular.z:+.3f}",
                 throttle_duration_sec=1.0,
             )
         self.override_pub.publish(override)

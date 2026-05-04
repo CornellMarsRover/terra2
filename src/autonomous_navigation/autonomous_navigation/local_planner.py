@@ -309,6 +309,13 @@ class LocalPlannerNode(Node):
                 return
 
         progressed = False
+        nearest_index = self.get_nearest_path_index()
+        while nearest_index > 0 and self.current_path:
+            self.invalidated_segments = dict()
+            self.previous_points.append(self.current_path.popleft())
+            progressed = True
+            nearest_index -= 1
+
         while self.current_path:
             dx = self.current_path[0][0] - self.robot_position[0]
             dy = self.current_path[0][1] - self.robot_position[1]
@@ -431,10 +438,24 @@ class LocalPlannerNode(Node):
         if not self.current_path:
             return self.next_target
 
-        for point in self.current_path:
+        start_index = self.get_nearest_path_index()
+        for point in list(self.current_path)[start_index:]:
             if math.dist(self.robot_position, point) >= self.waypoint_lookahead_distance:
                 return point
         return self.current_path[-1]
+
+    def get_nearest_path_index(self):
+        if not self.current_path:
+            return 0
+        path_list = list(self.current_path)
+        nearest_index = 0
+        nearest_distance = math.inf
+        for index, point in enumerate(path_list):
+            distance = math.dist(self.robot_position, point)
+            if distance < nearest_distance:
+                nearest_distance = distance
+                nearest_index = index
+        return nearest_index
 
     def is_path_segment_dense(self):
         """

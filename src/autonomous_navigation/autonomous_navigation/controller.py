@@ -18,10 +18,12 @@ class ControllerNode(Node):
         self.declare_parameter('diagnostic_logging', True)
         self.declare_parameter('avoidance_timeout_s', 0.5)
         self.declare_parameter('arrival_tolerance_m', 0.2)
+        self.declare_parameter('ackerman_wheelbase_m', 0.83)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
         self.avoidance_timeout_s = self.get_parameter('avoidance_timeout_s').get_parameter_value().double_value
         self.arrival_tolerance_m = self.get_parameter('arrival_tolerance_m').get_parameter_value().double_value
+        self.ackerman_wheelbase_m = self.get_parameter('ackerman_wheelbase_m').get_parameter_value().double_value
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -107,33 +109,6 @@ class ControllerNode(Node):
                 self.last_command_mode = 'idle_stop'
             return
 
-        if self.avoidance_override_is_active():
-            point_turn_z = self.avoidance_override.angular.z
-            if abs(point_turn_z) > 1e-3:
-                self.publish_point_turn(point_turn_z)
-                self.last_movement = 'point_turn'
-                self.last_command_time = self.get_clock().now().to_msg()
-                self.publish_movement('obstacle_avoidance')
-                command_mode = 'obstacle_override_turn'
-            else:
-                self.publish_ackerman(0.0, 0.0)
-                self.last_movement = 'ackerman'
-                self.last_command_time = self.get_clock().now().to_msg()
-                self.publish_movement('obstacle_avoidance')
-                command_mode = 'obstacle_override_stop'
-            self.log_navigation_diagnostics(
-                0.0,
-                0.0,
-                0.0,
-                self.yaw,
-                0.0,
-                command_mode,
-                0.0,
-                0.0,
-                point_turn_z,
-            )
-            return
-
         # Position difference to the waypoint
         x_error = self.waypoint[0] - self.robot_position[0]
         y_error = self.waypoint[1] - self.robot_position[1]
@@ -168,6 +143,57 @@ class ControllerNode(Node):
         command_velocity = self.ackerman_velocity
         command_steer_deg = angle_error_deg
         point_turn_z = 0.0
+
+        if self.avoidance_override_is_active():
+            override_linear_x = self.avoidance_override.linear.x
+            point_turn_z = self.avoidance_override.angular.z
+            curr_time = self.get_clock().now().to_msg()
+            if abs(override_linear_x) > 1e-3:
+                override_steer_deg = 0.0
+                if abs(point_turn_z) > 1e-3:
+                    override_steer_deg = math.degrees(
+                        math.atan2(
+                            point_turn_z * self.ackerman_wheelbase_m,
+                            max(abs(override_linear_x), 1e-6),
+                        )
+                    )
+                    if override_linear_x < 0.0:
+                        override_steer_deg *= -1.0
+                self.publish_ackerman(override_linear_x, override_steer_deg)
+                self.last_movement = 'ackerman'
+                self.last_command_time = curr_time
+                self.publish_movement('obstacle_avoidance')
+                command_mode = 'obstacle_override_ackerman'
+                command_velocity = override_linear_x
+                command_steer_deg = override_steer_deg
+            elif abs(point_turn_z) > 1e-3:
+                self.publish_point_turn(point_turn_z)
+                self.last_movement = 'point_turn'
+                self.last_command_time = curr_time
+                self.publish_movement('obstacle_avoidance')
+                command_mode = 'obstacle_override_turn'
+                command_velocity = 0.0
+                command_steer_deg = 0.0
+            else:
+                self.publish_ackerman(0.0, 0.0)
+                self.last_movement = 'ackerman'
+                self.last_command_time = curr_time
+                self.publish_movement('obstacle_avoidance')
+                command_mode = 'obstacle_override_stop'
+                command_velocity = 0.0
+                command_steer_deg = 0.0
+            self.log_navigation_diagnostics(
+                x_error,
+                y_error,
+                distance_to_wp,
+                angle_to_target,
+                heading_error,
+                command_mode,
+                command_velocity,
+                command_steer_deg,
+                point_turn_z,
+            )
+            return
         
         # If large angle error to next waypoint, use point-turn
         if abs(angle_error_deg) > self.point_turn_threshold:

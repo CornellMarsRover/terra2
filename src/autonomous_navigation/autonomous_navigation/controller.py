@@ -165,11 +165,8 @@ class ControllerNode(Node):
                 self.publish_point_turn(point_turn_z)
             else:
                 # Actual point turn.
-                # heading_error > 0 means the target is CCW of us (to our left
-                # in N/W frame), so we want a positive (CCW) yaw rate. The drives
-                # may invert this internally if their convention differs, but
-                # our localization frame is consistent (CCW-positive yaw) so no
-                # platform-specific sign flip belongs here.
+                # heading_error > 0 means the target is CCW of us, so use a
+                # positive yaw rate in the shared localization frame.
                 turn_sign = 1.0 if angle_error_deg > 0 else -1.0
                 point_turn_z = turn_sign * self.point_turn_velocity
                 command_mode = 'point_turn'

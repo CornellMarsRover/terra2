@@ -23,6 +23,8 @@ class SimDriveBridge(Node):
         self.declare_parameter("point_turn_scale", 10.0)
         self.declare_parameter("max_linear_speed", 0.9)
         self.declare_parameter("max_angular_speed", 1.2)
+        self.declare_parameter("linear_accel_limit", 0.75)
+        self.declare_parameter("angular_accel_limit", 1.2)
 
         self.twist_topic = str(self.get_parameter("twist_topic").value)
         self.command_timeout_s = float(self.get_parameter("command_timeout_s").value)
@@ -31,6 +33,8 @@ class SimDriveBridge(Node):
         self.point_turn_scale = float(self.get_parameter("point_turn_scale").value)
         self.max_linear_speed = float(self.get_parameter("max_linear_speed").value)
         self.max_angular_speed = float(self.get_parameter("max_angular_speed").value)
+        self.linear_accel_limit = float(self.get_parameter("linear_accel_limit").value)
+        self.angular_accel_limit = float(self.get_parameter("angular_accel_limit").value)
 
         self.drive_pub = self.create_publisher(Twist, self.twist_topic, 10)
         self.create_subscription(
@@ -42,7 +46,10 @@ class SimDriveBridge(Node):
 
         self.target_linear_x = 0.0
         self.target_angular_z = 0.0
+        self.current_linear_x = 0.0
+        self.current_angular_z = 0.0
         self.last_command_time = self.get_clock().now()
+        self.last_publish_time = self.get_clock().now()
         self.last_source = "startup"
 
         publish_rate_hz = float(self.get_parameter("publish_rate_hz").value)
@@ -82,16 +89,42 @@ class SimDriveBridge(Node):
         )
 
     def publish_cmd(self) -> None:
-        age = (self.get_clock().now() - self.last_command_time).nanoseconds / 1e9
-        twist = Twist()
+        now = self.get_clock().now()
+        age = (now - self.last_command_time).nanoseconds / 1e9
+        dt = max((now - self.last_publish_time).nanoseconds / 1e9, 1e-3)
+        self.last_publish_time = now
+
         if age <= self.command_timeout_s:
-            twist.linear.x = self.target_linear_x
-            twist.angular.z = self.target_angular_z
+            self.current_linear_x = self._slew(
+                self.current_linear_x, self.target_linear_x, self.linear_accel_limit, dt
+            )
+            self.current_angular_z = self._slew(
+                self.current_angular_z, self.target_angular_z, self.angular_accel_limit, dt
+            )
+        else:
+            self.current_linear_x = self._slew(self.current_linear_x, 0.0, self.linear_accel_limit, dt)
+            self.current_angular_z = self._slew(
+                self.current_angular_z, 0.0, self.angular_accel_limit, dt
+            )
+
+        twist = Twist()
+        twist.linear.x = self.current_linear_x
+        twist.angular.z = self.current_angular_z
         self.drive_pub.publish(twist)
 
     @staticmethod
     def _clamp(value: float, max_abs: float) -> float:
         return max(-max_abs, min(max_abs, float(value)))
+
+    @staticmethod
+    def _slew(current: float, target: float, rate_limit: float, dt: float) -> float:
+        max_delta = max(rate_limit * dt, 0.0)
+        delta = target - current
+        if delta > max_delta:
+            return current + max_delta
+        if delta < -max_delta:
+            return current - max_delta
+        return target
 
 
 def main(args=None) -> None:

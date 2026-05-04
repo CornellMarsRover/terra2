@@ -33,6 +33,7 @@ class LocalPlannerNode(Node):
         self.declare_parameter('validation_horizon_segments', 2)
         self.declare_parameter('replan_cooldown_s', 1.0)
         self.declare_parameter('goal_tolerance', 0.75)
+        self.declare_parameter('waypoint_lookahead_distance', 1.0)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
         self.diagnostic_logging = self.get_parameter('diagnostic_logging').get_parameter_value().bool_value
@@ -48,6 +49,10 @@ class LocalPlannerNode(Node):
         self.goal_tolerance = float(
             self.get_parameter('goal_tolerance').get_parameter_value().double_value
         )
+        self.waypoint_lookahead_distance = float(
+            self.get_parameter('waypoint_lookahead_distance').get_parameter_value().double_value
+        )
+        self.rng = np.random.default_rng(42)
         if self.visualize and rr is None:
             self.get_logger().warn("Rerun not installed; disabling visualization")
             self.visualize = False
@@ -124,7 +129,7 @@ class LocalPlannerNode(Node):
         self.current_path = deque()
         self.previous_points = deque()
         self.next_waypoint = None
-        self.waypoint_threshold = 0.6
+        self.waypoint_threshold = 0.3
         self.invalidation_count = 0
         self.invalidated_segments = dict()
         self.last_replan_wall_time = 0.0
@@ -279,7 +284,7 @@ class LocalPlannerNode(Node):
                 self.smooth_path()
             if not self.current_path:
                 self.current_path.append(self.next_target)
-            self.next_waypoint = self.current_path[0]
+            self.next_waypoint = self.select_lookahead_waypoint()
             self.get_logger().info(f"New next target: {self.next_target}")
             if self.diagnostic_logging:
                 self.get_logger().info(
@@ -303,18 +308,21 @@ class LocalPlannerNode(Node):
                 self.next_waypoint = None
                 return
 
-        if self.next_waypoint is not None:
-            dx = self.next_waypoint[0] - self.robot_position[0]
-            dy = self.next_waypoint[1] - self.robot_position[1]
+        progressed = False
+        while self.current_path:
+            dx = self.current_path[0][0] - self.robot_position[0]
+            dy = self.current_path[0][1] - self.robot_position[1]
             distance = math.sqrt(dx**2 + dy**2)
-            if distance < self.waypoint_threshold:
-                self.invalidated_segments = dict()
-                if self.current_path:
-                    self.previous_points.append(self.current_path.popleft())
-                if len(self.current_path) == 0:
-                    self.next_waypoint = None
-                else:
-                    self.next_waypoint = self.current_path[0]
+            if distance >= self.waypoint_threshold:
+                break
+            self.invalidated_segments = dict()
+            self.previous_points.append(self.current_path.popleft())
+            progressed = True
+
+        if len(self.current_path) == 0:
+            self.next_waypoint = None
+        elif progressed or self.next_waypoint is None:
+            self.next_waypoint = self.select_lookahead_waypoint()
     # -------------------------------------------------------------------------
     # Path Checking and Publishing
     # -------------------------------------------------------------------------
@@ -375,7 +383,7 @@ class LocalPlannerNode(Node):
                     if self.next_target is not None and (len(self.current_path) == 0 or self.current_path[-1] != self.next_target):
                         self.current_path.append(self.next_target)
                     if len(self.current_path) > 0:
-                        self.next_waypoint = self.current_path[0]
+                        self.next_waypoint = self.select_lookahead_waypoint()
                     else:
                         self.current_path.append((self.next_target[0], self.next_target[1]))
                     if self.diagnostic_logging:
@@ -396,25 +404,37 @@ class LocalPlannerNode(Node):
             return
 
         if self.next_waypoint is None:
-            self.next_waypoint = self.next_target
+            self.next_waypoint = self.select_lookahead_waypoint()
 
         if len(self.current_path) == 0 or self.current_path[-1] != self.next_target:
             self.current_path.append(self.next_target)
 
-        #self.get_logger().info(f"Waypoint: {self.next_waypoint}")
-        #self.get_logger().info(f"Current path: {self.current_path}")
-        # Simple "dense" path heuristic
-        self.use_stanley = self.is_path_segment_dense()
+        self.next_waypoint = self.select_lookahead_waypoint()
+        # Keep the shared path on the heading-based controller until the Stanley
+        # branch models real cross-track error instead of a placeholder.
+        self.use_stanley = False
 
         waypoint_msg = Float32MultiArray()
-        #use_stanley_flag = 1.0 if self.use_stanley else 0.0
-        use_stanley_flag = 1.0
+        use_stanley_flag = 1.0 if self.use_stanley else 0.0
         waypoint_msg.data = [
             float(self.next_waypoint[0]),
             float(self.next_waypoint[1]),
             use_stanley_flag
         ]
         self.next_waypoint_publisher.publish(waypoint_msg)
+
+    def select_lookahead_waypoint(self):
+        """
+        Pick a waypoint ahead on the current path rather than the nearest cell.
+        This better matches how the physical rover should track a path.
+        """
+        if not self.current_path:
+            return self.next_target
+
+        for point in self.current_path:
+            if math.dist(self.robot_position, point) >= self.waypoint_lookahead_distance:
+                return point
+        return self.current_path[-1]
 
     def is_path_segment_dense(self):
         """
@@ -489,7 +509,9 @@ class LocalPlannerNode(Node):
 
             # Retrieve cost
             c = self.costs.get((rx, ry), 0.0)
-            c2 = self.get_neighbor_costs(rx, ry, 1, gap)
+            # The shared costmap already inflates obstacle cells, so keep only a
+            # light neighbor penalty here to avoid invalidating safe corridors.
+            c2 = 0.25 * self.get_neighbor_costs(rx, ry, 1, 1)
             total_here = c + c2
 
             total_cost += total_here
@@ -531,8 +553,8 @@ class LocalPlannerNode(Node):
         #self.get_logger().info(f"Original goal: {gx},{gy} with cost: {cost}")
         # Find a local goal without high cost
         while (cost > self.max_cell_threshold*2):
-            x_rand = np.random.default_rng() - 1.0
-            y_rand = np.random.default_rng() - 1.0
+            x_rand = self.rng.uniform(-1.0, 1.0)
+            y_rand = self.rng.uniform(-1.0, 1.0)
             dx = round(x_rand * self.k) / self.k
             dy = round(y_rand * self.k) / self.k
             gx += dx
@@ -640,7 +662,7 @@ class LocalPlannerNode(Node):
         # pop off the first if it's basically the current robot position
         self.current_path.popleft()
         if len(self.current_path) > 0:
-            self.next_waypoint = self.current_path[0]
+            self.next_waypoint = self.select_lookahead_waypoint()
         if self.diagnostic_logging:
             preview = list(self.current_path)[:4]
             self.get_logger().info(
@@ -653,22 +675,43 @@ class LocalPlannerNode(Node):
     # -------------------------------------------------------------------------
     def smooth_path(self):
         """
-        Smooth the current path to handle both collinearity and dense clusters.
-        Uses a simplified Ramer-Douglas-Peucker approach to fit lines through
-        path segments and remove excess intermediate points.
+        Conservatively simplify the current path without collapsing it across
+        obstacle-cost regions. This keeps the simulated corridor closer to what
+        the real rover would actually follow.
         """
-        # Convert deque to list for easier manipulation
         path_list = list(self.current_path)
         if len(path_list) <= 2:
             return
 
-        # We'll do RDP with a chosen epsilon (tunable)
-        epsilon = 0.3
-        smoothed = self.rdp_simplify(path_list, epsilon)
+        smoothed = [path_list[0]]
+        anchor_idx = 0
+        candidate_idx = anchor_idx + 1
+
+        while candidate_idx < len(path_list):
+            anchor = smoothed[-1]
+            candidate = path_list[candidate_idx]
+            max_cost, _ = self.compute_segment_cost(anchor, candidate)
+            if max_cost <= self.max_cell_threshold:
+                candidate_idx += 1
+                continue
+
+            previous_idx = max(anchor_idx + 1, candidate_idx - 1)
+            previous_point = path_list[previous_idx]
+            if previous_point != smoothed[-1]:
+                smoothed.append(previous_point)
+                anchor_idx = previous_idx
+            else:
+                anchor_idx = candidate_idx
+                smoothed.append(candidate)
+            candidate_idx = anchor_idx + 1
+
+        if smoothed[-1] != path_list[-1]:
+            smoothed.append(path_list[-1])
+
         self.current_path = deque(smoothed)
 
         if len(self.current_path) > 0:
-            self.next_waypoint = self.current_path[0]
+            self.next_waypoint = self.select_lookahead_waypoint()
 
     def rdp_simplify(self, points, epsilon):
         """

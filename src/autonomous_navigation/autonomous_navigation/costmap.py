@@ -102,6 +102,8 @@ class CostmapNode(Node):
         self.min_depth = 0.3
         self.cell_size = 0.25
         self.k = 4
+        self.inflation_radius_m = 0.75 if not self.real else 0.6
+        self.inflation_cost_step = 12
 
         # Displacement from original position & rotation of robot, updated with data from localization node
         self.north = 0.0 # meters
@@ -148,8 +150,6 @@ class CostmapNode(Node):
         """
         Process incoming PointCloud2 messages
         """
-        if self.last_movement == "point_turn":
-            return
         self.grid_init = True
         curr_obstacles = set()
         #self.curr_obstacles = set()
@@ -157,6 +157,7 @@ class CostmapNode(Node):
         north, west, R = self.interpolate_pose(msg.header.stamp)
         for pt in point_cloud2.read_points(msg, skip_nans=True):
             self.point_cloud_point_to_grid(pt, [north, west], R, curr_obstacles, curr_free_space)
+        self.inflate_obstacles(curr_obstacles)
 
         #self.decay_cost(curr_obstacles, curr_free_space)
         #self.get_logger().info(f"{self.grid_dict}")
@@ -221,8 +222,6 @@ class CostmapNode(Node):
         """
         Update costmap from vertices surrounding ground plane from ZED camera.
         """
-        if self.last_movement == "point_turn":
-            return
         if Polygon is None:
             return
         pts = []
@@ -239,6 +238,42 @@ class CostmapNode(Node):
         for (x, y) in list(self.grid_dict.keys()):
             if ground_polygon.contains(Point(x, y)):
                 self.grid_dict[(x, y)] = max(self.grid_dict[(x, y)] - 3, 0)'''
+
+    def inflate_obstacles(self, curr_obstacles):
+        """
+        Spread obstacle cost to neighboring cells so downstream planning respects
+        rover-width clearance instead of hugging raw point returns.
+        """
+        if not curr_obstacles:
+            return
+
+        inflation_steps = max(1, int(round(self.inflation_radius_m / self.cell_size)))
+        for x_obs, y_obs in curr_obstacles:
+            for dx in range(-inflation_steps, inflation_steps + 1):
+                for dy in range(-inflation_steps, inflation_steps + 1):
+                    if dx == 0 and dy == 0:
+                        continue
+                    distance = math.sqrt((dx * self.cell_size) ** 2 + (dy * self.cell_size) ** 2)
+                    if distance > self.inflation_radius_m:
+                        continue
+
+                    x_neighbor = round((x_obs + dx * self.cell_size) * self.k) / self.k
+                    y_neighbor = round((y_obs + dy * self.cell_size) * self.k) / self.k
+                    if self.real and self.in_ground_plane(x_neighbor, y_neighbor):
+                        continue
+
+                    if (x_neighbor, y_neighbor) not in self.grid_dict:
+                        self.grid_dict[(x_neighbor, y_neighbor)] = 0
+
+                    falloff_steps = max(0, int(round(distance / self.cell_size)))
+                    inflated_cost = max(
+                        1,
+                        self.max_cost - (falloff_steps * self.inflation_cost_step),
+                    )
+                    self.grid_dict[(x_neighbor, y_neighbor)] = max(
+                        self.grid_dict[(x_neighbor, y_neighbor)],
+                        inflated_cost,
+                    )
 
     def publish_obstacles(self):
         """

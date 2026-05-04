@@ -56,7 +56,15 @@ def generate_launch_description():
                 executable='rtk_localization',
                 name='rtk_localization',
                 output='screen',
-                parameters=[{'real': True}],
+                parameters=[{
+                    'real': True,
+                    # HWT905-RS232 anglez on this rover comes out
+                    # CCW-positive (0=N, +90=W, -90=E), so do NOT invert.
+                    # Inverting was the cause of the E/W swap and reversed
+                    # rotation seen on the live telemetry.
+                    'invert_imu_yaw': False,
+                    'magnetic_declination_degrees': -11.5,
+                }],
                 remappings=[
                     ('/gps/fix', '/rtk/navsatfix_data'),
                 ],

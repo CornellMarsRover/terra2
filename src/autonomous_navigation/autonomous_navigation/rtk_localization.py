@@ -13,16 +13,20 @@ class RTKLocalization(Node):
 
         # IMU heading-correction parameters.
         #
-        # The HWT905-RS232 reports anglez as a magnetic-north-referenced angle in
-        # the WitMotion NEU/NED convention (CW-positive looking down: 0=N, +90=E,
-        # +180=S, -90=W). The autonomy controller works in an N/W frame where
-        # bearings come from atan2(west_err, north_err) (CCW-positive looking
-        # down: 0=N, +pi/2=W, -pi/2=E). To make the two frames agree we have to
-        # invert the IMU yaw sign, then apply magnetic declination and any
-        # rover-body mounting offset.
+        # The autonomy controller works in an N/W frame where bearings come
+        # from atan2(west_err, north_err) (CCW-positive looking down:
+        # 0=N, +pi/2=W, -pi/2=E). The HWT905-RS232 we currently fly outputs
+        # anglez such that, on this rover (with its current mounting), the
+        # raw value is already in the same CCW-positive sense -- so flipping
+        # the sign with invert_imu_yaw=True produces a CW-positive published
+        # yaw and the rover sees E/W swapped (and rotation reversed). Default
+        # is therefore False; flip back to True only if a future IMU swap or
+        # remount produces an empirical CW-positive raw stream. Static
+        # confirmation: face physical W, expect published_yaw ~ +78.5 deg
+        # (with declination=-11.5); face physical E, expect ~ -101.5 deg.
         self.declare_parameter('yaw_offset_degrees', 0.0)
         self.declare_parameter('magnetic_declination_degrees', -11.5)
-        self.declare_parameter('invert_imu_yaw', True)
+        self.declare_parameter('invert_imu_yaw', False)
         self.declare_parameter('use_gyro_fusion', False)
         self.declare_parameter('gyro_fusion_alpha', 0.98)
         self.declare_parameter('diagnostic_logging', True)

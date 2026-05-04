@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import math
 from typing import List, Sequence, Tuple
 
 import rclpy
@@ -37,6 +38,10 @@ class SimObstaclePointCloud(Node):
         self.declare_parameter("obstacle_wests", [0.0])
         self.declare_parameter("obstacle_size_norths", [0.8])
         self.declare_parameter("obstacle_size_wests", [0.8])
+        self.declare_parameter("obstacle_north", float("nan"))
+        self.declare_parameter("obstacle_west", float("nan"))
+        self.declare_parameter("obstacle_size_north", float("nan"))
+        self.declare_parameter("obstacle_size_west", float("nan"))
 
         self.point_topic = str(self.get_parameter("point_topic").value)
         self.frame_id = str(self.get_parameter("frame_id").value)
@@ -77,6 +82,15 @@ class SimObstaclePointCloud(Node):
         wests = [float(value) for value in self.get_parameter("obstacle_wests").value]
         size_norths = [float(value) for value in self.get_parameter("obstacle_size_norths").value]
         size_wests = [float(value) for value in self.get_parameter("obstacle_size_wests").value]
+        north_scalar = float(self.get_parameter("obstacle_north").value)
+        west_scalar = float(self.get_parameter("obstacle_west").value)
+        size_north_scalar = float(self.get_parameter("obstacle_size_north").value)
+        size_west_scalar = float(self.get_parameter("obstacle_size_west").value)
+        if not math.isnan(north_scalar) and not math.isnan(west_scalar):
+            norths = [north_scalar]
+            wests = [west_scalar]
+            size_norths = [0.8 if math.isnan(size_north_scalar) else size_north_scalar]
+            size_wests = [0.8 if math.isnan(size_west_scalar) else size_west_scalar]
         count = min(len(norths), len(wests), len(size_norths), len(size_wests))
         return [
             (norths[idx], wests[idx], size_norths[idx], size_wests[idx])

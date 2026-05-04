@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import math
 from pathlib import Path
 from typing import List
 
@@ -22,6 +23,9 @@ class DemoEntitySpawner(Node):
         self.declare_parameter("obstacle_xs", [0.0])
         self.declare_parameter("obstacle_ys", [0.0])
         self.declare_parameter("obstacle_zs", [0.5])
+        self.declare_parameter("obstacle_x", float("nan"))
+        self.declare_parameter("obstacle_y", float("nan"))
+        self.declare_parameter("obstacle_z", float("nan"))
 
         self.client = self.create_client(SpawnEntity, "/spawn_entity")
         self.delete_client = self.create_client(DeleteEntity, "/delete_entity")
@@ -45,9 +49,25 @@ class DemoEntitySpawner(Node):
         )
 
         obstacle_entities: List[str] = list(self.get_parameter("obstacle_entities").value)
-        obstacle_xs: List[float] = [float(value) for value in self.get_parameter("obstacle_xs").value]
-        obstacle_ys: List[float] = [float(value) for value in self.get_parameter("obstacle_ys").value]
-        obstacle_zs: List[float] = [float(value) for value in self.get_parameter("obstacle_zs").value]
+        obstacle_xs_param = self.get_parameter("obstacle_xs").value
+        obstacle_ys_param = self.get_parameter("obstacle_ys").value
+        obstacle_zs_param = self.get_parameter("obstacle_zs").value
+
+        obstacle_xs: List[float] = [float(value) for value in obstacle_xs_param]
+        obstacle_ys: List[float] = [float(value) for value in obstacle_ys_param]
+        obstacle_zs: List[float] = [float(value) for value in obstacle_zs_param]
+
+        obstacle_x_scalar = float(self.get_parameter("obstacle_x").value)
+        obstacle_y_scalar = float(self.get_parameter("obstacle_y").value)
+        obstacle_z_scalar = float(self.get_parameter("obstacle_z").value)
+        if (
+            len(obstacle_entities) == 1
+            and not math.isnan(obstacle_x_scalar)
+            and not math.isnan(obstacle_y_scalar)
+        ):
+            obstacle_xs = [obstacle_x_scalar]
+            obstacle_ys = [obstacle_y_scalar]
+            obstacle_zs = [0.5 if math.isnan(obstacle_z_scalar) else obstacle_z_scalar]
 
         for entity, x, y, z in zip(obstacle_entities, obstacle_xs, obstacle_ys, obstacle_zs):
             if not entity:

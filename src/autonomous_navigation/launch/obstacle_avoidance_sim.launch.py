@@ -46,9 +46,9 @@ def generate_launch_description():
                 "robot_z": 0.05,
                 "obstacle_file": obstacle_file,
                 "obstacle_entities": ["obstacle_box"],
-                "obstacle_xs": [obstacle_x],
-                "obstacle_ys": [obstacle_y],
-                "obstacle_zs": [0.5],
+                "obstacle_x": obstacle_x,
+                "obstacle_y": obstacle_y,
+                "obstacle_z": 0.5,
             }
         ],
     )
@@ -89,10 +89,10 @@ def generate_launch_description():
             parameters=[
                 {
                     "use_sim_time": use_sim_time,
-                    "obstacle_norths": [obstacle_x],
-                    "obstacle_wests": [obstacle_y],
-                    "obstacle_size_norths": [0.8],
-                    "obstacle_size_wests": [0.8],
+                    "obstacle_north": obstacle_x,
+                    "obstacle_west": obstacle_y,
+                    "obstacle_size_north": 0.8,
+                    "obstacle_size_west": 0.8,
                 }
             ],
         ),

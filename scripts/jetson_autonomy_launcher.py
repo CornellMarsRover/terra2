@@ -23,14 +23,9 @@ any existing code. It only requires:
     - Python 3 with tkinter (preinstalled on Ubuntu)
     - sshpass            (sudo apt install sshpass)
     - gnome-terminal / xterm / konsole / xfce4-terminal
-    - tmux  (optional)   (sudo apt install tmux)
-        If tmux is installed, every button opens a new tmux *tab* in a single
-        shared window instead of spawning a separate terminal each time.
-        Switch tabs with Ctrl-b then a number, or Ctrl-b then n / p.
-        Kill a tab with `exit` (or Ctrl-b then &).
 
 Run with:
-    python3 scripts/jetson_autonomy_launcher.py
+    python3 scripts/jetson_launcher.py
 """
 
 import os
@@ -58,11 +53,6 @@ LOCAL_WORKSPACE = str(REPO_ROOT)  # this same machine's terra2 workspace
 # Tip: if gnome-terminal throws DBus / "org.gnome.Terminal" errors, set this to
 # "xterm" (sudo apt install xterm) -- it has no client/server dance and just works.
 PREFERRED_TERMINAL = None
-
-# When True (and tmux is installed), all commands run as tmux tabs in a single
-# shared window. When False, each command opens its own terminal window.
-USE_TABS = True
-TMUX_SESSION = "jetson-autonomy-launcher"
 
 # Local commands -- run on THIS machine. (button label, command, source setup.bash?)
 LOCAL_COMMANDS = [
@@ -164,53 +154,35 @@ def build_terminal_argv(terminal, title, local_bash):
 
 
 def build_workspace_command(workspace, cmd, source_workspace):
-    """Wrap a ros2 command into a single bash one-liner.
-    `exec bash` keeps the shell interactive after the command exits so the
-    user can read errors / re-run things without losing the session."""
+    """Wrap a ros2 command into a single bash one-liner: `cd <ws> [&& source
+    install/setup.bash] && <cmd>`. No `exec bash` at the end -- the caller is
+    responsible for adding a pause so the terminal stays open. We deliberately
+    do NOT spawn a new interactive shell, so .bashrc on the remote does not
+    reload (and any path-typos in .bashrc don't pollute the output)."""
     parts = [f"cd {workspace}"]
     if source_workspace:
         parts.append("source install/setup.bash")
     parts.append(cmd)
-    pipeline = " && ".join(parts)
-    return f"{pipeline}; exec bash"
+    return " && ".join(parts)
 
 
-# --- tmux multiplexer (optional) --------------------------------------------
-
-def tmux_available():
-    return shutil.which("tmux") is not None
-
-
-def tmux_session_exists(session):
-    return subprocess.call(
-        ["tmux", "has-session", "-t", session],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    ) == 0
-
-
-def tmux_has_clients(session):
-    try:
-        out = subprocess.check_output(
-            ["tmux", "list-clients", "-t", session],
-            stderr=subprocess.DEVNULL,
-        ).decode()
-        return bool(out.strip())
-    except subprocess.CalledProcessError:
-        return False
+def with_pause(bash_cmd, message="[done -- press Enter to close]"):
+    """Append a pause prompt so the terminal doesn't close immediately."""
+    safe_msg = message.replace("'", "'\\''")
+    return f"{bash_cmd}; echo; echo '{safe_msg}'; read"
 
 
 # --- GUI ---------------------------------------------------------------------
 
-class JetsonAutonomyLauncher(tk.Tk):
+class JetsonLauncher(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Jetson Autonomy Launcher")
+        self.title("Rover Launcher")
         self.geometry("680x680")
         self.minsize(560, 600)
 
         self.terminal = find_terminal()
         self.password = load_jetson_password()
-        self.use_tabs = USE_TABS and tmux_available()
 
         pad = {"padx": 12, "pady": 4}
 
@@ -231,16 +203,6 @@ class JetsonAutonomyLauncher(tk.Tk):
             text=f"Terminal:  {self.terminal or 'NONE FOUND'}",
             foreground="#555",
         ).pack(anchor="w")
-        if self.use_tabs:
-            tabs_text = f"Tabs:  tmux session '{TMUX_SESSION}' (Ctrl-b n / p to switch)"
-            tabs_color = "#0a0"
-        elif USE_TABS:
-            tabs_text = "Tabs:  tmux not installed -- using separate windows (apt install tmux)"
-            tabs_color = "#a60"
-        else:
-            tabs_text = "Tabs:  disabled in script (USE_TABS=False)"
-            tabs_color = "#555"
-        ttk.Label(header, text=tabs_text, foreground=tabs_color).pack(anchor="w")
         pw_status = "loaded from .env" if self.password else "NOT SET (see .env.example)"
         ttk.Label(
             header,
@@ -248,19 +210,15 @@ class JetsonAutonomyLauncher(tk.Tk):
             foreground="#0a0" if self.password else "#a00",
         ).pack(anchor="w")
 
-        if self.use_tabs:
-            help_text = (
-                "Each button adds a new tab to the tmux window.\n"
-                "Switch tabs: Ctrl-b then n / p / number.   Close a tab: type 'exit'."
-            )
-        else:
-            help_text = (
+        ttk.Label(
+            self,
+            text=(
                 "Each button opens a new terminal window, sources install/setup.bash,\n"
-                "and runs the command. Close the terminal (or Ctrl+C inside it) to stop."
-            )
-        ttk.Label(self, text=help_text, foreground="#555", justify="left").pack(
-            **pad, anchor="w"
-        )
+                "and runs the command. Close the terminal (or Ctrl+C inside it) to stop it."
+            ),
+            foreground="#555",
+            justify="left",
+        ).pack(**pad, anchor="w")
 
         local_frame = ttk.LabelFrame(self, text=f"Local run  ({LOCAL_WORKSPACE})")
         local_frame.pack(fill="x", **pad)
@@ -283,18 +241,21 @@ class JetsonAutonomyLauncher(tk.Tk):
         jetson_frame = ttk.LabelFrame(self, text=f"Jetson  ({JETSON_USER}@{JETSON_HOST})")
         jetson_frame.pack(fill="both", expand=True, **pad)
 
+        ttk.Button(
+            jetson_frame,
+            text="Open SSH shell  (workspace sourced, ready for ros2 commands)",
+            command=self.launch_jetson_shell,
+        ).pack(fill="x", padx=8, pady=(8, 2))
+        ttk.Separator(jetson_frame, orient="horizontal").pack(
+            fill="x", padx=8, pady=(4, 2)
+        )
+
         for label, cmd, src in JETSON_COMMANDS:
             ttk.Button(
                 jetson_frame,
                 text=label,
                 command=lambda c=cmd, s=src, l=label: self.launch_jetson(c, s, l),
             ).pack(fill="x", padx=8, pady=4)
-
-        if self.use_tabs:
-            ttk.Button(
-                self, text="Kill all tabs (close tmux session)",
-                command=self.kill_all_tabs,
-            ).pack(fill="x", **pad)
 
         self.status = ttk.Label(self, text="Ready.", foreground="#0a0")
         self.status.pack(fill="x", **pad, side="bottom")
@@ -306,77 +267,30 @@ class JetsonAutonomyLauncher(tk.Tk):
                 "are installed.\nInstall one, e.g.:\n  sudo apt install xterm",
             )
 
-    # --- Build the bash one-liner for each kind of command ----------------
-
-    def _build_local_bash(self, cmd, source_workspace):
-        """Bash command for a local (non-SSH) launch."""
-        return build_workspace_command(LOCAL_WORKSPACE, cmd, source_workspace)
-
-    def _build_jetson_bash(self, cmd, source_workspace):
-        """Bash command that SSHes into the Jetson and runs `cmd`.
-        Reads the password from .env at runtime via `set -a; source .env`,
-        so the password never appears in any argv (no `ps` exposure)."""
-        remote = build_workspace_command(JETSON_WORKSPACE, cmd, source_workspace)
-        ssh = (
-            f"sshpass -e ssh -t -o StrictHostKeyChecking=accept-new "
-            f"{JETSON_USER}@{JETSON_HOST} {shlex.quote(remote)}"
-        )
-        return (
-            f"set -a; source {shlex.quote(str(ENV_FILE))}; set +a; "
-            f"{ssh}; "
-            f"echo; echo '[session ended -- press Enter to close]'; read"
-        )
-
-    # --- Common launch path (tabs OR new window) --------------------------
-
-    def _launch(self, title, bash_cmd):
+    def launch_local(self, cmd, source_workspace, label):
+        """Open a local terminal and run the command on this machine."""
         if not self.terminal:
             messagebox.showerror("No terminal", "No terminal emulator available.")
-            return False
+            return
+        bash = with_pause(
+            build_workspace_command(LOCAL_WORKSPACE, cmd, source_workspace)
+        )
+        title = f"Local: {label}"
+        argv = build_terminal_argv(self.terminal, title, bash)
         try:
-            if self.use_tabs:
-                self._launch_tab(title, bash_cmd)
-            else:
-                argv = build_terminal_argv(self.terminal, title, bash_cmd)
-                subprocess.Popen(argv, start_new_session=True)
-            return True
+            subprocess.Popen(argv, start_new_session=True)
+            self.status.config(text=f"Launched local: {label}", foreground="#0a0")
         except Exception as exc:  # noqa: BLE001
             messagebox.showerror("Launch failed", str(exc))
             self.status.config(text=f"Failed: {exc}", foreground="#a00")
+
+    def _launch_jetson_remote(self, remote_bash, label):
+        """Open a local terminal that SSHes into the Jetson with the password
+        sourced from .env, and runs `remote_bash` on the Jetson via ssh -t.
+        Returns True on success."""
+        if not self.terminal:
+            messagebox.showerror("No terminal", "No terminal emulator available.")
             return False
-
-    def _launch_tab(self, title, bash_cmd):
-        """Add a new tmux window in the shared session, opening a terminal
-        attached to the session if one isn't already attached."""
-        # tmux window names can't contain ':' so sanitise.
-        window_name = title.replace(":", " -")[:40]
-        if tmux_session_exists(TMUX_SESSION):
-            subprocess.run(
-                ["tmux", "new-window", "-t", f"{TMUX_SESSION}:",
-                 "-n", window_name, bash_cmd],
-                check=True,
-            )
-        else:
-            subprocess.run(
-                ["tmux", "new-session", "-d", "-s", TMUX_SESSION,
-                 "-n", window_name, bash_cmd],
-                check=True,
-            )
-        if not tmux_has_clients(TMUX_SESSION):
-            attach_argv = build_terminal_argv(
-                self.terminal, "Jetson Autonomy Launcher (tabs)",
-                f"tmux attach -t {shlex.quote(TMUX_SESSION)}",
-            )
-            subprocess.Popen(attach_argv, start_new_session=True)
-
-    # --- Button callbacks --------------------------------------------------
-
-    def launch_local(self, cmd, source_workspace, label):
-        bash = self._build_local_bash(cmd, source_workspace)
-        if self._launch(f"Local: {label}", bash):
-            self.status.config(text=f"Launched local: {label}", foreground="#0a0")
-
-    def launch_jetson(self, cmd, source_workspace, label):
         if not self.password:
             messagebox.showerror(
                 "Password not set",
@@ -385,26 +299,56 @@ class JetsonAutonomyLauncher(tk.Tk):
                 f"    JETSON_SSH_PASSWORD=your_password\n\n"
                 f"Or export JETSON_SSH_PASSWORD in your shell.",
             )
-            return
-        bash = self._build_jetson_bash(cmd, source_workspace)
-        if self._launch(f"Jetson: {label}", bash):
-            self.status.config(text=f"Launched jetson: {label}", foreground="#0a0")
+            return False
 
-    def kill_all_tabs(self):
-        """Tear down the tmux session (closes every tab and any attached window)."""
-        if not self.use_tabs:
-            return
-        if not tmux_session_exists(TMUX_SESSION):
-            self.status.config(text="No tmux session running.", foreground="#555")
-            return
-        if not messagebox.askyesno(
-            "Kill all tabs?",
-            f"This will close every command running in the '{TMUX_SESSION}' tmux session.\n"
-            f"Are you sure?",
-        ):
-            return
-        subprocess.run(["tmux", "kill-session", "-t", TMUX_SESSION], check=False)
-        self.status.config(text="Killed all tabs.", foreground="#a60")
+        # Source .env from inside the new bash so the password makes it into
+        # gnome-terminal's shell (env vars set on Popen don't propagate
+        # through gnome-terminal-server). sshpass -e reads $SSHPASS, .env
+        # stores it as JETSON_SSH_PASSWORD, so we bridge the two names.
+        ssh_inner = (
+            f"sshpass -e ssh -t -o StrictHostKeyChecking=accept-new "
+            f"{JETSON_USER}@{JETSON_HOST} {shlex.quote(remote_bash)}"
+        )
+        bash = (
+            f"set -a; source {shlex.quote(str(ENV_FILE))}; set +a; "
+            f"export SSHPASS=\"${{JETSON_SSH_PASSWORD:-}}\"; "
+            f"if [ -z \"$SSHPASS\" ]; then "
+            f"  echo 'ERROR: JETSON_SSH_PASSWORD not set in {ENV_FILE}'; "
+            f"  echo 'Edit that file and put your Jetson password after the ='; "
+            f"  echo; read -p 'Press Enter to close'; exit 1; "
+            f"fi; "
+            f"{ssh_inner}; "
+            f"echo; echo '[session ended -- press Enter to close]'; read"
+        )
+        title = f"Jetson: {label}"
+        argv = build_terminal_argv(self.terminal, title, bash)
+
+        try:
+            subprocess.Popen(argv, start_new_session=True)
+            self.status.config(text=f"Launched jetson: {label}", foreground="#0a0")
+            return True
+        except Exception as exc:  # noqa: BLE001
+            messagebox.showerror("Launch failed", str(exc))
+            self.status.config(text=f"Failed: {exc}", foreground="#a00")
+            return False
+
+    def launch_jetson(self, cmd, source_workspace, label):
+        """Open a local terminal that SSHes into the Jetson and runs the command."""
+        remote = build_workspace_command(JETSON_WORKSPACE, cmd, source_workspace)
+        self._launch_jetson_remote(remote, label)
+
+    def launch_jetson_shell(self):
+        """Drop into an interactive bash on the Jetson with the workspace
+        already sourced, so the user can run any ros2 command immediately.
+        `exec bash` replaces the remote sh with an interactive bash; ROS env
+        vars set by `source install/setup.bash` carry across via env
+        inheritance. The session ends when the user types `exit` / Ctrl+D."""
+        remote = (
+            f"cd {JETSON_WORKSPACE} && "
+            f"source install/setup.bash && "
+            f"exec bash"
+        )
+        self._launch_jetson_remote(remote, "SSH shell")
 
 
 def main():
@@ -415,7 +359,7 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
-    JetsonAutonomyLauncher().mainloop()
+    JetsonLauncher().mainloop()
 
 
 if __name__ == "__main__":

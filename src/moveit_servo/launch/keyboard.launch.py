@@ -34,8 +34,7 @@ def load_yaml(package_name, file_path):
 
 def generate_launch_description():
     moveit_config = (
-        MoveItConfigsBuilder("cmr_arm_simulator")
-        .robot_description(file_path="config/Arm.urdf.xacro")
+        MoveItConfigsBuilder("Arm", package_name="cmr_arm_simulator_moveit_config")
         .to_moveit_configs()
     )
 
@@ -120,16 +119,6 @@ def generate_launch_description():
                 plugin="tf2_ros::StaticTransformBroadcasterNode",
                 name="static_tf2_broadcaster",
                 parameters=[{"child_frame_id": "/base_link", "frame_id": "/world"}],
-            ),
-            ComposableNode(
-                package="moveit_servo",
-                plugin="moveit_servo::JoyToServoPub",
-                name="controller_to_servo_node",
-            ),
-            ComposableNode(
-                package="joy",
-                plugin="joy::Joy",
-                name="joy_node",
             ),
         ],
         output="screen",

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import copy
+import math
 from enum import Enum, auto
 
 import rclpy
@@ -23,6 +24,7 @@ class ArmCoordinator(Node):
     PREAPPROACH_OFFSET_Z = 0.05
     PRESS_OFFSET_Z = -0.003
     VARIANCE_THRESHOLD = 2.0
+    IDLE_DURATION = 1.0  # seconds to pause in IDLE before accepting next key
 
     STATE_DURATIONS = {
         State.MOVING_TO_PREAPPROACH: 3.0,
@@ -45,6 +47,8 @@ class ArmCoordinator(Node):
         self.declare_parameter("variance_threshold", self.VARIANCE_THRESHOLD)
         self.declare_parameter("linear_gain", 2.0)
         self.declare_parameter("max_linear_command", 0.35)
+        self.declare_parameter("angular_gain", 2.0)
+        self.declare_parameter("max_angular_command", 0.5)
         self.declare_parameter("position_tolerance", 0.01)
 
         self.target_frame = self.get_parameter("target_frame").value
@@ -54,6 +58,8 @@ class ArmCoordinator(Node):
         self.variance_threshold = self.get_parameter("variance_threshold").value
         self.linear_gain = self.get_parameter("linear_gain").value
         self.max_linear_command = self.get_parameter("max_linear_command").value
+        self.angular_gain = self.get_parameter("angular_gain").value
+        self.max_angular_command = self.get_parameter("max_angular_command").value
         self.position_tolerance = self.get_parameter("position_tolerance").value
 
         self.tf_buffer = tf2_ros.Buffer()
@@ -89,7 +95,7 @@ class ArmCoordinator(Node):
         self.timer = self.create_timer(0.1, self.state_machine_tick)
 
         self.get_logger().info(
-            "Arm coordinator started in Servo target-pose mode; "
+            "Arm coordinator started; "
             f"waiting for high-confidence key pose in target frame '{self.target_frame}'. "
             f"Servo twists will command '{self.ee_frame}'."
         )
@@ -167,24 +173,28 @@ class ArmCoordinator(Node):
 
         elif self.state == State.IDLE:
             self._publish_zero_twist()
+            # After a short pause, reset and wait for the next key from the mission node
+            if self._state_elapsed() >= self.IDLE_DURATION:
+                self.locked_pose = None
+                self._transition(State.WAITING_FOR_LOCK)
 
     def _publish_target_and_servo_command(self, pose: PoseStamped):
         self._publish_target_pose(pose)
-        current_position = self._lookup_current_ee_position()
-        if current_position is None:
+        ee_transform = self._lookup_ee_transform()
+        if ee_transform is None:
             self._publish_zero_twist()
             return
         self.servo_twist_pub.publish(
-            self._make_servo_twist(pose, current_position)
+            self._make_servo_twist(pose, ee_transform)
         )
 
     def _publish_target_pose(self, pose: PoseStamped):
         pose.header.stamp = self.get_clock().now().to_msg()
         self.target_pose_pub.publish(pose)
 
-    def _lookup_current_ee_position(self):
+    def _lookup_ee_transform(self):
         try:
-            transform = self.tf_buffer.lookup_transform(
+            return self.tf_buffer.lookup_transform(
                 self.target_frame,
                 self.ee_frame,
                 rclpy.time.Time(),
@@ -197,29 +207,59 @@ class ArmCoordinator(Node):
             )
             return None
 
-        return transform.transform.translation
+    def _make_servo_twist(self, target_pose: PoseStamped, ee_transform) -> TwistStamped:
+        current_pos = ee_transform.transform.translation
+        current_rot = ee_transform.transform.rotation
 
-    def _make_servo_twist(self, target_pose: PoseStamped, current_position) -> TwistStamped:
-        error_x = target_pose.pose.position.x - current_position.x
-        error_y = target_pose.pose.position.y - current_position.y
-        error_z = target_pose.pose.position.z - current_position.z
+        error_x = target_pose.pose.position.x - current_pos.x
+        error_y = target_pose.pose.position.y - current_pos.y
+        error_z = target_pose.pose.position.z - current_pos.z
 
-        if (
+        msg = self._zero_twist_msg()
+
+        if not (
             abs(error_x) < self.position_tolerance
             and abs(error_y) < self.position_tolerance
             and abs(error_z) < self.position_tolerance
         ):
-            return self._zero_twist_msg()
+            msg.twist.linear.x = self._bounded_linear_command(error_x)
+            msg.twist.linear.y = self._bounded_linear_command(error_y)
+            msg.twist.linear.z = self._bounded_linear_command(error_z)
 
-        msg = self._zero_twist_msg()
-        msg.twist.linear.x = self._bounded_linear_command(error_x)
-        msg.twist.linear.y = self._bounded_linear_command(error_y)
-        msg.twist.linear.z = self._bounded_linear_command(error_z)
+        # Angular correction: drive end effector toward target orientation
+        target_q = target_pose.pose.orientation
+        ax, ay, az = self._quaternion_error_to_angular(target_q, current_rot)
+        msg.twist.angular.x = self._bounded_angular_command(ax)
+        msg.twist.angular.y = self._bounded_angular_command(ay)
+        msg.twist.angular.z = self._bounded_angular_command(az)
+
         return msg
+
+    @staticmethod
+    def _quaternion_error_to_angular(q_target, q_current):
+        """Return angular error [x, y, z] as q_error = q_target * conj(q_current)."""
+        tw, tx, ty, tz = q_target.w, q_target.x, q_target.y, q_target.z
+        cw, cx, cy, cz = q_current.w, q_current.x, q_current.y, q_current.z
+
+        # q_error = q_target * conj(q_current)
+        ew = tw * cw + tx * cx + ty * cy + tz * cz
+        ex = -tw * cx + tx * cw - ty * cz + tz * cy
+        ey = -tw * cy + tx * cz + ty * cw - tz * cx
+        ez = -tw * cz - tx * cy + ty * cx + tz * cw
+
+        # Take the shorter arc
+        if ew < 0:
+            ex, ey, ez = -ex, -ey, -ez
+
+        return ex, ey, ez
 
     def _bounded_linear_command(self, error: float) -> float:
         command = self.linear_gain * error
         return max(-self.max_linear_command, min(self.max_linear_command, command))
+
+    def _bounded_angular_command(self, error: float) -> float:
+        command = self.angular_gain * error
+        return max(-self.max_angular_command, min(self.max_angular_command, command))
 
     def _publish_zero_twist(self):
         self.servo_twist_pub.publish(self._zero_twist_msg())

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Autonomous Typing Mission: Publishes PoseWithCovarianceStamped messages for robotic arm movement.
+Autonomous Typing Mission: detects keyboard via ArUco tags and publishes
+key poses in camera_frame so TF2 can transform them to base_link via
+the live end_effector → base_link chain.
 """
 
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from std_msgs.msg import String
 import cv2
 import numpy as np
 import math
@@ -15,7 +18,7 @@ from ament_index_python.packages import get_package_share_directory
 import os
 import json
 
-# --- Helper: Quaternion from RPY ---
+
 def quat_from_rpy(roll, pitch, yaw):
     cr = math.cos(roll * 0.5)
     sr = math.sin(roll * 0.5)
@@ -25,226 +28,223 @@ def quat_from_rpy(roll, pitch, yaw):
     sy = math.sin(yaw * 0.5)
     qw = cr * cp * cy + sr * sp * sy
     qx = sr * cp * cy - cr * sp * sy
-    qy = cr * sp * cy + cr * cp * sy
+    qy = cr * sp * cy + sr * cp * sy
     qz = cr * cp * sy - sr * sp * cy
     return qx, qy, qz, qw
 
+
 def load_key_positions(filename):
     pkg_share = get_package_share_directory('autonomous_typing_package')
-    filepath = os.path.join(pkg_share, filename)
-    with open(filepath, 'r') as f:
+    with open(os.path.join(pkg_share, filename), 'r') as f:
         return json.load(f)
 
 
-# --- Main Typing Mission ---
 class TypingMission(Node):
 
-    # How many frames to track for stability
-    STABILITY_WINDOW = 20
-
-    # Maximum allowed per-axis variance (in pixels squared) to consider the
-    # reference origin stable. Tune this to your camera resolution / use-case.
-    VARIANCE_THRESHOLD = 2.0
+    STABILITY_WINDOW   = 20
+    VARIANCE_THRESHOLD = 1e-6  # metres² — tight because ArUco gives real units
 
     def __init__(self):
         super().__init__('typing_mission')
 
-        self.declare_parameter("camera_index", 0)
+        self.declare_parameter("camera_index",  0)
         self.declare_parameter("camera_device", "")
-        self.camera_index = self.get_parameter("camera_index").value
-        self.camera_device = self.get_parameter("camera_device").value
 
-        # Load key positions from JSON
+        # Arducam 8MP (IMX219) at 640x480.
+        # Estimated from sensor specs: fx = f_mm / pixel_pitch_mm = 3.04 / 0.00571 ≈ 532
+        self.declare_parameter("camera_fx", 532.0)
+        self.declare_parameter("camera_fy", 532.0)
+        self.declare_parameter("camera_cx", 320.0)
+        self.declare_parameter("camera_cy", 240.0)
+
+        # Physical side-length of each ArUco marker in metres.
+        # Measure one printed marker with a ruler and set this.
+        self.declare_parameter("aruco_marker_size_m", 0.03)
+
+        self.camera_index    = self.get_parameter("camera_index").value
+        self.camera_device   = self.get_parameter("camera_device").value
+        self.fx              = self.get_parameter("camera_fx").value
+        self.fy              = self.get_parameter("camera_fy").value
+        self.cx              = self.get_parameter("camera_cx").value
+        self.cy              = self.get_parameter("camera_cy").value
+        self.marker_size_m   = self.get_parameter("aruco_marker_size_m").value
+
+        self.camera_matrix = np.array([[self.fx, 0,       self.cx],
+                                       [0,       self.fy, self.cy],
+                                       [0,       0,       1      ]], dtype=np.float64)
+        self.dist_coeffs   = np.zeros((4, 1))  # assume no lens distortion
+
         self.key_positions = load_key_positions("key_position.json")
 
-        # ArUco setup
-        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        self.aruco_dict      = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         self.detector_params = cv2.aruco.DetectorParameters()
 
-        # Reference frame state
         self.corner_tag_ids = {0, 1, 2, 3}
-        self.reference_origin = None
-        self.reference_depth = 0.2  # meters
 
-        # Rolling window of recent reference origins for stability estimation
-        # Each entry is a (x, y) pixel coordinate of the top-left tag centre
-        self.origin_history = deque(maxlen=self.STABILITY_WINDOW)
+        # Rolling window of keyboard-centre positions in camera frame (metres)
+        self.origin_history  = deque(maxlen=self.STABILITY_WINDOW)
+        self.reference_tvec  = None  # most recent 3-D keyboard centre (camera frame, metres)
 
-        # Once we lock a high-confidence pose, we stop publishing
-        self.pose_locked = False
+        self.pose_locked      = False
+        self.mission_complete = False
 
-        # Publisher — PoseWithCovarianceStamped so the coordinator can read
-        # confidence and tf2 can transform using the header frame_id
         self.pub_pose = self.create_publisher(
             PoseWithCovarianceStamped, '/key_location', 10)
 
-        # Hardcoded key for testing
-        self.hardcoded_key = "CMR"
+        self.create_subscription(String, '/coordinator_state', self._coordinator_state_cb, 10)
+        self._last_coordinator_state = ''
+
+        self.hardcoded_key     = "CMR"
+        self.current_key_index = 0
 
     # ------------------------------------------------------------------
-    # ArUco helpers
+
+    def _coordinator_state_cb(self, msg: String):
+        state = msg.data
+        if state == 'IDLE' and self._last_coordinator_state not in ('IDLE', ''):
+            self.pose_locked    = False
+            self.origin_history.clear()
+            self.reference_tvec = None
+            self.current_key_index += 1
+            if self.current_key_index >= len(self.hardcoded_key):
+                self.get_logger().info("All keys typed. Mission complete.")
+                self.mission_complete = True
+            else:
+                self.get_logger().info(
+                    f"Key typed. Next: '{self.hardcoded_key[self.current_key_index]}'"
+                )
+        self._last_coordinator_state = state
+
     # ------------------------------------------------------------------
 
-    def detect_aruco_tags(self, frame):
-        """Detect ArUco tags and return their IDs and corners."""
+    def detect_and_estimate(self, frame):
+        """
+        Detect ArUco tags and run pose estimation.
+        Returns (corners, ids, rvecs, tvecs) — all None on failure.
+        """
         corners, ids, _ = cv2.aruco.detectMarkers(
             frame, self.aruco_dict, parameters=self.detector_params)
-        if ids is not None:
-            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-        return corners, ids
+        if ids is None or len(ids) == 0:
+            return None, None, None, None
 
-    def initialize_reference_frame(self, corners, ids):
+        cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+
+        rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
+            corners, self.marker_size_m, self.camera_matrix, self.dist_coeffs)
+
+        return corners, ids, rvecs, tvecs
+
+    def update_reference_frame(self, ids, tvecs):
         """
-        Update the rolling window with the current keyboard center position,
-        computed from the 4 corner ArUco tags.
-        Returns True if all 4 corner tags were found this frame.
+        Average the tvecs of the 4 corner ArUco tags to get the keyboard
+        centre position in camera frame (real metres from ArUco pose estimation).
         """
         if ids is None:
             return False
 
         ids_flat = ids.flatten().tolist()
-
-        # Require all 4 corner tags
         if not self.corner_tag_ids.issubset(set(ids_flat)):
             return False
 
-        # Compute center of each corner tag, then average them
-        tag_centers = []
+        corner_tvecs = []
         for i, marker_id in enumerate(ids_flat):
             if marker_id in self.corner_tag_ids:
-                center = np.mean(corners[i].reshape(4, 2), axis=0)
-                tag_centers.append(center)
+                corner_tvecs.append(tvecs[i][0])  # shape (3,)
 
-        origin = np.mean(np.array(tag_centers), axis=0)
-
-        self.origin_history.append(origin)
-        self.reference_origin = origin
+        centre = np.mean(np.array(corner_tvecs), axis=0)  # (x, y, z) in metres
+        self.origin_history.append(centre)
+        self.reference_tvec = centre
         return True
 
     # ------------------------------------------------------------------
-    # Confidence estimation
-    # ------------------------------------------------------------------
 
     def compute_origin_variance(self):
-        """
-        Return (var_x, var_y) of the reference origin over the history window.
-        Returns large values if the window isn't full yet.
-        """
         if len(self.origin_history) < self.STABILITY_WINDOW:
-            # Not enough data — report high uncertainty
             return float('inf'), float('inf')
-
-        history = np.array(self.origin_history)   # shape (N, 2)
-        var_x = float(np.var(history[:, 0]))
-        var_y = float(np.var(history[:, 1]))
-        return var_x, var_y
+        history = np.array(self.origin_history)   # (N, 3)
+        return float(np.var(history[:, 0])), float(np.var(history[:, 1]))
 
     def is_confident(self, var_x, var_y):
         return max(var_x, var_y) < self.VARIANCE_THRESHOLD
 
     # ------------------------------------------------------------------
-    # Pose computation & publishing
-    # ------------------------------------------------------------------
 
     def compute_key_pose_stamped(self, key, var_x, var_y):
-        """
-        Build a PoseWithCovarianceStamped for the given key.
-        frame_id is set to 'camera_frame' so tf2 can transform it.
-        Diagonal covariance entries reflect measured pixel variance
-        (caller should convert to metres if needed; kept as pixels here
-        for simplicity — adjust to your calibration).
-        """
-        if self.reference_origin is None:
+        if self.reference_tvec is None:
             self.get_logger().error("Reference frame not initialised.")
             return None
-
         if key not in self.key_positions:
-            self.get_logger().error(f"Key '{key}' not found in key_positions.json.")
+            self.get_logger().error(f"Key '{key}' not in key_positions.json.")
             return None
 
-        rel_x = self.key_positions[key]["x"]
-        rel_y = self.key_positions[key]["y"]
+        # key_position.json is in centimetres; convert to metres
+        key_x_m = self.key_positions[key]["x"] * 0.01
+        key_y_m = self.key_positions[key]["y"] * 0.01
 
-        global_x = self.reference_origin[0] + rel_x
-        global_y = self.reference_origin[1] + rel_y
-        global_z = self.reference_depth
+        # Reference tvec is the keyboard centre in camera frame (metres).
+        # Key offsets are along camera X (right) and camera Y (down),
+        # which matches the key_position.json convention.
+        x = float(self.reference_tvec[0]) + key_x_m
+        y = float(self.reference_tvec[1]) + key_y_m
+        z = float(self.reference_tvec[2])
 
         msg = PoseWithCovarianceStamped()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "camera_frame"  # tf2 transforms FROM this frame
+        msg.header.stamp    = self.get_clock().now().to_msg()
+        msg.header.frame_id = "camera_frame"
 
-        msg.pose.pose.position.x = global_x
-        msg.pose.pose.position.y = global_y
-        msg.pose.pose.position.z = global_z
+        msg.pose.pose.position.x = x
+        msg.pose.pose.position.y = y
+        msg.pose.pose.position.z = z
 
         roll, pitch, yaw = 0.0, math.pi, 0.0
-        qx, qy, qz, qw = quat_from_rpy(roll, pitch, yaw)
+        qx, qy, qz, qw  = quat_from_rpy(roll, pitch, yaw)
         msg.pose.pose.orientation.x = qx
         msg.pose.pose.orientation.y = qy
         msg.pose.pose.orientation.z = qz
         msg.pose.pose.orientation.w = qw
 
-        # 6x6 covariance matrix (row-major: x, y, z, rx, ry, rz)
-        # We only populate the position diagonal; orientation left as zero.
-        msg.pose.covariance[0]  = var_x   # x variance
-        msg.pose.covariance[7]  = var_y   # y variance
-        msg.pose.covariance[14] = 0.0     # z variance — depth is fixed/known
+        msg.pose.covariance[0]  = var_x
+        msg.pose.covariance[7]  = var_y
+        msg.pose.covariance[14] = 0.0
 
         return msg
 
     def publish_key_pose(self, key):
-        """Publish pose with current confidence. Locks after threshold is met."""
         var_x, var_y = self.compute_origin_variance()
-        confident = self.is_confident(var_x, var_y)
-
         msg = self.compute_key_pose_stamped(key, var_x, var_y)
         if msg is None:
             return
-
         self.pub_pose.publish(msg)
-
-        if confident:
+        if self.is_confident(var_x, var_y):
             self.get_logger().info(
-                f"High-confidence pose published for '{key}' "
-                f"(var_x={var_x:.4f}, var_y={var_y:.4f}). Locking.")
+                f"High-confidence pose for '{key}' "
+                f"(var_x={var_x:.2e}, var_y={var_y:.2e}). Locking.")
             self.pose_locked = True
         else:
             self.get_logger().debug(
-                f"Low confidence for '{key}' "
-                f"(var_x={var_x:.4f}, var_y={var_y:.4f}). Still accumulating.")
+                f"Still accumulating for '{key}' "
+                f"(var_x={var_x:.2e}, var_y={var_y:.2e}).")
 
-    # ------------------------------------------------------------------
-    # Main loop
     # ------------------------------------------------------------------
 
     def get_camera_source(self):
         if self.camera_device:
             return str(self.camera_device)
-
         try:
             return int(self.camera_index)
         except (TypeError, ValueError):
-            self.get_logger().warn(
-                f"Invalid camera_index '{self.camera_index}', falling back to /dev/video0."
-            )
             return 0
 
     def run(self):
-        camera_source = self.get_camera_source()
-        camera_name = (
-            f"/dev/video{camera_source}"
-            if isinstance(camera_source, int)
-            else camera_source
-        )
-
-        self.get_logger().info(f"Opening camera {camera_name}")
-        cap = cv2.VideoCapture(camera_source, cv2.CAP_V4L2)
+        source = self.get_camera_source()
+        self.get_logger().info(f"Opening camera {source} at 640x480")
+        cap = cv2.VideoCapture(source, cv2.CAP_V4L2)
         if not cap.isOpened():
-            self.get_logger().error(f"Could not open camera {camera_name}.")
+            self.get_logger().error(f"Could not open camera {source}.")
             return
 
-        keys_to_type = self.hardcoded_key
-        current_index = 0
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
         try:
             while True:
@@ -252,25 +252,37 @@ class TypingMission(Node):
                 if not ret:
                     continue
 
-                corners, ids = self.detect_aruco_tags(frame)
-                self.initialize_reference_frame(corners, ids)
+                rclpy.spin_once(self, timeout_sec=0.0)
 
-                # Only publish if reference is initialised and pose not yet locked
-                if self.reference_origin is not None and not self.pose_locked:
-                    current_key = keys_to_type[current_index]
-                    self.publish_key_pose(current_key)
+                _, ids, rvecs, tvecs = self.detect_and_estimate(frame)
+                self.update_reference_frame(ids, tvecs)
 
-                # Overlay confidence info on the frame
+                if (self.reference_tvec is not None
+                        and not self.pose_locked
+                        and not self.mission_complete):
+                    self.publish_key_pose(self.hardcoded_key[self.current_key_index])
+
+                # Overlay
                 var_x, var_y = self.compute_origin_variance()
-                status = "LOCKED" if self.pose_locked else (
-                    "HIGH CONF" if self.is_confident(var_x, var_y) else "ACCUMULATING")
-                cv2.putText(frame, f"Status: {status}  var=({var_x:.2f},{var_y:.2f})",
-                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                if self.mission_complete:
+                    status = "DONE"
+                elif self.pose_locked:
+                    status = "LOCKED"
+                elif self.is_confident(var_x, var_y):
+                    status = "HIGH CONF"
+                else:
+                    status = "ACCUMULATING"
+                key_label = (self.hardcoded_key[self.current_key_index]
+                             if not self.mission_complete else '-')
+                cv2.putText(
+                    frame,
+                    f"Key: {key_label}  {status}  var=({var_x:.1e},{var_y:.1e})",
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2,
+                )
 
                 cv2.imshow("Camera Feed", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-
         finally:
             cap.release()
             cv2.destroyAllWindows()

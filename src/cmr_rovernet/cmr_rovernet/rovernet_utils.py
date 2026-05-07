@@ -192,6 +192,17 @@ def send_moteus_command_sync(
     # Block until done (or raise exception if error)
     return future.result()
 
+def query_moteus_sync(controller: moteus.Controller):
+    """
+    Synchronous wrapper for querying a moteus controller on the shared event loop.
+    """
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(controller.query(), _moteus_loop)
+    return future.result()
+
 def byte_command_converter(subteam, motor, position, drives_velocity, max_torque, max_vel, max_accel, ff_torque, logger):
     """
     Helper function to convert a given motor command into a 40-byte encoding. Current format, with 
@@ -366,4 +377,3 @@ def drive_distance(speed, distance, wheel_diameter, serial_port):
     time_in_minutes = distance / ((pi * wheel_diameter) * speed)
     set_speed_forward_timed(speed, time_in_minutes*60, serial_port)
     
-

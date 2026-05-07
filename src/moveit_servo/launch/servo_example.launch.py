@@ -34,8 +34,7 @@ def load_yaml(package_name, file_path):
 
 def generate_launch_description():
     moveit_config = (
-        MoveItConfigsBuilder("cmr_arm_simulator")
-        .robot_description(file_path="config/Arm.urdf.xacro")
+        MoveItConfigsBuilder("Arm", package_name="cmr_arm_simulator_moveit_config")
         .to_moveit_configs()
     )
 
@@ -90,12 +89,6 @@ def generate_launch_description():
         arguments=["main_arm_controller", "-c", "/controller_manager"],
     )
 
-    controller_remote = Node(
-        package="cmr_controller_remote",
-        executable="connect_node",
-        arguments=[],
-    )
-
     # Launch as much as possible in components
     container = ComposableNodeContainer(
         name="moveit_servo_demo_container",
@@ -127,16 +120,6 @@ def generate_launch_description():
                 name="static_tf2_broadcaster",
                 parameters=[{"child_frame_id": "/base_link", "frame_id": "/world"}],
             ),
-            ComposableNode(
-                package="moveit_servo",
-                plugin="moveit_servo::JoyToServoPub",
-                name="controller_to_servo_node",
-            ),
-            ComposableNode(
-                package="joy",
-                plugin="joy::Joy",
-                name="joy_node",
-            ),
         ],
         output="screen",
     )
@@ -161,7 +144,6 @@ def generate_launch_description():
             joint_state_broadcaster_spawner,
             panda_arm_controller_spawner,
             servo_node,
-            controller_remote,
             container,
         ]
     )

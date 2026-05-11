@@ -6,6 +6,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
 import time
 import serial
+import toml
 from cmr_rovernet.rovernet_utils import *
 
 MAX_TORQUE = 0.7
@@ -56,12 +57,20 @@ class JSInputSubscriber(Node):
         self.moveit_mode = 1
         # self.serial_port = None
         self.logger = self.get_logger()
+        self.declare_parameter("config_path", "")
+        node_config = self._load_node_config()
+        self.arm_can_port = str(node_config.get("can_port", "/dev/ttyACM1"))
+        self.arm_transport = moteus.Fdcanusb(self.arm_can_port)
         self.controllers = {
-            joint_name: moteus.Controller(id=motor_id)
+            joint_name: moteus.Controller(
+                id=motor_id,
+                transport=self.arm_transport,
+            )
             for joint_name, motor_id in JOINT_MOTOR_IDS.items()
         }
         self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
         self.joint_state_timer = self.create_timer(0.1, self.publish_joint_states)
+        self.get_logger().info(f"Arm moteus fdcanusb transport: {self.arm_can_port}")
         
         # Init constants given TOML file
         # arm_controller_table = parse_toml("TODO")
@@ -73,6 +82,23 @@ class JSInputSubscriber(Node):
         # self.GRADUAL_INCREASE_RATE = arm_net_node['gradual_increase_rate']
         # self.BASE_DYNAMIC_RATIO = arm_net_node['base_dynamic_ratio']
         
+    def _load_node_config(self):
+        config_path = str(self.get_parameter("config_path").value)
+        if not config_path:
+            return {}
+
+        try:
+            data = toml.load(config_path)
+        except Exception as exc:
+            self.get_logger().warn(f"Failed to load config_path {config_path}: {exc!r}")
+            return {}
+
+        node_config = data.get("node", {})
+        if not isinstance(node_config, dict):
+            self.get_logger().warn(f"config_path {config_path} has no valid [node] table")
+            return {}
+        return node_config
+
 
     def convert_angle_to_custom_range(self, angle, max_range):
         """
@@ -250,19 +276,12 @@ class JSInputSubscriber(Node):
             # send_number(self.serial_port, wrist_tilt)
             # send_number(self.serial_port, wrist_rotate_2)
 
-            base = moteus.Controller(id=9)
-            shoulder = moteus.Controller(id=10)
-            elbow = moteus.Controller(id=11)
-            wrist_rotate_1 = moteus.Controller(id=12)
-            wrist_tilt = moteus.Controller(id=13)
-            wrist_rotate_2 = moteus.Controller(id=14)
-
-            send_moteus_command_sync(controller=base, motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=shoulder, motor=10, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=elbow, motor=11, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=wrist_rotate_1, motor=12, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=wrist_tilt, motor=13, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=wrist_rotate_2, motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=self.controllers["base_joint"], motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=self.controllers["shoulder_joint"], motor=10, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=self.controllers["elbow_joint"], motor=11, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=self.controllers["wrist_rotate"], motor=12, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=self.controllers["wrist_twist"], motor=13, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            send_moteus_command_sync(controller=self.controllers["wrist_rotate_two"], motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
 
 
 

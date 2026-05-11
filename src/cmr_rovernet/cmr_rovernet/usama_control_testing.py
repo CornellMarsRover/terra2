@@ -48,6 +48,7 @@ STEER_CENTER_OFFSETS = {
 }
 
 BTN_L1 = 0
+BTN_R1 = 1
 BTN_L2 = 2
 BTN_R2 = 3
 BTN_TRIANGLE = 7
@@ -60,6 +61,10 @@ LEGACY_TRIANGLE = 16777216
 STICK_RANGE = 2.5
 TRIGGER_DEADBAND = 5
 TRIGGER_MAX = 255
+TRIGGER_PRESSED_THRESHOLD = 32
+HALF_SPEED_MULTIPLIER = 0.5
+DOUBLE_SPEED_MULTIPLIER = 2.0
+TRIPLE_SPEED_MULTIPLIER = 3.0
 
 ROVER_LENGTH = 39.0
 ROVER_WIDTH = 39.0
@@ -213,6 +218,10 @@ class UsamaControlRosNode(Node):
         self.declare_parameter("can_port", "/dev/ttyACM0")
         self.declare_parameter("timeout_s", 0.30)
         self.declare_parameter("drive_rps", 4.0)
+        self.declare_parameter("half_speed_multiplier", HALF_SPEED_MULTIPLIER)
+        self.declare_parameter("double_speed_multiplier", DOUBLE_SPEED_MULTIPLIER)
+        self.declare_parameter("triple_speed_multiplier", TRIPLE_SPEED_MULTIPLIER)
+        self.declare_parameter("trigger_pressed_threshold", TRIGGER_PRESSED_THRESHOLD)
         self.declare_parameter("drive_max_torque", 2.0)
         self.declare_parameter("steer_max_torque", 3.0)
         self.declare_parameter("steer_velocity_limit", 6.0)
@@ -227,6 +236,18 @@ class UsamaControlRosNode(Node):
         self.port = str(self._setting("can_port", config))
         self.timeout_s = float(self._setting("timeout_s", config))
         self.drive_rps = abs(float(self._setting("drive_rps", config)))
+        self.half_speed_multiplier = abs(
+            float(self._setting("half_speed_multiplier", config))
+        )
+        self.double_speed_multiplier = abs(
+            float(self._setting("double_speed_multiplier", config))
+        )
+        self.triple_speed_multiplier = abs(
+            float(self._setting("triple_speed_multiplier", config))
+        )
+        self.trigger_pressed_threshold = int(
+            self._setting("trigger_pressed_threshold", config)
+        )
         self.drive_max_torque = abs(float(self._setting("drive_max_torque", config)))
         self.steer_max_torque = abs(float(self._setting("steer_max_torque", config)))
         self.steer_velocity_limit = abs(
@@ -285,7 +306,10 @@ class UsamaControlRosNode(Node):
         self.get_logger().info(
             f"Using direct moteus command behavior on {self.port}: "
             f"drive_rps={self.drive_rps:.2f}, drive_torque={self.drive_max_torque:.2f}, "
-            f"steer_torque={self.steer_max_torque:.2f}"
+            f"steer_torque={self.steer_max_torque:.2f}, "
+            f"half={self.half_speed_multiplier:.2f}x, "
+            f"double={self.double_speed_multiplier:.2f}x, "
+            f"triple={self.triple_speed_multiplier:.2f}x"
         )
 
     def _load_node_config(self) -> dict[str, object]:
@@ -354,6 +378,7 @@ class UsamaControlRosNode(Node):
             return
 
         l1 = decoded["l1"]
+        r1 = decoded["r1"]
         triangle = decoded["triangle"]
         l2 = decoded["l2"]
         r2 = decoded["r2"]
@@ -376,20 +401,14 @@ class UsamaControlRosNode(Node):
                 self._manual.updated_at = time.time()
                 return
 
-            forward_rps = self._trigger_to_speed_scale(r2) * self.drive_rps
-            reverse_rps = self._trigger_to_speed_scale(l2) * self.drive_rps
-            if forward_rps > 0.0:
-                speed_rps = forward_rps
-            elif reverse_rps > 0.0:
-                speed_rps = -reverse_rps
-            else:
-                speed_rps = 0.0
+            speed_rps = self._manual_speed_rps(l1=l1, r1=r1, l2=l2, r2=r2)
 
             self._manual.speed_rps = speed_rps
             self._manual.updated_at = time.time()
 
         self.get_logger().info(
-            f"controller buttons L2={l2} R2={r2} speed_rps={speed_rps:+.3f}",
+            f"controller buttons L1={l1} R1={r1} L2={l2} R2={r2} "
+            f"speed_rps={speed_rps:+.3f}",
             throttle_duration_sec=1.0,
         )
 
@@ -558,6 +577,7 @@ class UsamaControlRosNode(Node):
             return {
                 "format": "expanded",
                 "l1": int(buttons[BTN_L1]),
+                "r1": int(buttons[BTN_R1]),
                 "triangle": int(buttons[BTN_TRIANGLE]),
                 "l2": int(buttons[BTN_L2]),
                 "r2": int(buttons[BTN_R2]),
@@ -571,6 +591,7 @@ class UsamaControlRosNode(Node):
                 "trigger_val": trigger_val,
                 "button_val": button_val,
                 "l1": int(trigger_val == LEGACY_L1),
+                "r1": 0,
                 "triangle": int(button_val == LEGACY_TRIANGLE),
                 "l2": UsamaControlRosNode._legacy_l2_value(trigger_val),
                 "r2": UsamaControlRosNode._legacy_r2_value(trigger_val),
@@ -601,14 +622,20 @@ class UsamaControlRosNode(Node):
             )
         return 0
 
-    @staticmethod
-    def _trigger_to_speed_scale(trigger_byte: int) -> float:
+    def _trigger_pressed(self, trigger_byte: int) -> bool:
         value = int(trigger_byte)
-        if value < TRIGGER_DEADBAND:
-            return 0.0
-        if value > TRIGGER_MAX:
-            value = TRIGGER_MAX
-        return value / TRIGGER_MAX
+        return value >= max(TRIGGER_DEADBAND, self.trigger_pressed_threshold)
+
+    def _manual_speed_rps(self, *, l1: int, r1: int, l2: int, r2: int) -> float:
+        if bool(l1):
+            return self.drive_rps * self.triple_speed_multiplier
+        if bool(r1):
+            return self.drive_rps * self.double_speed_multiplier
+        if self._trigger_pressed(r2):
+            return self.drive_rps
+        if self._trigger_pressed(l2):
+            return self.drive_rps * self.half_speed_multiplier
+        return 0.0
 
     @staticmethod
     def _apply_deadzone(value: float, deadzone: float) -> float:

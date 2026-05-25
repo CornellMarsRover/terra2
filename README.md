@@ -70,9 +70,13 @@ One-time setup:
 colcon build --symlink-install --packages-select cmr_msgs urc_mock_rover
 ```
 
-> Camera feeds are not part of `urc_mock_rover`; that work lives on a
-> separate branch and will merge in later. The Foxglove layout in
-> Phase 2a does not include camera panels.
+> Camera *publishers* are not part of `urc_mock_rover`; the actual ROS
+> image publishers live in `src/cmr_cams/` and the rover-side `zed_wrapper`
+> launch. The Foxglove **layouts** do reference camera topics (auger cam,
+> analysis cam, ZED) via the built-in Image panel, so against the mock
+> the Image panels render but show "no messages on topic" — that's
+> expected. See [`docs/current_state.md`](./docs/current_state.md)
+> ("Bringing up cameras") for the rover-side sequence.
 
 Then, each dev session:
 
@@ -85,8 +89,13 @@ That single command starts the mock rover plus the Foxglove bridge on
 `ws://localhost:8765`. In Foxglove Studio:
 
 1. **Open Connection** → `ws://localhost:8765`.
-2. **Layouts → Import from file** →
-   [`gcs/layouts/urc_astrotech_dashboard.json`](./gcs/layouts/urc_astrotech_dashboard.json).
+2. **Layouts → Import from file** — import both:
+   - [`gcs/layouts/urc_astrotech_auger.json`](./gcs/layouts/urc_astrotech_auger.json)
+     (drilling-side loadout: auger control + mixing servo + auger cam +
+     ZED).
+   - [`gcs/layouts/urc_astrotech_analysis.json`](./gcs/layouts/urc_astrotech_analysis.json)
+     (lab-work loadout: analysis sequence + Raman + analysis cam + CO₂
+     plot).
 3. (First time only) install the custom panels extension:
 
 ```bash

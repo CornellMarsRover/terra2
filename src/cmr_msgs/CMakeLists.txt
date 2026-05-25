@@ -41,7 +41,7 @@ rosidl_generate_interfaces(
   srv/ReleaseDependency.srv
   srv/NotifyDeactivate.srv
   srv/SiteAnalyze.srv
-  srv/SetMixingServoPreset.srv
+  srv/SetMixingServoAngle.srv
   action/TestTargetPosition.action
   action/RunAnalysisSequence.action
   DEPENDENCIES

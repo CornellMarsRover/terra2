@@ -27,14 +27,32 @@ auger:
   state_rate_hz: 20
 
 mixing_servo:
-  # TODO(astrotech-q-2): controller family unknown; preset names are labels
-  # only. Mock stores the last preset as state.
-  set_preset_service: /astrotech/mixing_servo/set_preset
-  set_preset_type: cmr_msgs/SetMixingServoPreset
+  # CMR servo board on the same fdcanusb as the auger moteus stack
+  # (can_id=26, servo_id=15). Two services drive it from the GCS:
+  #   - set_angle: drive to a specific angle (deg, offset from home)
+  #   - set_home:  declare the current physical position to be 0 deg
+  # The Foxglove panel persists the three site offsets locally and calls
+  # set_angle with whichever value is in the box for that button. See
+  # docs/mixing_servo_bringup_handoff.md for the bench history.
+  set_angle_service: /astrotech/mixing_servo/set_angle
+  set_angle_type: cmr_msgs/SetMixingServoAngle
+  set_home_service: /astrotech/mixing_servo/set_home
+  set_home_type: std_srvs/Trigger
   state_topic: /astrotech/mixing_servo/state
-  state_type: std_msgs/String
+  state_type: std_msgs/Int32
   state_rate_hz: 5
-  presets: [S1, S2, CO2_1, CO2_2, RETRACT]
+  # Real-driver config (only consulted when URC_MIXING_SERVO_REAL=1).
+  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
+  real_can_id: 26
+  real_servo_id: 15
+  real_bitrate: 1000000
+  # After sending a goto frame, the real driver sleeps move_settle_s
+  # before returning success. Closing the port (or returning before the
+  # chamber arrives) on this firmware can race the mechanical move and
+  # leave it stopped mid-travel -- same race scripts/mixing_servo_min.py
+  # works around with --hold-s. 5 s is enough for a full-range swing on
+  # the bench rig (2026-05-08); raise if larger envelopes are needed.
+  move_settle_s: 5.0
 
 analysis:
   # TODO(astrotech-q-3): step set is unknown; mock generates generic names.
@@ -67,6 +85,9 @@ env:
   type: cmr_msgs/EnvSample
   rate_hz: 1.0
 
-# Camera feeds intentionally absent — handled on a separate branch and
-# merged in later. Foxglove uses its built-in Image panel for whichever
-# topics that branch exposes.
+# Camera feeds aren't published by the mock — the cmr_cv camera nodes
+# launched by src/cmr_cams/launch/default.launch.py (rover-side) own
+# /camN/image_raw, and the stereolabs zed_wrapper owns the ZED topics.
+# See docs/operator_guide.md for the four-terminal bring-up procedure.
+# Foxglove uses its built-in Image panel; the layouts pre-fill the
+# topic IDs (/cam11, /cam12, /zed/zed_node/left/image_rect_color).

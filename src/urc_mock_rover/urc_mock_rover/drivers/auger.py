@@ -11,16 +11,15 @@ This mock keeps a small kinematic model: integrate commanded velocity
 let temperature drift up while motors are active. Watchdog: zero
 both velocities if no command for 200 ms.
 
-TODO(phase-2b-moteus): the real driver replaces this state
-integration with ``transport.cycle([lead_screw.make_position(...),
-auger.make_position(...)])`` at 50 Hz and reads back the resulting
-``moteus.Result`` per controller into the same ``AugerState`` shape.
-The translation is line-for-line: every field of ``AugerState``
-already maps to a moteus result register.
+The real-hardware path lives in :mod:`urc_mock_rover.drivers.auger_real`
+and is selected via the ``URC_AUGER_REAL`` env var in
+:mod:`urc_mock_rover.mock_rover_node`. Mock remains the default so devs
+without an fdcanusb / rover hardware can still launch.
 
-TODO(astrotech-q-fault-codes): the real moteus mode/fault enums
-should be mirrored here once we wrap the moteus library — for now
-both fields are hardcoded 0 (operational, no fault).
+TODO(astrotech-q-fault-codes): the real moteus mode/fault values are
+already plumbed through ``RealAugerDriver``; the *mock* still hardcodes
+both fields to 0. If we want the mock to exercise GCS fault rendering
+we should add a debug knob here later.
 """
 
 from __future__ import annotations

@@ -20,7 +20,7 @@ scripts.
 | `FdCanInterface` | `__init__(port, baud=115200, timeout=1.0)` | Owns the serial port. `port` defaults to `"COM16"`; on Linux it is `/dev/ttyACM*`. `timeout` is stored and never used. |
 | | `async open()` | Opens port, sleeps 1 s (boot drain), clears buffer. |
 | | `async close()` | Closes the writer. |
-| | `async configure_bus()` | Six bring-up `conf set` commands. **`fdcan_frame off`** — frames go out as classical CAN with bit-rate switching, not FD frame format. Bitrate 500 kbit/s. |
+| | `async configure_bus()` | Six bring-up `conf set` commands. **`fdcan_frame off`** — frames go out as classical CAN with bit-rate switching, not FD frame format. Library hardcodes **500 kbit/s**, but the actual Astrotech rig (verified 2026-05-08 bench bring-up) runs at **1 Mbit/s** — pass `--bitrate 1000000` to `scripts/mixing_servo_jog.py` / `--bitrate 1000000` to `scripts/mixing_servo_min.py`, and any future Phase 2b ROS driver must override this. |
 | | `async write_frame(std_id, data_hex, flags="FB")` | Fire-and-forget transmit. Drain timeout (1 s) is logged via `print` but not raised. No verification the dongle accepted the frame. |
 | | `async read_loop()` | Infinite — prints any `rcv` lines. Debug only. |
 | | `async request_response(std_id, payload, flags, timeout)` | Sends a 7-byte payload prefixed with an 8-bit sequence; waits for a frame on the same id whose first byte matches. **Currently unused** by `BDCController` / `ServoController`. |
@@ -105,6 +105,32 @@ exposes real closed-loop telemetry — see Session 5 in
 The Phase 2b ROS driver wrapper has to add: timeout guards on
 `_send_command`, an unsolicited-frame consumer (parse `rcv` lines),
 and graceful detection of a disconnected dongle.
+
+## Bench-discovered gotchas (2026-05-08)
+
+These are not in Caitlin's library or this doc as originally written.
+Confirmed on the bench against the real Astrotech rig.
+
+1. **Bus bitrate is 1 Mbit/s, not 500 kbit/s.** The library's
+   `configure_bus()` hardcodes `conf set can.bitrate 500000`. At that
+   rate the rig boards see only off-baud noise; nothing moves. The
+   Phase 2b driver must set 1 Mbit/s; both bench scripts default to it.
+2. **`clear_faults=1` must be set on every goto frame** (or on a
+   session-start clear-faults frame) **until a Phase 2b driver maintains
+   a single long-lived bus session**. Empirical observation: after any
+   other traffic on the same fdcanusb (moteus auger commands, prior
+   `can off`/`can on` cycles, prior session that ended with our
+   "stop" frame), the servo board ACKs `go_to_position` on the bus but
+   ignores it mechanically. Setting bit 7 of byte 3 (`clear_faults`)
+   in the frame unsticks the rig. `ServoController.go_to_position()`
+   does **not** set this bit, so wrappers must build the frame via
+   `_make_control_frame(control_mode=0, control_data=N, clear_faults=1)`
+   instead of calling `go_to_position()` directly. Both bench scripts
+   do this; copy the pattern into the Phase 2b driver.
+3. **Bench rig is at `(can_id=26, servo_id=15)`**, not the library's
+   defaults of `can_id=1, servo_id=0`. The user's vendored
+   `servo_min.py` (pasted into chat 2026-05-08) is the source of
+   truth; both bench scripts default to these values.
 
 ## Open questions for Caitlin
 

@@ -84,16 +84,26 @@ else
     fail "/astrotech/raman/spectrum rate ${RAMAN_RATE} Hz <= 0.5"
 fi
 
-# --- Step 5: service call returns success on a valid preset ---
-log "calling /astrotech/mixing_servo/set_preset with preset_name=S1"
-SVC_OUT="$(ros2 service call /astrotech/mixing_servo/set_preset \
-    cmr_msgs/srv/SetMixingServoPreset \
-    '{preset_name: S1}' 2>&1)"
+# --- Step 5: service call returns success on a valid angle ---
+log "calling /astrotech/mixing_servo/set_angle with angle_deg=110"
+SVC_OUT="$(ros2 service call /astrotech/mixing_servo/set_angle \
+    cmr_msgs/srv/SetMixingServoAngle \
+    '{angle_deg: 110}' 2>&1)"
 echo "${SVC_OUT}"
 if ! grep -q 'success=True' <<<"${SVC_OUT}"; then
-    fail "service did not return success=True"
+    fail "set_angle did not return success=True"
 fi
-log "  ok: service returned success"
+log "  ok: set_angle returned success"
+
+log "calling /astrotech/mixing_servo/set_home"
+SVC_OUT="$(ros2 service call /astrotech/mixing_servo/set_home \
+    std_srvs/srv/Trigger \
+    '{}' 2>&1)"
+echo "${SVC_OUT}"
+if ! grep -q 'success=True' <<<"${SVC_OUT}"; then
+    fail "set_home did not return success=True"
+fi
+log "  ok: set_home returned success"
 
 # --- All checks passed ---
 log "all checks passed; exiting 0"

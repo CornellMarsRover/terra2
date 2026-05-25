@@ -1,10 +1,12 @@
 # Astrotech Subteam Interview Notes
 
 Running log of questions asked to the Astrotech subteam and their
-answers. Source of truth for what the GCS and mock rover are being
-built against. If it isn't written here, it wasn't agreed.
+answers. Historical record of what was agreed and when. For the live
+"where we are now" snapshot, read `current_state.md`.
 
-Last updated: 2026-04-26
+Last updated: 2026-05-08 (mixing-servo bench bring-up closed Q2 —
+CMR servo board on the fdcanusb at can_id=26, servo_id=15, 1 Mbit/s;
+the open Caitlin questions below are now scoped to BDC pumps + heater).
 
 ---
 
@@ -24,8 +26,14 @@ Last updated: 2026-04-26
   stack on Caitlin's library exposes no feedback (commanded-only);
   the auger is on moteus and has full closed-loop telemetry — see
   Session 5.
-- **Cameras are off this branch.** Camera feed work happens on a
-  separate branch that will merge in later.
+- **Cameras are wired** via `src/cmr_cams/` (in-repo launch +
+  lifecycle configs) plus the rover-installed `cmr_cv.camera_node` and
+  stereolabs `zed_wrapper`. Layouts subscribe to
+  `/camN/image_raw` and `/zed/zed_node/left/image_rect_color`. See
+  [`operator_guide.md`](operator_guide.md) for the four-terminal
+  rover bring-up. _(Historical note: this was originally scoped onto a
+  separate branch; that turned out to be wrong — the orchestration was
+  already in this repo.)_
 - **Hardware**: custom **BDC boards** (BDC motors / pumps) and
   **Servo boards** (hobby servos / mixing chamber) on a CAN-FD bus
   via an mjbots `usbcanfd` USB-CAN dongle. Library at
@@ -71,9 +79,9 @@ moved to moteus per Session 5 and has its own questions below):
 **Pending — confirm against URC 2026 rulebook** (only blocks competition
 freeze, not development):
 
-- URC 2026 RF bandwidth cap. `docs/bandwidth_audit.md` uses a 5 Mbps
-  working assumption from prior years. Confirm before we lock the
-  Foxglove topic whitelist.
+- URC 2026 RF bandwidth cap. Working assumption from prior years is
+  **5 Mbps** ingress sustained; confirm before we lock the Foxglove
+  topic whitelist.
 
 **Phase status**: Phase 2a snapshot at `eef937c`; revision pass at
 `6bd8fcf` (dropped pause/resume, removed cameras); auger pass (this

@@ -1,66 +1,84 @@
 """Mock mixing-servo driver.
 
-Advertises the preset-set service, keeps last preset as state, and
-re-publishes it on a low-rate timer so the GCS always sees a current value.
+Same service surface as the real driver (`mixing_servo_real.py`):
+  * `/astrotech/mixing_servo/set_angle` -- drive to an absolute angle in
+    degrees (offset from the most recently set home).
+  * `/astrotech/mixing_servo/set_home` -- declare the current position to
+    be 0 deg. (`std_srvs/Trigger`; no fields.)
+  * `/astrotech/mixing_servo/state` -- last commanded angle, deg, 5 Hz.
 
-TODO(astrotech-q-2): controller family is not yet known. Mock holds state
-in a Python string and does nothing else; swap this class when the real
-driver is chosen.
+Mock just keeps the last commanded angle in memory and republishes it.
+Useful for panel/wiring development without hardware.
 """
 
 from __future__ import annotations
 
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import Int32
+from std_srvs.srv import Trigger
 
-from cmr_msgs.srv import SetMixingServoPreset
+from cmr_msgs.srv import SetMixingServoAngle
 
 
 class MockMixingServoDriver:
-    """Service server + state publisher for the mixing servo."""
-
     def __init__(self, node: Node, cfg: dict) -> None:
         self._node = node
-        self._presets = list(cfg["presets"])
-        self._current = "RETRACT" if "RETRACT" in self._presets else self._presets[0]
+        self._current_deg = 0
 
-        self._srv = node.create_service(
-            SetMixingServoPreset,
-            cfg["set_preset_service"],
-            self._on_set_preset,
+        self._set_angle_srv = node.create_service(
+            SetMixingServoAngle,
+            cfg["set_angle_service"],
+            self._on_set_angle,
+        )
+        self._set_home_srv = node.create_service(
+            Trigger,
+            cfg["set_home_service"],
+            self._on_set_home,
         )
         self._state_pub = node.create_publisher(
-            String, cfg["state_topic"], 10
+            Int32, cfg["state_topic"], 10
         )
         rate_hz = float(cfg["state_rate_hz"])
         self._state_timer = node.create_timer(1.0 / rate_hz, self._tick)
 
         node.get_logger().info(
-            f"MockMixingServoDriver up: service={cfg['set_preset_service']} "
-            f"presets={self._presets}"
+            f"MockMixingServoDriver up: "
+            f"set_angle={cfg['set_angle_service']} "
+            f"set_home={cfg['set_home_service']}"
         )
 
-    def _on_set_preset(
+    def _on_set_angle(
         self,
-        request: SetMixingServoPreset.Request,
-        response: SetMixingServoPreset.Response,
-    ) -> SetMixingServoPreset.Response:
-        name = request.preset_name
-        if name not in self._presets:
+        request: SetMixingServoAngle.Request,
+        response: SetMixingServoAngle.Response,
+    ) -> SetMixingServoAngle.Response:
+        deg = int(request.angle_deg)
+        if not 0 <= deg <= 4095:
             response.success = False
             response.message = (
-                f"unknown preset {name!r}; valid: {self._presets}"
+                f"angle_deg out of 12-bit wire range 0..4095: {deg}"
             )
             self._node.get_logger().warn(response.message)
             return response
-
-        self._current = name
+        self._current_deg = deg
         response.success = True
-        response.message = f"set to {name}"
+        response.message = f"mock: angle = {deg} deg"
+        self._node.get_logger().info(response.message)
+        return response
+
+    def _on_set_home(
+        self,
+        request: Trigger.Request,
+        response: Trigger.Response,
+    ) -> Trigger.Response:
+        del request  # std_srvs/Trigger has no fields
+        self._current_deg = 0
+        response.success = True
+        response.message = "mock: set_home(0) -- current is now 0 deg"
         self._node.get_logger().info(response.message)
         return response
 
     def _tick(self) -> None:
-        msg = String()
-        msg.data = self._current
+        msg = Int32()
+        msg.data = int(self._current_deg)
         self._state_pub.publish(msg)

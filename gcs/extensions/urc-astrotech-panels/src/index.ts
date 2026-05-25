@@ -5,31 +5,29 @@ import { initAugerControlPanel } from "./panels/AugerControl";
 import { initMixingServoPanel } from "./panels/MixingServo";
 import { initRamanSpectrumPanel } from "./panels/RamanSpectrum";
 
-// Foxglove stores panels in its registry under the key
-//   `${qualifiedName}.${panel.name}`
-// where, for *locally-installed* extensions (anything installed via
-// `foxglove-extension install`, including this one during dev),
-// `qualifiedName` resolves to the package.json `displayName` field
-// VERBATIM — spaces and all. Verified in the Foxglove 2.39 renderer:
+// Foxglove stores panel types as `${extensionId}.${panel.name}`.
 //
-//   function he(r, e) {
-//     switch (r) {
-//       case "local": return e.displayName;
-//       case "org":   return [r, qW(e), e.name].join(":");
-//     }
-//   }
+// For locally-installed extensions (`foxglove-extension install`), the
+// extension id is **`publisher` + `.` + `name`**, both normalized: lowercased,
+// and the publisher has all non-alphanumeric characters stripped. This
+// matches `getPackageId()` in create-foxglove-extension (and the on-disk
+// folder name, minus the `-<version>` suffix).
 //
-// So with displayName = "URC Astrotech Panels", the four panel-type IDs
-// that gcs/layouts/urc_astrotech_dashboard.json must use are:
-//   "URC Astrotech Panels.urc.auger_control"
-//   "URC Astrotech Panels.urc.analysis_sequence"
-//   "URC Astrotech Panels.urc.mixing_servo"
-//   "URC Astrotech Panels.urc.raman_spectrum"
+// With `publisher: "cornell-mars-rover"` and `name: "urc-astrotech-panels"`:
+//   extensionId === "cornellmarsrover.urc-astrotech-panels"
 //
-// Note: if/when we publish this as a Foxglove org extension instead of
-// loading locally, the prefix changes to "org:<publisher>:<name>" and
-// the layout will need updating in lockstep. (The `org:` form has no
-// spaces, which is one reason to prefer it for distribution.)
+// The four panel-type IDs that gcs/layouts/urc_astrotech_{auger,analysis}.json
+// must use are therefore:
+//   "cornellmarsrover.urc-astrotech-panels.urc.auger_control"
+//   "cornellmarsrover.urc-astrotech-panels.urc.analysis_sequence"
+//   "cornellmarsrover.urc-astrotech-panels.urc.mixing_servo"
+//   "cornellmarsrover.urc-astrotech-panels.urc.raman_spectrum"
+//
+// (`displayName` is human-facing UI only — do not use it in layout JSON.)
+//
+// If this extension is ever loaded from the Foxglove registry instead of
+// `local-install`, the prefix may become `org:<publisher>:<name>` instead;
+// update layouts in lockstep.
 export function activate(extensionContext: ExtensionContext): void {
   extensionContext.registerPanel({
     name: "urc.auger_control",

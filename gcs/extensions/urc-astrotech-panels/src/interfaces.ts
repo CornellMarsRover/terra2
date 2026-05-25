@@ -27,14 +27,22 @@ export const Auger = {
   },
 } as const;
 
-// TODO(astrotech-q-2): mixing servo controller family is unknown. Service
-// contract below is the assumption.
+// CMR servo board on the fdcanusb (can_id=26, servo_id=15). Two services:
+//   - setAngle: drive to N° (offset from the most recently set home).
+//   - setHome:  declare current physical position to be 0°.
+// State topic carries the last commanded angle (Int32). The panel keeps
+// the three site offsets in its own saved state and calls setAngle with
+// whichever value is in the editor for the button that was clicked.
+// See docs/mixing_servo_bringup_handoff.md for the bench history.
 export const MixingServo = {
-  setPresetService: "/astrotech/mixing_servo/set_preset",
-  setPresetType: "cmr_msgs/SetMixingServoPreset",
+  setAngleService: "/astrotech/mixing_servo/set_angle",
+  setAngleType: "cmr_msgs/SetMixingServoAngle",
+  setAngleSchemaName: "cmr_msgs/srv/SetMixingServoAngle",
+  setHomeService: "/astrotech/mixing_servo/set_home",
+  setHomeType: "std_srvs/Trigger",
+  setHomeSchemaName: "std_srvs/srv/Trigger",
   stateTopic: "/astrotech/mixing_servo/state",
-  stateType: "std_msgs/String",
-  presets: ["S1", "S2", "CO2_1", "CO2_2", "RETRACT"] as const,
+  stateType: "std_msgs/Int32",
 } as const;
 
 // TODO(astrotech-q-3), TODO(astrotech-q-4): two action servers, one per
@@ -61,8 +69,8 @@ export const Env = {
   type: "cmr_msgs/EnvSample",
 } as const;
 
-// Camera feeds: handled on a separate branch and merged in later.
-// Foxglove uses its built-in Image panel for whichever topics that
-// branch exposes; the extension does not own a camera registry today.
-
-export type MixingServoPreset = (typeof MixingServo.presets)[number];
+// Camera feeds: launched rover-side via src/cmr_cams/ (cmr_cv camera
+// nodes for /camN/image_raw + stereolabs zed_wrapper for /zed/...).
+// Foxglove uses its built-in Image panel referencing those topics
+// directly from the layout JSONs; the extension does not own a camera
+// registry. See docs/operator_guide.md for the four-terminal bring-up.

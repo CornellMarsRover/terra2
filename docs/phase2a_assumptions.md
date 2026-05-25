@@ -15,25 +15,28 @@ verification audit; keep them stable even when questions get answered.
 
 | Q | Question | Current answer | Status |
 |---|---|---|---|
-| Q1 | Auger controller: moteus or Maxon? | **moteus** (team confirmed) | ANSWERED, but interface type still an assumption (see below) |
-| Q2 | Mixing servo controller family? | unknown | OPEN |
-| Q3 | BDC (analysis sequence) controller? | unknown | OPEN |
+| Q1 | Auger controller: moteus or Maxon? | **moteus** (team confirmed). Interface shape now follows the moteus closed-loop telemetry surface. | ANSWERED |
+| Q2 | Mixing servo controller family? | **CMR servo board** on the same fdcanusb as the auger moteus stack (can_id=26, servo_id=15, 1 Mbit/s). Confirmed at bench bring-up 2026-05-08. | ANSWERED |
+| Q3 | Real analysis-sequence step set + per-step durations? | placeholder: 5 generic steps × 2 s | OPEN — Caitlin |
 | Q4 | What does `site_num` / `sequence_id` mean? | placeholder: 1 / 2 are the two sequences | OPEN — Slack to astrotech |
 | Q5 | Does a Raman driver already exist elsewhere? | unknown | OPEN |
 | Q6 | Does a CO2/humidity driver already exist elsewhere? | unknown | OPEN |
 | Q7 | Snapshot naming / storage / retention? | out of scope for Phase 2a | DEFERRED |
 | Q8 | URC 2026 RF bandwidth cap? | 5 Mbps working assumption | DEFERRED |
-| Q9 | USB `/dev/videoN` → logical camera mapping? | (camera work moved to a separate branch; not represented in Phase 2a) | DEFERRED |
-| Q10 | H.264 vs CompressedImage for cameras? | **H.264** (team confirmed by using existing pipeline) | ANSWERED |
+| Q9 | USB `/dev/videoN` → logical camera mapping? | Plug-order dependent on the rover. Layouts assume cam11=auger, cam12=analysis; operator verifies with `v4l2-ctl --list-devices` per the four-terminal bring-up in [`operator_guide.md`](operator_guide.md), and edits `cameraTopic` from the Image panel if a slot is wrong. | OPERATOR-SIDE |
+| Q10 | H.264 vs raw `Image` for cameras? | **Raw `sensor_msgs/Image`** on `/camN/image_raw` (from `cmr_cv.camera_node` via [`src/cmr_cams/`](../src/cmr_cams/)) is what the canonical bring-up exposes. The H.264 path in [`src/usb_camera_publisher/`](../src/usb_camera_publisher/) exists but is **not** what `cmr_cams default.launch.py` starts. | ANSWERED |
 | Q11 | Fabric-manage the foxglove bridge? | no — plain `launch_ros.Node` | ANSWERED |
-| Q12 | External cam packages (`cmr_cv`, etc.) | not needed for mock rover | DEFERRED |
+| Q12 | External cam packages (`cmr_cv`, etc.) | `cmr_cv.camera_node` is rover-installed, not in this repo. The orchestration ([`src/cmr_cams/`](../src/cmr_cams/) configs + launch) **is** here; the bring-up procedure runs on the rover Jetson. | EXTERNAL |
 | Q13 | Expose per-cam bitrate/fps as params? | out of scope for Phase 2a | DEFERRED |
 
 ## Namespace convention
 
 All Astrotech topics/services/actions sit under **`/astrotech/…`**.
-Camera feeds (separate branch) reuse the existing `camera_<id>/h264`
-naming from `usb_camera_publisher`.
+Camera feeds use the `/camN/image_raw` names emitted by
+`cmr_cv.camera_node` (started via [`src/cmr_cams/launch/default.launch.py`](../src/cmr_cams/launch/default.launch.py))
+and the `/zed/zed_node/...` names from the stereolabs `zed_wrapper`
+package. The `camera_<id>/h264` topic family from `usb_camera_publisher`
+is a separate stack that is not part of the canonical Astrotech bring-up.
 
 ## Auger — moteus stack (Session 5)
 
@@ -42,27 +45,36 @@ controllers (id=15 lead screw, id=16 auger). Reference pattern at
 `docs/reference/auger_keys_test_harness.py`.
 
 - Command topic: **`/astrotech/auger/cmd_vel`** — `cmr_msgs/AugerCommand`
-  (`lead_screw_velocity_rev_s` / `lead_screw_max_torque_Nm` /
-  `auger_velocity_rev_s` / `auger_max_torque_Nm`). Hold-to-act:
+  (`lead_screw_velocity_rev_s` / `lead_screw_max_torque_nm` /
+  `auger_velocity_rev_s` / `auger_max_torque_nm`). Hold-to-act:
   GCS publishes at 10 Hz while a button is held; driver applies a
   200 ms watchdog.
 - State topic: **`/astrotech/auger/state`** — `cmr_msgs/AugerState` —
   20 Hz mock, 50 Hz real (moteus watchdog cadence). Closed-loop fields
-  for both motors: position / velocity / torque / temperature / mode /
-  fault.
+  for both motors: `*_position_rev` / `*_velocity_rev_s` / `*_torque_nm`
+  / `*_temperature_c` / `*_mode` / `*_fault`. (Field names use lowercase
+  unit suffixes — ROS 2 IDL rejects uppercase letters.)
 
-## Mixing servo — `TODO(astrotech-q-2)`
+## Mixing servo — Q2 ANSWERED (bench 2026-05-08)
 
-- Presets (preset_name string values, exact casing used as the enum):
-  `S1`, `S2`, `CO2_1`, `CO2_2`, `RETRACT`.
-- Set-preset service: **`/astrotech/mixing_servo/set_preset`** —
-  `cmr_msgs/SetMixingServoPreset`.
-- State topic: **`/astrotech/mixing_servo/state`** — `std_msgs/String`
-  (last-set preset name) — 5 Hz.
-- **Assumption pinned at `TODO(astrotech-q-2)`**: controller type is unknown.
-  Mock implements the service with pure state; once the real controller is
-  picked (PWM from MCU, moteus, or dedicated servo driver), the driver
-  class is swapped but the service contract stays.
+CMR servo board on the fdcanusb at `(can_id=26, servo_id=15)`, bus at
+1 Mbit/s. After the bench bring-up the interface model shifted from the
+original 5-preset enum to an angle-based model with operator-set home:
+
+- Set-angle service: **`/astrotech/mixing_servo/set_angle`** —
+  `cmr_msgs/SetMixingServoAngle` (12-bit `angle_deg` 0..4095, offset
+  from the last `set_home`).
+- Set-home service: **`/astrotech/mixing_servo/set_home`** —
+  `std_srvs/Trigger` (zeros the board at the current physical position).
+- State topic: **`/astrotech/mixing_servo/state`** — `std_msgs/Int32`
+  (last commanded angle in deg) — 5 Hz.
+- The Foxglove panel keeps three editable site offsets locally (Big Box
+  / Site 1 / Site 2, defaults 110 / 145 / 185 from the bench rig) and
+  calls `set_angle` with whichever value is in the editor for the
+  clicked button. Manual goto is also supported.
+- Driver bench-discovered gotchas (1 Mbit/s, `clear_faults=1` per
+  frame) are documented in
+  [`astrotech_canfd_library_notes.md`](astrotech_canfd_library_notes.md).
 
 ## Analysis sequences — `TODO(astrotech-q-3)`, `TODO(astrotech-q-4)`
 
@@ -70,12 +82,18 @@ controllers (id=15 lead screw, id=16 auger). Reference pattern at
   - **`/astrotech/analysis/run_sequence_1`** — `cmr_msgs/RunAnalysisSequence`.
   - **`/astrotech/analysis/run_sequence_2`** — `cmr_msgs/RunAnalysisSequence`.
 - Goal: `int8 sequence_id` — mock accepts 1 or 2, rejects anything else.
-- Feedback: `float32 progress_pct`, `string current_step`.
-- Result: `bool success`, `string result_message`.
-- Mock duration: 10 seconds linear ramp from 0 → 100% progress.
-  - **Assumption pinned at `TODO(astrotech-q-3)`**: duration is arbitrary.
-    Real BDC sequences may be seconds or minutes. Step names are purely
-    placeholder (`"starting"`, `"running"`, `"finalizing"`).
+- Feedback: `int32 current_step`, `int32 total_steps`,
+  `string current_step_description`, `float32 elapsed_seconds`.
+- Result: `bool success`, `string message`,
+  `int32 last_completed_step`.
+- Mock duration: **5 generic steps × 2 s each** by default
+  (`num_steps` / `step_duration_sec` in `astrotech_interfaces.yaml`).
+  - **Assumption pinned at `TODO(astrotech-q-3)`**: step count and per-step
+    duration are placeholder values. Real BDC sequences are 5–10 minutes
+    end to end (per Session 3) and use real step descriptions.
+  - Cancel returns `success=false` with a message like
+    `"cancelled at step N"` and leaves the rover wherever it stopped
+    (run-to-completion-with-hard-abort; pause/resume → post-URC backlog).
 - **Assumption pinned at `TODO(astrotech-q-4)`**: `sequence_id` and
   `site_num` semantics are unresolved. `sequence_id` is kept as the goal
   field name; if the team says it's actually a site id, rename the field
@@ -107,11 +125,6 @@ controllers (id=15 lead screw, id=16 auger). Reference pattern at
   driver exists it likely has its own message type, rename across the same
   four locations.
 
-## Cameras
-
-Camera feeds are not part of Phase 2a. That work lives on a separate
-branch and will merge into `astrotech-gui` later.
-
 ## Full interface table (copy into `astrotech_interfaces.yaml`)
 
 Pseudo-YAML form; the real YAML file is at
@@ -128,12 +141,16 @@ auger:
   state_rate_hz: 20
 
 mixing_servo:
-  set_preset_service: /astrotech/mixing_servo/set_preset
-  set_preset_type: cmr_msgs/SetMixingServoPreset
-  state_topic: /astrotech/mixing_servo/state
-  state_type: std_msgs/String
-  state_rate_hz: 5
-  presets: [S1, S2, CO2_1, CO2_2, RETRACT]
+  # CMR servo board, can_id=26, servo_id=15, 1 Mbit/s.
+  set_angle_service: /astrotech/mixing_servo/set_angle
+  set_angle_type:    cmr_msgs/SetMixingServoAngle
+  set_home_service:  /astrotech/mixing_servo/set_home
+  set_home_type:     std_srvs/Trigger
+  state_topic:       /astrotech/mixing_servo/state
+  state_type:        std_msgs/Int32
+  state_rate_hz:     5
+  # Three site offsets live in panel state, not the YAML; defaults
+  # 110 / 145 / 185 from the bench rig (2026-05-08).
 
 analysis:
   sequences:
@@ -159,14 +176,16 @@ env:
   type: cmr_msgs/EnvSample
   rate_hz: 1.0
 
-# (Camera feeds intentionally absent — separate branch.)
+# Camera feeds aren't part of the mock YAML — the cmr_cv camera nodes
+# are rover-installed and started via src/cmr_cams/launch/default.launch.py
+# (see docs/operator_guide.md for the four-terminal bring-up).
 ```
 
 ## Out of scope for Phase 2a (recorded to prevent scope creep)
 
 - Snapshot service (Q7).
 - Pause/resume for sequences — see `docs/post_urc_backlog.md`.
-- Camera feeds (separate branch).
+- Camera publishers are out of the mock — they're launched rover-side via [`src/cmr_cams/`](../src/cmr_cams/); the Foxglove layouts consume the resulting topics directly.
 - Real panel widgets (Phase 2b).
 - Fabric-managed bridge (Q11).
 - CI wiring for the smoke test.

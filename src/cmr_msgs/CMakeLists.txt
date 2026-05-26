@@ -29,7 +29,7 @@ rosidl_generate_interfaces(
   msg/IMUSensorData.msg
   msg/Int16ArrayStamped.msg
   msg/GroundPlaneStamped.msg
-  # Astrotech (URC 2026) — see docs/phase2a_assumptions.md
+  # Astrotech (URC 2026) — see gui/README.md
   msg/RamanSpectrum.msg
   msg/EnvSample.msg
   msg/AugerState.msg

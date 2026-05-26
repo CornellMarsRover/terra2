@@ -5,7 +5,7 @@
 # if commands stop arriving. The driver translates each non-NaN
 # velocity into a moteus `make_position(position=NaN, velocity=...,
 # maximum_torque=...)` per the test harness in
-# docs/reference/auger_keys_test_harness.py.
+# src/astrotech_rover/scripts/auger_keys_test_harness.py.
 
 float32 lead_screw_velocity_rev_s
 float32 lead_screw_max_torque_nm

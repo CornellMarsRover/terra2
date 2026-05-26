@@ -55,79 +55,57 @@ Terra contains all the code that is part of a ROS codebase and implements the br
   back-pressure the bridge. Command and service topics stay on reliable QoS.
   See the `BEST_EFFORT_TOPIC_REGEXES` list in the launch file.
 
-### Astrotech Mock Rover: [src/urc_mock_rover](./src/urc_mock_rover)
-- **Description:** Fake rover node that publishes every Astrotech GCS
-  topic/service/action described in
-  [`src/urc_mock_rover/config/astrotech_interfaces.yaml`](./src/urc_mock_rover/config/astrotech_interfaces.yaml).
-  Lets GCS development happen with no real hardware.
-- **Assumptions and Q-number map:** [docs/phase2a_assumptions.md](./docs/phase2a_assumptions.md).
+### Astrotech rover node: [src/astrotech_rover](./src/astrotech_rover)
+- **Description:** ROS 2 node for the Astrotech science payload. Runs the
+  **real hardware drivers by default** (auger moteus stack, CMR mixing
+  servo, TCD1340 Raman, SCD-30 environment); each can be swapped for a
+  simulation driver via a `URC_*_MOCK=1` env var for GUI development
+  without hardware. Interface contract:
+  [`src/astrotech_rover/config/astrotech_interfaces.yaml`](./src/astrotech_rover/config/astrotech_interfaces.yaml).
+- **Foxglove GUI** (panels + layouts) and the full operator/dev guide live
+  under [`gui/`](./gui/) — start with [`gui/README.md`](./gui/README.md).
 
-## Developing the Astrotech GCS without the rover
+## Running / developing the Astrotech GUI
 
 One-time setup:
 
 ```bash
-colcon build --symlink-install --packages-select cmr_msgs urc_mock_rover
-```
-
-> Camera *publishers* are not part of `urc_mock_rover`; the actual ROS
-> image publishers live in `src/cmr_cams/` and the rover-side `zed_wrapper`
-> launch. The Foxglove **layouts** do reference camera topics (auger cam,
-> analysis cam, ZED) via the built-in Image panel, so against the mock
-> the Image panels render but show "no messages on topic" — that's
-> expected. See [`docs/current_state.md`](./docs/current_state.md)
-> ("Bringing up cameras") for the rover-side sequence.
-
-Then, each dev session:
-
-```bash
+colcon build --symlink-install --packages-select cmr_msgs astrotech_rover
 source install/setup.bash
-ros2 launch urc_mock_rover mock.launch.py
 ```
 
-That single command starts the mock rover plus the Foxglove bridge on
-`ws://localhost:8765`. In Foxglove Studio:
-
-1. **Open Connection** → `ws://localhost:8765`.
-2. **Layouts → Import from file** — import both:
-   - [`gcs/layouts/urc_astrotech_auger.json`](./gcs/layouts/urc_astrotech_auger.json)
-     (drilling-side loadout: auger control + mixing servo + auger cam +
-     ZED).
-   - [`gcs/layouts/urc_astrotech_analysis.json`](./gcs/layouts/urc_astrotech_analysis.json)
-     (lab-work loadout: analysis sequence + Raman + analysis cam + CO₂
-     plot).
-3. (First time only) install the custom panels extension:
+Real hardware (default — the normal rover command):
 
 ```bash
-cd gcs/extensions/urc-astrotech-panels
-npm install
-npm run build
-npm run local-install
-# Fully quit + relaunch Foxglove Studio for panels to appear.
+ros2 launch astrotech_rover astrotech.launch.py
 ```
 
-A smoke test that builds, launches, checks expected topics and rates, and
-calls a service is at [`scripts/smoke_test.sh`](./scripts/smoke_test.sh).
-Run from the repo root on a ROS 2 Humble machine.
+No hardware (GUI dev / demo — mock any or all features):
 
-### When `astrotech-q-N` is answered — files to change
+```bash
+URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 URC_RAMAN_MOCK=1 URC_ENV_MOCK=1 \
+  ros2 launch astrotech_rover astrotech.launch.py
+```
 
-Every assumption currently baked into the mock is tagged in source with
-`TODO(astrotech-q-N)`. When the team gives an answer, grep the tag and
-update these files in lockstep. (`docs/phase2a_assumptions.md` holds the
-question text; repeated here only as a lookup table.)
+Both bring up `astrotech_node` plus the Foxglove bridge on
+`ws://localhost:8765`. Then connect Foxglove Studio and import a layout
+from [`gui/layouts/`](./gui/layouts/). First time, install the custom
+panels extension (`cd gui/extensions/urc-astrotech-panels && npm install
+&& npm run build && npm run local-install`, then relaunch Foxglove).
 
-| Q | What to change |
-|---|---|
-| Q1 — auger controller | `docs/phase2a_assumptions.md`; `src/urc_mock_rover/config/astrotech_interfaces.yaml` (`auger:`); `src/urc_mock_rover/urc_mock_rover/drivers/auger.py`; `src/cmr_msgs/msg/AugerState.msg`; `gcs/extensions/urc-astrotech-panels/src/interfaces.ts` (`Auger`); `gcs/extensions/urc-astrotech-panels/src/panels/AugerControl.tsx` |
-| Q2 — mixing servo controller | `astrotech_interfaces.yaml` (`mixing_servo:`); `drivers/mixing_servo.py`; `interfaces.ts` (`MixingServo`); `panels/MixingServo.tsx` |
-| Q3 — BDC sequence controller, real step set | `astrotech_interfaces.yaml` (`analysis.num_steps`, `analysis.step_duration_sec`); `drivers/analysis_sequencer.py` |
-| Q4 — `sequence_id` vs. `site_num` naming | `src/cmr_msgs/action/RunAnalysisSequence.action`; `drivers/analysis_sequencer.py`; `interfaces.ts` (`Analysis`); `panels/AnalysisSequence.tsx` (button labels) |
-| Q5 — Raman driver message type | `astrotech_interfaces.yaml` (`raman.type`); `src/cmr_msgs/msg/RamanSpectrum.msg` (delete if replaced); `drivers/raman.py`; `interfaces.ts` (`Raman`); `panels/RamanSpectrum.tsx` |
-| Q6 — CO2/humidity driver message type | same shape as Q5: `env:` YAML block, `EnvSample.msg`, `drivers/env.py`, `Env` in `interfaces.ts` |
+**Full launch / debug / camera / sensor-wiring guide:**
+[`gui/operator_guide.md`](./gui/operator_guide.md). **System overview and
+what's wired:** [`gui/README.md`](./gui/README.md).
 
-Q7, Q8, Q9, Q11, Q12, Q13 are intentionally deferred — see
-`docs/post_urc_backlog.md`.
+> Camera *publishers* aren't part of `astrotech_rover`; they're launched
+> rover-side from [`src/cmr_cams/`](./src/cmr_cams/) (cmr_cv nodes) plus the
+> stereolabs `zed_wrapper`. Against a hardware-free dev launch the Foxglove
+> Image panels render but show "no messages on topic" — expected. See
+> the camera section of [`gui/operator_guide.md`](./gui/operator_guide.md).
+
+A smoke test (build, launch, check topics/rates, call a service) is at
+[`src/astrotech_rover/scripts/smoke_test.sh`](./src/astrotech_rover/scripts/smoke_test.sh); run from the repo root
+on a ROS 2 Humble machine.
 
 ## TODO Functionality
 

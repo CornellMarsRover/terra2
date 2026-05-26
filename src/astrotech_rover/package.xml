@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+    <name>astrotech_rover</name>
+    <version>0.2.0</version>
+    <description>
+        Astrotech rover driver node for the URC 2026 science-payload GCS.
+        Runs the real hardware drivers by default (auger moteus stack, CMR
+        mixing servo, TCD1340 Raman, SCD-30 environment); each can be
+        swapped for a simulation driver via URC_*_MOCK env vars for GUI
+        development without hardware. Interface contract:
+        config/astrotech_interfaces.yaml. See the GUI README under gui/.
+    </description>
+    <maintainer email="team@cornellmarsrover.org">CMR</maintainer>
+    <license>MIT</license>
+
+    <exec_depend>rclpy</exec_depend>
+    <exec_depend>std_msgs</exec_depend>
+    <exec_depend>std_srvs</exec_depend>
+    <exec_depend>cmr_msgs</exec_depend>
+    <exec_depend>python3-yaml</exec_depend>
+    <exec_depend>python3-numpy</exec_depend>
+    <!-- Real Raman driver (TCD1340 over USB serial) needs pyserial, a rosdep
+         key. The adafruit-* SCD-30 deps for the real env driver are pip-only
+         and documented in gui/operator_guide.md. -->
+    <exec_depend>python3-serial</exec_depend>
+    <!-- Snapshot driver renders the Raman/CO2 plots to PNG with matplotlib. -->
+    <exec_depend>python3-matplotlib</exec_depend>
+    <exec_depend>ros2launch</exec_depend>
+    <exec_depend>foxglove_bridge</exec_depend>
+
+    <test_depend>python3-pytest</test_depend>
+
+    <export>
+        <build_type>ament_python</build_type>
+    </export>
+</package>

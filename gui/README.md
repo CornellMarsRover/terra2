@@ -16,6 +16,60 @@ or fixing the GUI.
 
 ---
 
+## Running it
+
+**Easiest — the Astrotech Hub.** A one-window launcher with a button for every
+step (build, launch the node + bridge, cameras/ZED, diagnostics, Raman
+calibration, shut down):
+
+```bash
+python3 src/astrotech_rover/scripts/astrotech_hub.py
+```
+
+In a mission the payload node runs on the **Jetson** (where the hardware is);
+the hub's **Jetson** tab brings it up over SSH, and you operate from Foxglove on
+the base-station laptop. The [operator guide](operator_guide.md) has the full
+walkthrough plus the one-time SSH setup.
+
+**Manual — what the hub runs under the hood.** One-time build (on the machine
+that runs the node):
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install --packages-select cmr_msgs astrotech_rover
+source install/setup.bash
+```
+
+Start the node + Foxglove bridge:
+
+```bash
+ros2 launch astrotech_rover astrotech.launch.py
+```
+
+That serves Foxglove at `ws://localhost:8765` (or `ws://<jetson-ip>:8765` when
+it runs on the rover). To run with no hardware, prefix the launch with the mock
+flags: `URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 URC_RAMAN_MOCK=1 URC_ENV_MOCK=1`.
+
+## Connecting Foxglove
+
+1. Open Foxglove Studio.
+2. **Open Connection** → `ws://<jetson-ip>:8765` (e.g.
+   `ws://192.168.1.69:8765`), or `ws://localhost:8765` if the node runs on this
+   machine.
+3. **Layouts → Import from file** → pick `urc_astrotech_auger.json`
+   (drilling) or `urc_astrotech_analysis.json` (lab work).
+
+First time on a machine, install the panels (then fully quit + relaunch
+Foxglove) — or use the hub's "Build + install Foxglove panels" button:
+
+```bash
+cd gui/extensions/urc-astrotech-panels
+npm install && npm run build && npm run local-install
+```
+
+The full operator walkthrough — what every button does, plus the
+rover-side camera bring-up — is in [`operator_guide.md`](operator_guide.md).
+
 ## What's in here
 
 | Piece | Where | What it is |
@@ -39,43 +93,6 @@ or fixing the GUI.
 
 The extension is version **0.4.0**.
 
-## Running it
-
-One-time build:
-
-```bash
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install --packages-select cmr_msgs astrotech_rover
-source install/setup.bash
-```
-
-Start the rover node + the Foxglove bridge:
-
-```bash
-ros2 launch astrotech_rover astrotech.launch.py
-```
-
-That serves Foxglove at `ws://localhost:8765`.
-
-## Connecting Foxglove
-
-1. Open Foxglove Studio.
-2. **Open Connection** → `ws://localhost:8765` (or `ws://<rover-ip>:8765`
-   from another laptop).
-3. **Layouts → Import from file** → pick `urc_astrotech_auger.json`
-   (drilling) or `urc_astrotech_analysis.json` (lab work).
-
-First time on a machine, install the panels (then fully quit + relaunch
-Foxglove):
-
-```bash
-cd gui/extensions/urc-astrotech-panels
-npm install && npm run build && npm run local-install
-```
-
-The full operator walkthrough — what every button does, plus the
-rover-side camera bring-up — is in [`operator_guide.md`](operator_guide.md).
-
 ## Switching which camera a panel shows
 
 Each camera tile is a built-in Foxglove **Image** panel, so you can point
@@ -84,13 +101,15 @@ it at any camera that's currently publishing:
 - **In Foxglove:** click the Image panel, open its **settings** (the gear
   / settings sidebar), and change the **topic** to a different feed. The
   USB cameras publish as `/cam0/image_raw` … `/cam14/image_raw` (whichever
-  ones are activated), and the ZED publishes
-  `/zed/zed_node/left/image_rect_color`.
+  ones are activated). The ZED's left image is on `/zed/image_left`
+  (published by the `cmr_zed` node, e.g. `ros2 run cmr_zed
+  zed_publisher_node`); if you run the stereolabs `zed_wrapper` instead, its
+  left image is `/zed/zed_node/left/image_rect_color`.
 - **In the layout file:** the topic each panel starts on is the
   `cameraTopic` field in the layout JSON ([`gui/layouts/`](layouts/)). The
-  auger layout defaults to `/cam11/image_raw` (auger cam) and the ZED; the
-  analysis layout defaults to `/cam12/image_raw`. Edit those if you want a
-  different default.
+  auger layout defaults to `/cam11/image_raw` (auger cam) and the ZED left
+  image (`/zed/image_left`); the analysis layout defaults to
+  `/cam12/image_raw`. Edit those if you want a different default.
 
 Heads up: which physical camera is `/cam11` vs `/cam12` can change between
 boots (it depends on USB plug order), so if a tile shows the wrong camera,
@@ -251,6 +270,11 @@ In [`src/astrotech_rover/scripts/`](../src/astrotech_rover/scripts/):
 - `auger_keys_test_harness.py` — Astrotech's original keyboard test script
   (the pattern the auger driver is based on).
 - `smoke_test.sh` — builds, launches, and checks the topics show up.
+- `raman_calibrate.py` — fit the Raman pixel→wavelength calibration from known
+  peaks and print the YAML block to paste (stdlib only; see operator guide §6).
+- `astrotech_hub.py` — tkinter operator launcher: buttons to build, launch the
+  node + bridge (real/mock), bring up cameras/ZED on the Jetson over SSH, run
+  diagnostics, calibrate Raman, and shut down. `python3 src/astrotech_rover/scripts/astrotech_hub.py`.
 
 ## Where every file lives
 

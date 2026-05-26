@@ -85,8 +85,10 @@ raman:
   real_baud: 115200
   real_length_tolerance: 8  # accept frames within +/- this many of n_points
   # Optional pixel->wavenumber calibration. Omit/comment out to plot the
-  # raw pixel-index x-axis. When Astrotech provides the polynomial:
-  #   wavelength_nm = c0 + c1*p + c2*p^2 (ascending coeffs)
+  # raw pixel-index x-axis. To generate the polynomial from known peaks, run
+  # scripts/raman_calibrate.py; see gui/operator_guide.md ("Calibrate the
+  # Raman spectrometer"). Coeffs are ASCENDING:
+  #   wavelength_nm = c0 + c1*p + c2*p^2
   #   shift_cm_inv  = (1/laser_nm - 1/wavelength_nm) * 1e7
   # real_calibration:
   #   laser_nm: 785.0

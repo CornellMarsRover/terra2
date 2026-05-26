@@ -41,8 +41,9 @@ We then compute, per pixel p:
 
 If ``real_calibration`` is absent, the x-axis is the **pixel index**
 (0..n_points-1) -- the plot still works, peaks just aren't in cm⁻¹ until
-Astrotech provides the polynomial + laser wavelength. See
-gui/operator_guide.md ("Raman calibration").
+Astrotech provides the polynomial + laser wavelength. Generate it from known
+peaks with scripts/raman_calibrate.py; see gui/operator_guide.md ("Calibrate
+the Raman spectrometer").
 
 Dependency: ``pyserial`` (``/usr/bin/python3 -m pip install --user pyserial``).
 """

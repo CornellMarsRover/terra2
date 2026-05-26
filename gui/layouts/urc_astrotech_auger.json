@@ -1,0 +1,45 @@
+{
+  "configById": {
+    "cornellmarsrover.urc-astrotech-panels.urc.auger_control!auger": {},
+    "cornellmarsrover.urc-astrotech-panels.urc.mixing_servo!mixing": {},
+    "Image!auger_cam": {
+      "cameraTopic": "/cam11/image_raw",
+      "synchronize": false,
+      "smooth": true,
+      "rotation": 0,
+      "calibrationTopic": "",
+      "enabledMarkerTopics": [],
+      "transformMarkers": false
+    },
+    "Image!zed_cam": {
+      "cameraTopic": "/zed/zed_node/left/image_rect_color",
+      "synchronize": false,
+      "smooth": true,
+      "rotation": 0,
+      "calibrationTopic": "",
+      "enabledMarkerTopics": [],
+      "transformMarkers": false
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": {
+      "direction": "column",
+      "first": "cornellmarsrover.urc-astrotech-panels.urc.auger_control!auger",
+      "second": "cornellmarsrover.urc-astrotech-panels.urc.mixing_servo!mixing",
+      "splitPercentage": 60
+    },
+    "second": {
+      "direction": "column",
+      "first": "Image!auger_cam",
+      "second": "Image!zed_cam",
+      "splitPercentage": 50
+    },
+    "splitPercentage": 40
+  }
+}

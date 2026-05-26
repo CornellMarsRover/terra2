@@ -1,0 +1,129 @@
+# Astrotech rover interface contract.
+#
+# Single source of truth for every topic, service, and action name the
+# astrotech_node advertises and the Foxglove extension subscribes to.
+# A few values (analysis step set, whether Raman/env have their own
+# upstream message types) are still placeholders -- those carry a plain
+# `TODO:` comment inline; ping the project lead if one bites.
+#
+# The TypeScript mirror of this file lives at
+# gui/extensions/urc-astrotech-panels/src/interfaces.ts. Keep the two in sync
+# manually — the file is small (<50 lines of TS) and runtime YAML parsing in
+# the browser is not worth the dependency.
+
+auger:
+  # The auger lives on TWO moteus controllers (id=15 lead_screw, id=16 auger)
+  # using Josh Pieper's `moteus` library — *not* Caitlin's CAN-FD library.
+  # See src/astrotech_rover/scripts/auger_keys_test_harness.py for the upstream pattern.
+  # Hold-to-act: GCS publishes AugerCommand at 10 Hz while a button is held;
+  # the driver applies a 200 ms watchdog and zeros velocities on silence.
+  cmd_topic: /astrotech/auger/cmd_vel
+  cmd_type: cmr_msgs/AugerCommand
+  cmd_watchdog_ms: 200
+  state_topic: /astrotech/auger/state
+  state_type: cmr_msgs/AugerState
+  state_rate_hz: 20   # mock publish rate. The real driver ignores this and
+                      # publishes every moteus cycle (50 Hz watchdog cadence).
+
+mixing_servo:
+  # CMR servo board on the same fdcanusb as the auger moteus stack
+  # (can_id=26, servo_id=15). Two services drive it from the GCS:
+  #   - set_angle: drive to a specific angle (deg, offset from home)
+  #   - set_home:  declare the current physical position to be 0 deg
+  # The Foxglove panel persists the three site offsets locally and calls
+  # set_angle with whichever value is in the box for that button. See
+  # gui/README.md ("Bench-discovered facts") for the history.
+  set_angle_service: /astrotech/mixing_servo/set_angle
+  set_angle_type: cmr_msgs/SetMixingServoAngle
+  set_home_service: /astrotech/mixing_servo/set_home
+  set_home_type: std_srvs/Trigger
+  state_topic: /astrotech/mixing_servo/state
+  state_type: std_msgs/Int32
+  state_rate_hz: 5
+  # Real-driver config (default; set URC_MIXING_SERVO_MOCK=1 to use the sim).
+  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
+  real_can_id: 26
+  real_servo_id: 15
+  real_bitrate: 1000000
+  # After sending a goto frame, the real driver sleeps move_settle_s
+  # before returning success. Closing the port (or returning before the
+  # chamber arrives) on this firmware can race the mechanical move and
+  # leave it stopped mid-travel -- same race src/astrotech_rover/scripts/mixing_servo_min.py
+  # works around with --hold-s. 5 s is enough for a full-range swing on
+  # the bench rig (2026-05-08); raise if larger envelopes are needed.
+  move_settle_s: 5.0
+
+analysis:
+  # TODO: step set is unknown; mock generates generic names.
+  # TODO: sequence_id vs. site_num naming unresolved.
+  # No pause/resume — sequences run to completion with hard abort.
+  action_type: cmr_msgs/RunAnalysisSequence
+  num_steps: 5
+  step_duration_sec: 2.0
+  sequences:
+    - id: 1
+      action: /astrotech/analysis/run_sequence_1
+    - id: 2
+      action: /astrotech/analysis/run_sequence_2
+
+raman:
+  # TODO: if a real driver exists in another repo with its
+  # own message type, replace `type` here, regenerate the TS mirror, and
+  # delete cmr_msgs/msg/RamanSpectrum.msg.
+  topic: /astrotech/raman/spectrum
+  type: cmr_msgs/RamanSpectrum
+  rate_hz: 1.0
+  wavenumber_min: 200.0
+  wavenumber_max: 2000.0
+  n_points: 1024            # TCD1340 emits 3648 pixels; raise to 3648 for real hw
+  mock_peaks_cm_inv: [1085.0, 1332.0, 1580.0]
+  # Real-driver config (default; set URC_RAMAN_MOCK=1 to use the sim). The CCD
+  # streams over USB serial via a microcontroller; framing is ASSUMED
+  # (one CSV/whitespace line of n_points intensities per scan) until
+  # confirmed with Astrotech -- see drivers/raman_real.py.
+  real_port: /dev/ttyACM1
+  real_baud: 115200
+  real_length_tolerance: 8  # accept frames within +/- this many of n_points
+  # Optional pixel->wavenumber calibration. Omit/comment out to plot the
+  # raw pixel-index x-axis. When Astrotech provides the polynomial:
+  #   wavelength_nm = c0 + c1*p + c2*p^2 (ascending coeffs)
+  #   shift_cm_inv  = (1/laser_nm - 1/wavelength_nm) * 1e7
+  # real_calibration:
+  #   laser_nm: 785.0
+  #   pixel_to_wavelength_poly: [0.0, 0.0, 0.0]
+
+env:
+  # TODO: swap to external type if a real env driver elsewhere owns this.
+  topic: /astrotech/env/sample
+  type: cmr_msgs/EnvSample
+  rate_hz: 1.0
+  # Real-driver config (default; set URC_ENV_MOCK=1 to use the sim). Adafruit
+  # SCD-30 (NDIR CO2 + temp + humidity), I2C addr 0x61. real_connection
+  # picks how the I2C bus is reached -- CHANGE THIS to match the wiring:
+  #   ft232h     -> FT232H USB->I2C bridge (default; sets BLINKA_FT232H=1)
+  #   jetson_i2c -> SCD-30 on the Jetson's I2C pins (board.I2C())
+  #   busio      -> explicit busio.I2C(board.SCL, board.SDA)
+  # See gui/operator_guide.md ("Wiring the SCD-30").
+  real_connection: ft232h
+  real_measurement_interval_s: 2   # SCD-30 minimum is 2 s (~0.5 Hz)
+
+snapshot:
+  # Operator "save this plot" feature. The snapshot driver buffers the
+  # latest Raman spectrum + recent CO2 samples and, on a service call,
+  # renders a PNG with matplotlib and writes it to disk. It writes on the
+  # machine running this node -- run the node on the operator laptop to get
+  # the laptop's Desktop. Falls back to <repo>/snapshots/ if the Desktop
+  # isn't writable. Panel buttons live in the "Snapshots" Foxglove panel.
+  save_raman_service: /astrotech/snapshot/raman
+  save_co2_service: /astrotech/snapshot/co2
+  service_type: std_srvs/Trigger
+  desktop_subdir: astrotech_snapshots   # folder created under ~/Desktop
+  fallback_subdir: snapshots            # folder created under the repo root
+  co2_history_seconds: 120              # how much CO2 history the plot shows
+
+# Camera feeds aren't published by the mock — the cmr_cv camera nodes
+# launched by src/cmr_cams/launch/default.launch.py (rover-side) own
+# /camN/image_raw, and the stereolabs zed_wrapper owns the ZED topics.
+# See gui/operator_guide.md for the four-terminal bring-up procedure.
+# Foxglove uses its built-in Image panel; the layouts pre-fill the
+# topic IDs (/cam11, /cam12, /zed/zed_node/left/image_rect_color).

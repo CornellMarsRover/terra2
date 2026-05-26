@@ -1,0 +1,11 @@
+# Drive the mixing chamber to an absolute angle, measured from the most
+# recently set home (i.e. the last call to /astrotech/mixing_servo/set_home,
+# which the operator presses after walking the chamber to the desired
+# zero position).
+#
+# Wire field on the servo board is unsigned 12-bit (0..4095). Mechanical
+# envelope is much smaller; the driver clamps to a sane range.
+int32 angle_deg
+---
+bool success
+string message

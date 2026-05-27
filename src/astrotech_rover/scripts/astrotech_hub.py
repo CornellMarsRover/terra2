@@ -152,21 +152,26 @@ JETSON_GROUPS = [
             "source": False,
         },
     ]),
+    # Auger, mixing servo, and analysis pumps all share the one fdcanusb -- only
+    # one can hold it. Each mode launches the node + bridge with the OTHER two
+    # mocked, so exactly one owns the bus (Raman/env/snapshot are always real --
+    # different buses).
     ("Run the payload  (node + Foxglove bridge -> ws://192.168.1.69:8765)", [
         {
-            "label": "Launch  (real hardware)",
-            "cmd": "ros2 launch astrotech_rover astrotech.launch.py",
-            "source": True,
-        },
-        {
-            "label": "Launch  auger only  (mixing servo mocked)",
-            "cmd": "URC_MIXING_SERVO_MOCK=1 "
+            "label": "Drilling  (auger; servo + analysis mocked)",
+            "cmd": "URC_MIXING_SERVO_MOCK=1 URC_ANALYSIS_MOCK=1 "
                    "ros2 launch astrotech_rover astrotech.launch.py",
             "source": True,
         },
         {
-            "label": "Launch  mixing servo only  (auger mocked)",
-            "cmd": "URC_AUGER_MOCK=1 "
+            "label": "Mixing servo  (auger + analysis mocked)",
+            "cmd": "URC_AUGER_MOCK=1 URC_ANALYSIS_MOCK=1 "
+                   "ros2 launch astrotech_rover astrotech.launch.py",
+            "source": True,
+        },
+        {
+            "label": "Analysis / lab mode  (real pumps; auger + servo mocked)",
+            "cmd": "URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 "
                    "ros2 launch astrotech_rover astrotech.launch.py",
             "source": True,
         },

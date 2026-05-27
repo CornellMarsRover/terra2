@@ -174,14 +174,15 @@ service call, renders a PNG with matplotlib to the operator laptop's Desktop
 — fallback `<repo>/snapshots/`. A missing matplotlib disables only snapshots,
 not the rest of the node.)
 
-## Sharing the CAN dongle (auger vs mixing servo)
+## Sharing the CAN dongle (auger / mixing servo / analysis)
 
-The auger and the mixing servo are both on the **same** USB-CAN dongle, and
-only one program can hold that dongle at a time — if both try, the second
-one fails to open it. So today you run one of them at a time. The plan is
-to give the mixing servo its own second dongle, after which both can run
-together; that's set by the `real_port` value in the config file. (The
-operator guide shows the exact command for running just one.)
+The auger, the mixing servo, **and the analysis pumps** are all on the **same**
+USB-CAN dongle, and only one program can hold it at a time — if a second tries,
+its open fails (`EBUSY`). So you run one bus owner at a time and mock the other
+two. The hub's "Run the payload" buttons (Drilling / Mixing servo / Analysis lab
+mode) do exactly that; the operator guide lists the equivalent env-var commands.
+The plan is to add a second dongle later (`real_port` in the config file), after
+which more than one can run together.
 
 ## How the auger panel buttons work
 

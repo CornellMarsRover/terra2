@@ -143,11 +143,13 @@ dongle and **can't run on it at once**. Mock the ones you're not using so they
 don't grab the bus:
 
 ```
-URC_MIXING_SERVO_MOCK=1 ros2 launch astrotech_rover astrotech.launch.py   # auger only
-URC_AUGER_MOCK=1        ros2 launch astrotech_rover astrotech.launch.py    # mixing servo only
-# analysis ("lab mode"): mock both the auger and the mixing servo
-URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 ros2 launch astrotech_rover astrotech.launch.py
+URC_MIXING_SERVO_MOCK=1 URC_ANALYSIS_MOCK=1 ros2 launch astrotech_rover astrotech.launch.py  # drilling (auger)
+URC_AUGER_MOCK=1 URC_ANALYSIS_MOCK=1        ros2 launch astrotech_rover astrotech.launch.py  # mixing servo
+URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1    ros2 launch astrotech_rover astrotech.launch.py  # analysis (lab mode)
 ```
+
+(The hub's "Run the payload" buttons — Drilling / Mixing servo / Analysis lab
+mode — run exactly these for you.)
 
 ## 5. Bring up the cameras (on the rover)
 

@@ -54,17 +54,26 @@ mixing_servo:
   move_settle_s: 5.0
 
 analysis:
-  # TODO: step set is unknown; mock generates generic names.
-  # TODO: sequence_id vs. site_num naming unresolved.
-  # No pause/resume — sequences run to completion with hard abort.
-  action_type: cmr_msgs/RunAnalysisSequence
-  num_steps: 5
-  step_duration_sec: 2.0
-  sequences:
-    - id: 1
-      action: /astrotech/analysis/run_sequence_1
-    - id: 2
-      action: /astrotech/analysis/run_sequence_2
+  # Foxglove-native interface (panels have no ROS action client). The sequence
+  # set + device map + site->angle mapping live in
+  # astrotech_rover/drivers/analysis_protocol.py -- EDIT THERE for the real
+  # protocol; this block is only the ROS names + bus config. Real driver by
+  # default; URC_ANALYSIS_MOCK=1 for the no-hardware sim. No pause/resume --
+  # sequences run to completion with hard abort (the boards give no feedback).
+  start_service: /astrotech/analysis/start_sequence
+  start_type: cmr_msgs/StartAnalysisSequence
+  cancel_service: /astrotech/analysis/cancel
+  cancel_type: std_srvs/Trigger
+  status_topic: /astrotech/analysis/status
+  status_type: cmr_msgs/AnalysisStatus
+  status_rate_hz: 5.0
+  # Pumps/servos share the fdcanusb with the auger + mixing servo (CMR_CANFD /
+  # moteus), so run analysis in LAB MODE: URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1.
+  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
+  real_bitrate: 1000000
+  sequences:        # mirrors analysis_protocol.py SEQUENCES (panel labels only)
+    - {id: 1, name: Ninhydrin assay}
+    - {id: 2, name: Water-system assay}
 
 raman:
   # TODO: if a real driver exists in another repo with its

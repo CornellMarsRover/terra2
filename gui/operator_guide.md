@@ -7,39 +7,27 @@ For system internals and hardware setup, see `README.md` in this folder.
 
 ## 1. Start the rover software
 
-One-time, on the machine running the payload:
-
-```
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install --packages-select cmr_msgs astrotech_rover
-source install/setup.bash
-```
-
-Every session — start the node + Foxglove bridge:
-
-```
-ros2 launch astrotech_rover astrotech.launch.py
-```
-
-This runs the real hardware and serves Foxglove at `ws://localhost:8765`.
-(To run without hardware for a demo, see
-`src/astrotech_rover/astrotech_rover/drivers/mock/README.md`.)
-
-### Or use the Astrotech Hub (one-window launcher)
-
-Instead of typing commands by hand, run the launcher:
+**Run the Astrotech Hub** — one window with a button for every step (build,
+launch, cameras/ZED, diagnostics, Raman calibration, shut down):
 
 ```
 python3 src/astrotech_rover/scripts/astrotech_hub.py
 ```
 
-It's a small GUI with a button for every step — build, launch the node +
-bridge (real or all-mock), bring the cameras / ZED up on the Jetson, run
-diagnostics, calibrate Raman, shut down. Each button opens a terminal and runs
-the command there. The **Jetson** tab (the default) is the real rover bring-up;
-the **Base station** tab is just this laptop's panel build + tools.
+First time on this laptop: `sudo apt install python3-tk sshpass`.
 
-**Jetson tab (SSH into `cmr@192.168.1.69`)** — pick whichever auth you like:
+The payload hardware is on the Jetson, so on the **Jetson** tab (the default):
+
+1. Set up SSH auth once (see just below).
+2. Press **Build astrotech**, then **Launch (real hardware)** under
+   "Run the payload."
+
+That starts the node + Foxglove bridge on the Jetson, served at
+`ws://192.168.1.69:8765` (connect to it in §2). The **Base station** tab is just
+this laptop's panel build + tools; the **Raman calibration** tab is covered in
+§6.
+
+**Jetson SSH auth** — pick whichever you like:
 
 - **Simplest — type it in the panel:** there's a **Jetson SSH password** field
   in the hub's header. Type the team password (`*****`) there and it's used for
@@ -60,6 +48,27 @@ the **Base station** tab is just this laptop's panel build + tools.
   ```
   JETSON_SSH_PASSWORD=*****
   ```
+
+### Fallback — run the commands by hand
+
+The hub just runs these for you; you can also type them in a terminal on the
+machine that runs the node (the Jetson). One-time build:
+
+```
+colcon build --symlink-install --packages-select cmr_msgs astrotech_rover
+source install/setup.bash
+```
+
+Then, each session:
+
+```
+ros2 launch astrotech_rover astrotech.launch.py
+```
+
+This serves Foxglove at `ws://localhost:8765` (or `ws://<jetson-ip>:8765` when
+run on the rover). To run with no hardware, prefix the launch with the mock
+flags `URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 URC_RAMAN_MOCK=1 URC_ENV_MOCK=1 URC_ANALYSIS_MOCK=1`
+(see `src/astrotech_rover/astrotech_rover/drivers/mock/README.md`).
 
 ## 2. Connect Foxglove Studio
 
@@ -115,17 +124,29 @@ Then fully quit (Cmd/Ctrl+Q) and relaunch Foxglove. If panels show
   written. The button shows the saved file path when it's done.
 
 ### Analysis sequence
-Not active yet — the buttons are placeholders. Skip for now.
+- **Start Ninhydrin assay / Start Water-system assay** — kicks off that science
+  sequence on the rover. Only one runs at a time; Start greys out while one is
+  in progress.
+- **Progress** shows the running sequence, step N/M, the current step, and
+  elapsed seconds with a progress bar.
+- **Cancel** — hard abort: stops every pump immediately and ends the sequence.
+- The pumps give no position feedback, so progress is *commanded-only* (it
+  reflects what was sent, not sensed completion).
+- ⚠️ Run analysis in **lab mode** (see §4) — its pumps are on the same dongle as
+  the auger/mixing servo. And the step list is a draft from the bench protocol;
+  confirm with the lead before a real sample run.
 
 ## 4. Running one actuator at a time
 
-The auger and the mixing servo share one USB-CAN dongle and **can't both
-run on it at once**. If you only need one, mock the other so it doesn't
-grab the bus:
+The auger, the mixing servo, **and the analysis pumps** all share one USB-CAN
+dongle and **can't run on it at once**. Mock the ones you're not using so they
+don't grab the bus:
 
 ```
 URC_MIXING_SERVO_MOCK=1 ros2 launch astrotech_rover astrotech.launch.py   # auger only
 URC_AUGER_MOCK=1        ros2 launch astrotech_rover astrotech.launch.py    # mixing servo only
+# analysis ("lab mode"): mock both the auger and the mixing servo
+URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 ros2 launch astrotech_rover astrotech.launch.py
 ```
 
 ## 5. Bring up the cameras (on the rover)

@@ -34,6 +34,7 @@ rosidl_generate_interfaces(
   msg/EnvSample.msg
   msg/AugerState.msg
   msg/AugerCommand.msg
+  msg/AnalysisStatus.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv
@@ -42,6 +43,7 @@ rosidl_generate_interfaces(
   srv/NotifyDeactivate.srv
   srv/SiteAnalyze.srv
   srv/SetMixingServoAngle.srv
+  srv/StartAnalysisSequence.srv
   action/TestTargetPosition.action
   action/RunAnalysisSequence.action
   DEPENDENCIES

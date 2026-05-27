@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0
+
+Analysis sequence panel — wired up for real.
+
+- **Analysis panel** now drives the rover instead of logging to the console:
+  *Start Ninhydrin assay* / *Start Water-system assay* buttons, a live progress
+  readout (running sequence, step N/M, current step description, elapsed
+  seconds, progress bar), and a hard-abort **Cancel**. Start is disabled while a
+  sequence runs; Cancel only enables while one is running.
+- **Foxglove-native interface** (panels have no ROS action client): the panel
+  uses a `StartAnalysisSequence` start service, a `std_srvs/Trigger` cancel, and
+  a `cmr_msgs/AnalysisStatus` topic it subscribes to for progress — replacing
+  the old `RunAnalysisSequence` action the panel couldn't reach. Names added to
+  `interfaces.ts` + the rover YAML.
+- Rover side: a real CMR_CANFD analysis driver (pumps/servos), a generic
+  cancellable sequencer, and a **data-driven protocol** seeded from the lead's
+  `AnalysisFiles/` (edit `analysis_protocol.py` for the final sequence). Boards
+  give no feedback, so progress is commanded-only and Cancel stops every motor.
+- Removed the now-unused `PanelStub` (every panel is real).
+
 ## 0.4.0
 
 Raman plot + plot snapshots.

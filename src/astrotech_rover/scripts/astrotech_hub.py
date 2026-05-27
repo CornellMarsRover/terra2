@@ -128,7 +128,7 @@ LOCAL_GROUPS = [
         {
             "label": "Launch ALL-MOCK  (demo, no hardware)",
             "cmd": "URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 "
-                   "URC_RAMAN_MOCK=1 URC_ENV_MOCK=1 "
+                   "URC_RAMAN_MOCK=1 URC_ENV_MOCK=1 URC_ANALYSIS_MOCK=1 "
                    "ros2 launch astrotech_rover astrotech.launch.py",
             "source": True,
         },

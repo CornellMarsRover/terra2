@@ -60,17 +60,28 @@ class JSInputSubscriber(Node):
         self.declare_parameter("config_path", "")
         node_config = self._load_node_config()
         self.arm_can_port = str(node_config.get("can_port", "/dev/ttyACM1"))
-        self.arm_transport = moteus.Fdcanusb(self.arm_can_port)
-        self.controllers = {
-            joint_name: moteus.Controller(
-                id=motor_id,
-                transport=self.arm_transport,
-            )
-            for joint_name, motor_id in JOINT_MOTOR_IDS.items()
-        }
-        self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
-        self.joint_state_timer = self.create_timer(0.1, self.publish_joint_states)
+        self.publish_hardware_joint_states = bool(
+            node_config.get("publish_hardware_joint_states", False)
+        )
+        self.use_legacy_ik_command_mapping = bool(
+            node_config.get("use_legacy_ik_command_mapping", True)
+        )
+        self.arm_transport, self.controllers = make_moteus_transport_and_controllers_sync(
+            self.arm_can_port,
+            JOINT_MOTOR_IDS,
+        )
+        self.joint_state_pub = None
+        self.joint_state_timer = None
+        if self.publish_hardware_joint_states:
+            self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
+            self.joint_state_timer = self.create_timer(0.1, self.publish_joint_states)
         self.get_logger().info(f"Arm moteus fdcanusb transport: {self.arm_can_port}")
+        self.get_logger().info(
+            f"Arm hardware joint-state publishing: {self.publish_hardware_joint_states}"
+        )
+        self.get_logger().info(
+            f"Arm legacy IK command mapping: {self.use_legacy_ik_command_mapping}"
+        )
         
         # Init constants given TOML file
         # arm_controller_table = parse_toml("TODO")
@@ -240,6 +251,40 @@ class JSInputSubscriber(Node):
 
     def listener_callback(self, msg):
         if self.moveit_mode:
+            if self.use_legacy_ik_command_mapping:
+                if not msg.points:
+                    self.get_logger().warning("Ignoring empty JointTrajectory.")
+                    return
+
+                point = msg.points[0]
+                if len(point.positions) < 6:
+                    self.get_logger().error(
+                        "Ignoring JointTrajectory with fewer than 6 positions."
+                    )
+                    return
+
+                positions, velocities = self.translate_to_electrical(
+                    point.positions,
+                    point.velocities,
+                )
+                for joint_name, position, velocity_limit in zip(
+                    JOINT_MOTOR_IDS.keys(),
+                    positions,
+                    velocities,
+                ):
+                    send_moteus_command_sync(
+                        controller=self.controllers[joint_name],
+                        motor=JOINT_MOTOR_IDS[joint_name],
+                        position=position,
+                        drives_velocity=None,
+                        maximum_torque=MAX_TORQUE,
+                        velocity_limit=velocity_limit,
+                        accel_limit=MAX_ACCEL,
+                        ff_torque=None,
+                        logger=logger,
+                    )
+                return
+
             commands = self.iter_joint_commands(msg)
             # base = byte_command_converter(ARM, ARM_BASE, positions[0], None, MAX_TORQUE, velocities[0], MAX_ACCEL, None, self.get_logger())
             # shoulder = byte_command_converter(ARM, ARM_SHOULDER, positions[1], None, MAX_TORQUE, velocities[1], MAX_ACCEL, None, self.get_logger())

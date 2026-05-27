@@ -211,6 +211,36 @@ async def _query_moteus_async(controller: moteus.Controller):
     return await controller.query()
 
 
+async def _make_moteus_transport_and_controllers_async(
+    can_port: str,
+    motor_ids: dict[str, int],
+):
+    transport = moteus.Fdcanusb(can_port)
+    controllers = {
+        joint_name: moteus.Controller(
+            id=motor_id,
+            transport=transport,
+        )
+        for joint_name, motor_id in motor_ids.items()
+    }
+    return transport, controllers
+
+
+def make_moteus_transport_and_controllers_sync(
+    can_port: str,
+    motor_ids: dict[str, int],
+):
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        _make_moteus_transport_and_controllers_async(can_port, motor_ids),
+        _moteus_loop,
+    )
+    return future.result()
+
+
 def query_moteus_sync(controller: moteus.Controller, timeout_s: float = 0.2):
     """
     Synchronous wrapper for querying a moteus controller on the shared event loop.

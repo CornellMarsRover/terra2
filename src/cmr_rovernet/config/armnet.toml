@@ -8,4 +8,6 @@ restart_attempts = 2
 restart_delay = 10
 
 [node]
-can_port = "/dev/ttyACM1"
+can_port = "/dev/serial/by-id/usb-mjbots_fdcanusb_7194399E-if01"
+publish_hardware_joint_states = false
+use_legacy_ik_command_mapping = true

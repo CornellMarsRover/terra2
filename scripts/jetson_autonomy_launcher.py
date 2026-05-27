@@ -93,6 +93,14 @@ JETSON_COMMANDS = [
     ),
 ]
 
+# One-click FULL AUTON (nav + detect) run. The button fires both halves:
+#   * Jetson (SSH): full nav stack + on-Jetson telemetry GUI w/ overlay.
+#   * Local (base laptop): the YOLO base-station detection node.
+# RTK corrections (base) and GPS rover (Jetson) are prerequisites -- start them
+# first using the buttons below, as in the normal workflow.
+FULL_AUTON_JETSON_CMD = "ros2 launch autonomous_navigation full_auton.launch.py"
+FULL_AUTON_LOCAL_CMD = "ros2 launch cmr_cams base_detection.launch.py"
+
 
 # --- .env loading ------------------------------------------------------------
 
@@ -220,6 +228,24 @@ class JetsonLauncher(tk.Tk):
             justify="left",
         ).pack(**pad, anchor="w")
 
+        auton_frame = ttk.LabelFrame(self, text="Full autonomy + detection  (one click)")
+        auton_frame.pack(fill="x", **pad)
+        ttk.Label(
+            auton_frame,
+            text=(
+                "Boots the rover nav stack + telemetry GUI on the Jetson (SSH) AND the\n"
+                "base-station YOLO detection node locally. Start RTK corrections (below)\n"
+                "and GPS rover (Jetson, below) first, as in the normal workflow."
+            ),
+            foreground="#555",
+            justify="left",
+        ).pack(anchor="w", padx=8, pady=(4, 4))
+        ttk.Button(
+            auton_frame,
+            text="FULL AUTON RUN   (nav + detect)",
+            command=self.launch_full_auton,
+        ).pack(fill="x", padx=8, pady=4)
+
         local_frame = ttk.LabelFrame(self, text=f"Local run  ({LOCAL_WORKSPACE})")
         local_frame.pack(fill="x", **pad)
         ttk.Label(
@@ -336,6 +362,14 @@ class JetsonLauncher(tk.Tk):
         """Open a local terminal that SSHes into the Jetson and runs the command."""
         remote = build_workspace_command(JETSON_WORKSPACE, cmd, source_workspace)
         self._launch_jetson_remote(remote, label)
+
+    def launch_full_auton(self):
+        """One entry: Jetson nav stack + telemetry GUI (over SSH) AND the
+        base-station detection node (local). Two terminals, one click."""
+        remote = build_workspace_command(JETSON_WORKSPACE, FULL_AUTON_JETSON_CMD, True)
+        started = self._launch_jetson_remote(remote, "FULL AUTON nav + GUI")
+        if started:
+            self.launch_local(FULL_AUTON_LOCAL_CMD, True, "FULL AUTON detection")
 
     def launch_jetson_shell(self):
         """Drop into an interactive bash on the Jetson with the workspace

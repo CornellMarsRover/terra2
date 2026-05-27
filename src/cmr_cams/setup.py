@@ -24,6 +24,7 @@ setup(
         "console_scripts": [
             "object_detection_node = cmr_cams.object_detection:main",
             "web_stream_node = cmr_cams.web_stream:main",
+            "base_detection_node = cmr_cams.base_detection:main",
             # PHOBOS_APPEND
         ],
     },

@@ -18,9 +18,9 @@ from rclpy.executors import ExternalShutdownException
 from geometry_msgs.msg import PoseStamped, Point, Twist, TwistStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image, NavSatFix
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 
-from cmr_msgs.msg import AutonomyDrive
+from cmr_msgs.msg import AutonomyDrive, Detection
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +44,13 @@ class RealtimeRobotPlotter(Node):
         self.declare_parameter('gps_topic', '/rtk/navsatfix_data')
         self.declare_parameter('move_type_topic', '/autonomy/move/move_type')
         self.declare_parameter('image_topic', '/zed/image_left')
+        # URC 2026 detection overlay: single best box from the base-station
+        # detector and the onboard arrived/detected state.
+        self.declare_parameter('detection_topic', '/autonomy/detection/result')
+        self.declare_parameter('arrived_topic', '/autonomy/detection/arrived')
+        # How long a detection box / banner persists on screen without a fresh
+        # message (the detector samples at ~2 Hz, so this bridges the gap).
+        self.declare_parameter('detection_overlay_timeout', 2.0)
         self.declare_parameter('robot_pose_type', 'twist_stamped')  # pose_stamped / odometry / twist_stamped
         self.declare_parameter('target_type', 'twist')              # point / pose_stamped / twist
         self.declare_parameter('waypoints_file', DEFAULT_WAYPOINT_FILE)
@@ -79,6 +86,9 @@ class RealtimeRobotPlotter(Node):
         self.gps_topic = self.get_parameter('gps_topic').value
         self.move_type_topic = self.get_parameter('move_type_topic').value
         self.image_topic = self.get_parameter('image_topic').value
+        self.detection_topic = self.get_parameter('detection_topic').value
+        self.arrived_topic = self.get_parameter('arrived_topic').value
+        self.detection_overlay_timeout = float(self.get_parameter('detection_overlay_timeout').value)
         self.robot_pose_type = self.get_parameter('robot_pose_type').value
         self.target_type = self.get_parameter('target_type').value
         self.waypoints_file = self.get_parameter('waypoints_file').value or DEFAULT_WAYPOINT_FILE
@@ -151,6 +161,22 @@ class RealtimeRobotPlotter(Node):
         self.latest_image = None
         self.latest_image_stamp = None
         self.latest_image_size = None
+
+        # === URC object-detection subsystem (overview: cmr_cams/DETECTION_TESTING.md) ===
+        # Overlay state. Drawn by draw_detection_overlay(); fed by detection_cb()
+        # and arrived_cb(). Last NON-empty detection box: (label, conf, x1, y1,
+        # x2, y2) normalized
+        # to [0, 1]; kept until it ages out so the box doesn't flicker between
+        # the detector's samples.
+        self.latest_box = None
+        self.latest_box_stamp = None
+        # Latest per-frame "detected" flag (drives the banner together with the
+        # onboard arrived state).
+        self.detection_detected = False
+        self.detection_detected_stamp = None
+        # Onboard arrived/detected state from the state machine (held through
+        # the detection dwell). Authoritative source for the banner / future LED.
+        self.arrived_state = False
         self.latest_image_tk = None
         self.image_topics = []
         self.last_image_topic_refresh = 0.0
@@ -253,6 +279,12 @@ class RealtimeRobotPlotter(Node):
         self.image_sub = self.create_subscription(
             Image, self.image_topic, self.image_cb, 10
         )
+        self.detection_sub = self.create_subscription(
+            Detection, self.detection_topic, self.detection_cb, 10
+        )
+        self.arrived_sub = self.create_subscription(
+            Bool, self.arrived_topic, self.arrived_cb, 10
+        )
 
         self.get_logger().info('Realtime Robot Plotter started.')
         self.get_logger().info(f'Robot pose topic: {self.robot_pose_topic} ({self.robot_pose_type})')
@@ -343,6 +375,15 @@ class RealtimeRobotPlotter(Node):
         )
         self.refresh_topics_btn.grid(row=0, column=2, sticky='e')
         camera_controls.columnconfigure(1, weight=1)
+
+        # URC 2026 detection overlay toggle. On = draw the single detected box
+        # + the "OBJECT DETECTED" banner over the ZED feed.
+        self.overlay_enabled_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            camera_controls,
+            text='Show detection overlay',
+            variable=self.overlay_enabled_var,
+        ).grid(row=1, column=0, columnspan=3, sticky='w', pady=(4, 0))
 
         self.image_canvas = tk.Canvas(camera_box, bg='black', highlightthickness=0)
         self.image_canvas.pack(fill='both', expand=True)
@@ -951,6 +992,24 @@ class RealtimeRobotPlotter(Node):
             self.latest_image_size = (msg.width, msg.height)
         self.mark_seen('image')
 
+    def detection_cb(self, msg: Detection):
+        """Latest single detection from the base-station detector."""
+        now = time.time()
+        with self.lock:
+            if msg.label:
+                self.latest_box = (
+                    msg.label, float(msg.confidence),
+                    float(msg.x1), float(msg.y1), float(msg.x2), float(msg.y2),
+                )
+                self.latest_box_stamp = now
+            self.detection_detected = bool(msg.detected)
+            self.detection_detected_stamp = now
+
+    def arrived_cb(self, msg: Bool):
+        """Onboard arrived/detected state (held through the detection dwell)."""
+        with self.lock:
+            self.arrived_state = bool(msg.data)
+
     def gps_cb(self, msg: NavSatFix):
         with self.lock:
             self.gps_lat = msg.latitude
@@ -1088,6 +1147,8 @@ class RealtimeRobotPlotter(Node):
         offset_y = (canvas_height - draw_height) / 2
         self.image_canvas.create_image(offset_x, offset_y, anchor='nw', image=self.latest_image_tk)
 
+        self.draw_detection_overlay(offset_x, offset_y, draw_width, draw_height, canvas_width)
+
         age_text = '--'
         if image_stamp is not None:
             age_text = f'{time.time() - image_stamp:.1f}s ago'
@@ -1099,6 +1160,59 @@ class RealtimeRobotPlotter(Node):
         self.image_status_label.config(
             text=f'Topic: {self.image_topic} | Image: {size_text} | Last frame: {age_text}'
         )
+
+    def draw_detection_overlay(self, offset_x, offset_y, draw_width, draw_height, canvas_width):
+        """Draw EXACTLY ONE detection box (the base detector already reports
+        only the single highest-confidence object) plus a large, obvious
+        "OBJECT DETECTED" banner when the rover has arrived/stopped. This is the
+        on-screen proof for the C2 telemetry panel. Toggled by the checkbox."""
+        if not self.overlay_enabled_var.get():
+            return
+
+        now = time.time()
+        with self.lock:
+            box = self.latest_box
+            box_stamp = self.latest_box_stamp
+            detected = self.detection_detected
+            detected_stamp = self.detection_detected_stamp
+            arrived = self.arrived_state
+        timeout = self.detection_overlay_timeout
+
+        # The single bounding box, scaled from normalized coords onto the canvas.
+        box_fresh = box is not None and box_stamp is not None and (now - box_stamp) < timeout
+        box_label = ''
+        if box_fresh:
+            label, conf, nx1, ny1, nx2, ny2 = box
+            box_label = label
+            px1 = offset_x + min(nx1, nx2) * draw_width
+            py1 = offset_y + min(ny1, ny2) * draw_height
+            px2 = offset_x + max(nx1, nx2) * draw_width
+            py2 = offset_y + max(ny1, ny2) * draw_height
+            self.image_canvas.create_rectangle(px1, py1, px2, py2, outline='#00ff00', width=3)
+            caption = f'{label} {conf * 100:.0f}%'
+            tag_w = 9 * len(caption) + 10
+            tag_top = max(offset_y, py1 - 20)
+            self.image_canvas.create_rectangle(
+                px1, tag_top, px1 + tag_w, tag_top + 20, fill='#00ff00', outline='')
+            self.image_canvas.create_text(
+                px1 + 5, tag_top + 10, anchor='w', text=caption,
+                fill='black', font=('TkDefaultFont', 11, 'bold'))
+
+        # Banner: driven by the onboard arrived state (held through the dwell),
+        # or a recent detected flag if running detection without the nav stack.
+        banner = arrived or (
+            detected and detected_stamp is not None and (now - detected_stamp) < timeout)
+        if banner:
+            text = 'OBJECT DETECTED'
+            if box_label:
+                text += f': {box_label.upper()}'
+            text += '  —  ROVER STOPPED'
+            self.image_canvas.create_rectangle(
+                offset_x, offset_y, offset_x + draw_width, offset_y + 46,
+                fill='#cc0000', outline='')
+            self.image_canvas.create_text(
+                offset_x + draw_width / 2, offset_y + 23, text=text,
+                fill='white', font=('TkDefaultFont', 18, 'bold'))
 
     def quaternion_to_yaw(self, x, y, z, w):
         siny_cosp = 2.0 * (w * z + x * y)

@@ -22,10 +22,10 @@ class RTKLocalization(Node):
         # yaw and the rover sees E/W swapped (and rotation reversed). Default
         # is therefore False; flip back to True only if a future IMU swap or
         # remount produces an empirical CW-positive raw stream. Static
-        # confirmation: face physical W, expect published_yaw ~ +78.5 deg
-        # (with declination=-11.5); face physical E, expect ~ -101.5 deg.
+        # confirmation: face physical W, expect published_yaw ~ +90 deg;
+        # face physical E, expect ~ -90 deg.
         self.declare_parameter('yaw_offset_degrees', 0.0)
-        self.declare_parameter('magnetic_declination_degrees', -11.5)
+        self.declare_parameter('magnetic_declination_degrees', 0.0)
         self.declare_parameter('invert_imu_yaw', False)
         self.declare_parameter('use_gyro_fusion', False)
         self.declare_parameter('gyro_fusion_alpha', 0.98)

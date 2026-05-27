@@ -63,7 +63,7 @@ def generate_launch_description():
                     # Inverting was the cause of the E/W swap and reversed
                     # rotation seen on the live telemetry.
                     'invert_imu_yaw': False,
-                    'magnetic_declination_degrees': -11.5,
+                    'magnetic_declination_degrees': 0.0,
                 }],
                 remappings=[
                     ('/gps/fix', '/rtk/navsatfix_data'),

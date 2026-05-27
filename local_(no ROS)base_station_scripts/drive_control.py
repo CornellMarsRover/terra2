@@ -1,10 +1,38 @@
 from pydualsense import pydualsense
+import argparse
+import hidapi
+import os
 import time
 import socket
 
 
 UDP_IP = "192.168.1.69"   # Jetson / rover IP
 UDP_PORT = 5005        # 5010 = drives
+DEFAULT_CONTROLLER_PATH = os.environ.get("DRIVE_CONTROLLER_PATH", "/dev/hidraw4")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Send drive controller data over UDP.")
+    parser.add_argument(
+        "--controller-path",
+        default=DEFAULT_CONTROLLER_PATH,
+        help="DualSense HID path to use for drives, e.g. /dev/hidraw4.",
+    )
+    return parser.parse_args()
+
+
+def open_controller(controller_path: str):
+    ds = pydualsense()
+
+    if controller_path:
+        def find_device_by_path():
+            return hidapi.Device(path=os.fsencode(controller_path))
+
+        ds._pydualsense__find_device = find_device_by_path
+
+    ds.init()
+    print(f"Using drive controller: {controller_path}")
+    return ds
 
 
 def clamp_byte(value: int) -> int:
@@ -62,8 +90,8 @@ def format_data_for_udp(ds_state) -> bytearray:
 
 
 def main():
-    ds = pydualsense()
-    ds.init()
+    args = parse_args()
+    ds = open_controller(args.controller_path)
 
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

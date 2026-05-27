@@ -1,4 +1,7 @@
 from pydualsense import pydualsense, TriggerModes
+import argparse
+import hidapi
+import os
 import time
 import socket
 import struct
@@ -12,6 +15,29 @@ import struct
 UDP_IP = "192.168.1.69" # JETSON IP ON REDROVER WIFI 
 # UDP_IP = "128.253.53.211"
 UDP_PORT = 5020 # 5010 - Drives, 5020 - Controller Arm, 5030 - Mini Arm
+DEFAULT_CONTROLLER_PATH = os.environ.get("ARM_CONTROLLER_PATH", "/dev/hidraw5")
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Send arm controller data over UDP.")
+    parser.add_argument(
+        "--controller-path",
+        default=DEFAULT_CONTROLLER_PATH,
+        help="DualSense HID path to use for the arm, e.g. /dev/hidraw5.",
+    )
+    return parser.parse_args()
+
+def open_controller(controller_path: str):
+    ds = pydualsense()
+
+    if controller_path:
+        def find_device_by_path():
+            return hidapi.Device(path=os.fsencode(controller_path))
+
+        ds._pydualsense__find_device = find_device_by_path
+
+    ds.init()
+    print(f"Using arm controller: {controller_path}")
+    return ds
 
 def format_data_for_udp(ds_state):
     # Assuming ds_state is an instance of DSState or similar with attributes for each button/trigger
@@ -45,8 +71,8 @@ def format_data_for_udp(ds_state):
 
 def main():
     # Initialize controller and network settings
-    ds = pydualsense()
-    ds.init()
+    args = parse_args()
+    ds = open_controller(args.controller_path)
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 

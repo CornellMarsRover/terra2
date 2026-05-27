@@ -31,24 +31,24 @@ LEGACY_BUTTON_VALUES = {
 }
 
 BUTTON_TO_MOTOR = {
-    "triangle": 1,  # front right drive
-    "circle": 3,    # back right drive
-    "x": 4,         # back left drive
-    "square": 2,    # front left drive
+    "triangle": 3,  # front right drive
+    "circle": 4,    # back right drive
+    "x": 2,         # back left drive
+    "square": 1,    # front left drive
 }
 
 MOTOR_LABELS = {
-    1: "front right",
-    2: "front left",
-    3: "back right",
-    4: "back left",
+    1: "front left",
+    2: "back left",
+    3: "front right",
+    4: "back right",
 }
 
 DRIVE_FORWARD_SIGN = {
-    1: -1.0,  # front right
-    2: 1.0,   # front left
-    3: -1.0,  # back right
-    4: 1.0,   # back left
+    1: 1.0,   # front left
+    2: 1.0,   # back left
+    3: -1.0,  # front right
+    4: -1.0,  # back right
 }
 
 

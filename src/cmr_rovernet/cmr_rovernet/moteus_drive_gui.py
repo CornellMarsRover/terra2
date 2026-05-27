@@ -32,14 +32,14 @@ import moteus
 DEFAULT_PORT = "/dev/ttyACM0"
 
 EXPECTED_MODULES = {
-    1: "FR drive",
-    2: "FL drive",
-    3: "BR drive",
-    4: "BL drive",
-    5: "FR steer",
-    6: "FL steer",
-    7: "BR steer",
-    8: "BL steer",
+    1: "FL drive",
+    2: "BL drive",
+    3: "FR drive",
+    4: "BR drive",
+    5: "FL steer",
+    6: "BL steer",
+    7: "FR steer",
+    8: "BR steer",
 }
 
 

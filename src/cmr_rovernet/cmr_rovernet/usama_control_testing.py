@@ -27,10 +27,10 @@ STEER_IDS = [5, 7, 6, 8]
 STEER_DEGREES_TO_POSITION = 50.0 / 360.0
 
 FORWARD_SIGN = {
-    1: -1.0,
+    1: 1.0,
     2: 1.0,
     3: -1.0,
-    4: 1.0,
+    4: -1.0,
 }
 
 STEER_SIGN = {
@@ -536,7 +536,7 @@ class UsamaControlRosNode(Node):
 
     def _manual_command(self, manual: ManualCommandState) -> dict[str, object]:
         drive_axis_sign = self._manual_drive_axis_sign(manual.vx)
-        speed_rps = abs(manual.speed_rps) * drive_axis_sign
+        speed_rps = manual.speed_rps * drive_axis_sign
         return {
             "mode": "swerve",
             "source": "controller_topics",
@@ -630,7 +630,7 @@ class UsamaControlRosNode(Node):
         if bool(l1):
             return self.drive_rps * self.triple_speed_multiplier
         if bool(r1):
-            return self.drive_rps * self.double_speed_multiplier
+            return -self.drive_rps
         if self._trigger_pressed(r2):
             return self.drive_rps
         if self._trigger_pressed(l2):

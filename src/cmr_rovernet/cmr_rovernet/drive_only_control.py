@@ -28,10 +28,10 @@ import math
 
 
 DRIVE_FORWARD_SIGN = {
-    1: -1.0,  # front right
-    2: 1.0,   # front left
-    3: -1.0,  # back right
-    4: 1.0,   # back left
+    1: 1.0,   # front left
+    2: 1.0,   # back left
+    3: -1.0,  # front right
+    4: -1.0,  # back right
 }
 
 
@@ -267,7 +267,7 @@ class DriveOnlyControlNode(Node):
         if bool(l1):
             return self.drive_rps * self.triple_speed_multiplier
         if bool(r1):
-            return self.drive_rps * self.double_speed_multiplier
+            return -self.drive_rps
         if self._trigger_pressed(r2):
             return self.drive_rps
         if self._trigger_pressed(l2):

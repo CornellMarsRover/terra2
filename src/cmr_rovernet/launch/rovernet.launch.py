@@ -45,6 +45,7 @@ def fabric_composition(conf_dir: str, enable_ccb) -> List[Node]:
     return [
         fabric_node(path.join(conf_dir, x), enable_ccb)
         for x in listdir(conf_dir)
+        if x.endswith(".toml") and path.isfile(path.join(conf_dir, x))
     ]
 
 

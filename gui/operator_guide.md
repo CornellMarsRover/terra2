@@ -17,7 +17,18 @@ source install/setup.bash
 
 Every session — start the node + Foxglove bridge:
 
-```
+```python3 src/cmr_rovernet/scripts/moteus_drive_diagnostics.py \
+  --ids 1,2,3,4,5,6,7,8 \
+  --timeout 0.5 \
+  --motion-test \
+  --drive-rps 2.0 \
+  --drive-hold-time 3.0 \
+  --drive-torque 2.0 \
+  --steer-delta 2.0 \
+  --steer-hold-time 3.0 \
+  --steer-velocity-limit 2.0 \
+  --steer-torque 2.0
+
 ros2 launch astrotech_rover astrotech.launch.py
 ```
 

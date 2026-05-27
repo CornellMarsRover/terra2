@@ -29,7 +29,7 @@ from cmr_rovernet.moteus_drive_gui import (
 
 DRIVE_IDS = [1, 2, 3, 4]
 # Actual steer motor layout on the rover:
-# 5 = front left, 7 = front right, 6 = back left, 8 = back right
+# 5 = front right, 7 = back right, 8 = back left, 6 = front left
 STEER_IDS = [5, 7, 6, 8]
 STEER_DEGREES_TO_POSITION = 50.0 / 360.0
 STEER_DIRECTION_SIGN = 1.0
@@ -43,17 +43,17 @@ STEER_CENTER_OFFSETS = {
 # Left-side drives are positive for forward motion.
 # Right-side drives are negative for forward motion.
 FORWARD_SIGN = {
-    1: 1.0,   # FL
-    2: 1.0,   # BL
-    3: -1.0,  # FR
-    4: -1.0,  # BR
+    1: -1.0,  # FR
+    2: 1.0,   # FL
+    3: -1.0,  # BR
+    4: 1.0,   # BL
 }
 
 STEER_SIGN = {
-    5: 1.0,  # FL steer
-    7: 1.0,  # FR steer
-    6: 1.0,  # BL steer
-    8: 1.0,  # BR steer
+    5: 1.0,  # FR steer
+    7: 1.0,  # BR steer
+    6: 1.0,  # FL steer
+    8: 1.0,  # BL steer
 }
 
 SPIN_STEER_SIGN = {

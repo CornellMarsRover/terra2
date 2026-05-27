@@ -27,10 +27,10 @@ STEER_IDS = [5, 7, 6, 8]
 STEER_DEGREES_TO_POSITION = 50.0 / 360.0
 
 FORWARD_SIGN = {
-    1: 1.0,
+    1: -1.0,
     2: 1.0,
     3: -1.0,
-    4: -1.0,
+    4: 1.0,
 }
 
 STEER_SIGN = {

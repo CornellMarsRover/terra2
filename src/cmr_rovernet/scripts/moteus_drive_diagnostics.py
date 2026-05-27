@@ -23,14 +23,14 @@ import moteus
 DEFAULT_PORT = "auto"
 
 EXPECTED_MODULES = {
-    1: "FL drive",
-    2: "BL drive",
-    3: "FR drive",
-    4: "BR drive",
-    5: "FL steer",
-    6: "BL steer",
-    7: "FR steer",
-    8: "BR steer",
+    1: "FR drive",
+    2: "FL drive",
+    3: "BR drive",
+    4: "BL drive",
+    5: "FR steer",
+    6: "FL steer",
+    7: "BR steer",
+    8: "BL steer",
 }
 
 
@@ -338,7 +338,7 @@ async def motion_test(
                         velocity=drive_rps,
                         maximum_torque=drive_torque,
                         accel_limit=5.0,
-                        watchdog_timeout=0.25,
+                        watchdog_timeout=max(0.5, drive_hold_time + 0.25),
                     ),
                     timeout=timeout_s,
                 )

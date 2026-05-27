@@ -9,7 +9,15 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
-        ('share/' + package_name + '/launch', ['launch/rovernet.launch.py']),
+        (
+            'share/' + package_name + '/launch',
+            [
+                'launch/rovernet.launch.py',
+                'launch/steer_only.launch.py',
+                'launch/drive_only.launch.py',
+                'launch/single_drive_wheel.launch.py',
+            ],
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -24,6 +32,9 @@ setup(
             # PHOBOS_APPEND
             'drivesnet_node = cmr_rovernet.drivesnet:main',
             'usama_control_testing_node = cmr_rovernet.usama_control_testing:ros_main',
+            'steer_only_control_node = cmr_rovernet.steer_only_control:ros_main',
+            'drive_only_control_node = cmr_rovernet.drive_only_control:ros_main',
+            'single_drive_wheel_control_node = cmr_rovernet.single_drive_wheel_control:ros_main',
             'ackermann_keyboard_node = cmr_rovernet.ackermann_keyboard:main',
             'cmr_read_node = cmr_rovernet.ccb_read:main',
             'debug_node = cmr_rovernet.debug:main'

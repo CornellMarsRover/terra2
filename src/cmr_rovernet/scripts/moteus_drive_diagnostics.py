@@ -425,13 +425,23 @@ def write_csv(path: str, results: list[QueryResult]):
 
 
 async def main_async(args):
+    if args.list_ports:
+        found_ports = find_can_ports()
+        print("Detected CAN USB candidates:")
+        if found_ports:
+            for candidate in found_ports:
+                print(f"  {candidate}")
+        else:
+            print("  none")
+        return
+
     ids = parse_ids(args.ids)
     qr = make_query_resolution()
 
     transport = None
     port = resolve_port(args.port)
     if port:
-        transport = moteus.Fdcanusb(port)
+        transport = moteus.Fdcanusb(path=port)
 
     controllers = {
         motor_id: (
@@ -506,11 +516,20 @@ def main():
     )
     parser.add_argument(
         "--port",
+        "--can-port",
+        dest="port",
+        metavar="PATH",
         default=DEFAULT_PORT,
         help=(
-            "fdcanusb port, 'auto', or '' for moteus default. "
+            "fdcanusb device path, such as /dev/ttyACM1; use 'auto' to pick "
+            "the first detected adapter, or '' for moteus default. "
             f"Default: {DEFAULT_PORT}"
         ),
+    )
+    parser.add_argument(
+        "--list-ports",
+        action="store_true",
+        help="Print detected CAN USB candidate ports and exit.",
     )
     parser.add_argument("--timeout", type=float, default=0.20, help="Per-command timeout seconds.")
     parser.add_argument(

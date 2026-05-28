@@ -109,18 +109,17 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
 {
     // Give joint jogging priority because it is only buttons
     // If any joint jog command is requested, we are only publishing joint commands
-    if (buttons[A] || buttons[X] || axes[D_PAD_X] || axes[D_PAD_Y]) {
+    if (buttons[B] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y]) {
         // Map the D_PAD to the proximal joints
         joint->joint_names.push_back("base_joint");
         joint->velocities.push_back(axes[D_PAD_X]);
         joint->joint_names.push_back("shoulder_joint");
         joint->velocities.push_back(axes[D_PAD_Y]);
 
-        // Map the diamond to the distal joints
-        joint->joint_names.push_back("wrist_twist");
-        joint->velocities.push_back(buttons[B] - buttons[X]);
+        // Map square/circle to gearbox six roll. X/triangle are reserved for
+        // end-effector servos and should not produce IK commands.
         joint->joint_names.push_back("wrist_rotate_two");
-        joint->velocities.push_back(buttons[Y] - buttons[A]);
+        joint->velocities.push_back(buttons[Y] - buttons[B]);
         return false;
     }
 
@@ -130,7 +129,7 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     //   - right trigger / R1     -> forward/back translation
     //   - left stick up/down     -> pitch (up = pitch down, down = pitch up)
     //   - left stick left/right  -> yaw
-    //   - square/circle          -> roll
+    //   - square/circle          -> direct gearbox six roll joint jog above
     twist->twist.linear.z = axes[RIGHT_STICK_Y];
     twist->twist.linear.x = axes[RIGHT_STICK_X];
 
@@ -142,9 +141,7 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     twist->twist.angular.x = -axes[LEFT_STICK_Y];
     twist->twist.angular.z = axes[LEFT_STICK_X];
 
-    double roll_positive = buttons[Y];
-    double roll_negative = -1 * (buttons[B]);
-    twist->twist.angular.y = roll_positive + roll_negative;
+    twist->twist.angular.y = 0.0;
 
     return true;
 }

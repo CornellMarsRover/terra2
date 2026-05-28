@@ -82,7 +82,7 @@ async def servo_loop(ee0, ee11, ee15):
         await asyncio.sleep(0.1)  # 10 Hz poll
 
 async def main():
-    fd = FdCanInterface(port="/dev/ttyACM0", baud=115200)
+    fd = FdCanInterface(port="/dev/tty.usbmodemD9E9AF951", baud=115200)
     await fd.open()
     await fd.configure_bus()
 

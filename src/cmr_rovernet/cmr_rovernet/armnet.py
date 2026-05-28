@@ -68,11 +68,11 @@ class JSInputSubscriber(Node):
         # self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
         # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
-        self.moveit_mode = 0
         # self.serial_port = None
         self.logger = self.get_logger()
         self.declare_parameter("config_path", "")
         node_config = self._load_node_config()
+        self.moveit_mode = int(bool(node_config.get("start_in_moveit_mode", False)))
         self.arm_can_port = str(node_config.get("can_port", "/dev/ttyACM1"))
         self.publish_hardware_joint_states = bool(
             node_config.get("publish_hardware_joint_states", False)
@@ -96,6 +96,7 @@ class JSInputSubscriber(Node):
         self.get_logger().info(
             f"Arm legacy IK command mapping: {self.use_legacy_ik_command_mapping}"
         )
+        self.get_logger().info(f"Arm initial mode: {'IK' if self.moveit_mode else 'mini arm'}")
         
         # Init constants given TOML file
         # arm_controller_table = parse_toml("TODO")

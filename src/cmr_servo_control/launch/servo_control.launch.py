@@ -9,7 +9,7 @@ def generate_launch_description():
             executable='arm_servo_control_node',
             output='screen',
             parameters=[
-                {'can_port': '/dev/ttyACM0'},
+                {'can_port': '/dev/ttyACM1'},
                 {'baud': 115200},
                 {'servo_can_id': 25},
                 {'command_topic': '/arm_controller/cmd_buttons'},

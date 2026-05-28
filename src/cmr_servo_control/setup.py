@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'servo_hw_node = cmr_servo_control.servo_hw_node:main',
+            'arm_servo_control_node = cmr_servo_control.arm_servo_control_node:main',
             'keyboard_input_node = cmr_servo_control.keyboard_input_node:main',
             'servo_probe = cmr_servo_control.servo_probe:main',
         ],

@@ -138,7 +138,7 @@ class CmdVelPublisher(Node):
             arm_data, addr = arm_packet
             if self.validate_drive_packet(arm_data, UDP_PORT_ARM, addr, kind="arm"):
                 lx, ly, rx, ry = self.parse_controller_data(arm_data)
-                arm_button_array, _dpad = self.parse_button_data(arm_data)
+                arm_button_array, dpad = self.parse_button_data(arm_data)
                 self.arm_publisher_.publish(
                     self.create_arm_joy_message(
                         [
@@ -159,7 +159,7 @@ class CmdVelPublisher(Node):
                     )
                 )
                 self.arm_button_publisher_.publish(
-                    self.create_arm_button_message(arm_button_array)
+                    self.create_arm_button_message(arm_button_array, dpad)
                 )
 
         mini_arm_packet = self.recv_latest(mini_arm_sock)
@@ -257,9 +257,10 @@ class CmdVelPublisher(Node):
         button_msg.dpad = dpad
         return button_msg
 
-    def create_arm_button_message(self, button_array):
+    def create_arm_button_message(self, button_array, dpad):
         button_msg = ControllerReading()
         button_msg.button_array = button_array
+        button_msg.dpad = dpad
         return button_msg
 
     def decode_drive_buttons(self, button_array):

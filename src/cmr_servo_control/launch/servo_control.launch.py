@@ -6,17 +6,13 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='cmr_servo_control',
-            executable='servo_hw_node',
+            executable='arm_servo_control_node',
             output='screen',
             parameters=[
-                {'can_port': '/dev/ttyTHS0'},
+                {'can_port': '/dev/ttyACM0'},
                 {'baud': 115200},
-                {'servo_can_id': 24},
+                {'servo_can_id': 25},
+                {'command_topic': '/arm_controller/cmd_buttons'},
             ],
-        ),
-        Node(
-            package='cmr_servo_control',
-            executable='keyboard_input_node',
-            output='screen',
         ),
     ])

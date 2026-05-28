@@ -82,15 +82,14 @@ async def servo_loop(ee0, ee11, ee15):
         await asyncio.sleep(0.1)  # 10 Hz poll
 
 async def main():
-    fd = FdCanInterface(port="/dev/tty.usbmodemD9E9AF951", baud=115200)
+    fd = FdCanInterface(port="/dev/ttyACM0", baud=115200)
     await fd.open()
     await fd.configure_bus()
 
-    # Board 1 (can_id=25): ee0, ee11
-    # Board 2 (can_id=26): ee15
+    # Board 1 (can_id=25): ee0, ee11, ee15
     ee0 = ServoController(can=fd, servo_id=0, can_id=25)
     ee11 = ServoController(can=fd, servo_id=11, can_id=25)
-    ee15 = ServoController(can=fd, servo_id=15, can_id=26)
+    ee15 = ServoController(can=fd, servo_id=15, can_id=25)
 
     print("=======================================")
     print("  SERVO KEYBOARD CONTROL               ")
@@ -99,7 +98,7 @@ async def main():
     print("  9   : ee0  -> 93°        (board id25) ")
     print("  3/4 : ee11 -5 / +5       (board id25) ")
     print("  0   : ee11 -> 100°       (board id25) ")
-    print("  5/6 : ee15 -5 / +5       (board id26) ")
+    print("  5/6 : ee15 -5 / +5       (board id25) ")
     print(f"  ee15 range: {EE15_MIN} to {EE15_MAX} degrees")
     print(f"  Step size: {STEP} degrees            ")
     print("  Ctrl+C to exit                       ")

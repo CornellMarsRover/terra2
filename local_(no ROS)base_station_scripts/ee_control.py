@@ -16,10 +16,16 @@ import struct
 # UDP_IP = "10.49.15.204"
 
 #UDP_IP = "192.168.1.69" # JETSON IP ON RADIO
-UDP_IP = "192.168.1.69" # JETSON IP ON REDROVER WIFI 
+UDP_IP = "192.168.1.69" # JETSON IP ON REDROVER WIFI
 # UDP_IP = "128.253.53.211"
 UDP_PORT = 5020 # 5010 - Drives, 5020 - Controller Arm, 5030 - Mini Arm
 DEFAULT_CONTROLLER_PATH = os.environ.get("ARM_CONTROLLER_PATH", "/dev/hidraw5")
+
+DPAD_NEUTRAL = 8
+DPAD_UP = 0
+DPAD_RIGHT = 2
+DPAD_DOWN = 4
+DPAD_LEFT = 6
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Send arm controller data over UDP.")
@@ -43,6 +49,52 @@ def open_controller(controller_path: str):
     print(f"Using arm controller: {controller_path}")
     return ds
 
+def read_dpad(ds_state):
+    for attr in ("dpad", "Dpad", "DPAD", "hat", "hat_switch"):
+        if hasattr(ds_state, attr):
+            value = getattr(ds_state, attr)
+            if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 8:
+                return value
+
+    up = bool(
+        getattr(ds_state, "dpad_up", False)
+        or getattr(ds_state, "DpadUp", False)
+        or getattr(ds_state, "up", False)
+    )
+    right = bool(
+        getattr(ds_state, "dpad_right", False)
+        or getattr(ds_state, "DpadRight", False)
+        or getattr(ds_state, "right", False)
+    )
+    down = bool(
+        getattr(ds_state, "dpad_down", False)
+        or getattr(ds_state, "DpadDown", False)
+        or getattr(ds_state, "down", False)
+    )
+    left = bool(
+        getattr(ds_state, "dpad_left", False)
+        or getattr(ds_state, "DpadLeft", False)
+        or getattr(ds_state, "left", False)
+    )
+
+    if up and right:
+        return 1
+    if right and down:
+        return 3
+    if down and left:
+        return 5
+    if left and up:
+        return 7
+    if up:
+        return DPAD_UP
+    if right:
+        return DPAD_RIGHT
+    if down:
+        return DPAD_DOWN
+    if left:
+        return DPAD_LEFT
+    return DPAD_NEUTRAL
+
 def format_data_for_udp(ds_state):
     # Assuming ds_state is an instance of DSState or similar with attributes for each button/trigger
     # Convert button states to binary representation
@@ -60,9 +112,7 @@ def format_data_for_udp(ds_state):
     l2_button       = int(ds_state.L2)  
     r2_button       = int(ds_state.R2)
     
-    # Convert hat direction to binary representation, if available
-    # Adjust this part according to your needs and the data provided by pydualsense
-    hat_switch = 0  # Example placeholder, adjust based on available data
+    hat_switch = read_dpad(ds_state)
 
     if l2_button < 30: 
         l2_button = 0
@@ -90,6 +140,8 @@ def main():
             # ds.triggerR.setMode(TriggerModes.Rigid)
             # ds.triggerR.setForce(1, 255)
             for x in range(len(data_list)):
+                if x == 12:
+                    continue
                 if data_list[x] != 0 and data_list[x] != 1:
                     data_list[x] -= 1
             print(data_list)

@@ -68,7 +68,7 @@ class JSInputSubscriber(Node):
         # self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
         # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
-        self.moveit_mode = 1
+        self.moveit_mode = 0
         # self.serial_port = None
         self.logger = self.get_logger()
         self.declare_parameter("config_path", "")

@@ -202,8 +202,8 @@ class CmdVelPublisher(Node):
         msg.base_angle = mini_arm_data[0]
         msg.shoulder_angle = mini_arm_data[1]
         msg.elbow_angle = mini_arm_data[2]
-        msg.first_rotate_angle = mini_arm_data[3]
-        msg.tilt_angle = mini_arm_data[4]
+        msg.first_rotate_angle = mini_arm_data[4]
+        msg.tilt_angle = mini_arm_data[3]
         msg.second_rotate_angle = mini_arm_data[5]
         return msg
 

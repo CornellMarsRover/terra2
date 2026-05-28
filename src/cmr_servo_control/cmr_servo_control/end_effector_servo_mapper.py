@@ -8,13 +8,16 @@ BUTTON_SQUARE_INDEX = 4
 BUTTON_CIRCLE_INDEX = 6
 
 STEP_DEGREES = 5
+DRILL_STOP_DEGREES = 90
+DRILL_REVERSE_DEGREES = 0
+DRILL_FORWARD_DEGREES = 180
 
 SERVO_EE0 = "ee0"
 SERVO_EE11 = "ee11"
 SERVO_EE15 = "ee15"
 
 INITIAL_STATE = {
-    SERVO_EE0: 101,
+    SERVO_EE0: DRILL_STOP_DEGREES,
     SERVO_EE11: 100,
     SERVO_EE15: 95,
 }
@@ -23,6 +26,12 @@ SERVO_IDS = {
     SERVO_EE0: 0,
     SERVO_EE11: 11,
     SERVO_EE15: 15,
+}
+
+SERVO_CAN_IDS = {
+    SERVO_EE0: 25,
+    SERVO_EE11: 25,
+    SERVO_EE15: 26,
 }
 
 SERVO_MIN = {
@@ -59,9 +68,21 @@ class EndEffectorServoMapper:
                     self._step_servo(SERVO_EE11, -STEP_DEGREES)
                 )
             elif dpad == DPAD_LEFT:
-                commands.append(self._set_servo(SERVO_EE0, 0))
+                commands.append(
+                    self._toggle_servo(
+                        SERVO_EE0,
+                        DRILL_REVERSE_DEGREES,
+                        DRILL_STOP_DEGREES,
+                    )
+                )
             elif dpad == DPAD_RIGHT:
-                commands.append(self._set_servo(SERVO_EE0, 180))
+                commands.append(
+                    self._toggle_servo(
+                        SERVO_EE0,
+                        DRILL_FORWARD_DEGREES,
+                        DRILL_STOP_DEGREES,
+                    )
+                )
 
         if self._rising_edge(button_array, BUTTON_SQUARE_INDEX):
             commands.append(self._step_servo(SERVO_EE15, STEP_DEGREES))
@@ -75,6 +96,11 @@ class EndEffectorServoMapper:
 
     def _step_servo(self, name: str, delta: int):
         return self._set_servo(name, self.state[name] + delta)
+
+    def _toggle_servo(self, name: str, active_angle: int, inactive_angle: int):
+        if self.state[name] == active_angle:
+            return self._set_servo(name, inactive_angle)
+        return self._set_servo(name, active_angle)
 
     def _set_servo(self, name: str, angle: int):
         if name in SERVO_MIN:

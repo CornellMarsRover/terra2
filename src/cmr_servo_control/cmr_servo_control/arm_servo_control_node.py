@@ -10,6 +10,7 @@ from cmr_msgs.msg import ControllerReading
 from .CMR_CANFD import FdCanInterface, ServoController
 from .end_effector_servo_mapper import (
     EndEffectorServoMapper,
+    SERVO_CAN_IDS,
     SERVO_IDS,
 )
 
@@ -50,17 +51,21 @@ class ArmServoControlNode(Node):
         )
         self.get_logger().info(
             f"Arm servo control ready: topic={self.command_topic}, "
-            f"servo_can_id={self.servo_can_id}"
+            f"default_servo_can_id={self.servo_can_id}"
         )
 
     async def _startup(self):
         await self.fd.open()
         await self.fd.configure_bus()
         for name, servo_id in SERVO_IDS.items():
+            can_id = SERVO_CAN_IDS.get(name, self.servo_can_id)
             self.servos[name] = ServoController(
                 can=self.fd,
                 servo_id=servo_id,
-                can_id=self.servo_can_id,
+                can_id=can_id,
+            )
+            self.get_logger().info(
+                f"Configured {name}: board_can_id={can_id}, servo_id={servo_id}"
             )
 
     def command_callback(self, msg: ControllerReading):
@@ -70,7 +75,10 @@ class ArmServoControlNode(Node):
             if servo is None:
                 self.get_logger().warn(f"No configured servo for {name}")
                 continue
-            self.get_logger().info(f"Commanding {name} -> {angle} deg")
+            self.get_logger().info(
+                f"Commanding {name} on board {servo.can_id}, "
+                f"servo {servo.servo_id} -> {angle} deg"
+            )
             future = asyncio.run_coroutine_threadsafe(
                 servo.go_to_position(angle),
                 self.loop,

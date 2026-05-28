@@ -11,6 +11,18 @@ from cmr_rovernet.rovernet_utils import *
 
 MAX_TORQUE = 0.7
 MAX_ACCEL = 5.0
+MINI_ARM_MAX_TORQUE = 0.7
+MINI_ARM_VELOCITY_LIMIT = 10.0
+MINI_ARM_ACCEL_LIMIT = 10.0
+MINI_ARM_SOFT_GEAR_RATIO = [
+    0.25,
+    0.3,
+    0.25,
+    0.125,
+    0.125,
+    0.125,
+]
+MINI_ARM_DEADBAND = 0.002
 JOINT_MOTOR_IDS = {
     "base_joint": 9,
     "shoulder_joint": 10,
@@ -42,19 +54,15 @@ class JSInputSubscriber(Node):
             '/mini_arm_controller/cmd_pos',
             self.listener_callback_mini,
             10)
-        self.button_subscription = self.create_subscription(
-            ControllerReading,
-            '/arm_controller/cmd_buttons',
-            self.listener_button_callback,
-            10)
         self.subscription  # prevent unused variable warning
         self.current_speed = 0
         self.current_speed_angular = 0
         self.last_time = time.time()
+        self.prev_mini_arm_positions = None
+        self.target_mini_arm_positions = [0.0] * len(JOINT_MOTOR_IDS)
         # self.port = "/dev/ttyTHS0"
         self.baud_rate = 115200
         # self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=1)
-        self.moveit_mode = 1
         # self.serial_port = None
         self.logger = self.get_logger()
         self.declare_parameter("config_path", "")
@@ -250,107 +258,82 @@ class JSInputSubscriber(Node):
 
 
     def listener_callback(self, msg):
-        if self.moveit_mode:
-            if self.use_legacy_ik_command_mapping:
-                if not msg.points:
-                    self.get_logger().warning("Ignoring empty JointTrajectory.")
-                    return
-
-                point = msg.points[0]
-                if len(point.positions) < 6:
-                    self.get_logger().error(
-                        "Ignoring JointTrajectory with fewer than 6 positions."
-                    )
-                    return
-
-                positions, velocities = self.translate_to_electrical(
-                    point.positions,
-                    point.velocities,
-                )
-                for joint_name, position, velocity_limit in zip(
-                    JOINT_MOTOR_IDS.keys(),
-                    positions,
-                    velocities,
-                ):
-                    send_moteus_command_sync(
-                        controller=self.controllers[joint_name],
-                        motor=JOINT_MOTOR_IDS[joint_name],
-                        position=position,
-                        drives_velocity=None,
-                        maximum_torque=MAX_TORQUE,
-                        velocity_limit=velocity_limit,
-                        accel_limit=MAX_ACCEL,
-                        ff_torque=None,
-                        logger=logger,
-                    )
+        if self.use_legacy_ik_command_mapping:
+            if not msg.points:
+                self.get_logger().warning("Ignoring empty JointTrajectory.")
                 return
 
-            commands = self.iter_joint_commands(msg)
-            # base = byte_command_converter(ARM, ARM_BASE, positions[0], None, MAX_TORQUE, velocities[0], MAX_ACCEL, None, self.get_logger())
-            # shoulder = byte_command_converter(ARM, ARM_SHOULDER, positions[1], None, MAX_TORQUE, velocities[1], MAX_ACCEL, None, self.get_logger())
-            # elbow = byte_command_converter(ARM, ARM_ELBOW, positions[2], None, MAX_TORQUE, velocities[2], MAX_ACCEL, None, self.get_logger())
-            # wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, positions[3], None, MAX_TORQUE, velocities[3], MAX_ACCEL, None, self.get_logger())
-            # wrist_tilt = byte_command_converter(ARM, WRIST_TILT, positions[4], None, MAX_TORQUE, velocities[4], MAX_ACCEL, None, self.get_logger())
-            # wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, positions[5], None, MAX_TORQUE, velocities[5], MAX_ACCEL, None, self.get_logger())
-            # send_number(self.serial_port, base)
-            # send_number(self.serial_port, shoulder)
-            # send_number(self.serial_port, elbow)
-            # send_number(self.serial_port, wrist_rotate_1)
-            # send_number(self.serial_port, wrist_tilt)
-            # send_number(self.serial_port, wrist_rotate_2)
+            point = msg.points[0]
+            if len(point.positions) < 6:
+                self.get_logger().error(
+                    "Ignoring JointTrajectory with fewer than 6 positions."
+                )
+                return
 
-            for _, controller, motor_id, position, velocity_limit in commands:
-                send_moteus_command_sync(controller=controller, motor=motor_id, position=position, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocity_limit,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+            positions, velocities = self.translate_to_electrical(
+                point.positions,
+                point.velocities,
+            )
+            for joint_name, position, velocity_limit in zip(
+                JOINT_MOTOR_IDS.keys(),
+                positions,
+                velocities,
+            ):
+                send_moteus_command_sync(
+                    controller=self.controllers[joint_name],
+                    motor=JOINT_MOTOR_IDS[joint_name],
+                    position=position,
+                    drives_velocity=None,
+                    maximum_torque=MAX_TORQUE,
+                    velocity_limit=velocity_limit,
+                    accel_limit=MAX_ACCEL,
+                    ff_torque=None,
+                    logger=logger,
+                )
+            return
+
+        commands = self.iter_joint_commands(msg)
+
+        for _, controller, motor_id, position, velocity_limit in commands:
+            send_moteus_command_sync(controller=controller, motor=motor_id, position=position, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=velocity_limit,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
 
 
 
     def listener_callback_mini(self, msg):  
-        if not self.moveit_mode:
-            max_velocity = 3
-            print([msg.base_angle, msg.shoulder_angle, msg.elbow_angle, msg.first_rotate_angle, msg.tilt_angle, msg.second_rotate_angle])
-            # base = byte_command_converter(ARM, ARM_BASE, msg.base_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            # shoulder = byte_command_converter(ARM, ARM_SHOULDER, msg.shoulder_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            # elbow = byte_command_converter(ARM, ARM_ELBOW, msg.elbow_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            # wrist_rotate_1 = byte_command_converter(ARM, WRIST_ROTATE_1, msg.first_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            # wrist_tilt = byte_command_converter(ARM, WRIST_TILT, msg.tilt_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            # wrist_rotate_2 = byte_command_converter(ARM, WRIST_ROTATE_2, msg.second_rotate_angle, None, MAX_TORQUE, max_velocity, MAX_ACCEL, None, self.get_logger())
-            # send_number(self.serial_port, base)
-            # send_number(self.serial_port, shoulder)
-            # send_number(self.serial_port, elbow)
-            # send_number(self.serial_port, wrist_rotate_1)
-            # send_number(self.serial_port, wrist_tilt)
-            # send_number(self.serial_port, wrist_rotate_2)
+        mini_arm_positions = [
+            msg.base_angle,
+            msg.shoulder_angle,
+            msg.elbow_angle,
+            msg.first_rotate_angle,
+            msg.tilt_angle,
+            msg.second_rotate_angle,
+        ]
 
-            send_moteus_command_sync(controller=self.controllers["base_joint"], motor=9, position=msg.base_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=self.controllers["shoulder_joint"], motor=10, position=msg.shoulder_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=self.controllers["elbow_joint"], motor=11, position=msg.elbow_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=self.controllers["wrist_rotate"], motor=12, position=msg.first_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=self.controllers["wrist_twist"], motor=13, position=msg.tilt_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
-            send_moteus_command_sync(controller=self.controllers["wrist_rotate_two"], motor=14, position=msg.second_rotate_angle, drives_velocity=None, maximum_torque=MAX_TORQUE, velocity_limit=max_velocity,  accel_limit=MAX_ACCEL, ff_torque=None, logger=logger)
+        if self.prev_mini_arm_positions is None:
+            self.prev_mini_arm_positions = mini_arm_positions
+            self.target_mini_arm_positions = [0.0] * len(mini_arm_positions)
+            self.get_logger().info(
+                f"Mini arm initialized at: {mini_arm_positions}"
+            )
+            return
 
+        for index, position in enumerate(mini_arm_positions):
+            delta = position - self.prev_mini_arm_positions[index]
+            if abs(delta) < MINI_ARM_DEADBAND:
+                delta = 0.0
+            self.target_mini_arm_positions[index] += (
+                MINI_ARM_SOFT_GEAR_RATIO[index] * delta
+            )
 
+        self.prev_mini_arm_positions = mini_arm_positions
+        print(self.target_mini_arm_positions)
 
-    def listener_button_callback(self, msg):
-            trigger_val = msg.button_array[0]
-            button_val = msg.button_array[1]
-            # self.logger.info(f'button_array: {msg.button_array[0]}')
-            if trigger_val == L1 and button_val == SQUARE:
-                self.moveit_mode = 0
-                self.logger.info(f'Mini arm mode: {str(self.moveit_mode)}')
-                print("Mini arm mode: " + str(self.moveit_mode))
-            if trigger_val == L1 and button_val == CIRCLE:
-                self.moveit_mode = 1
-                self.logger.info(f'IK mode: {str(self.moveit_mode)}')
-                print("MoveIt arm mode: " + str(self.moveit_mode))
-            if trigger_val == R1 and button_val == SQUARE:
-                self.moveit_mode = 1
-                print("MoveIt arm mode: " + str(self.moveit_mode))
-            if trigger_val == R1 and button_val == CIRCLE:
-                self.moveit_mode = 1
-                print("MoveIt arm mode: " + str(self.moveit_mode))
-            if trigger_val == R1 and button_val == TRIANGLE:
-                self.moveit_mode = 1
-                print("MoveIt arm mode: " + str(self.moveit_mode))
+        send_moteus_command_sync(controller=self.controllers["base_joint"], motor=9, position=self.target_mini_arm_positions[0], drives_velocity=None, maximum_torque=MINI_ARM_MAX_TORQUE, velocity_limit=MINI_ARM_VELOCITY_LIMIT,  accel_limit=MINI_ARM_ACCEL_LIMIT, ff_torque=0.0, logger=logger)
+        send_moteus_command_sync(controller=self.controllers["shoulder_joint"], motor=10, position=self.target_mini_arm_positions[1], drives_velocity=None, maximum_torque=MINI_ARM_MAX_TORQUE, velocity_limit=MINI_ARM_VELOCITY_LIMIT,  accel_limit=MINI_ARM_ACCEL_LIMIT, ff_torque=0.0, logger=logger)
+        send_moteus_command_sync(controller=self.controllers["elbow_joint"], motor=11, position=self.target_mini_arm_positions[2], drives_velocity=None, maximum_torque=MINI_ARM_MAX_TORQUE, velocity_limit=MINI_ARM_VELOCITY_LIMIT,  accel_limit=MINI_ARM_ACCEL_LIMIT, ff_torque=0.0, logger=logger)
+        send_moteus_command_sync(controller=self.controllers["wrist_rotate"], motor=12, position=self.target_mini_arm_positions[3], drives_velocity=None, maximum_torque=MINI_ARM_MAX_TORQUE, velocity_limit=MINI_ARM_VELOCITY_LIMIT,  accel_limit=MINI_ARM_ACCEL_LIMIT, ff_torque=0.0, logger=logger)
+        send_moteus_command_sync(controller=self.controllers["wrist_twist"], motor=13, position=self.target_mini_arm_positions[4], drives_velocity=None, maximum_torque=MINI_ARM_MAX_TORQUE, velocity_limit=MINI_ARM_VELOCITY_LIMIT,  accel_limit=MINI_ARM_ACCEL_LIMIT, ff_torque=0.0, logger=logger)
+        send_moteus_command_sync(controller=self.controllers["wrist_rotate_two"], motor=14, position=self.target_mini_arm_positions[5], drives_velocity=None, maximum_torque=MINI_ARM_MAX_TORQUE, velocity_limit=MINI_ARM_VELOCITY_LIMIT,  accel_limit=MINI_ARM_ACCEL_LIMIT, ff_torque=0.0, logger=logger)
 
 
 def main(args=None):

@@ -109,8 +109,7 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
 {
     // Give joint jogging priority because it is only buttons
     // If any joint jog command is requested, we are only publishing joint commands
-    if (buttons[A] || buttons[B] || buttons[X] || buttons[Y] || axes[D_PAD_X] ||
-        axes[D_PAD_Y]) {
+    if (buttons[A] || buttons[X] || axes[D_PAD_X] || axes[D_PAD_Y]) {
         // Map the D_PAD to the proximal joints
         joint->joint_names.push_back("panda_joint1");
         joint->velocities.push_back(axes[D_PAD_X]);
@@ -128,24 +127,23 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     // Arm teleop mapping:
     //   - right stick up/down    -> vertical translation
     //   - right stick left/right -> right/left plane translation
-    //   - triggers               -> forward/back translation
+    //   - right trigger / R1     -> forward/back translation
     //   - left stick up/down     -> pitch (up = pitch down, down = pitch up)
     //   - left stick left/right  -> yaw
-    //   - bumpers                -> roll (R1 positive, L1 negative)
+    //   - square/circle          -> roll
     twist->twist.linear.z = axes[RIGHT_STICK_Y];
     twist->twist.linear.x = axes[RIGHT_STICK_X];
 
     double lin_forward_right =
         0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-    double lin_backward_left =
-        -0.5 * (axes[LEFT_TRIGGER] - AXIS_DEFAULTS.at(LEFT_TRIGGER));
-    twist->twist.linear.y = lin_forward_right + lin_backward_left;
+    double lin_backward_r1 = buttons[RIGHT_BUMPER];
+    twist->twist.linear.y = lin_forward_right + lin_backward_r1;
 
     twist->twist.angular.x = -axes[LEFT_STICK_Y];
     twist->twist.angular.z = axes[LEFT_STICK_X];
 
-    double roll_positive = buttons[LEFT_BUMPER];
-    double roll_negative = -1 * (buttons[RIGHT_BUMPER]);
+    double roll_positive = buttons[Y];
+    double roll_negative = -1 * (buttons[B]);
     twist->twist.angular.y = roll_positive + roll_negative;
 
     return true;

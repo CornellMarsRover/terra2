@@ -26,7 +26,7 @@ def test_dpad_edges_step_once_until_released():
     assert mapper.update([0] * 8, DPAD_DOWN) == [("ee11", 105)]
 
 
-def test_dpad_left_right_command_absolute_spin_servo_positions():
+def test_dpad_left_right_command_drill_spin_servo_positions():
     mapper = EndEffectorServoMapper()
 
     assert mapper.update([0] * 8, DPAD_LEFT) == [
@@ -53,18 +53,18 @@ def test_dpad_left_right_toggle_drill_to_stop():
     assert mapper.update([0] * 8, DPAD_LEFT) == [("ee0", DRILL_STOP_DEGREES)]
 
 
-def test_square_circle_edges_step_ee15_once_until_released():
+def test_triangle_x_edges_step_ee15_once_until_released():
     mapper = EndEffectorServoMapper()
     buttons = [0] * 8
 
-    buttons[4] = 1
+    buttons[7] = 1
     assert mapper.update(buttons, DPAD_NEUTRAL) == [("ee15", 100)]
     assert mapper.update(buttons, DPAD_NEUTRAL) == []
 
-    buttons[4] = 0
+    buttons[7] = 0
     assert mapper.update(buttons, DPAD_NEUTRAL) == []
 
-    buttons[6] = 1
+    buttons[5] = 1
     assert mapper.update(buttons, DPAD_NEUTRAL) == [("ee15", 95)]
 
 
@@ -72,13 +72,13 @@ def test_incremental_servos_are_clamped():
     mapper = EndEffectorServoMapper()
 
     mapper.state["ee11"] = 150
-    mapper.state["ee15"] = 40
+    mapper.state["ee15"] = 60
 
     assert mapper.update([0] * 8, DPAD_UP) == []
     assert mapper.update([0] * 8, DPAD_NEUTRAL) == []
 
     buttons = [0] * 8
-    buttons[6] = 1
+    buttons[5] = 1
     assert mapper.update(buttons, DPAD_NEUTRAL) == []
 
 

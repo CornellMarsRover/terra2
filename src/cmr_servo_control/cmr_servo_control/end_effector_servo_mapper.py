@@ -4,8 +4,8 @@ DPAD_DOWN = 4
 DPAD_LEFT = 6
 DPAD_NEUTRAL = 8
 
-BUTTON_SQUARE_INDEX = 4
-BUTTON_CIRCLE_INDEX = 6
+BUTTON_X_INDEX = 5
+BUTTON_TRIANGLE_INDEX = 7
 
 STEP_DEGREES = 5
 DRILL_STOP_DEGREES = 90
@@ -36,12 +36,12 @@ SERVO_CAN_IDS = {
 
 SERVO_MIN = {
     SERVO_EE11: 40,
-    SERVO_EE15: 40,
+    SERVO_EE15: 75,
 }
 
 SERVO_MAX = {
     SERVO_EE11: 150,
-    SERVO_EE15: 150,
+    SERVO_EE15: 120,
 }
 
 
@@ -84,9 +84,9 @@ class EndEffectorServoMapper:
                     )
                 )
 
-        if self._rising_edge(button_array, BUTTON_SQUARE_INDEX):
+        if self._rising_edge(button_array, BUTTON_TRIANGLE_INDEX):
             commands.append(self._step_servo(SERVO_EE15, STEP_DEGREES))
-        if self._rising_edge(button_array, BUTTON_CIRCLE_INDEX):
+        if self._rising_edge(button_array, BUTTON_X_INDEX):
             commands.append(self._step_servo(SERVO_EE15, -STEP_DEGREES))
 
         self.previous_dpad = dpad

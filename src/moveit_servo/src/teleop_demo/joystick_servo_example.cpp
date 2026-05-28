@@ -111,15 +111,15 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     // If any joint jog command is requested, we are only publishing joint commands
     if (buttons[A] || buttons[X] || axes[D_PAD_X] || axes[D_PAD_Y]) {
         // Map the D_PAD to the proximal joints
-        joint->joint_names.push_back("panda_joint1");
+        joint->joint_names.push_back("base_joint");
         joint->velocities.push_back(axes[D_PAD_X]);
-        joint->joint_names.push_back("panda_joint2");
+        joint->joint_names.push_back("shoulder_joint");
         joint->velocities.push_back(axes[D_PAD_Y]);
 
         // Map the diamond to the distal joints
-        joint->joint_names.push_back("panda_joint7");
+        joint->joint_names.push_back("wrist_twist");
         joint->velocities.push_back(buttons[B] - buttons[X]);
-        joint->joint_names.push_back("panda_joint6");
+        joint->joint_names.push_back("wrist_rotate_two");
         joint->velocities.push_back(buttons[Y] - buttons[A]);
         return false;
     }

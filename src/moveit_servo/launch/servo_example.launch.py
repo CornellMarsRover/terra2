@@ -5,7 +5,9 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
-from launch.actions import ExecuteProcess
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 import xacro
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -33,8 +35,10 @@ def load_yaml(package_name, file_path):
 
 
 def generate_launch_description():
+    enable_controller = LaunchConfiguration("enable_controller")
+
     moveit_config = (
-        MoveItConfigsBuilder("cmr_arm_simulator")
+        MoveItConfigsBuilder("Arm", package_name="cmr_arm_simulator_moveit_config")
         .robot_description(file_path="config/Arm.urdf.xacro")
         .to_moveit_configs()
     )
@@ -94,6 +98,7 @@ def generate_launch_description():
         package="cmr_controller_remote",
         executable="connect_node",
         arguments=[],
+        condition=IfCondition(enable_controller),
     )
 
     # Launch as much as possible in components
@@ -125,7 +130,7 @@ def generate_launch_description():
                 package="tf2_ros",
                 plugin="tf2_ros::StaticTransformBroadcasterNode",
                 name="static_tf2_broadcaster",
-                parameters=[{"child_frame_id": "/base_link", "frame_id": "/world"}],
+                parameters=[{"child_frame_id": "base_link", "frame_id": "world"}],
             ),
             ComposableNode(
                 package="moveit_servo",
@@ -156,6 +161,14 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "enable_controller",
+                default_value="false",
+                description=(
+                    "Launch the UDP controller bridge. Leave false when "
+                    "rovernet.launch.py is running."
+                ),
+            ),
             rviz_node,
             ros2_control_node,
             joint_state_broadcaster_spawner,

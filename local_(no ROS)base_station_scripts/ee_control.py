@@ -6,6 +6,10 @@ import time
 import socket
 import struct
 
+#run 
+#python ee_control.py --controller-path /dev/hidraw5
+
+
 # Network settings
 # UDP_IP   = "192.168.1.102"
 # UDP_IP = "10.49.43.10" # JETSON IP

@@ -5,6 +5,8 @@ import os
 import time
 import socket
 
+#run
+#python drive_control.py --controller-path /dev/hidraw4
 
 UDP_IP = "192.168.1.69"   # Jetson / rover IP
 UDP_PORT = 5005        # 5010 = drives

@@ -1,4 +1,3 @@
-from pydualsense import pydualsense, TriggerModes
 import argparse
 import os
 import time
@@ -32,6 +31,26 @@ DPAD_UP = 0
 DPAD_RIGHT = 2
 DPAD_DOWN = 4
 DPAD_LEFT = 6
+
+
+def load_pydualsense():
+    try:
+        from pydualsense import pydualsense
+    except ModuleNotFoundError as exc:
+        if exc.name != "pydualsense":
+            raise
+        raise SystemExit(
+            "Missing Python dependency: pydualsense\n"
+            "Install local controller dependencies with:\n"
+            "  python3 -m pip install -r requirements.txt"
+        ) from exc
+    except OSError as exc:
+        raise SystemExit(
+            "Missing system HID library for pydualsense.\n"
+            "Install it with:\n"
+            "  sudo apt install libhidapi-hidraw0 libhidapi-libusb0"
+        ) from exc
+    return pydualsense
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Send arm controller data over UDP.")
@@ -139,6 +158,7 @@ def main():
         print_dualsense_devices()
         return
 
+    pydualsense = load_pydualsense()
     ds = open_dualsense(
         pydualsense,
         "arm",

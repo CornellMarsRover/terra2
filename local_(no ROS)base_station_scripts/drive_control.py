@@ -1,4 +1,3 @@
-from pydualsense import pydualsense
 import argparse
 import os
 import time
@@ -17,6 +16,26 @@ DEFAULT_CONTROLLER_PATH = os.environ.get("DRIVE_CONTROLLER_PATH")
 DEFAULT_CONTROLLER_SERIAL = os.environ.get("DRIVE_CONTROLLER_SERIAL")
 DEFAULT_CONTROLLER_INDEX = int(os.environ.get("DRIVE_CONTROLLER_INDEX", "0"))
 LEGACY_CONTROLLER_PATH = "/dev/hidraw4"
+
+
+def load_pydualsense():
+    try:
+        from pydualsense import pydualsense
+    except ModuleNotFoundError as exc:
+        if exc.name != "pydualsense":
+            raise
+        raise SystemExit(
+            "Missing Python dependency: pydualsense\n"
+            "Install local controller dependencies with:\n"
+            "  python3 -m pip install -r requirements.txt"
+        ) from exc
+    except OSError as exc:
+        raise SystemExit(
+            "Missing system HID library for pydualsense.\n"
+            "Install it with:\n"
+            "  sudo apt install libhidapi-hidraw0 libhidapi-libusb0"
+        ) from exc
+    return pydualsense
 
 
 def parse_args():
@@ -105,6 +124,7 @@ def main():
         print_dualsense_devices()
         return
 
+    pydualsense = load_pydualsense()
     ds = open_dualsense(
         pydualsense,
         "drive",

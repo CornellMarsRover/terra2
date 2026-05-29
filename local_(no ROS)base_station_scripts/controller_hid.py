@@ -1,10 +1,28 @@
 import os
 
-import hidapi
-
 
 DUALSENSE_VENDOR_IDS = {0x054C}
 DUALSENSE_NAME_HINTS = ("dualsense", "wireless controller")
+
+
+def load_hidapi():
+    try:
+        import hidapi
+    except ModuleNotFoundError as exc:
+        if exc.name != "hidapi":
+            raise
+        raise SystemExit(
+            "Missing Python dependency: hidapi\n"
+            "Install local controller dependencies with:\n"
+            "  python3 -m pip install -r requirements.txt"
+        ) from exc
+    except OSError as exc:
+        raise SystemExit(
+            "Missing system HID library for Python hidapi.\n"
+            "Install it with:\n"
+            "  sudo apt install libhidapi-hidraw0 libhidapi-libusb0"
+        ) from exc
+    return hidapi
 
 
 def _decode(value):
@@ -34,6 +52,7 @@ def is_dualsense(device):
 
 
 def list_dualsense_devices():
+    hidapi = load_hidapi()
     devices = []
     for device in hidapi.enumerate():
         if is_dualsense(device):
@@ -108,9 +127,28 @@ def open_dualsense(pydualsense_cls, role, explicit_path=None, serial=None, index
     ds = pydualsense_cls()
 
     def find_device_by_path():
-        return hidapi.Device(path=os.fsencode(controller_path))
+        hidapi = load_hidapi()
+        product_id = None
+        for device in list_dualsense_devices():
+            if _path_text(device) == controller_path:
+                product_id = _field(device, "product_id")
+                break
+
+        device = hidapi.Device(path=os.fsencode(controller_path))
+        return device, product_id == 0x0DF2
 
     ds._pydualsense__find_device = find_device_by_path
-    ds.init()
+    try:
+        ds.init()
+    except OSError as exc:
+        script_name = "ee_control.py" if role == "arm" else "drive_control.py"
+        raise SystemExit(
+            f"Could not open {role} controller at {controller_path}.\n"
+            "Linux can see the controller, but this user may not have permission "
+            "to open the hidraw device.\n"
+            "For a quick test, try:\n"
+            f"  sudo python3 {script_name} --controller-path {controller_path}\n"
+            "For the normal fix, install the udev rule in this folder's README."
+        ) from exc
     print(f"Using {role} controller: {controller_path}")
     return ds

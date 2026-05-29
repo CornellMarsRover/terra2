@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import glob
+import os
 import rclpy
 from rclpy.node import Node
 
@@ -13,19 +15,22 @@ import time
 class GPSRover(Node):
     def __init__(self):
         super().__init__('gps_rover')
+        self.declare_parameter('serial_path', '')
 
         # Navsatfix data publisher
         self.pub = self.create_publisher(NavSatFix, '/rtk/navsatfix_data', 10)
+        requested_serial_path = self.get_parameter('serial_path').value
+        self.serial_path = requested_serial_path or self.detect_gps_serial_path()
 
         # ------------------------
         # 1. Open local serial port for the rover’s ZED-F9P
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM2', baudrate=115200, timeout=1)
+            self.ser = serial.Serial(self.serial_path, baudrate=115200, timeout=1)
             # We want to parse UBX, possibly also see if RTCM is recognized. 
             # ubxonly=False so that RTCM is recognized if it appears in the stream.
             self.ubr = UBXReader(self.ser)  
-            self.get_logger().info("Rover serial port /dev/ttyACM2 opened successfully.")
+            self.get_logger().info(f"Rover serial port {self.serial_path} opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
             return
@@ -40,7 +45,8 @@ class GPSRover(Node):
         # ------------------------
         # 3. Set up TCP socket to receive RTCM corrections
         # ------------------------
-        self.server_ip = '192.168.1.101'  # Basestation IP
+        # self.server_ip = '192.168.1.101'  # Basestation IP
+        self.server_ip = '192.168.1.103'  # Basestation IP or  84
         self.server_port = 4990          # Same port as the basestation
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -66,6 +72,42 @@ class GPSRover(Node):
         self.create_timer(0.1, self.timer_callback)
 
         self.get_logger().info("GPS Rover node started.")
+
+    def detect_gps_serial_path(self):
+        by_id_dir = '/dev/serial/by-id'
+        if os.path.isdir(by_id_dir):
+            candidates = sorted(glob.glob(os.path.join(by_id_dir, '*')))
+            self.get_logger().info(f"Serial by-id candidates: {candidates}")
+            preferred = []
+            fallback = []
+            for path in candidates:
+                lower = os.path.basename(path).lower()
+                if 'fdcanusb' in lower:
+                    continue
+                if any(token in lower for token in ['u-blox', 'ublox', 'zed', 'gnss', 'gps']):
+                    preferred.append(path)
+                else:
+                    fallback.append(path)
+
+            if preferred:
+                self.get_logger().info(f"Detected GPS serial device by-id: {preferred[0]}")
+                return preferred[0]
+            if fallback:
+                self.get_logger().warn(
+                    f"No explicit GPS serial device found by-id, falling back to {fallback[0]}"
+                )
+                return fallback[0]
+
+        tty_candidates = sorted(glob.glob('/dev/ttyACM*') + glob.glob('/dev/ttyUSB*'))
+        if tty_candidates:
+            self.get_logger().warn(f"No by-id GPS match found, falling back to {tty_candidates[0]}")
+            return tty_candidates[0]
+
+        self.get_logger().warn(
+            "No GPS serial device found; falling back to /dev/ttyACM2. "
+            "Pass --ros-args -p serial_path:=/path/to/device to override."
+        )
+        return '/dev/ttyACM2'
 
     def configure_rover(self):
         """

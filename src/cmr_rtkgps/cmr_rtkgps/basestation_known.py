@@ -3,8 +3,10 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 import serial
+from serial.tools import list_ports
 import socket
 import threading
+import glob
 from pyubx2 import UBXReader, UBXMessage
 from pyubx2 import llh2ecef, ecef2llh
 import time
@@ -18,9 +20,10 @@ class GPSBasestation(Node):
         # 1. Open serial port
         # ------------------------
         try:
-            self.ser = serial.Serial('/dev/ttyACM0', baudrate=230400, timeout=1)
+            self.serial_port = self.find_ublox_port()
+            self.ser = serial.Serial(self.serial_port, baudrate=230400, timeout=1)
             self.ubr = UBXReader(self.ser)
-            self.get_logger().info("Serial port /dev/ttyACM0 opened successfully.")
+            self.get_logger().info(f"Serial port {self.serial_port} opened successfully.")
         except Exception as e:
             self.get_logger().error(f"Failed to open serial port: {e}")
             return
@@ -47,11 +50,8 @@ class GPSBasestation(Node):
         self.server_address = ('0.0.0.0', 4990)  # All IPs
         self.server_socket.bind(self.server_address)
         self.server_socket.listen(1)  # Only one connection (rover)
-        self.get_logger().info(f"Waiting for rover to connect on {self.server_address}...")
 
-        # Accept connection from rover (this blocks until rover connects)
-        self.client_socket, self.client_address = self.server_socket.accept()
-        self.get_logger().info(f"Rover connected from {self.client_address}")
+        self.wait_for_rover()
         
         # ------------------------
         # 4. Start reading and processing GPS messages in a background thread
@@ -60,6 +60,31 @@ class GPSBasestation(Node):
         self.read_thread.start()
 
         self.get_logger().info("GPS Basestation node started in Survey-In mode.")
+
+    def wait_for_rover(self):
+        self.get_logger().info(f"Waiting for rover to connect on {self.server_address}...")
+        self.client_socket, self.client_address = self.server_socket.accept()
+        self.get_logger().info(f"Rover connected from {self.client_address}")
+
+    def find_ublox_port(self):
+        """
+        Prefer the stable by-id u-blox symlink, then fall back to ttyACM ports.
+        """
+        by_id_ports = sorted(glob.glob("/dev/serial/by-id/*u-blox*"))
+        if by_id_ports:
+            return by_id_ports[0]
+
+        ports = list(list_ports.comports())
+        for port in ports:
+            desc = f"{port.description} {port.manufacturer or ''} {port.product or ''}".lower()
+            if "u-blox" in desc or "ublox" in desc:
+                return port.device
+
+        for port in ports:
+            if port.device.startswith("/dev/ttyACM"):
+                return port.device
+
+        raise RuntimeError("No u-blox GNSS receiver found")
 
     def configure_fixed_mode(self):
         """
@@ -84,6 +109,7 @@ class GPSBasestation(Node):
         y = int(y*100)
         z = int(z*100)
         self.get_logger().info(f"ECEF coordinates: {x}  {y}  {z}")'''
+        lat, lon, h = self.fix['LAT'], self.fix['LON'], self.fix['ALT']
         x, y, z = self.fix['x'], self.fix['y'], self.fix['z']
         cfgData.append(("CFG_TMODE_ECEF_X", x))
         cfgData.append(("CFG_TMODE_ECEF_Y", y))
@@ -111,7 +137,7 @@ class GPSBasestation(Node):
         """
         Continuously read from the ZED-F9P. While in Survey-In mode, display survey info
         and check if the accuracy criteria are met. Once fixed mode is enabled, forward RTCM
-        messages over UDP.
+        messages over TCP.
         """
         while rclpy.ok():
             try:
@@ -119,10 +145,13 @@ class GPSBasestation(Node):
                 if msg[0] is None:
                     continue
                 raw, parsed = msg[0], msg[1]
-                self.get_logger().info(f"{parsed}")
-                self.get_logger().info(f"{parsed.identity}")
-                self.client_socket.sendall(raw)
-                self.get_logger().info("Broadcasting RTCM correction")
+                if parsed.identity.startswith("RTCM"):
+                    self.client_socket.sendall(raw)
+                    self.get_logger().info(f"Sent RTCM correction: {parsed.identity}")
+            except (BrokenPipeError, ConnectionResetError) as e:
+                self.get_logger().error(f"Rover TCP connection lost: {e}")
+                self.client_socket.close()
+                self.wait_for_rover()
             except Exception as e:
                 self.get_logger().error(f"Error processing GPS data: {e}")
 

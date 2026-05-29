@@ -10,7 +10,7 @@ import struct
 # python mini_arm_control.py --serial-port COM9 --baud-rate 115200
 # python mini_arm_control.py --serial-port /dev/ttyACM0 --baud-rate 115200
 
-DEFAULT_SERIAL_PORT = "COM9"
+DEFAULT_SERIAL_PORT = "/dev/ttyACM0"
 DEFAULT_BAUD_RATE = 115200
 DEFAULT_TIMEOUT = 1.0
 DEFAULT_UDP_IP = "192.168.1.69"

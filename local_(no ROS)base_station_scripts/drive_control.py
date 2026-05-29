@@ -1,16 +1,22 @@
 from pydualsense import pydualsense
 import argparse
-import hidapi
 import os
 import time
 import socket
 
+from controller_hid import open_dualsense, print_dualsense_devices
+
 #run
 #python drive_control.py --controller-path /dev/hidraw4
+#python drive_control.py --list-controllers
+#python drive_control.py --controller-serial SERIAL_FROM_LIST
 
 UDP_IP = "192.168.1.69"   # Jetson / rover IP
 UDP_PORT = 5005        # 5010 = drives
-DEFAULT_CONTROLLER_PATH = os.environ.get("DRIVE_CONTROLLER_PATH", "/dev/hidraw4")
+DEFAULT_CONTROLLER_PATH = os.environ.get("DRIVE_CONTROLLER_PATH")
+DEFAULT_CONTROLLER_SERIAL = os.environ.get("DRIVE_CONTROLLER_SERIAL")
+DEFAULT_CONTROLLER_INDEX = int(os.environ.get("DRIVE_CONTROLLER_INDEX", "0"))
+LEGACY_CONTROLLER_PATH = "/dev/hidraw4"
 
 
 def parse_args():
@@ -20,21 +26,23 @@ def parse_args():
         default=DEFAULT_CONTROLLER_PATH,
         help="DualSense HID path to use for drives, e.g. /dev/hidraw4.",
     )
+    parser.add_argument(
+        "--controller-serial",
+        default=DEFAULT_CONTROLLER_SERIAL,
+        help="DualSense serial number to use for drives. Use --list-controllers to find it.",
+    )
+    parser.add_argument(
+        "--controller-index",
+        type=int,
+        default=DEFAULT_CONTROLLER_INDEX,
+        help="Zero-based DualSense index to use if no path/serial is provided.",
+    )
+    parser.add_argument(
+        "--list-controllers",
+        action="store_true",
+        help="List detected DualSense HID devices and exit.",
+    )
     return parser.parse_args()
-
-
-def open_controller(controller_path: str):
-    ds = pydualsense()
-
-    if controller_path:
-        def find_device_by_path():
-            return hidapi.Device(path=os.fsencode(controller_path))
-
-        ds._pydualsense__find_device = find_device_by_path
-
-    ds.init()
-    print(f"Using drive controller: {controller_path}")
-    return ds
 
 
 def clamp_byte(value: int) -> int:
@@ -93,7 +101,18 @@ def format_data_for_udp(ds_state) -> bytearray:
 
 def main():
     args = parse_args()
-    ds = open_controller(args.controller_path)
+    if args.list_controllers:
+        print_dualsense_devices()
+        return
+
+    ds = open_dualsense(
+        pydualsense,
+        "drive",
+        explicit_path=args.controller_path,
+        serial=args.controller_serial,
+        index=args.controller_index,
+        legacy_path=LEGACY_CONTROLLER_PATH,
+    )
 
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

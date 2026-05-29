@@ -1,13 +1,16 @@
 from pydualsense import pydualsense, TriggerModes
 import argparse
-import hidapi
 import os
 import time
 import socket
 import struct
 
+from controller_hid import open_dualsense, print_dualsense_devices
+
 #run 
 #python ee_control.py --controller-path /dev/hidraw5
+#python ee_control.py --list-controllers
+#python ee_control.py --controller-serial SERIAL_FROM_LIST
 
 
 # Network settings
@@ -19,7 +22,10 @@ import struct
 UDP_IP = "192.168.1.69" # JETSON IP ON REDROVER WIFI
 # UDP_IP = "128.253.53.211"
 UDP_PORT = 5020 # 5010 - Drives, 5020 - Controller Arm, 5030 - Mini Arm
-DEFAULT_CONTROLLER_PATH = os.environ.get("ARM_CONTROLLER_PATH", "/dev/hidraw5")
+DEFAULT_CONTROLLER_PATH = os.environ.get("ARM_CONTROLLER_PATH")
+DEFAULT_CONTROLLER_SERIAL = os.environ.get("ARM_CONTROLLER_SERIAL")
+DEFAULT_CONTROLLER_INDEX = int(os.environ.get("ARM_CONTROLLER_INDEX", "1"))
+LEGACY_CONTROLLER_PATH = "/dev/hidraw5"
 
 DPAD_NEUTRAL = 8
 DPAD_UP = 0
@@ -34,20 +40,23 @@ def parse_args():
         default=DEFAULT_CONTROLLER_PATH,
         help="DualSense HID path to use for the arm, e.g. /dev/hidraw5.",
     )
+    parser.add_argument(
+        "--controller-serial",
+        default=DEFAULT_CONTROLLER_SERIAL,
+        help="DualSense serial number to use for the arm. Use --list-controllers to find it.",
+    )
+    parser.add_argument(
+        "--controller-index",
+        type=int,
+        default=DEFAULT_CONTROLLER_INDEX,
+        help="Zero-based DualSense index to use if no path/serial is provided.",
+    )
+    parser.add_argument(
+        "--list-controllers",
+        action="store_true",
+        help="List detected DualSense HID devices and exit.",
+    )
     return parser.parse_args()
-
-def open_controller(controller_path: str):
-    ds = pydualsense()
-
-    if controller_path:
-        def find_device_by_path():
-            return hidapi.Device(path=os.fsencode(controller_path))
-
-        ds._pydualsense__find_device = find_device_by_path
-
-    ds.init()
-    print(f"Using arm controller: {controller_path}")
-    return ds
 
 def read_dpad(ds_state):
     for attr in ("dpad", "Dpad", "DPAD", "hat", "hat_switch"):
@@ -126,7 +135,18 @@ def format_data_for_udp(ds_state):
 def main():
     # Initialize controller and network settings
     args = parse_args()
-    ds = open_controller(args.controller_path)
+    if args.list_controllers:
+        print_dualsense_devices()
+        return
+
+    ds = open_dualsense(
+        pydualsense,
+        "arm",
+        explicit_path=args.controller_path,
+        serial=args.controller_serial,
+        index=args.controller_index,
+        legacy_path=LEGACY_CONTROLLER_PATH,
+    )
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 

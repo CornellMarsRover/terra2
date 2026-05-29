@@ -128,14 +128,7 @@ def open_dualsense(pydualsense_cls, role, explicit_path=None, serial=None, index
 
     def find_device_by_path():
         hidapi = load_hidapi()
-        product_id = None
-        for device in list_dualsense_devices():
-            if _path_text(device) == controller_path:
-                product_id = _field(device, "product_id")
-                break
-
-        device = hidapi.Device(path=os.fsencode(controller_path))
-        return device, product_id == 0x0DF2
+        return hidapi.Device(path=os.fsencode(controller_path))
 
     ds._pydualsense__find_device = find_device_by_path
     try:

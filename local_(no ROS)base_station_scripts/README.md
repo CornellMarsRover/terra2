@@ -14,8 +14,8 @@ List controllers and use the serial for the drive or arm script:
 
 ```bash
 python3 drive_control.py --list-controllers
-python3 drive_control.py --controller-serial SERIAL_FROM_LIST
-python3 ee_control.py --controller-serial SERIAL_FROM_LIST
+python3 drive_control.py --controller-serial 24:a6:fa:f9:f7:f6
+python3 ee_control.py --controller-serial 24:a6:fa:f9:f7:f6
 ```
 
 If listing works but opening the controller fails with `Could not open

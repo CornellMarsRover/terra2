@@ -45,14 +45,22 @@ export const MixingServo = {
   stateType: "std_msgs/Int32",
 } as const;
 
-// TODO: two action servers, one per
-// sequence id. If sequence_id gets renamed to site_num (or similar), update
-// both here and the .action definition.
+// Foxglove-native interface (panels have no ROS action client): a start service
+// (StartAnalysisSequence by id), a cancel Trigger, and an AnalysisStatus topic
+// the panel subscribes to for live progress. The sequence set lives rover-side
+// in drivers/analysis_protocol.py; mirror id + name here for the button labels.
 export const Analysis = {
-  actionType: "cmr_msgs/RunAnalysisSequence",
+  startService: "/astrotech/analysis/start_sequence",
+  startType: "cmr_msgs/StartAnalysisSequence",
+  startSchemaName: "cmr_msgs/srv/StartAnalysisSequence",
+  cancelService: "/astrotech/analysis/cancel",
+  cancelType: "std_srvs/Trigger",
+  cancelSchemaName: "std_srvs/srv/Trigger",
+  statusTopic: "/astrotech/analysis/status",
+  statusType: "cmr_msgs/AnalysisStatus",
   sequences: [
-    { id: 1, action: "/astrotech/analysis/run_sequence_1" },
-    { id: 2, action: "/astrotech/analysis/run_sequence_2" },
+    { id: 1, name: "Ninhydrin assay" },
+    { id: 2, name: "Water-system assay" },
   ],
 } as const;
 

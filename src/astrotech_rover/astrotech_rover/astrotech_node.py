@@ -18,7 +18,7 @@ development / demos / CI without hardware, swap any feature to its
 simulation driver with a per-feature env var:
 
     URC_AUGER_MOCK=1          URC_MIXING_SERVO_MOCK=1
-    URC_RAMAN_MOCK=1          URC_ENV_MOCK=1
+    URC_RAMAN_MOCK=1          URC_ENV_MOCK=1          URC_ANALYSIS_MOCK=1
 
 (The older ``URC_*_REAL`` vars are not read by anything — real is already
 the default, so an old command that sets one still gets the real driver.)
@@ -29,8 +29,10 @@ that needs it. Every real driver also degrades gracefully on its own:
 if its hardware/deps are absent it logs an error and idles (publishes
 nothing) rather than crashing the node.
 
-The analysis sequencer has no real driver yet (Phase 2b), so it always
-uses the mock.
+The analysis sequencer now has a real driver (drivers/analysis_real.py,
+CMR_CANFD pumps/servos); URC_ANALYSIS_MOCK=1 swaps in the no-hardware sim.
+It shares the fdcanusb with the auger / mixing servo, so run it in lab mode
+(URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1).
 
 fdcanusb bus contention
 -----------------------
@@ -56,7 +58,6 @@ from rclpy.node import Node
 # Real drivers are the default; imported lazily in __init__ so a missing
 # hardware dep only bites the feature that uses it. Mock drivers live in
 # the drivers/mock/ subpackage (see its README) and are opt-in.
-from astrotech_rover.drivers.mock.analysis_sequencer import MockAnalysisSequencer
 
 # Camera feeds are launched rover-side via src/cmr_cams/ (cmr_cv camera
 # nodes + stereolabs zed_wrapper); see gui/operator_guide.md.
@@ -70,6 +71,7 @@ _MOCK_AUGER_ENV_VAR = "URC_AUGER_MOCK"
 _MOCK_MIXING_SERVO_ENV_VAR = "URC_MIXING_SERVO_MOCK"
 _MOCK_RAMAN_ENV_VAR = "URC_RAMAN_MOCK"
 _MOCK_ENV_ENV_VAR = "URC_ENV_MOCK"
+_MOCK_ANALYSIS_ENV_VAR = "URC_ANALYSIS_MOCK"
 _TRUTHY = {"1", "true", "yes", "on"}
 
 
@@ -110,8 +112,7 @@ class AstrotechRoverNode(Node):
         # otherwise crash the whole node).
         self._auger = self._start("auger", lambda: self._build_auger(cfg))
         self._mixing = self._start("mixing_servo", lambda: self._build_mixing(cfg))
-        # No real analysis-sequence driver yet -- always the sim sequencer.
-        self._analysis = self._start("analysis", lambda: MockAnalysisSequencer(self, cfg["analysis"]))
+        self._analysis = self._start("analysis", lambda: self._build_analysis(cfg))
         self._raman = self._start("raman", lambda: self._build_raman(cfg))
         self._env = self._start("env", lambda: self._build_env(cfg))
         # Always-on utility: save-plot-to-disk services for the GUI.
@@ -148,6 +149,14 @@ class AstrotechRoverNode(Node):
         from astrotech_rover.drivers.mixing_servo_real import RealMixingServoDriver
         return RealMixingServoDriver(self, cfg["mixing_servo"])
 
+    def _build_analysis(self, cfg):
+        if _env_truthy(_MOCK_ANALYSIS_ENV_VAR):
+            from astrotech_rover.drivers.mock.analysis import build_mock_analysis
+            self.get_logger().info(f"{_MOCK_ANALYSIS_ENV_VAR} set; analysis = sim.")
+            return build_mock_analysis(self, cfg["analysis"])
+        from astrotech_rover.drivers.analysis_real import build_real_analysis
+        return build_real_analysis(self, cfg["analysis"])
+
     def _build_raman(self, cfg):
         if _env_truthy(_MOCK_RAMAN_ENV_VAR):
             from astrotech_rover.drivers.mock.raman import MockRamanPublisher
@@ -172,8 +181,9 @@ class AstrotechRoverNode(Node):
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = AstrotechRoverNode()
-    # MultiThreadedExecutor so the analysis action server's blocking
-    # execute_callback doesn't stall the other drivers' timers.
+    # MultiThreadedExecutor so a blocking service callback (e.g. the analysis
+    # cancel dispatching a stop to the bus) doesn't stall the other drivers'
+    # timers.
     executor = MultiThreadedExecutor()
     executor.add_node(node)
     try:

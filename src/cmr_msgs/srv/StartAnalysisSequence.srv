@@ -1,0 +1,12 @@
+# Start an analysis sequence by id. The set of sequences is defined in
+# astrotech_rover's drivers/analysis_protocol.py (seeded from the lead's
+# AnalysisFiles/ protocol). Rejected (success=false) if a sequence is already
+# running or the hardware bus isn't up.
+#
+# Foxglove panels have no ROS action client, so the analysis panel drives the
+# sequencer through this service + a std_srvs/Trigger cancel + an
+# AnalysisStatus topic (the "Option B" Foxglove-native interface).
+int8 sequence_id
+---
+bool success
+string message

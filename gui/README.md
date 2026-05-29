@@ -16,6 +16,59 @@ or fixing the GUI.
 
 ---
 
+## Running it
+
+**Easiest — the Astrotech Hub.** A one-window launcher with a button for every
+step (build, launch the node + bridge, cameras/ZED, diagnostics, Raman
+calibration, shut down):
+
+```bash
+python3 src/astrotech_rover/scripts/astrotech_hub.py
+```
+
+In a mission the payload node runs on the **Jetson** (where the hardware is);
+the hub's **Jetson** tab brings it up over SSH, and you operate from Foxglove on
+the base-station laptop. The [operator guide](operator_guide.md) has the full
+walkthrough plus the one-time SSH setup.
+
+**Manual — what the hub runs under the hood.** One-time build (on the machine
+that runs the node):
+
+```bash
+colcon build --symlink-install --packages-select cmr_msgs astrotech_rover
+source install/setup.bash
+```
+
+Start the node + Foxglove bridge:
+
+```bash
+ros2 launch astrotech_rover astrotech.launch.py
+```
+
+That serves Foxglove at `ws://localhost:8765` (or `ws://<jetson-ip>:8765` when
+it runs on the rover). To run with no hardware, prefix the launch with the mock
+flags: `URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1 URC_RAMAN_MOCK=1 URC_ENV_MOCK=1 URC_ANALYSIS_MOCK=1`.
+
+## Connecting Foxglove
+
+1. Open Foxglove Studio.
+2. **Open Connection** → `ws://<jetson-ip>:8765` (e.g.
+   `ws://192.168.1.69:8765`), or `ws://localhost:8765` if the node runs on this
+   machine.
+3. **Layouts → Import from file** → pick `urc_astrotech_auger.json`
+   (drilling) or `urc_astrotech_analysis.json` (lab work).
+
+First time on a machine, install the panels (then fully quit + relaunch
+Foxglove) — or use the hub's "Build + install Foxglove panels" button:
+
+```bash
+cd gui/extensions/urc-astrotech-panels
+npm install && npm run build && npm run local-install
+```
+
+The full operator walkthrough — what every button does, plus the
+rover-side camera bring-up — is in [`operator_guide.md`](operator_guide.md).
+
 ## What's in here
 
 | Piece | Where | What it is |
@@ -23,7 +76,7 @@ or fixing the GUI.
 | Foxglove panels | [`gui/extensions/urc-astrotech-panels/`](extensions/urc-astrotech-panels/) | The custom panels: auger, mixing servo, Raman, snapshots, analysis. |
 | Layouts | [`gui/layouts/`](layouts/) | `urc_astrotech_auger.json`, `urc_astrotech_analysis.json`. |
 | Rover node | [`src/astrotech_rover/`](../src/astrotech_rover/) | `astrotech_node` — one driver per piece of hardware. |
-| Messages | [`src/cmr_msgs/`](../src/cmr_msgs/) | `AugerCommand`/`AugerState`, `RamanSpectrum`, `EnvSample`, `SetMixingServoAngle`, `RunAnalysisSequence`. |
+| Messages | [`src/cmr_msgs/`](../src/cmr_msgs/) | `AugerCommand`/`AugerState`, `RamanSpectrum`, `EnvSample`, `SetMixingServoAngle`, `StartAnalysisSequence`/`AnalysisStatus`. |
 | Bridge | [`launch/gcs_bridge.launch.py`](../launch/gcs_bridge.launch.py) | The Foxglove WebSocket bridge. |
 | Cameras | [`src/cmr_cams/`](../src/cmr_cams/) | Launch + config for the rover-side camera drivers. |
 
@@ -34,47 +87,10 @@ or fixing the GUI.
 | **Auger control** | Working, tested on hardware 2026-05-07. Hold-to-drive buttons + saved home positions + return-to-home. |
 | **Mixing servo** | Working, tested on hardware 2026-05-08. Set Home + 3 editable site presets + manual go-to. |
 | **Raman spectrum** | Working — live wavenumber-vs-intensity plot of the latest spectrum. |
-| **Analysis sequence** | Not done yet — the buttons are placeholders. |
+| **Analysis sequence** | Working in the GUI — Start (ninhydrin / water assay) + live progress + Cancel. Runs against the mock today; the real CMR_CANFD driver is written but **not yet hardware-tested**, and the step list is seeded from the lead's bench protocol (confirm before a real run). |
 | **Snapshots** | Working — Save Raman / Save CO₂ buttons that write a PNG of the current plot to the laptop Desktop (fallback: `<repo>/snapshots/`). |
 
-The extension is version **0.4.0**.
-
-## Running it
-
-One-time build:
-
-```bash
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install --packages-select cmr_msgs astrotech_rover
-source install/setup.bash
-```
-
-Start the rover node + the Foxglove bridge:
-
-```bash
-ros2 launch astrotech_rover astrotech.launch.py
-```
-
-That serves Foxglove at `ws://localhost:8765`.
-
-## Connecting Foxglove
-
-1. Open Foxglove Studio.
-2. **Open Connection** → `ws://localhost:8765` (or `ws://<rover-ip>:8765`
-   from another laptop).
-3. **Layouts → Import from file** → pick `urc_astrotech_auger.json`
-   (drilling) or `urc_astrotech_analysis.json` (lab work).
-
-First time on a machine, install the panels (then fully quit + relaunch
-Foxglove):
-
-```bash
-cd gui/extensions/urc-astrotech-panels
-npm install && npm run build && npm run local-install
-```
-
-The full operator walkthrough — what every button does, plus the
-rover-side camera bring-up — is in [`operator_guide.md`](operator_guide.md).
+The extension is version **0.5.0**.
 
 ## Switching which camera a panel shows
 
@@ -84,13 +100,15 @@ it at any camera that's currently publishing:
 - **In Foxglove:** click the Image panel, open its **settings** (the gear
   / settings sidebar), and change the **topic** to a different feed. The
   USB cameras publish as `/cam0/image_raw` … `/cam14/image_raw` (whichever
-  ones are activated), and the ZED publishes
-  `/zed/zed_node/left/image_rect_color`.
+  ones are activated). The ZED's left image is on `/zed/image_left`
+  (published by the `cmr_zed` node, e.g. `ros2 run cmr_zed
+  zed_publisher_node`); if you run the stereolabs `zed_wrapper` instead, its
+  left image is `/zed/zed_node/left/image_rect_color`.
 - **In the layout file:** the topic each panel starts on is the
   `cameraTopic` field in the layout JSON ([`gui/layouts/`](layouts/)). The
-  auger layout defaults to `/cam11/image_raw` (auger cam) and the ZED; the
-  analysis layout defaults to `/cam12/image_raw`. Edit those if you want a
-  different default.
+  auger layout defaults to `/cam11/image_raw` (auger cam) and the ZED left
+  image (`/zed/image_left`); the analysis layout defaults to
+  `/cam12/image_raw`. Edit those if you want a different default.
 
 Heads up: which physical camera is `/cam11` vs `/cam12` can change between
 boots (it depends on USB plug order), so if a tile shows the wrong camera,
@@ -117,17 +135,18 @@ There's a matching copy on the TypeScript side in
 /astrotech/mixing_servo/set_angle   cmr_msgs/SetMixingServoAngle (degrees)
 /astrotech/mixing_servo/set_home    std_srvs/Trigger
 /astrotech/mixing_servo/state       std_msgs/Int32               (last commanded angle, 5 Hz)
-/astrotech/analysis/run_sequence_1  cmr_msgs/RunAnalysisSequence (action)
-/astrotech/analysis/run_sequence_2  cmr_msgs/RunAnalysisSequence (action)
+/astrotech/analysis/start_sequence  cmr_msgs/StartAnalysisSequence (start an assay by id)
+/astrotech/analysis/cancel          std_srvs/Trigger             (hard-abort the running sequence)
+/astrotech/analysis/status          cmr_msgs/AnalysisStatus      (sequence progress, 5 Hz)
 /astrotech/raman/spectrum           cmr_msgs/RamanSpectrum       (1 Hz)
 /astrotech/env/sample               cmr_msgs/EnvSample           (about every 2 s)
 /astrotech/snapshot/raman           std_srvs/Trigger             (save the latest Raman plot to a PNG)
 /astrotech/snapshot/co2             std_srvs/Trigger             (save the recent CO₂ plot to a PNG)
 ```
 
-The two `/astrotech/analysis/run_sequence_*` actions exist on the rover, but
-the Foxglove panel API has **no ROS action client**, so the analysis panel
-doesn't drive them yet — see "Still to do".
+Analysis uses a start service + cancel + a status topic rather than a ROS
+action because Foxglove panels have **no action client**. (The legacy
+`RunAnalysisSequence.action` still ships in `cmr_msgs` but nothing uses it.)
 
 ## What each driver talks to
 
@@ -139,13 +158,15 @@ doesn't drive them yet — see "Still to do".
 | `mixing_servo_real.py` | The CMR servo board over the same dongle, at 1 Mbit/s. |
 | `raman_real.py` | The TCD1340 spectrometer over a USB serial port. |
 | `env_real.py` | The Adafruit SCD-30 sensor over I²C (through an FT232H USB→I²C bridge by default). |
+| `analysis_real.py` | The fluidic pumps + servos over the same fdcanusb (CMR_CANFD), running the assay sequences from `analysis_protocol.py`. Shares the dongle with the auger/mixing servo, so run it in lab mode (`URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1`). Not yet hardware-tested. |
 
 If a driver's hardware or its Python libraries aren't there, it just logs
 an error and sits quietly — it won't crash the rest of the node, so the
 other panels keep working.
 
-(There's no real analysis-sequence driver yet, so that panel's backend is
-still a placeholder.)
+(The analysis sequence + device map + site→angle mapping are data in
+`drivers/analysis_protocol.py` — that's the one file to edit when the lead
+sends the final protocol. `URC_ANALYSIS_MOCK=1` runs it with no hardware.)
 
 (`snapshot.py` is an always-on, non-hardware driver: it buffers the latest
 Raman spectrum and recent CO₂ samples and, on a `/astrotech/snapshot/{raman,co2}`
@@ -153,14 +174,15 @@ service call, renders a PNG with matplotlib to the operator laptop's Desktop
 — fallback `<repo>/snapshots/`. A missing matplotlib disables only snapshots,
 not the rest of the node.)
 
-## Sharing the CAN dongle (auger vs mixing servo)
+## Sharing the CAN dongle (auger / mixing servo / analysis)
 
-The auger and the mixing servo are both on the **same** USB-CAN dongle, and
-only one program can hold that dongle at a time — if both try, the second
-one fails to open it. So today you run one of them at a time. The plan is
-to give the mixing servo its own second dongle, after which both can run
-together; that's set by the `real_port` value in the config file. (The
-operator guide shows the exact command for running just one.)
+The auger, the mixing servo, **and the analysis pumps** are all on the **same**
+USB-CAN dongle, and only one program can hold it at a time — if a second tries,
+its open fails (`EBUSY`). So you run one bus owner at a time and mock the other
+two. The hub's "Run the payload" buttons (Drilling / Mixing servo / Analysis lab
+mode) do exactly that; the operator guide lists the equivalent env-var commands.
+The plan is to add a second dongle later (`real_port` in the config file), after
+which more than one can run together.
 
 ## How the auger panel buttons work
 
@@ -199,9 +221,9 @@ operator guide shows the exact command for running just one.)
 These were learned on the bench and aren't obvious from the code — keep them
 around:
 
-1. **The CAN bus runs at 1 Mbit/s.** The vendored CAN library defaults to
-   500 kbit/s, which is wrong for our rig — at that speed nothing moves. We
-   set 1 Mbit/s ourselves.
+1. **CAN bit-rates differ.** The servo runs at **1 Mbit/s**; the auger may
+   need **500 kbit/s** — so the two might need separate CAN buses. Ask
+   **Caitlin** (electrical) if you hit bus issues.
 2. **Every servo move needs the "clear faults" bit set.** The library's
    `go_to_position()` doesn't set it, and without it the board says OK but
    doesn't actually move once anything else has used the bus. Our driver
@@ -217,14 +239,12 @@ The full notes on the vendored CAN library are in
 
 ## Still to do
 
-- **Analysis sequence panel** — still a placeholder: the Start buttons only
-  log to the browser console. The rover already runs the
-  `RunAnalysisSequence` action servers, but the Foxglove panel API has **no
-  ROS action client**, so the panel can't drive them directly — wiring this
-  up will need a Foxglove-native interface on the driver (e.g. a start
-  service + a status topic + a cancel service). The real sequence design /
-  step list from the project lead is still open, so the panel is left
-  intentionally isolated until then.
+- **Analysis sequence — hardware bring-up.** The panel + driver + sequencer are
+  wired and work against the mock (`URC_ANALYSIS_MOCK=1`). What's left: bench-test
+  `analysis_real.py` against the real pump/servo boards, and replace the seeded
+  step list in `analysis_protocol.py` with the lead's final protocol (the
+  current one is reconstructed from `AnalysisFiles/`, **ASSUMED**). Confirm the
+  device CAN ids + the site→angle mapping with the lead / electrical.
 - **Raman plot** — the plot is built; what's left is the real sensor: confirm
   how the spectrometer streams its data, set `raman.n_points` to 3648, and add
   the pixel→wavenumber calibration once we have it. (Details are in
@@ -232,8 +252,11 @@ The full notes on the vendored CAN library are in
 - **Env sensor** — confirm how the SCD-30 is wired and set
   `env.real_connection` to match. (Options are documented in `env_real.py`
   and the config file.)
-- **Pumps + heater** — these still need a ROS driver wrapping the vendored
-  CAN library. See the API notes linked above.
+- **Pumps + heater** — `analysis_real.py` now wraps the CMR_CANFD pumps +
+  servos for the assay sequences (CAN map in
+  [`src/astrotech_rover/AnalysisFiles/`](../src/astrotech_rover/AnalysisFiles/):
+  servo board `can_id=1`, BDC pump boards `18`/`20`/`21`), but it's untested on
+  hardware and the heater devices aren't driven yet. See the API notes above.
 - **Bench-test the Raman and env drivers** — they're written but haven't
   been run against the real sensors yet.
 - **Camera bandwidth** — the raw camera feeds are big; we'll want to limit
@@ -251,6 +274,11 @@ In [`src/astrotech_rover/scripts/`](../src/astrotech_rover/scripts/):
 - `auger_keys_test_harness.py` — Astrotech's original keyboard test script
   (the pattern the auger driver is based on).
 - `smoke_test.sh` — builds, launches, and checks the topics show up.
+- `raman_calibrate.py` — fit the Raman pixel→wavelength calibration from known
+  peaks and print the YAML block to paste (stdlib only; see operator guide §6).
+- `astrotech_hub.py` — tkinter operator launcher: buttons to build, launch the
+  node + bridge (real/mock), bring up cameras/ZED on the Jetson over SSH, run
+  diagnostics, calibrate Raman, and shut down. `python3 src/astrotech_rover/scripts/astrotech_hub.py`.
 
 ## Where every file lives
 
@@ -272,7 +300,7 @@ gui/                                         ← the GUI (this folder)
         ├── AugerControl.tsx                  auger panel (working)
         ├── MixingServo.tsx                   mixing-servo panel (working)
         ├── RamanSpectrum.tsx                 Raman panel (wavenumber-vs-intensity plot)
-        ├── AnalysisSequence.tsx              analysis panel (placeholder)
+        ├── AnalysisSequence.tsx              analysis panel (start/cancel + live progress)
         └── Snapshots.tsx                     Save Raman / Save CO₂ buttons
 
 src/astrotech_rover/                         ← the rover-side ROS package
@@ -286,16 +314,22 @@ src/astrotech_rover/                         ← the rover-side ROS package
 │       ├── mixing_servo_real.py              mixing servo → CMR servo board
 │       ├── raman_real.py                     Raman → TCD1340 over USB serial
 │       ├── env_real.py                       CO₂/temp/humidity → Adafruit SCD-30
+│       ├── analysis_real.py                  analysis assays → CMR_CANFD pumps/servos
+│       ├── analysis_sequencer.py             generic sequencer + start/cancel/status interface
+│       ├── analysis_protocol.py              EDITABLE assay step data + device/site map
 │       ├── snapshot.py                       save-plot-to-PNG services (Raman/CO₂)
 │       └── mock/                             stand-in drivers for running with no hardware
 ├── scripts/                                  bench / debug tools (see section above)
+├── AnalysisFiles/                            lead's reference fluidic protocol (see its README)
 └── third_party/astrotech_canfd/              vendored CAN library + API_NOTES.md (don't edit)
 
 src/cmr_msgs/                                 ← shared message package (rover-wide)
 ├── msg/AugerCommand.msg  AugerState.msg       auger command + telemetry
 ├── msg/RamanSpectrum.msg  EnvSample.msg        Raman + environment readings
+├── msg/AnalysisStatus.msg                     analysis-sequence progress
 ├── srv/SetMixingServoAngle.srv                mixing-servo "go to angle" service
-└── action/RunAnalysisSequence.action          analysis-sequence action
+├── srv/StartAnalysisSequence.srv              start an analysis assay by id
+└── action/RunAnalysisSequence.action          (legacy, unused — kept for reference)
 
 launch/gcs_bridge.launch.py                   ← the Foxglove bridge (rover ↔ Foxglove)
 src/cmr_cams/                                 ← camera launch + per-camera configs

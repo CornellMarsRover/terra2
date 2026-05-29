@@ -81,7 +81,7 @@ SHUTDOWN_STOP_TIMEOUT_S = 0.5
 # small vertical travel rate, while auger motor RPM maps directly to drum
 # rotation. See the "Safety caps" section of the module docstring.
 SAFE_LEAD_SCREW_VEL_CAP_REV_S = 50.0
-SAFE_AUGER_VEL_CAP_REV_S = 6.0
+SAFE_AUGER_VEL_CAP_REV_S = 16.0
 SAFE_TORQUE_CAP_NM = 3.0
 
 

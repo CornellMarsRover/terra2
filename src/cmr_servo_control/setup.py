@@ -24,6 +24,7 @@ setup(
             'arm_servo_control_node = cmr_servo_control.arm_servo_control_node:main',
             'keyboard_input_node = cmr_servo_control.keyboard_input_node:main',
             'servo_probe = cmr_servo_control.servo_probe:main',
+            'simple_gripper_keyboard = cmr_servo_control.simple_gripper_keyboard:main',
         ],
     },
 )

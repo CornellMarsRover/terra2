@@ -26,6 +26,7 @@ setup(
             'gps_rover = cmr_rtkgps.rover:main',
             'data_logger = cmr_rtkgps.gps_logger:main',
             'displacement_logger = cmr_rtkgps.displacement_logger:main',
+            'basic_gps_gui = cmr_rtkgps.basic_gps_gui:main',
         ],
     },
 )

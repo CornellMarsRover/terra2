@@ -2,19 +2,16 @@
 
 Default analysis backend in :mod:`astrotech_rover.astrotech_node`
 (``URC_ANALYSIS_MOCK=1`` swaps in the no-hardware sim). Owns the fdcanusb
-directly, so it cannot share the dongle with the auger (moteus) or the mixing
-servo (also CMR_CANFD) -- run analysis in **lab mode** with
-``URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1``. The mixing chamber is still driven
-here (the ``chamber`` device), since this driver owns the bus in lab mode.
+directly. On the two-CAN payload stack, this bus is for BDC pump boards only;
+the chamber servo is moving to Arduino serial, so servo actions are skipped
+unless explicitly re-enabled in config.
 
 Mirrors the proven CMR_CANFD bring-up in :mod:`mixing_servo_real`: open the
 port, manual ``configure_bus`` at 1 Mbit/s (the vendored lib hardcodes a wrong
-500 kbit/s), build one controller per device, and for servo moves build the
-frame with ``clear_faults=1`` (``go_to_position`` alone doesn't, and the rig
-ignores the move without it). BDC pump moves fire-and-return; the sequencer's
-per-step wait covers the run time. Cancel -> ``stop_all`` sends ``stop_motor``
-to every pump (cancelling the coroutine does NOT stop a commanded move -- see
-astrotech_canfd/API_NOTES.md).
+500 kbit/s), and build one controller per BDC device. BDC pump moves
+fire-and-return; the sequencer's per-step wait covers the run time. Cancel ->
+``stop_all`` sends ``stop_motor`` to every pump (cancelling the coroutine does
+NOT stop a commanded move -- see astrotech_canfd/API_NOTES.md).
 """
 
 from __future__ import annotations
@@ -67,10 +64,15 @@ _DISPATCH_TIMEOUT_S = 10.0
 class RealAnalysisExecutor(AnalysisExecutor):
     def __init__(self, node: Node, cfg: dict) -> None:
         self._node = node
-        self._port = cfg.get(
-            "real_port", "/dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00"
+        self._port = os.environ.get(
+            "ASTROTECH_BDC_CAN_PORT",
+            cfg.get(
+                "real_port", "/dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00"
+            ),
         )
         self._bitrate = int(cfg.get("real_bitrate", 1_000_000))
+        self._enable_chamber_servo = bool(cfg.get("enable_chamber_servo", False))
+        self._warned_servo_skip = False
 
         self._loop: asyncio.AbstractEventLoop | None = None
         self._fd: FdCanInterface | None = None
@@ -104,7 +106,8 @@ class RealAnalysisExecutor(AnalysisExecutor):
         else:
             self._node.get_logger().info(
                 f"RealAnalysisExecutor up: port={self._port} "
-                f"bitrate={self._bitrate} ({len(self._controllers)} devices)"
+                f"bitrate={self._bitrate} ({len(self._controllers)} devices, "
+                f"chamber_servo={'enabled' if self._enable_chamber_servo else 'skipped'})"
             )
 
     def shutdown(self) -> None:
@@ -134,6 +137,8 @@ class RealAnalysisExecutor(AnalysisExecutor):
                 await self._fd._send_command(cmd)
             for dev in proto.referenced_devices():
                 if dev.kind == proto.SERVO:
+                    if not self._enable_chamber_servo:
+                        continue
                     self._controllers[dev.name] = ServoController(
                         can=self._fd, servo_id=dev.dev_id, can_id=dev.can_id
                     )
@@ -172,6 +177,15 @@ class RealAnalysisExecutor(AnalysisExecutor):
         self._dispatch(self._perform_async(action))
 
     async def _perform_async(self, action: proto.Action) -> None:
+        if action.kind == proto.SERVO and not self._enable_chamber_servo:
+            if not self._warned_servo_skip:
+                self._node.get_logger().warning(
+                    "analysis chamber servo actions are skipped because "
+                    "analysis.enable_chamber_servo is false; move the "
+                    "chamber manually/through the Arduino path for now."
+                )
+                self._warned_servo_skip = True
+            return
         ctrl = self._controllers.get(action.device)
         if ctrl is None:
             raise RuntimeError(f"no controller for device '{action.device}'")

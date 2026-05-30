@@ -24,6 +24,10 @@ auger:
   state_type: cmr_msgs/AugerState
   state_rate_hz: 20   # mock publish rate. The real driver ignores this and
                       # publishes every moteus cycle (50 Hz watchdog cadence).
+  # Real-driver config. Use the auger fdcanusb here. With two CAN lines,
+  # do not rely on moteus autodiscovery choosing the right adapter.
+  # Bring-up shortcut: ASTROTECH_AUGER_CAN_PORT overrides this value.
+  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
 
 mixing_servo:
   # CMR servo board on the same fdcanusb as the auger moteus stack
@@ -67,10 +71,15 @@ analysis:
   status_topic: /astrotech/analysis/status
   status_type: cmr_msgs/AnalysisStatus
   status_rate_hz: 5.0
-  # Pumps/servos share the fdcanusb with the auger + mixing servo (CMR_CANFD /
-  # moteus), so run analysis in LAB MODE: URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1.
+  # BDC pump boards live on their own fdcanusb CAN line. Set this to the BDC
+  # dongle's stable /dev/serial/by-id path on the rover.
+  # Bring-up shortcut: ASTROTECH_BDC_CAN_PORT overrides this value.
   real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
   real_bitrate: 1000000
+  # The chamber servo is moving to Arduino serial. Until that driver exists,
+  # keep this false so the analysis sequencer skips chamber-position steps
+  # instead of trying to send them to a CANFD servo board.
+  enable_chamber_servo: false
   sequences:        # mirrors analysis_protocol.py SEQUENCES (panel labels only)
     - {id: 1, name: Ninhydrin assay}
     - {id: 2, name: Water-system assay}

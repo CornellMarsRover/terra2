@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import threading
 import time
 
@@ -102,6 +103,9 @@ class RealAugerDriver:
 
         self._node = node
         self._watchdog_s = float(cfg.get("cmd_watchdog_ms", 200)) / 1000.0
+        self._port = str(
+            os.environ.get("ASTROTECH_AUGER_CAN_PORT", cfg.get("real_port", ""))
+        ).strip()
 
         self._cmd_lock = threading.Lock()
         self._lead_v = 0.0
@@ -133,6 +137,7 @@ class RealAugerDriver:
         node.get_logger().info(
             f"RealAugerDriver up: cmd={cfg['cmd_topic']} "
             f"state={cfg['state_topic']} @ {LOOP_HZ:.0f} Hz "
+            f"port={self._port or 'moteus default'} "
             f"(caps: |lead_v|<={SAFE_LEAD_SCREW_VEL_CAP_REV_S} rev/s, "
             f"|auger_v|<={SAFE_AUGER_VEL_CAP_REV_S} rev/s, "
             f"torque<={SAFE_TORQUE_CAP_NM} Nm, "
@@ -158,11 +163,14 @@ class RealAugerDriver:
 
     async def _loop(self) -> None:
         try:
-            transport = moteus.get_singleton_transport()
+            if self._port:
+                transport = moteus.Fdcanusb(path=self._port)
+            else:
+                transport = moteus.get_singleton_transport()
         except Exception as exc:  # pragma: no cover - hardware path
             self._node.get_logger().error(
                 f"failed to open moteus transport ({exc}); "
-                "RealAugerDriver will sit idle. Check fdcanusb is plugged in."
+                "RealAugerDriver will sit idle. Check auger.real_port / fdcanusb."
             )
             return
 

@@ -79,6 +79,13 @@ def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in _TRUTHY
 
 
+def _cfg_enabled(cfg: dict, key: str) -> bool:
+    value = cfg.get(key, {}).get("enabled", True)
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(value)
+
+
 def _locate_config() -> Path:
     """Resolve the interface YAML from the installed share dir or overlay."""
     override = os.environ.get("ASTROTECH_CONFIG")
@@ -142,6 +149,9 @@ class AstrotechRoverNode(Node):
         return RealAugerDriver(self, cfg["auger"])
 
     def _build_mixing(self, cfg):
+        if not _cfg_enabled(cfg, "mixing_servo"):
+            self.get_logger().info("mixing_servo disabled in config.")
+            return None
         if _env_truthy(_MOCK_MIXING_SERVO_ENV_VAR):
             from astrotech_rover.drivers.mock.mixing_servo import MockMixingServoDriver
             self.get_logger().info(f"{_MOCK_MIXING_SERVO_ENV_VAR} set; mixing servo = sim.")
@@ -158,6 +168,9 @@ class AstrotechRoverNode(Node):
         return build_real_analysis(self, cfg["analysis"])
 
     def _build_raman(self, cfg):
+        if not _cfg_enabled(cfg, "raman"):
+            self.get_logger().info("raman disabled in config.")
+            return None
         if _env_truthy(_MOCK_RAMAN_ENV_VAR):
             from astrotech_rover.drivers.mock.raman import MockRamanPublisher
             self.get_logger().info(f"{_MOCK_RAMAN_ENV_VAR} set; raman = sim.")

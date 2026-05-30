@@ -8,7 +8,7 @@ simulation driver for hardware-free dev.
 Architecture
 ------------
 A daemon thread runs an asyncio loop that talks to two moteus controllers
-(id=15 lead screw, id=16 auger) over the singleton fdcanusb transport at
+(id=15 lead screw, id=16 auger) over the configured fdcanusb transport at
 50 Hz. ROS subscription callbacks (executor thread) drop the latest
 ``AugerCommand`` into a lock-protected snapshot; the asyncio loop reads
 the snapshot each cycle, applies a 200 ms watchdog and hard safety caps,
@@ -102,6 +102,7 @@ class RealAugerDriver:
 
         self._node = node
         self._watchdog_s = float(cfg.get("cmd_watchdog_ms", 200)) / 1000.0
+        self._port = cfg.get("real_port")
 
         self._cmd_lock = threading.Lock()
         self._lead_v = 0.0
@@ -133,7 +134,8 @@ class RealAugerDriver:
         node.get_logger().info(
             f"RealAugerDriver up: cmd={cfg['cmd_topic']} "
             f"state={cfg['state_topic']} @ {LOOP_HZ:.0f} Hz "
-            f"(caps: |lead_v|<={SAFE_LEAD_SCREW_VEL_CAP_REV_S} rev/s, "
+            f"(port={self._port or 'auto'}, "
+            f"caps: |lead_v|<={SAFE_LEAD_SCREW_VEL_CAP_REV_S} rev/s, "
             f"|auger_v|<={SAFE_AUGER_VEL_CAP_REV_S} rev/s, "
             f"torque<={SAFE_TORQUE_CAP_NM} Nm, "
             f"watchdog={self._watchdog_s * 1000:.0f} ms)"
@@ -158,11 +160,15 @@ class RealAugerDriver:
 
     async def _loop(self) -> None:
         try:
-            transport = moteus.get_singleton_transport()
+            if self._port:
+                transport = moteus.Fdcanusb(path=self._port)
+            else:
+                transport = moteus.get_singleton_transport()
         except Exception as exc:  # pragma: no cover - hardware path
             self._node.get_logger().error(
-                f"failed to open moteus transport ({exc}); "
-                "RealAugerDriver will sit idle. Check fdcanusb is plugged in."
+                f"failed to open moteus transport on {self._port or 'auto'} "
+                f"({exc}); RealAugerDriver will sit idle. Check fdcanusb is "
+                "plugged in."
             )
             return
 

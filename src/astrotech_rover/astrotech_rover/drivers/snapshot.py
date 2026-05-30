@@ -7,9 +7,9 @@ samples, and on a service call renders a PNG with matplotlib and writes it.
 
 Where files go
 --------------
-First choice: ``~/Desktop/<desktop_subdir>/`` on the machine running this
-node (run the node on the operator laptop to land on the laptop's Desktop).
-Fallback: ``<repo>/<fallback_subdir>/`` if the Desktop isn't writable.
+First choice: ``<repo>/<output_subdir>/`` on the machine running this
+node. Fallbacks: ``~/Desktop/<desktop_subdir>/``, then
+``<repo>/<fallback_subdir>/``.
 The save service returns the full path it wrote in its response ``message``.
 
 This is always-on (not hardware-gated): it works the same whether the
@@ -59,6 +59,7 @@ class SnapshotDriver:
     def __init__(self, node: Node, cfg: dict) -> None:
         self._node = node
         snap = cfg["snapshot"]
+        self._output_subdir = str(snap.get("output_subdir", "")).strip()
         self._desktop_subdir = str(snap.get("desktop_subdir", "astrotech_snapshots"))
         self._fallback_subdir = str(snap.get("fallback_subdir", "snapshots"))
         self._co2_window_s = float(snap.get("co2_history_seconds", 120))
@@ -83,8 +84,8 @@ class SnapshotDriver:
 
         node.get_logger().info(
             f"SnapshotDriver up: {snap['save_raman_service']} / "
-            f"{snap['save_co2_service']} -> ~/Desktop/{self._desktop_subdir} "
-            f"(fallback {self._fallback_subdir}/)"
+            f"{snap['save_co2_service']} -> "
+            f"{self._preferred_output_label()}"
         )
 
     # --- subscriptions (executor threads) -------------------------------
@@ -101,9 +102,15 @@ class SnapshotDriver:
                 self._co2.popleft()
 
     # --- output path ----------------------------------------------------
+    def _preferred_output_label(self) -> str:
+        if self._output_subdir:
+            return str(_REPO_ROOT / self._output_subdir)
+        return f"~/Desktop/{self._desktop_subdir} (fallback {self._fallback_subdir}/)"
+
     def _output_dir(self) -> Path:
-        """~/Desktop/<subdir> if writable, else <repo>/<fallback>, else /tmp."""
+        """Configured repo dir if writable, else Desktop, else repo fallback."""
         candidates = [
+            *([_REPO_ROOT / self._output_subdir] if self._output_subdir else []),
             Path.home() / "Desktop" / self._desktop_subdir,
             _REPO_ROOT / self._fallback_subdir,
             Path("/tmp") / self._desktop_subdir,

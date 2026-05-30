@@ -11,10 +11,12 @@ Hardware
 --------
 Adafruit SCD-30 (https://www.adafruit.com/product/4867). I2C device,
 fixed address **0x61**. It is *not* a native-USB device, so it reaches
-the rover computer one of three ways -- set ``env.real_connection`` in
+the rover computer one of four ways -- set ``env.real_connection`` in
 ``astrotech_interfaces.yaml`` to match the wiring:
 
-* ``ft232h``      (default) -- an FT232H USB->I2C bridge. We set
+* ``mcp2221``     (default) -- a Microchip MCP2221 USB->I2C bridge. We
+                  set ``BLINKA_MCP2221=1`` *before* importing ``board``.
+* ``ft232h``      -- an FT232H USB->I2C bridge. We set
                   ``BLINKA_FT232H=1`` *before* importing ``board`` so
                   Blinka talks to the bridge instead of host GPIO.
 * ``jetson_i2c``  -- SCD-30 wired straight to the Jetson's I2C pins;
@@ -35,10 +37,11 @@ is sensor-driven, not ``rate_hz`` (which only the mock honors).
 Dependencies
 ------------
 ``adafruit-circuitpython-scd30`` + ``adafruit-blinka`` (pip). On the
-FT232H path you also need ``pyftdi`` and the libusb backend. Install::
+MCP2221 path you also need ``hidapi``; on the FT232H path you also need
+``pyftdi`` and the libusb backend. Install::
 
     /usr/bin/python3 -m pip install --user \
-        adafruit-circuitpython-scd30 adafruit-blinka pyftdi
+        adafruit-circuitpython-scd30 adafruit-blinka hidapi pyftdi
 """
 
 from __future__ import annotations
@@ -58,7 +61,7 @@ _SCD30_I2C_ADDR = 0x61
 class RealEnvDriver:
     def __init__(self, node: Node, cfg: dict) -> None:
         self._node = node
-        self._connection = str(cfg.get("real_connection", "ft232h")).lower()
+        self._connection = str(cfg.get("real_connection", "mcp2221")).lower()
         self._interval_s = int(cfg.get("real_measurement_interval_s", 2))
         self._frame_id = str(cfg.get("frame_id", "env"))
 
@@ -88,9 +91,11 @@ class RealEnvDriver:
     def _init_sensor(self) -> bool:
         """Open the I2C bus + SCD-30. Returns True on success."""
         try:
-            # FT232H must be selected BEFORE `import board`, hence the env
-            # var dance rather than a constructor arg.
-            if self._connection == "ft232h":
+            # USB-I2C bridges must be selected BEFORE `import board`, hence
+            # the env var dance rather than a constructor arg.
+            if self._connection == "mcp2221":
+                os.environ["BLINKA_MCP2221"] = "1"
+            elif self._connection == "ft232h":
                 os.environ["BLINKA_FT232H"] = "1"
 
             import board  # noqa: E402  (deferred: depends on env var above)
@@ -100,8 +105,8 @@ class RealEnvDriver:
                 import busio  # noqa: E402
                 i2c = busio.I2C(board.SCL, board.SDA)
             else:
-                # ft232h and jetson_i2c both use the default bus; the env
-                # var set above routes ft232h to the bridge.
+                # USB-I2C bridges and jetson_i2c all use the default board bus;
+                # the env var set above routes Blinka to the selected bridge.
                 i2c = board.I2C()
 
             scd = adafruit_scd30.SCD30(i2c)
@@ -119,7 +124,7 @@ class RealEnvDriver:
             self._init_error = (
                 "missing python deps. install with: /usr/bin/python3 -m pip "
                 "install --user adafruit-circuitpython-scd30 adafruit-blinka "
-                f"pyftdi ({exc})"
+                f"hidapi pyftdi ({exc})"
             )
             return False
         except Exception as exc:  # noqa: BLE001 - hardware path, report it

@@ -24,10 +24,15 @@ auger:
   state_type: cmr_msgs/AugerState
   state_rate_hz: 20   # mock publish rate. The real driver ignores this and
                       # publishes every moteus cycle (50 Hz watchdog cadence).
+  # Real-driver config. This is the auger's dedicated fdcanusb.
+  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_D8957AFF-if00
 
 mixing_servo:
-  # CMR servo board on the same fdcanusb as the auger moteus stack
-  # (can_id=26, servo_id=15). Two services drive it from the GCS:
+  enabled: false
+  # Disabled: the mixing servo is now controlled by an Arduino plugged
+  # directly into the Jetson, outside astrotech_node.
+  # Historical CMR servo board config:
+  # (can_id=26, servo_id=15). Two services drove it from the GCS:
   #   - set_angle: drive to a specific angle (deg, offset from home)
   #   - set_home:  declare the current physical position to be 0 deg
   # The Foxglove panel persists the three site offsets locally and calls
@@ -67,8 +72,7 @@ analysis:
   status_topic: /astrotech/analysis/status
   status_type: cmr_msgs/AnalysisStatus
   status_rate_hz: 5.0
-  # Pumps/servos share the fdcanusb with the auger + mixing servo (CMR_CANFD /
-  # moteus), so run analysis in LAB MODE: URC_AUGER_MOCK=1 URC_MIXING_SERVO_MOCK=1.
+  # Pumps/servos live on the analysis fdcanusb, separate from the auger bus.
   real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
   real_bitrate: 1000000
   sequences:        # mirrors analysis_protocol.py SEQUENCES (panel labels only)
@@ -76,6 +80,8 @@ analysis:
     - {id: 2, name: Water-system assay}
 
 raman:
+  enabled: false
+  # Disabled: Raman is no longer part of the active Astrotech stack.
   # TODO: if a real driver exists in another repo with its
   # own message type, replace `type` here, regenerate the TS mirror, and
   # delete cmr_msgs/msg/RamanSpectrum.msg.
@@ -111,23 +117,23 @@ env:
   # Real-driver config (default; set URC_ENV_MOCK=1 to use the sim). Adafruit
   # SCD-30 (NDIR CO2 + temp + humidity), I2C addr 0x61. real_connection
   # picks how the I2C bus is reached -- CHANGE THIS to match the wiring:
-  #   ft232h     -> FT232H USB->I2C bridge (default; sets BLINKA_FT232H=1)
+  #   mcp2221    -> MCP2221 USB->I2C bridge (default; sets BLINKA_MCP2221=1)
+  #   ft232h     -> FT232H USB->I2C bridge (sets BLINKA_FT232H=1)
   #   jetson_i2c -> SCD-30 on the Jetson's I2C pins (board.I2C())
   #   busio      -> explicit busio.I2C(board.SCL, board.SDA)
   # See gui/operator_guide.md ("Wiring the SCD-30").
-  real_connection: ft232h
+  real_connection: mcp2221
   real_measurement_interval_s: 2   # SCD-30 minimum is 2 s (~0.5 Hz)
 
 snapshot:
   # Operator "save this plot" feature. The snapshot driver buffers the
   # latest Raman spectrum + recent CO2 samples and, on a service call,
-  # renders a PNG with matplotlib and writes it to disk. It writes on the
-  # machine running this node -- run the node on the operator laptop to get
-  # the laptop's Desktop. Falls back to <repo>/snapshots/ if the Desktop
-  # isn't writable. Panel buttons live in the "Snapshots" Foxglove panel.
+  # renders a PNG with matplotlib and writes it to disk. Panel buttons live
+  # in the "Snapshots" Foxglove panel.
   save_raman_service: /astrotech/snapshot/raman
   save_co2_service: /astrotech/snapshot/co2
   service_type: std_srvs/Trigger
+  output_subdir: astrotech_snapshots    # preferred folder under the repo root
   desktop_subdir: astrotech_snapshots   # folder created under ~/Desktop
   fallback_subdir: snapshots            # folder created under the repo root
   co2_history_seconds: 120              # how much CO2 history the plot shows

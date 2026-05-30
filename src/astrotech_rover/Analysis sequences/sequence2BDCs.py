@@ -106,7 +106,7 @@ async def main():
         await h2oS1.move_motor_forward(30)
         await dmsoS1.move_motor_forward(30)
 
-        
+
         await asyncio.sleep(1.5)
 
         #Get dmso into cuvette
@@ -115,6 +115,7 @@ async def main():
         await h2oS1.move_motor_forward(5)
         await h2obayers.move_motor_reverse(5)
         await asyncio.sleep(4.5)
+        await led.move_motor_reverse(300)
 
         #get nin and dmso into cuvette
         await dmsoS1.move_motor_forward(4)

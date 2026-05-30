@@ -15,8 +15,8 @@ import tty
 
 import serial
 
-
-PORT = "/dev/ttyACM0"
+# PORT = "/dev/ttyACM0"
+PORT = "/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_03536373332351306182-if00"
 BAUD = 115200
 
 

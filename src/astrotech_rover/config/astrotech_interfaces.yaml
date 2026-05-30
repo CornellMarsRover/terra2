@@ -26,8 +26,7 @@ auger:
                       # publishes every moteus cycle (50 Hz watchdog cadence).
   # Real-driver config. Use the auger fdcanusb here. With two CAN lines,
   # do not rely on moteus autodiscovery choosing the right adapter.
-  # Bring-up shortcut: ASTROTECH_AUGER_CAN_PORT overrides this value.
-  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
+  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_AUGER-if00
 
 mixing_servo:
   # CMR servo board on the same fdcanusb as the auger moteus stack
@@ -73,8 +72,7 @@ analysis:
   status_rate_hz: 5.0
   # BDC pump boards live on their own fdcanusb CAN line. Set this to the BDC
   # dongle's stable /dev/serial/by-id path on the rover.
-  # Bring-up shortcut: ASTROTECH_BDC_CAN_PORT overrides this value.
-  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_8249C85D-if00
+  real_port: /dev/serial/by-id/usb-mjbots_fdcanusb_BDC-if00
   real_bitrate: 1000000
   # The chamber servo is moving to Arduino serial. Until that driver exists,
   # keep this false so the analysis sequencer skips chamber-position steps

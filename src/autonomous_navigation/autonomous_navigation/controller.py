@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TwistStamped
-from std_msgs.msg import Float32MultiArray, String
+from std_msgs.msg import Float32MultiArray, String, Bool
 import math
 import time
 
@@ -31,6 +31,20 @@ class ControllerNode(Node):
             Float32MultiArray,
             '/autonomy/path/next_waypoint',
             self.update_waypoint,
+            10
+        )
+
+        # === URC object-detection subsystem (overview: cmr_cams/DETECTION_TESTING.md) ===
+        # Autonomous STOP command. Latched by the base-station detection node
+        # when a mission object is confidently detected (round-trips back over
+        # the radio link). When True we hold the rover still regardless of the
+        # current waypoint -- this is the tight, deterministic stop that does
+        # not depend on a human watching the panel.
+        self.stop_commanded = False
+        self.stop_subscription = self.create_subscription(
+            Bool,
+            '/autonomy/motion/stop',
+            self.update_stop,
             10
         )
 
@@ -81,6 +95,13 @@ class ControllerNode(Node):
           4. Otherwise, if 'use_stanley' is True, run Stanley logic for steering angle.
           5. If 'use_stanley' is False, use your original "ackerman" approach.
         """
+        # Detection-driven stop overrides everything: hold the rover still and
+        # keep republishing zero velocity so the drives stay commanded to stop.
+        if self.stop_commanded:
+            self.publish_ackerman(0.0, 0.0)
+            self.publish_movement('stopped')
+            return
+
         if self.waypoint is None:
             return
 
@@ -319,6 +340,13 @@ class ControllerNode(Node):
         dt = (current_stamp.sec - last_stamp.sec) + \
              (current_stamp.nanosec - last_stamp.nanosec) * 1e-9
         return dt
+
+    def update_stop(self, msg: Bool):
+        """Latch/clear the autonomous detection stop."""
+        if msg.data != self.stop_commanded:
+            self.get_logger().info(
+                f'Detection STOP {"engaged" if msg.data else "released"}')
+        self.stop_commanded = msg.data
 
     def stop_robot(self):
         self.publish_ackerman(0.0, 0.0)

@@ -36,6 +36,7 @@ rosidl_generate_interfaces(
   msg/IMUSensorData.msg
   msg/Int16ArrayStamped.msg
   msg/GroundPlaneStamped.msg
+  msg/Detection.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv

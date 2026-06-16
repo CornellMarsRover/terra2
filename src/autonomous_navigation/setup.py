@@ -15,6 +15,7 @@ setup(
         ('share/' + package_name + '/config', ['config/waypoints_duff.yaml']),
         ('share/' + package_name + '/launch', ['launch/localization_real.launch.py']),
         ('share/' + package_name + '/launch', ['launch/sim_autonomy.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/full_auton.launch.py']),
         ('share/' + package_name + '/config', ['config/waypoints.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_engquad.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_long.yaml']),

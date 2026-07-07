@@ -123,7 +123,7 @@ class ControllerNode(Node):
                 x_error,
                 y_error,
                 distance_to_wp,
-                self.yaw,
+                math.atan2(y_error, x_error),
                 0.0,
                 'arrived_stop',
                 0.0,

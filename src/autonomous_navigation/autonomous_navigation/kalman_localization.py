@@ -45,9 +45,9 @@ class KalmanLocalizationNode(Node):
         # Default depth camera noise covariance (2x2) in case message covariance is not used.
         self.R_depth_default = np.diag([0.5, 0.5])
 
-        # Initial GPS coordinates
-        self.initial_lat = 42.4562060
-        self.initial_lon = -76.4878320
+        # Initial GPS coordinates, captured from the first fix
+        self.initial_lat = None
+        self.initial_lon = None
 
         self.last_z_depth = np.array([[0.0], [0.0]])
 
@@ -90,7 +90,7 @@ class KalmanLocalizationNode(Node):
         # Publisher
         # ---------------------------
         # Publish the filtered estimate (position and velocity) as Odometry.
-        self.pub_estimate = self.create_publisher(TwistStamped, '/autonomy/pose/global/robot', 10)
+        self.pub_estimate = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
         self.pose_timer = self.create_timer(0.1, self.publish_estimate)
 
         self.get_logger().info("Localization node has been started.")
@@ -262,7 +262,7 @@ class KalmanLocalizationNode(Node):
         # Set velocity (linear component)
         pose_msg.twist.linear.x = float(self.x[0])
         pose_msg.twist.linear.y = float(self.x[1])
-        pose_msg.twist.angular.z = float(math.degrees(self.current_yaw))
+        pose_msg.twist.angular.z = float(self.current_yaw)
         self.pub_estimate.publish(pose_msg)
 
     # Update yaw with IMU message

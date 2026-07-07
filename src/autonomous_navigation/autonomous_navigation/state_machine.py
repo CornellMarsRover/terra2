@@ -18,7 +18,6 @@ import numpy as np
 from collections import deque
 from typing import Dict, Tuple, Optional, Deque
 from ament_index_python.packages import get_package_share_directory
-from pyubx2 import llh2ecef
 
 class StateMachineNode(Node):
     def __init__(self):

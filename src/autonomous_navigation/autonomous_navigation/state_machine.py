@@ -143,6 +143,7 @@ class StateMachineNode(Node):
         self.r_step = None
         self.theta_step = None
         self.searched = False
+        self.ignore_objects_until_s = 0.0
         self.update_search_params() # Updates above values using current waypoint index
 
         self.target_position = None
@@ -228,6 +229,11 @@ class StateMachineNode(Node):
         self.yaw = msg.twist.angular.z
     
     def object_callback(self, msg):
+        # The detector latches and republishes the previous marker for a few
+        # frames after a waypoint advance; drop those so a stale position
+        # cannot instantly complete the new waypoint.
+        if self.get_clock().now().nanoseconds / 1e9 < self.ignore_objects_until_s:
+            return
         self.target_position = [msg.linear.x, msg.linear.y]
         self.get_logger().info(f"Current target {self.current_state} found at {self.target_position}")
 
@@ -320,6 +326,7 @@ class StateMachineNode(Node):
         self.target_position = None
         self.search_waypoints = deque()
         self.searched = False
+        self.ignore_objects_until_s = self.get_clock().now().nanoseconds / 1e9 + 1.0
         # Retarget the detector immediately so it stops republishing the
         # previous marker's position into the new waypoint's approach
         self.publish_target_name()

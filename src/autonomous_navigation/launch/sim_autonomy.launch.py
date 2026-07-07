@@ -62,7 +62,7 @@ def generate_launch_description():
                     executable='local_planner',
                     name='local_planner',
                     output='screen',
-                    parameters=[{'visualize': True, 'real': False}]
+                    parameters=[{'visualize': True, 'real': False, 'use_sim_time': True}]
                 ),
             ],
         ),
@@ -74,7 +74,7 @@ def generate_launch_description():
                     executable='global_planner',
                     name='global_planner',
                     output='screen',
-                    parameters=[{'real': False}]
+                    parameters=[{'real': False, 'use_sim_time': True}]
                 ),
             ],
         ),
@@ -88,7 +88,7 @@ def generate_launch_description():
                     executable='controller',
                     name='controller',
                     output='screen',
-                    parameters=[{'real': False}]
+                    parameters=[{'real': False, 'use_sim_time': True}]
                 ),
             ],
         ),

@@ -209,15 +209,13 @@ class CostmapNode(Node):
         # don't update if out of grid bounds or previously detected an obstacle at that grid location
         if (x_new, y_new) in curr_obstacles or (self.real and self.in_ground_plane(x_new, y_new)):
             return
-        if (x_new, y_new) not in self.grid_dict:
-            self.grid_dict[(x_new, y_new)] = 0
         # Store traversable cells to decay
         if (self.ground_threshold < height < self.obstacle_threshold) or height > self.clearance_height:
             curr_free_space.add((x_new, y_new))
             return
         # increment cell cost if height seems to represent obstacle
         else:
-            self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+2)
+            self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict.get((x_new, y_new), 0)+2)
             self.grid_last_seen[(x_new, y_new)] = self.get_clock().now().nanoseconds / 1e9
             curr_obstacles.add((x_new, y_new))
         return

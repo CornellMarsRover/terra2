@@ -114,8 +114,9 @@ class LocalizationSim(Node):
         if dt == 0:
             return
 
-        # Update angular velocity
-        omega_z = (self.yaw - last_yaw)/dt
+        # Update angular velocity (wrap the delta so a +/-pi crossing does not spike)
+        yaw_delta = math.atan2(math.sin(self.yaw - last_yaw), math.cos(self.yaw - last_yaw))
+        omega_z = yaw_delta/dt
         self.imu_velocity[2] = omega_z
 
         linear_accel_x = msg.linear_acceleration.x

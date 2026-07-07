@@ -142,8 +142,8 @@ class CostmapNode(Node):
         x_snap = round(x * self.k) / self.k
         y_snap = round(y * self.k) / self.k
         self.game_object_position = set()
-        for dx in range(-1*N, N, 1):
-            for dy in range(-1*N, N, 1):
+        for dx in range(-1*N, N + 1, 1):
+            for dy in range(-1*N, N + 1, 1):
                 safe_x = x_snap + (dx*0.25)
                 safe_y = y_snap + (dy*0.25)
                 self.game_object_position.add((safe_x, safe_y))
@@ -182,7 +182,7 @@ class CostmapNode(Node):
             # Discard points outside of 45 degree line of sight or too far
             #if abs(y) > 1.0 and abs(math.degrees(math.atan(y/x))) > 45.0:
             #    return
-            if dist > self.max_depth or dist < self.min_depth or abs(math.degrees(math.atan(y/x))) > 45.0:
+            if dist > self.max_depth or dist < self.min_depth or abs(math.degrees(math.atan2(y, x))) > 45.0:
                 return
         else:
             # Y points downwards in camera coordinate frame in Gazebo

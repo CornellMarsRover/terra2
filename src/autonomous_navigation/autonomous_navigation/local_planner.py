@@ -485,8 +485,8 @@ class LocalPlannerNode(Node):
         'n' is the expansion in each direction, in 0.25m steps.
         """
         cost = 0
-        for x in range(-n, n, 1):
-            for y in range(-n, n, 1):
+        for x in range(-n, n + 1, 1):
+            for y in range(-n, n + 1, 1):
                 if x == 0 and y == 0:
                     continue
                 x1 = rx + (x * 0.25)

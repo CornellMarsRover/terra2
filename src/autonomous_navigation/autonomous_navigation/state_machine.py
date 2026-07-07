@@ -320,6 +320,10 @@ class StateMachineNode(Node):
         # Reset object variables
         self.target_position = None
         self.search_waypoints = deque()
+        self.searched = False
+        # Retarget the detector immediately so it stops republishing the
+        # previous marker's position into the new waypoint's approach
+        self.publish_target_name()
         
     def publish_state(self):
         """

@@ -30,7 +30,9 @@ if [[ ! -f /opt/ros/humble/setup.bash ]]; then
   echo "ROS 2 Humble is required. Run this on the Jetson or in the dev container." >&2
   exit 1
 fi
+set +u
 source /opt/ros/humble/setup.bash
+set -u
 if [[ "$mode" == build ]]; then
   exec colcon build --symlink-install --packages-up-to \
     cmr_fabric cmr_controller_remote cmr_rovernet autonomous_navigation "$@"
@@ -39,7 +41,9 @@ if [[ ! -f install/setup.bash ]]; then
   echo "Workspace is not built. Run: ./run build" >&2
   exit 1
 fi
+set +u
 source install/setup.bash
+set -u
 case "$mode" in
   teleop) exec ros2 launch cmr_rovernet rovernet.launch.py enable_arm:=false ;;
   auto) exec ros2 launch autonomous_navigation localization_real.launch.py ;;

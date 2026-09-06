@@ -21,6 +21,7 @@ from autonomous_navigation.planner_core import (
     parse_costmap,
     path_is_dense,
     segment_cost,
+    simplify_path,
 )
 
 try:
@@ -529,7 +530,7 @@ class LocalPlannerNode(Node):
 
         # We'll do RDP with a chosen epsilon (tunable)
         epsilon = 0.3
-        smoothed = self.rdp_simplify(path_list, epsilon)
+        smoothed = simplify_path(path_list, epsilon)
         self.current_path = deque(smoothed)
 
         if len(self.current_path) > 0:

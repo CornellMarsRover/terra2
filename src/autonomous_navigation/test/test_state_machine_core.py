@@ -53,3 +53,24 @@ def test_search_target_announces_active_search():
 
     assert decision.target == (3, 0)
     assert decision.announce_object
+
+
+def test_search_target_times_out_after_final_reached_point():
+    decision = search_target((1, 0), (4, 4), [(1, 0)])
+
+    assert decision.target == (4, 4)
+    assert decision.timed_out
+    assert decision.pop_search
+
+
+def test_search_target_advances_to_following_point():
+    decision = search_target((1, 0), (4, 4), [(1, 0), (2, 0)])
+
+    assert decision.target == (2, 0)
+    assert decision.pop_search
+    assert not decision.announce_object
+
+
+def test_object_target_reports_standoff_crossing():
+    assert object_target((0, 0), (1, 0)).reached
+    assert not object_target((0, 0), (2, 0)).reached

@@ -15,7 +15,12 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
-from autonomous_navigation.planner_core import advance_path, parse_costmap, path_is_dense
+from autonomous_navigation.planner_core import (
+    advance_path,
+    neighbor_cost,
+    parse_costmap,
+    path_is_dense,
+)
 
 try:
     import rerun as rr
@@ -352,22 +357,7 @@ class LocalPlannerNode(Node):
         Get cost of neighboring diagonals. 
         'n' is the expansion in each direction, in 0.25m steps.
         """
-        cost = 0
-        for x in range(-n, n, 1):
-            for y in range(-n, n, 1):
-                if x == 0 and y == 0:
-                    continue
-                x1 = rx + (x * 0.25)
-                y1 = ry + (y * 0.25)
-                d = math.sqrt(((x * 0.25) ** 2) + ((y * 0.25) ** 2))
-                if d < 1e-6:
-                    continue
-                co = self.costs.get((x1, y1), 0.0)
-                if co == 1:
-                    co = 0
-                c = co * (weight / d)
-                cost += c
-        return cost
+        return weight * neighbor_cost(self.costs, (rx, ry), self.cell_size, n)
     
     def compute_segment_cost(self, start, end, gap=4):
         """

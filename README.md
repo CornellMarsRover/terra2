@@ -123,7 +123,8 @@ Run these short commands from the repository root. Use `./run help` at any time.
 ### First Build
 
 Run `./run build` after cloning, switching branches, or changing ROS packages.
-The launcher sources ROS 2 Humble and the workspace automatically.
+The launcher sources ROS 2 Humble and the workspace automatically. For tests,
+install missing tools with `python3 -m pip install coverage pytest`.
 
 ### Hardware Tele-op
 

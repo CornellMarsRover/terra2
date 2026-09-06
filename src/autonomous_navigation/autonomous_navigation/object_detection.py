@@ -29,8 +29,8 @@ class ObjectDetectionNode(Node):
             'best.pt'
         )
 
-        # set to False if you want to read CameraInfo over the wire
-        self.real = True
+        self.declare_parameter('real', True)
+        self.real = self.get_parameter('real').value
 
         # state
         self.current_target_id = None
@@ -99,11 +99,14 @@ class ObjectDetectionNode(Node):
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(
             cv2.aruco.DICT_4X4_50
         )
-        self.aruco_params = cv2.aruco.DetectorParameters()
-        self.aruco_detector = cv2.aruco.ArucoDetector(
-            self.aruco_dict,
-            self.aruco_params
-        )
+        if hasattr(cv2.aruco, 'ArucoDetector'):
+            self.aruco_params = cv2.aruco.DetectorParameters()
+            self.aruco_detector = cv2.aruco.ArucoDetector(
+                self.aruco_dict, self.aruco_params
+            )
+        else:
+            self.aruco_params = cv2.aruco.DetectorParameters_create()
+            self.aruco_detector = None
 
         self.object_ids = {
             "ar1": 2,
@@ -171,7 +174,12 @@ class ObjectDetectionNode(Node):
         gray   = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
 
         # detect all markers
-        corners, ids, _ = self.aruco_detector.detectMarkers(gray)
+        if self.aruco_detector is not None:
+            corners, ids, _ = self.aruco_detector.detectMarkers(gray)
+        else:
+            corners, ids, _ = cv2.aruco.detectMarkers(
+                gray, self.aruco_dict, parameters=self.aruco_params
+            )
         if ids is None or len(ids) == 0:
             return
 

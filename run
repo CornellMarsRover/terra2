@@ -40,10 +40,10 @@ fi
 set +u
 source /opt/ros/humble/setup.bash
 set -u
-if [[ "" == setup ]]; then
-  exec rosdep install --from-paths src --ignore-src -r -y ""
+if [[ "$mode" == setup ]]; then
+  exec rosdep install --from-paths src --ignore-src -r -y "$@"
 fi
-if [[ "" == build ]]; then
+if [[ "$mode" == build ]]; then
   exec colcon build --symlink-install --packages-up-to \
     cmr_fabric cmr_controller_remote cmr_rovernet autonomous_navigation "$@"
 fi

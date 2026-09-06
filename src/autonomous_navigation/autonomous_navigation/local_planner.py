@@ -536,55 +536,6 @@ class LocalPlannerNode(Node):
         if len(self.current_path) > 0:
             self.next_waypoint = self.current_path[0]
 
-    def rdp_simplify(self, points, epsilon):
-        """
-        A basic Ramer-Douglas-Peucker line simplification.
-        'points' is a list of (x, y).
-        'epsilon' is distance threshold. Smaller -> keep more points.
-        """
-        if len(points) < 3:
-            return points
-
-        # Find the farthest point from the line formed by first and last
-        first = points[0]
-        last = points[-1]
-
-        max_dist = 0.0
-        index = 0
-        for i in range(1, len(points) - 1):
-            dist = self.perp_dist(points[i], first, last)
-            if dist > max_dist:
-                index = i
-                max_dist = dist
-
-        # If max distance is greater than epsilon, recursively simplify
-        if max_dist > epsilon:
-            left_part = self.rdp_simplify(points[: index+1], epsilon)
-            right_part = self.rdp_simplify(points[index:], epsilon)
-
-            # Combine, removing the repeated middle point
-            return left_part[:-1] + right_part
-        else:
-            # All points are close to a straight line from first to last
-            return [first, last]
-
-    @staticmethod
-    def perp_dist(point, line_start, line_end):
-        """
-        Perpendicular distance of `point` to the line formed by `line_start -> line_end`.
-        """
-        (x0, y0) = point
-        (x1, y1) = line_start
-        (x2, y2) = line_end
-
-        if (x1, y1) == (x2, y2):
-            # line_start and line_end are the same
-            return math.dist(point, line_start)
-
-        # Formula for distance from point to line
-        num = abs((y2 - y1)*x0 - (x2 - x1)*y0 + x2*y1 - y2*x1)
-        den = math.sqrt((y2 - y1)**2 + (x2 - x1)**2)
-        return num / den
 
 def main(args=None):
     rclpy.init(args=args)

@@ -107,9 +107,36 @@ A smoke test (build, launch, check topics/rates, call a service) is at
 [`src/astrotech_rover/scripts/smoke_test.sh`](./src/astrotech_rover/scripts/smoke_test.sh); run from the repo root
 on a ROS 2 Humble machine.
 
+## Autonomy Testing Status
+
+The `autonomy-fall2026` branch routes waypoint-following commands through
+`/cmd_vel_drives`, the same RoverNet swerve and Moteus path used by teleop.
+Teleop remains the manual input source and is not modified by autonomy.
+
+Run the focused tests from the repository root in the CMR development image:
+
+```bash
+bash scripts/test_autonomy.sh
+```
+
+CI enforces 100% line and branch coverage for the extracted drive-command
+mapping. This is not yet 100% coverage of every ROS autonomy node.
+
+### Autonomy Test Roadmap
+
+- [x] Unit-test normalized forward, steering, point-turn, and stop commands.
+- [x] Build `cmr_msgs`, `cmr_rovernet`, and `autonomous_navigation` on Humble.
+- [ ] Extract planner, costmap, and state-machine decisions into pure modules.
+- [ ] Add deterministic tests for waypoint completion and replanning failures.
+- [ ] Add recorded camera, point-cloud, GPS, and IMU fixture datasets.
+- [ ] Add Gazebo collision, blocked-path, sensor-dropout, and timeout tests.
+- [ ] Verify manual override, autonomy timeout, estop, and Moteus watchdog behavior.
+- [ ] Run repeatable Jetson hardware-in-the-loop tests with wheels lifted first.
+- [ ] Expand the coverage gate as each ROS node gains a testable core.
+
 ## TODO Functionality
 
-- **Autonomous Navigation:** [cmr_navigation](./src/cmr_navigation/)
+- **Autonomous Navigation:** [autonomous_navigation](./src/autonomous_navigation/)
 - **GPS Functionality** (inside of cmr_navigation in old main, gps.py)
 - **Arm Autonomy**
 - **ArUco Tag Detection**

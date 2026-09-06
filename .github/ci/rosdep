@@ -1,0 +1,8 @@
+#!/bin/bash
+set -euo pipefail
+
+if [[ "${1:-}" == "install" ]]; then
+  exec /usr/bin/rosdep "$@" --skip-keys \
+    "ament_python moteus opencv-python python3-serial-asyncio"
+fi
+exec /usr/bin/rosdep "$@"

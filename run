@@ -45,7 +45,7 @@ set +u
 source install/setup.bash
 set -u
 case "$mode" in
-  teleop) exec ros2 launch cmr_rovernet rovernet.launch.py enable_arm:=false ;;
-  auto) exec ros2 launch autonomous_navigation localization_real.launch.py ;;
-  sim) exec ros2 launch autonomous_navigation sim_autonomy.launch.py ;;
+  teleop) exec ros2 launch cmr_rovernet rovernet.launch.py enable_arm:=false "$@" ;;
+  auto) exec ros2 launch autonomous_navigation localization_real.launch.py "$@" ;;
+  sim) exec ros2 launch autonomous_navigation sim_autonomy.launch.py "$@" ;;
 esac

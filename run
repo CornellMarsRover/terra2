@@ -22,7 +22,13 @@ case "$mode" in
     cd "local_(no ROS)base_station_scripts"
     exec python3 drive_control.py "$@"
     ;;
-  test) exec bash scripts/test_autonomy.sh "$@" ;;
+  test)
+    python3 -c "import coverage, pytest" 2>/dev/null || {
+      echo "Test tools missing. Run: python3 -m pip install coverage pytest" >&2
+      exit 1
+    }
+    exec bash scripts/test_autonomy.sh "$@"
+    ;;
   build|teleop|auto|sim) ;;
   *) echo "Unknown mode: $mode" >&2; usage >&2; exit 2 ;;
 esac

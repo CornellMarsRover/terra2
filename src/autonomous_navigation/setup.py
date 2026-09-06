@@ -26,7 +26,7 @@ setup(
     maintainer_email='your.email@example.com',
     description='Rover Autonomy',
     license='Apache License 2.0',
-    tests_require=[],
+    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             # PHOBOS APPEND

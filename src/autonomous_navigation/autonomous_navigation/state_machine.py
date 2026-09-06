@@ -17,6 +17,11 @@ from std_msgs.msg import Float32MultiArray, String
 from collections import deque
 from ament_index_python.packages import get_package_share_directory
 
+from autonomous_navigation.state_machine_core import (
+    coordinate_target,
+    far_target,
+)
+
 
 class StateMachineNode(Node):
     def __init__(self):
@@ -221,19 +226,21 @@ class StateMachineNode(Node):
         #if d > (self.search_radius * 2) or d > 10.0:
         
         if d > 10.0:
-            if waypoint_dist is not None and waypoint_dist < 2.5:
+            decision = far_target(
+                (self.north, self.west), tuple(self.next_coordinate),
+                tuple(self.target_position), list(self.coarse_waypoints),
+                self.current_object != 'coordinate' and self.object_found,
+            )
+            if decision.pop_coarse:
                 self.coarse_waypoints.popleft()
-            if not (self.current_object != 'coordinate' and self.object_found):
-                if self.coarse_waypoints and len(self.coarse_waypoints) > 0:
-                    self.target_position = self.coarse_waypoints[0]
-                else:
-                    self.target_position = self.next_coordinate
+            self.target_position = decision.target
         else:
             if self.current_object == 'coordinate':
-                if d < 2.0:
-                    reached = True
-                else:
-                    self.target_position = self.next_coordinate
+                decision = coordinate_target(
+                    (self.north, self.west), tuple(self.next_coordinate)
+                )
+                self.target_position = decision.target
+                reached = decision.reached
             elif not self.object_found:
                 if len(self.search_waypoints) == 0:
                     timeout = True

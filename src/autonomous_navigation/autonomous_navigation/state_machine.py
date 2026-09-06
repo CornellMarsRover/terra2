@@ -20,8 +20,10 @@ from ament_index_python.packages import get_package_share_directory
 from autonomous_navigation.state_machine_core import (
     coordinate_target,
     far_target,
+    north_west_meters,
     object_target,
     search_target,
+    search_waypoints,
 )
 
 
@@ -185,10 +187,15 @@ class StateMachineNode(Node):
 
         # compute global‐frame target position (north/west) of the GPS waypoint itself
         wp = self.waypoints[self.current_waypoint_index]
-        n, w = self.get_north_west_meters(wp['latitude'], wp['longitude'])
+        n, w = north_west_meters(
+            (self.initial_lat, self.initial_lon),
+            (wp['latitude'], wp['longitude']),
+        )
         self.next_coordinate = [n, w]
         if self.current_object != 'coordinate':
-            self.search_waypoints = deque(self.generate_search_waypoints(n,w,self.ang_step, self.r_step, self.search_radius))
+            self.search_waypoints = deque(search_waypoints(
+                (n, w), self.ang_step, self.r_step, self.search_radius
+            ))
             self.get_logger().info(f"search waypoints: {self.search_waypoints}")
         self.get_logger().info(
             f"Advancing to WP#{self.current_waypoint_index}: "
@@ -269,24 +276,6 @@ class StateMachineNode(Node):
             self.current_waypoint_index += 1
             self.update_search_params()
 
-    def generate_search_waypoints(self, x, y, a, r, max_r):
-        pts = []
-        curr_r = r
-        curr_a = 0.0
-        while curr_r < max_r:
-            if curr_a > 180:
-                curr_a = -1 * (360 - curr_a)
-            a_rad = math.radians(curr_a)
-            dx = curr_r * (math.cos(a_rad) - math.sin(a_rad))
-            dy = curr_r * (math.sin(a_rad) + math.sin(a_rad))
-            pts.append((x+dx, y+dy))
-            if curr_a < 0:
-                curr_a -= a
-            else:
-                curr_a += a
-            curr_r += r
-        return pts
-
     def publish_targets(self):
         local_msg = Float32MultiArray()
         local_msg.data = [
@@ -329,24 +318,6 @@ class StateMachineNode(Node):
         self.target_position = [msg.linear.x, msg.linear.y]
         self.get_logger().info(f"Found {self.current_object} @ {self.target_position}")
 
-
-    def get_north_west_meters(self, target_lat, target_lon):
-        """
-        Convert (lat,lon) → local (north,west) from the starting reference.
-        """
-        R = 6378137.0
-        φ1 = math.radians(self.initial_lat)
-        φ2 = math.radians(target_lat)
-        λ1 = math.radians(self.initial_lon)
-        λ2 = math.radians(target_lon)
-
-        dφ = φ2 - φ1
-        dλ = λ2 - λ1
-        meanφ = 0.5 * (φ1 + φ2)
-
-        north = dφ * R
-        west  = -dλ * R * math.cos(meanφ)
-        return north, west
 
 
 def main(args=None):

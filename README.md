@@ -167,12 +167,19 @@ CI enforces 100% line and branch coverage for the drive-command mapping and
 the extracted planner, costmap, and state-machine decisions. ROS adapter nodes
 still require integration coverage.
 
+Software-only safeguards covered by this gate include deterministic selection
+of a clear local goal, consecutive-frame path invalidation, and stopping inside
+the configurable `waypoint_tolerance`. Static analysis is incremental: only C++
+files changed by a commit or pull request are formatted and checked with
+`clang-tidy`.
+
 ### Autonomy Test Roadmap
 
 - [x] Unit-test normalized forward, steering, point-turn, and stop commands.
 - [x] Build `cmr_msgs`, `cmr_rovernet`, and `autonomous_navigation` on Humble.
 - [x] Extract planner, costmap, and state-machine decisions into pure modules.
-- [ ] Add deterministic tests for waypoint completion and replanning failures.
+- [x] Add deterministic tests for waypoint completion and replanning failures.
+- [x] Run incremental C++ formatting and static analysis in CI.
 - [ ] Add recorded camera, point-cloud, GPS, and IMU fixture datasets.
 - [ ] Add Gazebo collision, blocked-path, sensor-dropout, and timeout tests.
 - [ ] Verify manual override, autonomy timeout, estop, and Moteus watchdog behavior.

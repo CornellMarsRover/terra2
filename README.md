@@ -163,14 +163,15 @@ Run the focused tests from the repository root in the CMR development image:
 bash scripts/test_autonomy.sh
 ```
 
-CI enforces 100% line and branch coverage for the extracted drive-command
-mapping. This is not yet 100% coverage of every ROS autonomy node.
+CI enforces 100% line and branch coverage for the drive-command mapping and
+the extracted planner, costmap, and state-machine decisions. ROS adapter nodes
+still require integration coverage.
 
 ### Autonomy Test Roadmap
 
 - [x] Unit-test normalized forward, steering, point-turn, and stop commands.
 - [x] Build `cmr_msgs`, `cmr_rovernet`, and `autonomous_navigation` on Humble.
-- [ ] Extract planner, costmap, and state-machine decisions into pure modules.
+- [x] Extract planner, costmap, and state-machine decisions into pure modules.
 - [ ] Add deterministic tests for waypoint completion and replanning failures.
 - [ ] Add recorded camera, point-cloud, GPS, and IMU fixture datasets.
 - [ ] Add Gazebo collision, blocked-path, sensor-dropout, and timeout tests.

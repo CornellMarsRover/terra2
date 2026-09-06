@@ -6,6 +6,7 @@ from autonomous_navigation.drive_command import (
     ChassisCommand,
     forward_heading_command,
     point_turn_command,
+    waypoint_reached,
 )
 
 
@@ -15,6 +16,17 @@ def test_forward_command_uses_normalized_chassis_axes():
     assert command.linear_x == pytest.approx(0.6)
     assert command.linear_y == 0.0
     assert command.angular_z == pytest.approx(math.radians(20.0))
+
+
+@pytest.mark.parametrize("position", [(0.0, 0.0), (0.3, 0.0)])
+def test_waypoint_reached_includes_tolerance_boundary(position):
+    assert waypoint_reached(position, (0.0, 0.0))
+
+
+def test_waypoint_reached_rejects_outside_and_invalid_tolerance():
+    assert not waypoint_reached((0.31, 0.0), (0.0, 0.0))
+    with pytest.raises(ValueError, match="negative"):
+        waypoint_reached((0.0, 0.0), (0.0, 0.0), -0.1)
 
 
 def test_forward_command_clamps_speed_and_heading():

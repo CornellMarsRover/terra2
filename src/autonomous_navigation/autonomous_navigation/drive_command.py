@@ -15,6 +15,13 @@ def _clamp(value: float) -> float:
     return max(-1.0, min(1.0, float(value)))
 
 
+def waypoint_reached(position, waypoint, tolerance: float = 0.3) -> bool:
+    """Return whether a planar waypoint is within the arrival tolerance."""
+    if tolerance < 0.0:
+        raise ValueError("tolerance must not be negative")
+    return math.dist(position, waypoint) <= tolerance
+
+
 def forward_heading_command(
     linear_x: float,
     heading_error_deg: float,

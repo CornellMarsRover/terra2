@@ -3,6 +3,6 @@ set -euo pipefail
 
 if [[ "${1:-}" == "install" ]]; then
   exec /usr/bin/rosdep "$@" --skip-keys \
-    "ament_python moteus opencv-python python3-serial-asyncio"
+    "ament_python moteus opencv-python python3-serial-asyncio warehouse_ros_mongo"
 fi
 exec /usr/bin/rosdep "$@"

@@ -30,16 +30,19 @@ jobs:
         id: get-self-packages
         uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
 
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-coverage ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher ros-humble-joint-state-broadcaster ros-humble-rviz2
+          python3 -m pip install --no-cache-dir moteus pyserial-asyncio
+          echo "$GITHUB_WORKSPACE/.github/ci" >> "$GITHUB_PATH"
+
       - name: Build
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
         uses: autowarefoundation/autoware-github-actions/colcon-build@v1
         with:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
-
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y python3-coverage ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher ros-humble-joint-state-broadcaster ros-humble-rviz2
 
       - name: Unit Tests
         id: test

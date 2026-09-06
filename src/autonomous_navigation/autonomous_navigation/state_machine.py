@@ -20,6 +20,8 @@ from ament_index_python.packages import get_package_share_directory
 from autonomous_navigation.state_machine_core import (
     coordinate_target,
     far_target,
+    object_target,
+    search_target,
 )
 
 
@@ -242,27 +244,21 @@ class StateMachineNode(Node):
                 self.target_position = decision.target
                 reached = decision.reached
             elif not self.object_found:
-                if len(self.search_waypoints) == 0:
-                    timeout = True
-                else:
-                    sx, sy = self.search_waypoints[0]
-                    dx3, dy3 = self.north - sx, self.west - sy
-                    d3 = math.sqrt((dx3**2) + (dy3**2))
-                    if d3 < 2.0:
-                        self.search_waypoints.popleft()
-                        if len(self.search_waypoints) == 0:
-                            timeout = True
-                        else:
-                            self.target_position = self.search_waypoints[0]
-                    else:
-                        self.target_position = self.search_waypoints[0]
-                        self.publish_target_name()
+                decision = search_target(
+                    (self.north, self.west), tuple(self.target_position),
+                    list(self.search_waypoints),
+                )
+                if decision.pop_search:
+                    self.search_waypoints.popleft()
+                self.target_position = decision.target
+                timeout = decision.timed_out
+                if decision.announce_object:
+                    self.publish_target_name()
             else:
-                gx, gy = self.target_position[0], self.target_position[1]
-                dx4, dy4 = self.north - gx, self.west - gy
-                d4 = math.sqrt((dx4**2) + (dy4**2))
-                if d4 < 1.5:
-                    reached = True
+                decision = object_target(
+                    (self.north, self.west), tuple(self.target_position)
+                )
+                reached = decision.reached
 
         if reached or timeout:
             if timeout:

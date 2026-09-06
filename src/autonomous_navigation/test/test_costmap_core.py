@@ -48,3 +48,35 @@ def test_projection_snaps_to_requested_cell_size():
     result = project_point((1.26, 0, 2.24), (0, 0), rotation, False, 1, 1, 6, 0.5)
 
     assert result.cell == (2.0, -1.5)
+
+
+from autonomous_navigation.costmap_core import decay_costs, observed_cost  # noqa: E402
+
+
+def test_observed_cost_marks_ground_and_overhead_as_traversable():
+    assert observed_cost(4, 0.0, -0.2, 0.15, 2, 100) is None
+    assert observed_cost(4, 3.0, -0.2, 0.15, 2, 100) is None
+
+
+def test_observed_cost_accumulates_low_and_tall_obstacles_with_cap():
+    assert observed_cost(4, 0.3, -0.2, 0.15, 2, 100) == 6
+    assert observed_cost(97, 0.8, -0.2, 0.15, 2, 100) == 100
+
+
+def test_decay_costs_removes_zeroes_and_preserves_ineligible_cells():
+    costs = {(0, 0): 1, (1, 0): 4, (2, 0): 5}
+
+    assert decay_costs(costs, 2, eligible={(0, 0), (1, 0)}) == {
+        (1, 0): 2,
+        (2, 0): 5,
+    }
+    assert costs == {(0, 0): 1, (1, 0): 4, (2, 0): 5}
+
+
+def test_decay_costs_defaults_to_all_cells():
+    assert decay_costs({(0, 0): 2}, 1) == {(0, 0): 1}
+
+
+def test_decay_costs_rejects_negative_amount():
+    with pytest.raises(ValueError, match="negative"):
+        decay_costs({}, -1)

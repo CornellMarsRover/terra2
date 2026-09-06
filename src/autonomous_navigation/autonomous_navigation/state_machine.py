@@ -18,12 +18,7 @@ from collections import deque
 from ament_index_python.packages import get_package_share_directory
 
 from autonomous_navigation.state_machine_core import (
-    coordinate_target,
-    far_target,
-    north_west_meters,
-    object_target,
-    search_target,
-    search_waypoints,
+    north_west_meters, search_waypoints, select_target,
 )
 
 

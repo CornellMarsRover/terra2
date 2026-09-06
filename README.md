@@ -129,6 +129,8 @@ install missing tools with `python3 -m pip install coverage pytest`.
 
 ### Hardware Tele-op
 
+On the controller laptop, run `./run controller setup` once.
+
 1. On the Jetson, run `./run teleop`.
 2. Connect the DualSense to the laptop.
 3. On the laptop, run `./run controller`.

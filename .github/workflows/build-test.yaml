@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher ros-humble-joint-state-broadcaster ros-humble-rviz2
+          sudo apt-get update && sudo apt-get install -y python3-coverage ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher ros-humble-joint-state-broadcaster ros-humble-rviz2
 
       - name: Unit Tests
         id: test
@@ -67,3 +67,12 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install lcov -y
           bash scripts/ci_code_coverage.sh
+
+      - name: Autonomy Python coverage
+        run: bash scripts/test_autonomy.sh
+
+      - name: Upload autonomy coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: autonomy-python-coverage
+          path: build/autonomy-coverage.xml

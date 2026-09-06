@@ -50,9 +50,7 @@ class ControllerNode(Node):
         self.point_turn_velocity = 0.4
         self.ackerman_velocity = 0.9
         self.num_waypoints = 0
-        if not self.real:
-            self.ackerman_velocity = 0.055
-            self.point_turn_velocity = 0.08
+        # /cmd_vel_drives is normalized identically in simulation and hardware.
         # Timers and state
         self.last_movement = 'ackerman'
         self.last_command_time = self.get_clock().now().to_msg()

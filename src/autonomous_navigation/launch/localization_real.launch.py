@@ -4,13 +4,16 @@ import launch_ros.actions
 def generate_launch_description():
     return launch.LaunchDescription([
 
-        # Start drives node
+        # Use the same drive node as teleop. It arbitrates manual commands with
+        # autonomy's /cmd_vel_drives input before shared swerve/Moteus handling.
         launch_ros.actions.Node(
-            package='cmr_controls',
-            executable='swerve_controller_node',
-            name='swerve_controller_node',
+            package='cmr_rovernet',
+            executable='usama_control_testing_node',
+            name='drivesnet',
             output='screen',
-            parameters=[{}]
+            parameters=[{
+                'config_path': '/home/cmr/cmr/terra2/src/cmr_rovernet/config/drivesnet.toml'
+            }],
         ),
 
         # Start state machine node

@@ -107,3 +107,29 @@ def north_west_meters(origin, target, earth_radius: float = 6378137.0) -> Point:
     mean_latitude = 0.5 * (latitude_1 + latitude_2)
     west = -(longitude_2 - longitude_1) * earth_radius * math.cos(mean_latitude)
     return north, west
+
+
+def select_target(
+    position: Point,
+    goal: Point,
+    current_target: Point,
+    coarse_waypoints: Sequence[Point],
+    current_object: str,
+    object_found: bool,
+    search_points: Sequence[Point],
+    far_threshold: float = 10.0,
+) -> TargetDecision:
+    """Select the active mission target from the complete navigation state."""
+    if math.dist(position, goal) > far_threshold:
+        return far_target(
+            position,
+            goal,
+            current_target,
+            coarse_waypoints,
+            current_object != "coordinate" and object_found,
+        )
+    if current_object == "coordinate":
+        return coordinate_target(position, goal)
+    if not object_found:
+        return search_target(position, current_target, search_points)
+    return object_target(position, current_target)

@@ -261,6 +261,7 @@ class GazeboDriveBridge(Node):
             joint_positions.append(self.module_wheel_positions[module_name])
 
         msg = JointTrajectory()
+        msg.header.frame_id = "base_link"
         msg.joint_names = joint_names
         point = JointTrajectoryPoint()
         point.positions = joint_positions

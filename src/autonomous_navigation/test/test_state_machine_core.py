@@ -3,8 +3,11 @@ import pytest
 from autonomous_navigation.state_machine_core import (
     coordinate_target,
     far_target,
+    north_west_meters,
     object_target,
     search_target,
+    search_waypoints,
+    select_target,
 )
 
 
@@ -74,3 +77,38 @@ def test_search_target_advances_to_following_point():
 def test_object_target_reports_standoff_crossing():
     assert object_target((0, 0), (1, 0)).reached
     assert not object_target((0, 0), (2, 0)).reached
+
+
+def test_search_waypoints_expand_and_wrap_angles():
+    points = search_waypoints((10, 20), 200, 1, 4)
+
+    assert len(points) == 3
+    assert points[0] == (11, 20)
+    assert points[1] != points[2]
+
+
+def test_north_west_conversion_preserves_expected_signs():
+    north, west = north_west_meters((42.0, -76.0), (42.00001, -76.00001))
+
+    assert north > 0
+    assert west > 0
+    assert north_west_meters((42, -76), (42, -76)) == (0, 0)
+
+
+@pytest.mark.parametrize(
+    "goal, object_name, found, search, expected",
+    [
+        ((20, 0), "coordinate", False, [], (4, 0)),
+        ((1, 0), "coordinate", False, [], (1, 0)),
+        ((1, 0), "ar1", False, [(3, 0)], (3, 0)),
+        ((1, 0), "ar1", True, [], (2, 0)),
+    ],
+)
+def test_select_target_routes_each_mission_mode(
+    goal, object_name, found, search, expected
+):
+    decision = select_target(
+        (0, 0), goal, (2, 0), [(4, 0)], object_name, found, search
+    )
+
+    assert decision.target == expected

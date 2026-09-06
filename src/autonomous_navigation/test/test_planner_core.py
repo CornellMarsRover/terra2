@@ -41,3 +41,46 @@ def test_path_density_requires_two_short_segments():
     assert path_is_dense([(0, 0), (0.5, 0), (1.0, 0)])
     assert not path_is_dense([(0, 0), (2, 0), (2.5, 0)])
     assert not path_is_dense([(0, 0), (0.5, 0)])
+
+
+from autonomous_navigation.planner_core import (  # noqa: E402
+    neighbor_cost,
+    perpendicular_distance,
+    segment_cost,
+    simplify_path,
+)
+
+
+def test_perpendicular_distance_handles_line_and_point():
+    assert perpendicular_distance((1, 1), (0, 0), (2, 0)) == pytest.approx(1)
+    assert perpendicular_distance((1, 1), (0, 0), (0, 0)) == pytest.approx(2**0.5)
+
+
+def test_simplify_path_handles_short_straight_and_bent_paths():
+    assert simplify_path([(0, 0), (1, 0)], 0.1) == [(0, 0), (1, 0)]
+    assert simplify_path([(0, 0), (1, 0), (2, 0)], 0.1) == [(0, 0), (2, 0)]
+    assert simplify_path([(0, 0), (1, 1), (2, 0)], 0.1) == [
+        (0, 0),
+        (1, 1),
+        (2, 0),
+    ]
+
+
+def test_neighbor_cost_weights_cells_and_ignores_unknown_marker():
+    costs = {(-0.25, -0.25): 2, (-0.25, 0): 1}
+
+    assert neighbor_cost(costs, (0, 0), 0.25, 1) == pytest.approx(2 / 0.25**0.5)
+    assert neighbor_cost({}, (0, 0), 0.25, 0) == 0
+
+
+def test_segment_cost_handles_stationary_and_sampled_segments():
+    assert segment_cost({}, (0, 0), (0, 0)) == (0, 0)
+
+    maximum, total = segment_cost(
+        {(0.5, 0.0): 4.0},
+        (0, 0),
+        (1, 0),
+        neighbor_radius=0,
+    )
+    assert maximum == 4.0
+    assert total == 4.0

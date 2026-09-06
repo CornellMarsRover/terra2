@@ -128,6 +128,7 @@ class GazeboDriveBridge(Node):
         self.services_warned = False
         self._joint_effort_failures = 0
         self._joint_effort_successes = 0
+        self.manual_override_until_ns = 0
 
         self.module_order = [
             "front_left",
@@ -197,10 +198,24 @@ class GazeboDriveBridge(Node):
         self._set_target(linear_x, linear_y, angular_z, "/drives_controller/cmd_vel")
 
     def _set_target(self, linear_x: float, linear_y: float, angular_z: float, source: str) -> None:
+        now = self.get_clock().now()
+        command_active = any(
+            abs(value) > self.controller_deadzone
+            for value in (linear_x, linear_y, angular_z)
+        )
+        if source == "/drives_controller/cmd_vel":
+            if not command_active and self.last_command_source != source:
+                self.manual_override_until_ns = 0
+                return
+            timeout_ns = int(self.command_timeout_s * 1e9) if command_active else 0
+            self.manual_override_until_ns = now.nanoseconds + timeout_ns
+        elif now.nanoseconds < self.manual_override_until_ns:
+            return
+
         self.target_linear_x = float(linear_x)
         self.target_linear_y = float(linear_y)
         self.target_angular_z = float(angular_z)
-        self.last_command_time = self.get_clock().now()
+        self.last_command_time = now
         self.last_command_source = source
         self.get_logger().info(
             f"Drive command from {source}: linear_x={self.target_linear_x:.3f}, "

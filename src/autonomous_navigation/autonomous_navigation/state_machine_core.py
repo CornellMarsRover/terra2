@@ -95,3 +95,15 @@ def search_waypoints(
         angle += -angle_step if angle < 0 else angle_step
         radius += radius_step
     return points
+
+
+def north_west_meters(origin, target, earth_radius: float = 6378137.0) -> Point:
+    """Convert latitude/longitude pairs to local north/west meters."""
+    latitude_1 = math.radians(origin[0])
+    latitude_2 = math.radians(target[0])
+    longitude_1 = math.radians(origin[1])
+    longitude_2 = math.radians(target[1])
+    north = (latitude_2 - latitude_1) * earth_radius
+    mean_latitude = 0.5 * (latitude_1 + latitude_2)
+    west = -(longitude_2 - longitude_1) * earth_radius * math.cos(mean_latitude)
+    return north, west

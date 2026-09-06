@@ -107,6 +107,46 @@ A smoke test (build, launch, check topics/rates, call a service) is at
 [`src/astrotech_rover/scripts/smoke_test.sh`](./src/astrotech_rover/scripts/smoke_test.sh); run from the repo root
 on a ROS 2 Humble machine.
 
+## Driving Quick Start
+
+Run these short commands from the repository root. Use `./run help` at any time.
+
+| Command | Run it on | Purpose |
+| --- | --- | --- |
+| `./run build` | Jetson or dev container | Build drive and autonomy packages |
+| `./run teleop` | Jetson | Receive UDP input and drive the rover |
+| `./run controller` | Controller laptop | Send DualSense input to the rover |
+| `./run auto` | Jetson | Start hardware autonomy and shared rover driving |
+| `./run sim` | Dev container | Start autonomy in simulated-input mode |
+| `./run test` | Laptop or dev container | Run focused autonomy tests |
+
+### First Build
+
+Run `./run build` after cloning, switching branches, or changing ROS packages.
+The launcher sources ROS 2 Humble and the workspace automatically.
+
+### Hardware Tele-op
+
+1. On the Jetson, run `./run teleop`.
+2. Connect the DualSense to the laptop.
+3. On the laptop, run `./run controller`.
+
+Use `./run controller --list-controllers` to list controller IDs, then select one
+with `./run controller --controller-serial SERIAL`. The tele-op shortcut
+explicitly disables arm startup; it does not change any controller mappings.
+
+### Hardware Autonomy
+
+Run `./run auto` on the Jetson. This starts localization, perception, planning,
+the controller, and the same RoverNet motor path used by tele-op. The controller
+starts after the launch file's existing 30-second safety delay.
+
+### Simulation
+
+Run `./run sim` in the dev container. This starts the autonomy nodes in their
+simulated-input mode, but it does not start Gazebo. Full Gazebo tooling remains
+isolated on the `gazebo_sim` branch.
+
 ## Autonomy Testing Status
 
 The `autonomy-fall2026` branch routes waypoint-following commands through

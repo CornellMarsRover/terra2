@@ -229,38 +229,19 @@ class StateMachineNode(Node):
         
         #if d > (self.search_radius * 2) or d > 10.0:
         
-        if d > 10.0:
-            decision = far_target(
-                (self.north, self.west), tuple(self.next_coordinate),
-                tuple(self.target_position), list(self.coarse_waypoints),
-                self.current_object != 'coordinate' and self.object_found,
-            )
-            if decision.pop_coarse:
-                self.coarse_waypoints.popleft()
-            self.target_position = decision.target
-        else:
-            if self.current_object == 'coordinate':
-                decision = coordinate_target(
-                    (self.north, self.west), tuple(self.next_coordinate)
-                )
-                self.target_position = decision.target
-                reached = decision.reached
-            elif not self.object_found:
-                decision = search_target(
-                    (self.north, self.west), tuple(self.target_position),
-                    list(self.search_waypoints),
-                )
-                if decision.pop_search:
-                    self.search_waypoints.popleft()
-                self.target_position = decision.target
-                timeout = decision.timed_out
-                if decision.announce_object:
-                    self.publish_target_name()
-            else:
-                decision = object_target(
-                    (self.north, self.west), tuple(self.target_position)
-                )
-                reached = decision.reached
+        decision = select_target(
+            (self.north, self.west), tuple(self.next_coordinate),
+            tuple(self.target_position), list(self.coarse_waypoints),
+            self.current_object, self.object_found, list(self.search_waypoints),
+        )
+        if decision.pop_coarse:
+            self.coarse_waypoints.popleft()
+        if decision.pop_search:
+            self.search_waypoints.popleft()
+        if decision.announce_object:
+            self.publish_target_name()
+        self.target_position = decision.target
+        reached, timeout = decision.reached, decision.timed_out
 
         if reached or timeout:
             if timeout:

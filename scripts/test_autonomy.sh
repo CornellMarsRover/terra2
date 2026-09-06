@@ -6,7 +6,8 @@ cd "$ROOT"
 export PYTHONPATH="$ROOT/src/autonomous_navigation${PYTHONPATH:+:$PYTHONPATH}"
 
 python3 -m coverage erase
-python3 -m coverage run --branch --source=autonomous_navigation.drive_command \
+PURE_MODULES="autonomous_navigation.drive_command,autonomous_navigation.planner_core,autonomous_navigation.costmap_core,autonomous_navigation.state_machine_core"
+python3 -m coverage run --branch --source="$PURE_MODULES" \
   -m pytest -q -p no:cacheprovider src/autonomous_navigation/test
 python3 -m coverage report --show-missing --fail-under=100
 mkdir -p build

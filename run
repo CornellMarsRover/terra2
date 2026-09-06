@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+usage() {
+  cat <<'HELP'
+Usage: ./run MODE
+  build       Build driving and autonomy packages
+  teleop      Start controller receiver and rover drive hardware
+  controller  Send controller input from the laptop
+  auto        Start hardware autonomy and rover drive hardware
+  sim         Start autonomy with simulated sensor inputs
+  test        Run focused autonomy tests
+  help        Show this guide
+HELP
+}
+mode="${1:-help}"
+shift || true
+case "$mode" in
+  help|-h|--help) usage; exit 0 ;;
+  controller)
+    cd "local_(no ROS)base_station_scripts"
+    exec python3 drive_control.py "$@"
+    ;;
+  test) exec bash scripts/test_autonomy.sh "$@" ;;
+  build|teleop|auto|sim) ;;
+  *) echo "Unknown mode: $mode" >&2; usage >&2; exit 2 ;;
+esac
+if [[ ! -f /opt/ros/humble/setup.bash ]]; then
+  echo "ROS 2 Humble is required. Run this on the Jetson or in the dev container." >&2
+  exit 1
+fi
+source /opt/ros/humble/setup.bash
+if [[ "$mode" == build ]]; then
+  exec colcon build --symlink-install --packages-up-to \
+    cmr_fabric cmr_controller_remote cmr_rovernet autonomous_navigation "$@"
+fi
+if [[ ! -f install/setup.bash ]]; then
+  echo "Workspace is not built. Run: ./run build" >&2
+  exit 1
+fi
+source install/setup.bash
+case "$mode" in
+  teleop) exec ros2 launch cmr_rovernet rovernet.launch.py enable_arm:=false ;;
+  auto) exec ros2 launch autonomous_navigation localization_real.launch.py ;;
+  sim) exec ros2 launch autonomous_navigation sim_autonomy.launch.py ;;
+esac

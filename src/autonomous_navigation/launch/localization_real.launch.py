@@ -1,7 +1,12 @@
 import launch
 import launch_ros.actions
+from os import path
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
+    drive_config = path.join(
+        get_package_share_directory("cmr_rovernet"), "config", "drivesnet.toml"
+    )
     return launch.LaunchDescription([
 
         # Use the same drive node as teleop. It arbitrates manual commands with
@@ -12,7 +17,7 @@ def generate_launch_description():
             name='drivesnet',
             output='screen',
             parameters=[{
-                'config_path': '/home/cmr/cmr/terra2/src/cmr_rovernet/config/drivesnet.toml'
+                'config_path': drive_config
             }],
         ),
 

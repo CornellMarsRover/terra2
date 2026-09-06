@@ -15,7 +15,7 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
-from autonomous_navigation.planner_core import parse_costmap
+from autonomous_navigation.planner_core import advance_path, parse_costmap
 
 try:
     import rerun as rr
@@ -241,16 +241,18 @@ class LocalPlannerNode(Node):
         self.yaw = msg.twist.angular.z
 
         if self.next_waypoint is not None:
-            dx = self.next_waypoint[0] - self.robot_position[0]
-            dy = self.next_waypoint[1] - self.robot_position[1]
-            distance = math.sqrt(dx**2 + dy**2)
-            if distance < self.waypoint_threshold:
+            path, waypoint, reached = advance_path(
+                self.robot_position,
+                self.next_target,
+                self.current_path,
+                self.next_waypoint,
+                self.waypoint_threshold,
+            )
+            if reached is not None:
                 self.invalidated_segments = dict()
-                if len(self.current_path) == 0:
-                    self.next_waypoint = self.next_target
-                else:
-                    self.next_waypoint = self.current_path[0]
-                    self.previous_points.append(self.current_path.popleft())
+                self.current_path = deque(path)
+                self.next_waypoint = waypoint
+                self.previous_points.append(reached)
     # -------------------------------------------------------------------------
     # Path Checking and Publishing
     # -------------------------------------------------------------------------

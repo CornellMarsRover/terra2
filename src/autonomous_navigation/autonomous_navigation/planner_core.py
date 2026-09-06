@@ -6,6 +6,48 @@ from typing import Iterable, List, Sequence, Tuple
 Point = Tuple[float, float]
 
 
+def record_segment_observation(counts, segment, blocked, confirmations=3):
+    """Track consecutive blocked observations and report confirmed blockage."""
+    if confirmations < 1:
+        raise ValueError("confirmations must be positive")
+    updated = dict(counts)
+    if not blocked:
+        updated.pop(segment, None)
+        return updated, False
+    updated[segment] = updated.get(segment, 0) + 1
+    return updated, updated[segment] >= confirmations
+
+
+def nearest_clear_goal(goal: Point, bounds, is_blocked, step: float) -> Point:
+    """Return the nearest in-bounds grid point that is not blocked."""
+    if step <= 0.0:
+        raise ValueError("step must be positive")
+    min_x, max_x, min_y, max_y = bounds
+    origin = (
+        max(min(float(goal[0]), max_x), min_x),
+        max(min(float(goal[1]), max_y), min_y),
+    )
+    max_radius = math.ceil(max(max_x - min_x, max_y - min_y) / step)
+    for radius in range(max_radius + 1):
+        offsets = range(-radius, radius + 1)
+        candidates = (
+            (origin[0] + dx * step, origin[1] + dy * step)
+            for dx in offsets
+            for dy in offsets
+            if max(abs(dx), abs(dy)) == radius
+        )
+        for candidate in sorted(
+            candidates, key=lambda point: (math.dist(origin, point), point)
+        ):
+            in_bounds = (
+                min_x <= candidate[0] <= max_x
+                and min_y <= candidate[1] <= max_y
+            )
+            if in_bounds and not is_blocked(candidate):
+                return candidate
+    return origin
+
+
 def parse_costmap(data: Sequence[float], threshold: float):
     """Return cell costs and currently occupied cells from xyz-style triples."""
     if len(data) % 3:

@@ -15,7 +15,10 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
-import rerun as rr
+try:
+    import rerun as rr
+except ModuleNotFoundError:
+    rr = None
 
 class LocalPlannerNode(Node):
     def __init__(self):
@@ -26,7 +29,9 @@ class LocalPlannerNode(Node):
         self.declare_parameter('real', True)  # False if running sim
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
-        self.visualize = True
+        if self.visualize and rr is None:
+            self.get_logger().warning("Rerun is unavailable; planner visualization disabled.")
+            self.visualize = False
         
         # ------------------------------------
         # Tunable parameters for cost-based path planning

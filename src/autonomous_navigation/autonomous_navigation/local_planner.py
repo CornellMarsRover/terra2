@@ -15,6 +15,8 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
+from autonomous_navigation.planner_core import parse_costmap
+
 try:
     import rerun as rr
 except ModuleNotFoundError:
@@ -208,21 +210,12 @@ class LocalPlannerNode(Node):
         """
         Costmap callback – updates local costs and "obstacles".
         """
-        if len(msg.data) == 0:
+        if not msg.data:
             return
-        self.costs = dict()
-        for i in range(0, len(msg.data), 3):
-            xx = msg.data[i]
-            yy = msg.data[i+1]
-            cost_val = msg.data[i+2]
-
-            if cost_val > self.threshold:
-                self.obstacles.add((xx, yy))
-            else:
-                if (xx, yy) in self.obstacles:
-                    self.obstacles.discard((xx, yy))
-
-            self.costs[(xx, yy)] = cost_val
+        try:
+            self.costs, self.obstacles = parse_costmap(msg.data, self.threshold)
+        except ValueError as error:
+            self.get_logger().error(f"Ignoring malformed costmap: {error}")
 
     def next_target_callback(self, msg):
         """

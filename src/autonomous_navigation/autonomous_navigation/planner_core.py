@@ -75,3 +75,45 @@ def simplify_path(points: Sequence[Point], epsilon: float) -> List[Point]:
     left = simplify_path(points[: split + 1], epsilon)
     right = simplify_path(points[split:], epsilon)
     return left[:-1] + right
+
+
+def neighbor_cost(costs, cell: Point, cell_size: float, radius: int) -> float:
+    """Return inverse-distance-weighted costs around a grid cell."""
+    total = 0.0
+    for dx in range(-radius, radius):
+        for dy in range(-radius, radius):
+            if dx == 0 and dy == 0:
+                continue
+            distance = math.hypot(dx * cell_size, dy * cell_size)
+            cost = costs.get(
+                (cell[0] + dx * cell_size, cell[1] + dy * cell_size), 0.0
+            )
+            total += (0.0 if cost == 1 else cost) / distance
+    return total
+
+
+def segment_cost(
+    costs,
+    start: Point,
+    end: Point,
+    cell_size: float = 0.25,
+    neighbor_radius: int = 4,
+):
+    """Return maximum and accumulated sampled cost along a segment."""
+    distance = math.dist(start, end)
+    if distance < 1e-6:
+        return 0.0, 0.0
+    samples = max(1, int(round(distance / (cell_size * 2))))
+    values = []
+    for index in range(samples + 1):
+        ratio = index / samples
+        point = (
+            start[0] + ratio * (end[0] - start[0]),
+            start[1] + ratio * (end[1] - start[1]),
+        )
+        cell = tuple(round(value / cell_size) * cell_size for value in point)
+        values.append(
+            costs.get(cell, 0.0)
+            + neighbor_cost(costs, cell, cell_size, neighbor_radius)
+        )
+    return max(values), sum(values)

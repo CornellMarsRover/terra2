@@ -5,14 +5,15 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    container: 
+    timeout-minutes: 45
+    container:
       image: cornellmarsrover/dev:latest
       options: --user root
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Config git
         run: |
@@ -28,6 +29,19 @@ jobs:
         id: get-self-packages
         uses: autowarefoundation/autoware-github-actions/get-self-packages@v1
 
+      - name: Refresh ROS apt source
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu jammy main" > /etc/apt/sources.list.d/ros2-latest.list
+          rm -f /etc/apt/sources.list.d/xpra.list
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip clang-format clang-tidy ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-xacro ros-humble-controller-manager ros-humble-robot-state-publisher ros-humble-joint-state-broadcaster ros-humble-rviz2
+          python3 -m pip install --no-cache-dir moteus pyserial-asyncio
+          echo "$GITHUB_WORKSPACE/.github/ci" >> "$GITHUB_PATH"
+
       - name: Build
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
         uses: autowarefoundation/autoware-github-actions/colcon-build@v1
@@ -35,17 +49,10 @@ jobs:
           rosdistro: humble
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
 
-      - name: Get clang tools
-        id: tools
-        run: |
-          sudo apt update && sudo apt install clang-format clang-tidy -y
-
       - name: Clean compile commands
         id: clean_db
-        run: |
-          bash scripts/clean_build_db_wd.sh
+        run: bash scripts/clean_build_db_wd.sh
 
       - name: Static analysis
         id: analyze
-        run: |
-          bash scripts/check_wd.sh "${{ steps.changed-files.outputs.all_changed_files }}"
+        run: bash scripts/check_wd.sh "${{ steps.changed-files.outputs.all_changed_files }}"

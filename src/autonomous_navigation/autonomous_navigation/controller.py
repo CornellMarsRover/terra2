@@ -5,10 +5,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist, TwistStamped
 from std_msgs.msg import Float32MultiArray, String
 import math
-import time
 
-from ament_index_python.packages import get_package_share_directory
-from cmr_msgs.msg import AutonomyDrive
+from autonomous_navigation import drive_command
 
 class ControllerNode(Node):
     def __init__(self):
@@ -40,9 +38,8 @@ class ControllerNode(Node):
         )
         self.stopped = False
 
-        # Drive command publishers
-        self.ackerman_publisher = self.create_publisher(AutonomyDrive, '/autonomy/move/ackerman', 10)
-        self.point_turn_publisher = self.create_publisher(Twist, '/autonomy/move/point_turn', 10)
+        # The shared RoverNet drive node arbitrates this against manual input.
+        self.drive_publisher = self.create_publisher(Twist, '/cmd_vel_drives', 10)
         self.movement_id_publisher = self.create_publisher(String, '/autonomy/move/move_type', 10)
 
         # Store current robot position
@@ -115,17 +112,12 @@ class ControllerNode(Node):
             dt = self.compute_time_delta(curr_time, self.last_command_time)
             #self.get_logger().info(f"dt: {dt}")
             if self.last_movement == "ackerman" and dt < self.min_wait:
-                # Just publish a tiny turn command
-                if not self.real:
-                    self.publish_point_turn(0.00001)
-                else:
-                    self.publish_point_turn(0.0)
+                # Stop while the steering modules transition to point-turn mode.
+                self.publish_point_turn(0.0)
                 #self.point_turn_threshold = 40
             else:
                 # Actual point turn
-                turn_sign = 1.0 if angle_error_deg < 0 else -1.0
-                if self.real:
-                    turn_sign *= -1.0
+                turn_sign = 1.0 if angle_error_deg > 0.0 else -1.0
                 self.publish_point_turn(turn_sign * self.point_turn_velocity)
                 self.last_movement = 'point_turn'
                 self.last_command_time = curr_time
@@ -207,25 +199,20 @@ class ControllerNode(Node):
         self.movement_id_publisher.publish(msg)
 
     def publish_point_turn(self, point_turn_velocity):
-        """
-        Publishes point turn message
-        """
-        point_turn_msg = Twist()
-        point_turn_msg.angular.z = point_turn_velocity
-        self.point_turn_publisher.publish(point_turn_msg)
+        """Publish a signed point turn to the shared drive implementation."""
+        command = drive_command.point_turn_command(point_turn_velocity)
+        msg = Twist()
+        msg.linear.x = command.linear_x
+        msg.angular.z = command.angular_z
+        self.drive_publisher.publish(msg)
 
     def publish_ackerman(self, vel, steer_angle_deg):
-        """
-        Publish ackerman drive message (steer_angle in degrees)
-        """
-        drive_msg = AutonomyDrive()
-        drive_msg.vel = vel
-        drive_msg.fl_angle = float(max(min(steer_angle_deg, 35), -35))
-        drive_msg.fr_angle = float(max(min(steer_angle_deg, 35), -35))
-        drive_msg.bl_angle = 0.0
-        drive_msg.br_angle = 0.0
-
-        self.ackerman_publisher.publish(drive_msg)
+        """Publish forward motion plus bounded heading correction."""
+        command = drive_command.forward_heading_command(vel, steer_angle_deg)
+        drive_msg = Twist()
+        drive_msg.linear.x = command.linear_x
+        drive_msg.angular.z = command.angular_z
+        self.drive_publisher.publish(drive_msg)
 
     def update_pose(self, msg):
         """

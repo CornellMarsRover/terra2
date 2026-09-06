@@ -20,6 +20,7 @@ from autonomous_navigation.planner_core import (
     neighbor_cost,
     parse_costmap,
     path_is_dense,
+    segment_cost,
 )
 
 try:
@@ -365,36 +366,7 @@ class LocalPlannerNode(Node):
         the maximum local cost among all sample points plus neighbors, 
         and also sum the total cost for logging/analysis.
         """
-        dx = end[0] - start[0]
-        dy = end[1] - start[1]
-        distance = math.sqrt(dx**2 + dy**2)
-
-        # If there's effectively no length, treat as zero cost
-        if distance < 1e-6:
-            return (0.0, 0.0)
-
-        # Number of sample points
-        n = max(1, int(round(distance / (self.cell_size * 2))))
-        total_cost = 0.0
-        max_cost = 0.0
-        for i in range(n + 1):
-            t = i / n
-            sx = start[0] + t * dx
-            sy = start[1] + t * dy
-            
-            # Snap to nearest 0.25 for dictionary lookup
-            rx = round(sx * 4) / 4.0
-            ry = round(sy * 4) / 4.0
-
-            # Retrieve cost
-            c = self.costs.get((rx, ry), 0.0)
-            c2 = self.get_neighbor_costs(rx, ry, 1, gap)
-            total_here = c + c2
-
-            total_cost += total_here
-            max_cost = max(max_cost, total_here)
-
-        return max_cost, total_cost
+        return segment_cost(self.costs, start, end, self.cell_size, gap)
 
     # -------------------------------------------------------------------------
     # A* Path Planning (with length + cost)

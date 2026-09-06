@@ -14,6 +14,9 @@ class ControllerNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
+        self.declare_parameter('waypoint_tolerance', 0.3)
+        self.waypoint_tolerance = self.get_parameter(
+            'waypoint_tolerance').get_parameter_value().double_value
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -91,8 +94,12 @@ class ControllerNode(Node):
         x_error = self.waypoint[0] - self.robot_position[0]
         y_error = self.waypoint[1] - self.robot_position[1]
 
-        # Distance
-        distance_to_wp = math.sqrt(x_error**2 + y_error**2)
+        if drive_command.waypoint_reached(
+            self.robot_position, self.waypoint, self.waypoint_tolerance
+        ):
+            self.stop_robot()
+            self.publish_movement('stopped')
+            return
 
         # Heading to target
         angle_to_target = math.atan2(y_error, x_error)

@@ -252,7 +252,8 @@ class ControllerNode(Node):
         self.stopped = True
 
     def destroy_node(self):
-        self.stop_robot()
+        if rclpy.ok():
+            self.stop_robot()
         super().destroy_node()
 
     def cross_track_error(self):
@@ -286,9 +287,13 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         node.get_logger().info('Shutting down controller node.')
+    except Exception:
+        if rclpy.ok():
+            raise
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

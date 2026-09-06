@@ -17,7 +17,7 @@ import numpy as np
 import math
 from shapely.geometry import Point, Polygon
 
-from autonomous_navigation.costmap_core import project_point
+from autonomous_navigation.costmap_core import observed_cost, project_point
 
 
 class CostmapNode(Node):
@@ -180,17 +180,15 @@ class CostmapNode(Node):
             return
         if (x_new, y_new) not in self.grid_dict:
             self.grid_dict[(x_new, y_new)] = 0
-        # Store traversable cells to decay
-        if (self.ground_threshold < height < self.obstacle_threshold) or height > self.clearance_height:
+        cost = observed_cost(
+            self.grid_dict[(x_new, y_new)], height, self.ground_threshold,
+            self.obstacle_threshold, self.clearance_height, self.max_cost,
+        )
+        if cost is None:
             curr_free_space.add((x_new, y_new))
             return
-        # increment cell cost if height seems to represent obstacle
-        else:
-            self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+2)
-            if height > 0.5:
-                self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+5)
-            #self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+0)
-            curr_obstacles.add((x_new, y_new))
+        self.grid_dict[(x_new, y_new)] = cost
+        curr_obstacles.add((x_new, y_new))
         return
 
     def ground_plane_callback(self, msg):

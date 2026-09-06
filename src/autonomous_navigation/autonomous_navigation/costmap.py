@@ -17,7 +17,7 @@ import numpy as np
 import math
 from shapely.geometry import Point, Polygon
 
-from autonomous_navigation.costmap_core import observed_cost, project_point
+from autonomous_navigation.costmap_core import decay_costs, observed_cost, project_point
 
 
 class CostmapNode(Node):
@@ -230,32 +230,17 @@ class CostmapNode(Node):
         Linearly decay cost of grid cells if an 
         obstacle not actively detected in that region
         """
-        d = set()
-        for (x, y) in self.grid_dict.keys():
-            if self.in_ground_plane(x, y) == False:
-                continue
-            self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-4)
-            if self.grid_dict[(x, y)] == 0:
-                d.add((x,y))
-        # Delete all 0-cost cells
-        for c in d:
-            if c in self.grid_dict:
-                del self.grid_dict[c]
+        eligible = {
+            cell for cell in self.grid_dict if self.in_ground_plane(*cell)
+        }
+        self.grid_dict = decay_costs(self.grid_dict, 4, eligible)
 
     def decay_cost(self):
         """
         Linearly decay cost of grid cells if in ground plane
         at a higher frequency
         """
-        d = set()
-        for (x, y) in self.grid_dict.keys():
-            self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
-            if self.grid_dict[(x, y)] == 0:
-                d.add((x,y))
-        # Delete all 0-cost cells
-        for c in d:
-            if c in self.grid_dict:
-                del self.grid_dict[c]
+        self.grid_dict = decay_costs(self.grid_dict, 1)
                 
     def update_last_movement(self, msg):
         """

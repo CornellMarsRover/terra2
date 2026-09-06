@@ -37,3 +37,19 @@ def test_far_target_advances_reached_coarse_waypoint(coarse, expected):
 
 
 def test_coordinate_target_reports_threshold_crossing():
+    assert coordinate_target((0, 0), (1, 0)).reached
+    assert not coordinate_target((0, 0), (3, 0)).reached
+
+
+def test_search_target_reports_empty_search_as_timeout():
+    decision = search_target((0, 0), (4, 4), [])
+
+    assert decision.target == (4, 4)
+    assert decision.timed_out
+
+
+def test_search_target_announces_active_search():
+    decision = search_target((0, 0), (4, 4), [(3, 0)])
+
+    assert decision.target == (3, 0)
+    assert decision.announce_object

@@ -17,6 +17,8 @@ import numpy as np
 import math
 from shapely.geometry import Point, Polygon
 
+from autonomous_navigation.costmap_core import project_point
+
 
 class CostmapNode(Node):
     def __init__(self):
@@ -165,39 +167,14 @@ class CostmapNode(Node):
         the left (west), same as global coordinates in gazebo. Returns True if 
         new obstacle detected, False if not
         '''
-        if self.real:
-            # ZED coordinate system is same as Gazebo, and coord system we are using
-            # X forward, Y left, Z up
-            height = self.camera_height + pt[2]
-            x, y = pt[0], pt[1]
-            dist = math.sqrt((x**2) + (y**2))
-            # Discard points outside of 45 degree line of sight or too far
-            #if abs(y) > 1.0 and abs(math.degrees(math.atan(y/x))) > 45.0:
-            #    return
-            if dist > self.max_depth or dist < self.min_depth or abs(math.degrees(math.atan(y/x))) > 45.0:
-                return
-        else:
-            # Y points downwards in camera coordinate frame in Gazebo
-            height = self.camera_height - pt[1]
-            x, y = pt[2], pt[0]
-            #self.get_logger().info(f"x:  {x}  y:  {y}  height: {height}")
-            if x > self.max_depth or x < self.min_depth:
-                return
-        
-        rotated_pt = R.dot(np.array([x, y]))
-        if self.real:
-            x_rot = rotated_pt[0] + pose[0]
-            y_rot = rotated_pt[1] + pose[1]
-        else:
-            x_rot = rotated_pt[0] + pose[0]
-            y_rot = (-1.0*rotated_pt[1]) + pose[1]
-        
-        if x_rot is None or y_rot is None:
+        observation = project_point(
+            pt, pose, R, self.real, self.camera_height,
+            self.min_depth, self.max_depth, self.cell_size,
+        )
+        if observation is None:
             return
-
-        # discretize to 0.25 m
-        x_new = round(x_rot * self.k) / self.k
-        y_new = round(y_rot * self.k) / self.k
+        x_new, y_new = observation.cell
+        height = observation.height
         # don't update if out of grid bounds or previously detected an obstacle at that grid location
         if (x_new, y_new) in curr_obstacles or (self.real and self.in_ground_plane(x_new, y_new)):
             return

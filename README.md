@@ -113,6 +113,7 @@ Run these short commands from the repository root. Use `./run help` at any time.
 
 | Command | Run it on | Purpose |
 | --- | --- | --- |
+| `./run setup` | Jetson or dev container | Install ROS dependencies once |
 | `./run build` | Jetson or dev container | Build drive and autonomy packages |
 | `./run teleop` | Jetson | Receive UDP input and drive the rover |
 | `./run controller` | Controller laptop | Send DualSense input to the rover |
@@ -122,7 +123,7 @@ Run these short commands from the repository root. Use `./run help` at any time.
 
 ### First Build
 
-Run `./run build` after cloning, switching branches, or changing ROS packages.
+Run `./run setup` once after cloning. Run `./run build` after setup, switching branches, or changing ROS packages.
 The launcher sources ROS 2 Humble and the workspace automatically. For tests,
 install missing tools with `python3 -m pip install coverage pytest`.
 

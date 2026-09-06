@@ -5,6 +5,7 @@ cd "$ROOT"
 usage() {
   cat <<'HELP'
 Usage: ./run MODE
+  setup       Install ROS package dependencies
   build       Build driving and autonomy packages
   teleop      Start controller receiver and rover drive hardware
   controller  Send controller input from the laptop
@@ -29,7 +30,7 @@ case "$mode" in
     }
     exec bash scripts/test_autonomy.sh "$@"
     ;;
-  build|teleop|auto|sim) ;;
+  build|setup|teleop|auto|sim) ;;
   *) echo "Unknown mode: $mode" >&2; usage >&2; exit 2 ;;
 esac
 if [[ ! -f /opt/ros/humble/setup.bash ]]; then
@@ -39,7 +40,10 @@ fi
 set +u
 source /opt/ros/humble/setup.bash
 set -u
-if [[ "$mode" == build ]]; then
+if [[ "" == setup ]]; then
+  exec rosdep install --from-paths src --ignore-src -r -y ""
+fi
+if [[ "" == build ]]; then
   exec colcon build --symlink-install --packages-up-to \
     cmr_fabric cmr_controller_remote cmr_rovernet autonomous_navigation "$@"
 fi

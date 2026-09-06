@@ -3,6 +3,45 @@
 
 Terra contains all the code that is part of a ROS codebase and implements the brains of our devices. This main branch contains the current fully integrated and tested functionality for the rover.
 
+## Branch Status for Contributors and AI Agents
+
+New work should normally branch from the latest `origin/main`. Do not use an inactive branch as a base unless a maintainer explicitly asks you to resume that work. Do not delete, merge, rebase onto, or broadly cherry-pick an inactive branch without explicit maintainer approval; these branches are retained for recovery and historical reference.
+
+Status was reviewed on **2026-09-06**. A non-default branch is considered inactive when it has had no commits in the previous 90 days. GitHub does not provide a manual inactive state, so this section is the repository's source of truth. Before relying on this list after the review date, check the remote branch and open pull requests again.
+
+### Current Branches
+
+| Branch | Last commit | Status |
+| --- | --- | --- |
+| `main` | 2026-05-30 | Canonical base for new work; exempt from inactivity based on age because it is the default branch. |
+| `anant/sim-bugfix-2026-07-07` | 2026-07-07 | Active at the time of review. |
+
+### Inactive Branches
+
+| Branch | Last commit | Notes |
+| --- | --- | --- |
+| `Ishaan-Combine-IK-Keyboard` | 2026-04-28 | Inactive. |
+| `anant-test-driving` | 2026-04-24 | Inactive. |
+| `astrotech-gui` | 2026-05-27 | Inactive. |
+| `astrotech-twocan` | 2026-05-30 | Inactive. |
+| `autonomy_tools` | 2026-04-12 | Inactive. |
+| `autonomy_usama_testing` | 2026-04-16 | Inactive. |
+| `autonomy` | 2026-05-27 | Inactive, but retained by open PR #2 into `main`. |
+| `backup_comp_5_26` | 2026-05-27 | Inactive. |
+| `competition` | 2026-05-28 | Inactive, but retained by open PR #24 into `main`. |
+| `devon/IK_2026` | 2026-05-07 | Inactive. |
+| `drive_controll_debug_usama` | 2026-04-18 | Inactive. |
+| `feature/autonomy-obstacle-avoidance-cv` | 2026-05-04 | Inactive. |
+| `gazebo_sim` | 2026-04-22 | Inactive. |
+| `ik-mostly-working-2026-04-28` | 2026-05-27 | Inactive. |
+| `integrate-ik-arm-controller` | 2026-05-27 | Inactive. |
+| `local_controller_changes` | 2026-05-29 | Inactive. |
+| `object-detection-search-detect` | 2026-05-27 | Inactive, but retained by open PR #23 into `autonomy`. |
+| `testing-aruco` | 2026-04-28 | Inactive, but retained by open PR #4 into `autonomy`. |
+| `usama-drive-auto` | 2026-04-27 | Inactive. |
+
+If an inactive branch must be resumed, first compare it with the latest `origin/main`, identify the smallest changes still needed, and create a new feature branch from `main` unless a maintainer specifies another base.
+
 ## Current Functionality
 
 ### RoverNet: [cmr_rovernet](./src/cmr_rovernet/)

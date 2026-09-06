@@ -18,8 +18,10 @@ import heapq  # For priority queue in A*
 from autonomous_navigation.planner_core import (
     advance_path,
     neighbor_cost,
+    nearest_clear_goal,
     parse_costmap,
     path_is_dense,
+    record_segment_observation,
     segment_cost,
     simplify_path,
 )
@@ -100,7 +102,6 @@ class LocalPlannerNode(Node):
         self.threshold = 4  
         
         self.cell_size = 0.25
-        self.k = 4
 
         # Path control
         self.current_path = deque()
@@ -286,8 +287,11 @@ class LocalPlannerNode(Node):
             #self.get_logger().info(f"Segment {i}: start={start_pt}, end={end_pt}, max_cell={max_cell}, total={total}")
 
             if max_cell > self.max_cell_threshold:
-                self.invalidated_segments[(i, i+1)] = 1 + self.invalidated_segments.get((i, i+1), 0)
-                if self.invalidated_segments[(i, i+1)] >= 3:
+                segment = (i, i + 1)
+                self.invalidated_segments, confirmed = record_segment_observation(
+                    self.invalidated_segments, segment, True
+                )
+                if confirmed:
                     self.get_logger().info(
                         f"Segment from {start_pt} to {end_pt} above threshold with cost {max_cell}. "
                         f"Re-planning from {start_pt} to final target."
@@ -320,6 +324,10 @@ class LocalPlannerNode(Node):
                     else:
                         self.current_path.append((self.next_target[0], self.next_target[1]))
                     break  # We only re-plan once per validation cycle
+            else:
+                self.invalidated_segments, _ = record_segment_observation(
+                    self.invalidated_segments, (i, i + 1), False
+                )
 
 
     def publish_waypoint(self):
@@ -396,22 +404,13 @@ class LocalPlannerNode(Node):
         y_vals = np.arange(min_y, max_y + step_size, step_size)
 
         goal = tuple(self.next_target)
-        # Clamp goal
-        gx = max(min(goal[0], max_x), min_x)
-        gy = max(min(goal[1], max_y), min_y)
-        cost = self.get_neighbor_costs(gx,gy,1,3)
-        #self.get_logger().info(f"Original goal: {gx},{gy} with cost: {cost}")
-        # Find a local goal without high cost
-        while (cost > self.max_cell_threshold*2):
-            x_rand = np.random.default_rng() - 1.0
-            y_rand = np.random.default_rng() - 1.0
-            dx = round(x_rand * self.k) / self.k
-            dy = round(y_rand * self.k) / self.k
-            gx += dx
-            gy += dy
-            cost = self.get_neighbor_costs(gx,gy,1,3)
-        #self.get_logger().info(f"Goal adjusted to: {gx},{gy} with cost: {cost}")
-        goal_clamped = (gx, gy)
+        goal_clamped = nearest_clear_goal(
+            goal,
+            (min_x, max_x, min_y, max_y),
+            lambda point: self.get_neighbor_costs(*point, 1, 3)
+            > self.max_cell_threshold * 2,
+            step_size,
+        )
 
         def get_index(xc, yc):
             i = int(round((xc - min_x) / step_size))

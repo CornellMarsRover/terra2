@@ -46,3 +46,31 @@ def project_point(
         round(global_left / cell_size) * cell_size,
     )
     return GridObservation(cell, height)
+
+
+def observed_cost(
+    current: float,
+    height: float,
+    ground_threshold: float,
+    obstacle_threshold: float,
+    clearance_height: float,
+    maximum: float,
+) -> Optional[float]:
+    """Return an updated obstacle cost, or None when the cell is traversable."""
+    if ground_threshold < height < obstacle_threshold or height > clearance_height:
+        return None
+    increment = 7 if height > 0.5 else 2
+    return min(maximum, current + increment)
+
+
+def decay_costs(costs, amount: float, eligible=None):
+    """Return a decayed copy, preserving cells outside an optional eligible set."""
+    if amount < 0:
+        raise ValueError("decay amount cannot be negative")
+    eligible_cells = set(costs) if eligible is None else set(eligible)
+    decayed = {}
+    for cell, cost in costs.items():
+        value = max(0, cost - amount) if cell in eligible_cells else cost
+        if value > 0:
+            decayed[cell] = value
+    return decayed

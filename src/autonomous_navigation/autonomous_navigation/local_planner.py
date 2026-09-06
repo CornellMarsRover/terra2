@@ -15,7 +15,7 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
-from autonomous_navigation.planner_core import advance_path, parse_costmap
+from autonomous_navigation.planner_core import advance_path, parse_costmap, path_is_dense
 
 try:
     import rerun as rr
@@ -331,7 +331,7 @@ class LocalPlannerNode(Node):
         #self.get_logger().info(f"Waypoint: {self.next_waypoint}")
         #self.get_logger().info(f"Current path: {self.current_path}")
         # Simple "dense" path heuristic
-        self.use_stanley = self.is_path_segment_dense()
+        self.use_stanley = path_is_dense(list(self.current_path))
 
         waypoint_msg = Float32MultiArray()
         #use_stanley_flag = 1.0 if self.use_stanley else 0.0
@@ -343,25 +343,6 @@ class LocalPlannerNode(Node):
             float(len(self.current_path))
         ]
         self.next_waypoint_publisher.publish(waypoint_msg)
-
-    def is_path_segment_dense(self):
-        """
-        Example heuristic: if at least 3 consecutive points are within 1m, label it "dense".
-        """
-        path_list = list(self.current_path)
-        if len(path_list) < 3:
-            return False
-        
-        distance_threshold = 1.0
-        for i in range(len(path_list) - 2):
-            p1 = path_list[i]
-            p2 = path_list[i + 1]
-            p3 = path_list[i + 2]
-            d12 = math.dist(p1, p2)
-            d23 = math.dist(p2, p3)
-            if d12 < distance_threshold and d23 < distance_threshold:
-                return True
-        return False
 
     # -------------------------------------------------------------------------
     # Cost-Based Segment Check

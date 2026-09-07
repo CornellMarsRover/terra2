@@ -133,42 +133,16 @@ class ControllerNode(Node):
 
         else:
             self.point_turn_threshold = 50
-        # If angle error is not large, use either the original ackerman or Stanley
-        if self.use_stanley:
-            cross_track_error = self.cross_track_error()  
-            k = 1.0 - (max(2, self.num_waypoints)/6)
-            speed = (self.ackerman_velocity*k) + 1e-6
-            cross_track_term = math.atan2(self.k_stanley * cross_track_error, speed)
-            stanley_steer = heading_error
-            # Convert to degrees
-            steer_angle_deg = math.degrees(stanley_steer)
-
-            # Publish ackerman with stanley_steer
-            curr_time = self.get_clock().now().to_msg()
-            dt = self.compute_time_delta(curr_time, self.last_command_time)
-            if self.last_movement == 'point_turn' and dt < self.min_wait:
-                # Wait after a point turn
-                self.publish_ackerman(0.0, steer_angle_deg)
-            else:
-                self.publish_ackerman(self.ackerman_velocity, steer_angle_deg)
-                self.last_movement = 'ackerman'
-                self.last_command_time = curr_time
-            self.publish_movement(self.last_movement)
-
+        curr_time = self.get_clock().now().to_msg()
+        dt = self.compute_time_delta(curr_time, self.last_command_time)
+        steer_angle_deg = math.degrees(heading_error)
+        if self.last_movement == 'point_turn' and dt < self.min_wait:
+            self.publish_ackerman(0.0, steer_angle_deg)
         else:
-            # Not using Stanley: original logic
-            curr_time = self.get_clock().now().to_msg()
-            dt = self.compute_time_delta(curr_time, self.last_command_time)
-
-            # If we just point turned, wait
-            if self.last_movement == 'point_turn' and dt < self.min_wait:
-                self.publish_ackerman(0.0, math.degrees(heading_error))
-            else:
-                self.publish_ackerman(self.ackerman_velocity, math.degrees(heading_error))
-                self.last_movement = 'ackerman'
-                self.last_command_time = curr_time
-
-            self.publish_movement(self.last_movement)
+            self.publish_ackerman(self.ackerman_velocity, steer_angle_deg)
+            self.last_movement = 'ackerman'
+            self.last_command_time = curr_time
+        self.publish_movement(self.last_movement)
 
     def publish_movement(self, movement):
         """

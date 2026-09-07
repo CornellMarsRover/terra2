@@ -121,9 +121,13 @@ def simplify_path(points: Sequence[Point], epsilon: float) -> List[Point]:
 
 def neighbor_cost(costs, cell: Point, cell_size: float, radius: int) -> float:
     """Return inverse-distance-weighted costs around a grid cell."""
+    if cell_size <= 0.0:
+        raise ValueError("cell_size must be positive")
+    if radius < 0:
+        raise ValueError("radius must not be negative")
     total = 0.0
-    for dx in range(-radius, radius):
-        for dy in range(-radius, radius):
+    for dx in range(-radius, radius + 1):
+        for dy in range(-radius, radius + 1):
             if dx == 0 and dy == 0:
                 continue
             distance = math.hypot(dx * cell_size, dy * cell_size)
@@ -132,6 +136,11 @@ def neighbor_cost(costs, cell: Point, cell_size: float, radius: int) -> float:
             )
             total += (0.0 if cost == 1 else cost) / distance
     return total
+
+
+def segment_traversable(maximum_cost: float, threshold: float) -> bool:
+    """Treat above-threshold segments as impassable, not merely expensive."""
+    return math.isfinite(maximum_cost) and maximum_cost <= threshold
 
 
 def segment_cost(

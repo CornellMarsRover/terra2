@@ -22,6 +22,7 @@ from autonomous_navigation.planner_core import (
     parse_costmap,
     path_is_dense,
     record_segment_observation,
+    segment_traversable,
     segment_cost,
     simplify_path,
 )
@@ -473,8 +474,8 @@ class LocalPlannerNode(Node):
 
                 nbr_coords = get_coords(ni, nj)
                 seg_cost, _ = self.compute_segment_cost(cur_coords, nbr_coords, gap=gap)
-                # If segment is "invalid", skip – in this example, if seg_cost is None, or we can skip
-                # if seg_cost > some threshold, depending on your usage. We'll just incorporate seg_cost directly:
+                if not segment_traversable(seg_cost, self.max_cell_threshold):
+                    continue
                 step_distance = math.dist(cur_coords, nbr_coords)
                 travel_cost = (self.distance_weight * step_distance) \
                               + (self.cost_weight * seg_cost)

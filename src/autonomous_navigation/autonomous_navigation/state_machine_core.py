@@ -82,6 +82,10 @@ def search_waypoints(
     maximum_radius: float,
 ):
     """Generate the legacy expanding search pattern around a target."""
+    if radius_step <= 0.0 or not math.isfinite(radius_step):
+        raise ValueError("radius_step must be finite and positive")
+    if maximum_radius < 0.0 or not math.isfinite(maximum_radius):
+        raise ValueError("maximum_radius must be finite and nonnegative")
     points = []
     radius = radius_step
     angle = 0.0

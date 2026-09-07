@@ -35,6 +35,7 @@ class KalmanLocalizationNode(Node):
 
         self.initial_lat = None
         self.initial_lon = None
+        self.initialized = False
 
         self.current_yaw = 0.0
 
@@ -64,6 +65,9 @@ class KalmanLocalizationNode(Node):
             msg.twist.linear.x,
             msg.twist.linear.y
         ])
+        if not np.all(np.isfinite(meas)) or not math.isfinite(msg.twist.angular.z):
+            self.get_logger().error("Ignoring non-finite ZED pose")
+            return
 
         # first ZED → just init
         if self.last_z_time is None:
@@ -97,6 +101,12 @@ class KalmanLocalizationNode(Node):
             )
 
     def gps_callback(self, msg: NavSatFix):
+        covariance = msg.position_covariance
+        values = [msg.latitude, msg.longitude, covariance[0], covariance[1],
+                  covariance[3], covariance[4]]
+        if msg.status.status < 0 or not all(math.isfinite(value) for value in values):
+            self.get_logger().error("Ignoring invalid GPS fix")
+            return
         # first GPS → set reference
         if self.initial_lat is None:
             self.initial_lat = msg.latitude
@@ -105,6 +115,7 @@ class KalmanLocalizationNode(Node):
                 f"Initial GPS ref set to lat={self.initial_lat:.6f}, "
                 f"lon={self.initial_lon:.6f}"
             )
+            self.initialized = True
             return
 
         # timestamp
@@ -144,6 +155,8 @@ class KalmanLocalizationNode(Node):
         self.last_g_time = t_ns
 
     def publish_estimate(self):
+        if not self.initialized:
+            return
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.twist.linear.x = float(self.x[0])   # north

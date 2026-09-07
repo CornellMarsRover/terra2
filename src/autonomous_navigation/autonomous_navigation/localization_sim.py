@@ -230,33 +230,6 @@ class LocalizationSim(Node):
         return [0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0)]
 
     '''
-    def publish_odom_to_base_link_transform(self):
-        """
-        Publishes the odom -> base_link transform based on odometry data.
-        """
-        delta_north = self.current_odom_position[0] - self.last_odom_position[0]
-        delta_west = self.current_odom_position[1] - self.last_odom_position[1]
-        delta_yaw = self.current_odom_yaw - self.last_odom_yaw
-
-        # Update last position
-        self.last_odom_position = self.current_odom_position
-
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'odom'
-        t.child_frame_id = 'base_link'
-        t.transform.translation.x = delta_north
-        t.transform.translation.y = delta_west
-        t.transform.translation.z = 0.0
-
-        q = self.quaternion_from_yaw(delta_yaw)
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
-
-        self.tf_broadcaster.sendTransform(t)
-
     def publish_map_to_odom_transform(self):
         """
         Publishes the map -> odom transform based on localization data.

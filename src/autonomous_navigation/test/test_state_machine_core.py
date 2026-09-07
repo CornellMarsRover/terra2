@@ -87,6 +87,17 @@ def test_search_waypoints_expand_and_wrap_angles():
     assert points[1] != points[2]
 
 
+@pytest.mark.parametrize(
+    "radius_step,maximum_radius",
+    [(0, 1), (-1, 1), (float("inf"), 1), (1, float("inf"))],
+)
+def test_search_waypoints_rejects_unsafe_radius_parameters(
+    radius_step, maximum_radius
+):
+    with pytest.raises(ValueError):
+        search_waypoints((0, 0), 10, radius_step, maximum_radius)
+
+
 def test_north_west_conversion_preserves_expected_signs():
     north, west = north_west_meters((42.0, -76.0), (42.00001, -76.00001))
 

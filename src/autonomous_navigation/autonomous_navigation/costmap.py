@@ -21,7 +21,6 @@ class CostmapNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
-        #self.real = True
 
         if self.real:
             self.ground_plane_sub = self.create_subscription(
@@ -68,7 +67,6 @@ class CostmapNode(Node):
 
         # Store all detected obstacles
         self.obstacles_global = set()
-        #self.curr_obstacles = set()
         # Maximum cost for occupied cells in the costmap
         self.max_cost = 100
 
@@ -82,7 +80,6 @@ class CostmapNode(Node):
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
-            #self.camera_height = 1.2
             self.camera_height = 1.0
 
         self.expected_height = -1.0 * self.camera_height
@@ -111,8 +108,6 @@ class CostmapNode(Node):
 
         # Timer to decay cell costs uniformly
         self.decay_timer = self.create_timer(20.0, self.decay_cost)
-        # Timer to decay cells in ground plane
-        #self.decay_ground_timer = self.create_timer(0.1, self.decay_ground)
         # Timer to publish costmap
         self.pub_timer = self.create_timer(0.1, self.publish_obstacles)
 
@@ -145,14 +140,11 @@ class CostmapNode(Node):
             #return
         self.grid_init = True
         curr_obstacles = set()
-        #self.curr_obstacles = set()
         curr_free_space = set()
         north, west, R = self.interpolate_pose(msg.header.stamp)
         for pt in point_cloud2.read_points(msg, skip_nans=True):
             self.point_cloud_point_to_grid(pt, [north, west], R, curr_obstacles, curr_free_space)
 
-        #self.decay_cost(curr_obstacles, curr_free_space)
-        #self.get_logger().info(f"{self.grid_dict}")
 
     def point_cloud_point_to_grid(self, pt, pose, R, curr_obstacles, curr_free_space):
         '''
@@ -190,8 +182,6 @@ class CostmapNode(Node):
         """
         Update costmap from vertices surrounding ground plane from ZED camera.
         """
-        '''if self.last_movement == "point_turn":
-            return'''
         pts = []
         north, west, R = self.interpolate_pose(msg.header.stamp)
         x = msg.x
@@ -203,10 +193,6 @@ class CostmapNode(Node):
         self.ground_plane = ground_polygon
         self.ground_dict = dict()
         self.decay_ground()
-        '''# Iterate over grid cells and reduce cost if inside the ground polygon
-        for (x, y) in list(self.grid_dict.keys()):
-            if ground_polygon.contains(Point(x, y)):
-                self.grid_dict[(x, y)] = max(self.grid_dict[(x, y)] - 3, 0)'''
 
     def publish_obstacles(self):
         """

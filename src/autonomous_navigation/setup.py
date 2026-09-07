@@ -29,7 +29,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            # PHOBOS APPEND
             'state_machine = autonomous_navigation.state_machine:main',
             'local_planner = autonomous_navigation.local_planner:main',
             'costmap = autonomous_navigation.costmap:main',

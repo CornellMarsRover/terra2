@@ -138,15 +138,6 @@ class ObjectDetectionNode(Node):
         if self.current_target_id is None:
             return
 
-        '''# if we've already seen it once, just re-publish the last coords
-        if self.target_found:
-            out = Twist()
-            out.linear.x  = float(self.target_coordinates[0])
-            out.linear.y  = float(self.target_coordinates[1])
-            out.angular.z = 0.0
-            self.pub_target.publish(out)
-            return'''
-
         # need intrinsics
         if self.camera_matrix is None:
             self.get_logger().warn('No camera intrinsics yet.')

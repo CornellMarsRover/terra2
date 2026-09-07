@@ -104,7 +104,6 @@ class ControllerNode(Node):
         # Normalize heading error to [-pi, pi]
         heading_error = math.atan2(math.sin(heading_error), math.cos(heading_error))
         angle_error_deg = math.degrees(heading_error)
-        #self.get_logger().info(f"Heading error: {angle_error_deg}")
 
         # If large angle error to next waypoint, use point-turn
         if abs(angle_error_deg) > self.point_turn_threshold:
@@ -112,11 +111,9 @@ class ControllerNode(Node):
             # Possibly wait for wheels to re-position
             curr_time = self.get_clock().now().to_msg()
             dt = self.compute_time_delta(curr_time, self.last_command_time)
-            #self.get_logger().info(f"dt: {dt}")
             if self.last_movement == "ackerman" and dt < self.min_wait:
                 # Stop while the steering modules transition to point-turn mode.
                 self.publish_point_turn(0.0)
-                #self.point_turn_threshold = 40
             else:
                 # Actual point turn
                 turn_sign = 1.0 if angle_error_deg > 0.0 else -1.0

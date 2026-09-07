@@ -114,7 +114,6 @@ class LocalPlannerNode(Node):
         self.publish_waypoint_timer = self.create_timer(0.1, self.publish_waypoint)
         self.use_stanley = False
         
-        # For demonstration
         self.get_logger().info("Planner Node initialized")
         self.ground_plane = []
 
@@ -283,7 +282,6 @@ class LocalPlannerNode(Node):
             end_pt = path_points[i + 1]
             max_cell, total = self.compute_segment_cost(start_pt, end_pt, gap=2)
 
-            #self.get_logger().info(f"Segment {i}: start={start_pt}, end={end_pt}, max_cell={max_cell}, total={total}")
 
             if max_cell > self.max_cell_threshold:
                 path_blocked = True
@@ -335,7 +333,6 @@ class LocalPlannerNode(Node):
         """
         Publish the next waypoint plus a flag for using Stanley vs. pure pursuit.
         """
-        #self.get_logger().info("PUBLISHING WAYPOINT")
         if self.next_waypoint is None:
             if self.next_target is None:
                 return
@@ -344,8 +341,6 @@ class LocalPlannerNode(Node):
         if len(self.current_path) == 0 or self.current_path[-1] != self.next_target:
             self.current_path.append(self.next_target)
 
-        #self.get_logger().info(f"Waypoint: {self.next_waypoint}")
-        #self.get_logger().info(f"Current path: {self.current_path}")
         # Simple "dense" path heuristic
         self.use_stanley = path_is_dense(list(self.current_path))
 

@@ -56,7 +56,6 @@ class ControllerNode(Node):
         # Movement parameters
         self.point_turn_velocity = 0.4
         self.ackerman_velocity = 0.9
-        self.num_waypoints = 0
         # /cmd_vel_drives is normalized identically in simulation and hardware.
         # Timers and state
         self.last_movement = 'ackerman'
@@ -66,11 +65,7 @@ class ControllerNode(Node):
         self.point_turn_threshold = 40
 
         # Next waypoint in path
-        self.prev_waypoint = (0.0, 0.0)
         self.waypoint = None
-        self.use_stanley = False   # Will be set by the 3rd element in the waypoint array
-
-        self.k_stanley = 0.1
 
         # Create a timer to periodically command velocities
         self.drive_commander = self.create_timer(0.1, self.follow_waypoint)
@@ -182,24 +177,13 @@ class ControllerNode(Node):
 
     def update_waypoint(self, msg):
         """
-        Callback function to update waypoint to follow.
-        We'll parse the third element (if present) as the "use_stanley" flag.
+        Callback function to update the waypoint to follow.
         """
-        waypoint = None
-        if self.waypoint is not None:
-            waypoint = self.waypoint
         if len(msg.data) < 2 or not all(math.isfinite(v) for v in msg.data):
             self.get_logger().error('Ignoring malformed autonomy waypoint')
             return
         self.waypoint = (msg.data[0], msg.data[1])
         self.last_waypoint_time_s = self.get_clock().now().nanoseconds * 1e-9
-        if len(msg.data) >= 4:
-            self.use_stanley = (msg.data[2] == 1.0)  # 1.0 means True
-            self.num_waypoints = msg.data[3]
-        else:
-            self.use_stanley = False
-        if waypoint is not None and waypoint != self.waypoint:
-            self.prev_waypoint = waypoint
 
     def compute_time_delta(self, current_stamp, last_stamp):
         """
@@ -220,30 +204,6 @@ class ControllerNode(Node):
             self.stop_robot()
         super().destroy_node()
 
-    def cross_track_error(self):
-        """
-        Compute the perpendicular distance from current pose to current segment
-        """
-        x1, y1 = self.waypoint[0], self.waypoint[1]
-        x2, y2 = self.prev_waypoint[0], self.prev_waypoint[1]
-        x3, y3 = self.robot_position[0], self.robot_position[1]
-
-        # Direction vector of the line
-        dx = x2 - x1
-        dy = y2 - y1
-
-        if dx == 0 and dy == 0:
-            return 0
-
-        # Cross‐product magnitude between (p2−p1) and (p1−p3)
-        # |(dx, dy) × (x1−x3, y1−y3)| = |dx*(y1−y3) − dy*(x1−x3)|
-        num = abs(dx * (y1 - y3) - dy * (x1 - x3))
-
-        # Length of the line segment vector
-        den = math.hypot(dx, dy)
-
-        return num / den
-        
 def main(args=None):
     rclpy.init(args=args)
     node = ControllerNode()

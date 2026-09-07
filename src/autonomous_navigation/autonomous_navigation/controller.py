@@ -70,22 +70,14 @@ class ControllerNode(Node):
         self.waypoint = None
         self.use_stanley = False   # Will be set by the 3rd element in the waypoint array
 
-        # Stanley controller parameters
-        self.k_stanley = 0.1      # Gain for cross-track error term
-        # If speed is small, dividing by speed can be large, so be mindful. 
-        # We'll pretend the speed is ~ self.ackerman_velocity
+        self.k_stanley = 0.1
 
         # Create a timer to periodically command velocities
         self.drive_commander = self.create_timer(0.1, self.follow_waypoint)
 
     def follow_waypoint(self):
         """
-        Logic for sending drive commands:
-          1. If no waypoint, do nothing.
-          2. Compute heading error to next waypoint.
-          3. If heading error is above threshold, do a point turn.
-          4. Otherwise, if 'use_stanley' is True, run Stanley logic for steering angle.
-          5. If 'use_stanley' is False, use your original "ackerman" approach.
+        Send a point-turn or forward command toward the active waypoint.
         """
         now_s = self.get_clock().now().nanoseconds * 1e-9
         if self.waypoint is None or not drive_command.inputs_fresh(
@@ -143,38 +135,11 @@ class ControllerNode(Node):
             self.point_turn_threshold = 50
         # If angle error is not large, use either the original ackerman or Stanley
         if self.use_stanley:
-            # Compute Stanley control for steering
-            # heading_error + arctan(k * cross_track / (speed+epsilon))
-
-            # 1) heading error is computed above
-            # 2) cross-track error: project robot position onto line from 
-            #    "previous waypoint" to "this waypoint" or just treat the line from robot -> waypoint 
-            #    for a short example. We'll do a simple approach here.
-
-            # For demonstration, let's assume cross-track is just the perpendicular distance 
-            # from the robot to the line connecting (0,0)->(x_error,y_error).
-            # For better performance, you'd want the segment from the "previous waypoint" 
-            # to the "current waypoint" in the full path.  We'll keep it minimal.
-
-            # Robot in local frame = (0,0). The path is a line from (0,0)->(x_error,y_error).
-            # Cross track is 0 for the direct line approach, so let's do a small cheat:
-            # We'll treat the waypoint as if there's a line along angle_to_target. 
-            # If you have more of the path, you'd do a better geometry calculation.
-
             cross_track_error = self.cross_track_error()  
-            #self.get_logger().info(f"Cross track error {cross_track_error}")
-            # If you had the previous waypoint or a local path, compute an actual perpendicular 
-            # distance to that segment. For now, we show a placeholder of 0.0.self.point_turn_threshold = 20
-
-            # Speed-based term
             k = 1.0 - (max(2, self.num_waypoints)/6)
             speed = (self.ackerman_velocity*k) + 1e-6
             cross_track_term = math.atan2(self.k_stanley * cross_track_error, speed)
             stanley_steer = heading_error
-            '''if heading_error < 0:
-                stanley_steer -= cross_track_term
-            else:
-                stanley_steer += cross_track_term'''
             # Convert to degrees
             steer_angle_deg = math.degrees(stanley_steer)
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import sys
-
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
@@ -9,8 +7,6 @@ from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-import os
-from ament_index_python.packages import get_package_share_directory
 from autonomous_navigation.target_contract import decode_target_request
 
 class ObjectDetectionNode(Node):
@@ -25,11 +21,6 @@ class ObjectDetectionNode(Node):
         cell_size = self.get_parameter('tag_cell_size').value
         grid_size = self.get_parameter('tag_grid_size').value
         self.marker_length = cell_size * grid_size  # e.g. 0.10 m
-        model_path = os.path.join(
-            get_package_share_directory('autonomous_navigation'),
-            'best.pt'
-        )
-
         self.declare_parameter('real', True)
         self.real = self.get_parameter('real').value
 
@@ -112,7 +103,7 @@ class ObjectDetectionNode(Node):
         self.mallet_pos = None
         self.bottle_pos = None
         self.curr_id = None
-        self.get_logger().info("Object Detection Node initialized ooga booga")
+        self.get_logger().info("Object detection node initialized")
     def name_cb(self, msg: String):
         try:
             self.curr_id, name, marker_id = decode_target_request(msg.data)

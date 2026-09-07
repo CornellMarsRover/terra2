@@ -14,7 +14,7 @@ import math
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import TwistStamped, TwistWithCovarianceStamped
+from geometry_msgs.msg import TwistStamped
 from sensor_msgs.msg import NavSatFix
 
 class KalmanLocalizationNode(Node):
@@ -129,11 +129,6 @@ class KalmanLocalizationNode(Node):
         R = np.array([[cov[0], cov[1]],
                       [cov[3], cov[4]]])
 
-        # gating dt reference
-        ref_t_ns = max(
-            self.last_z_time or 0,
-            self.last_g_time or 0
-        )
         # innovation
         y = z - self.x
         S = self.P + R

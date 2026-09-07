@@ -2,10 +2,6 @@
 
 import rclpy
 from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-from message_filters import Subscriber, ApproximateTimeSynchronizer
-
-from sensor_msgs.msg import Image
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import TwistStamped
 from cmr_msgs.msg import GroundPlaneStamped
@@ -545,8 +541,6 @@ class LocalPlannerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = LocalPlannerNode()
-    executor = MultiThreadedExecutor(num_threads=4)
-    executor.add_node(node)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

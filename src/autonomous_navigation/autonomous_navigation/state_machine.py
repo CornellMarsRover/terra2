@@ -8,8 +8,6 @@ High-level logic for autonomy, with preplanned coarse waypoints
 import os
 import math
 import yaml
-import numpy as np
-
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TwistStamped

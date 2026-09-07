@@ -3,18 +3,13 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
-from message_filters import Subscriber, ApproximateTimeSynchronizer
-
 from cmr_msgs.msg import GroundPlaneStamped
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Float32MultiArray, String
-from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist, TwistStamped
-from cv_bridge import CvBridge
 
 import numpy as np
-import math
 from shapely.geometry import Point, Polygon
 
 from autonomous_navigation.costmap_core import decay_costs, observed_cost, project_point

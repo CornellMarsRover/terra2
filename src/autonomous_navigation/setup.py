@@ -31,7 +31,6 @@ setup(
         'console_scripts': [
             # PHOBOS APPEND
             'state_machine = autonomous_navigation.state_machine:main',
-            'global_planner = autonomous_navigation.global_planner:main',
             'local_planner = autonomous_navigation.local_planner:main',
             'costmap = autonomous_navigation.costmap:main',
             'controller = autonomous_navigation.controller:main',

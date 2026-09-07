@@ -27,14 +27,12 @@ class GlobalPlannerNode(Node):
             self.curr_target, _ = parse_planar_target(msg.data)
         except ValueError as error:
             self.get_logger().error(f"Ignoring malformed target: {error}")
-        
     def publish_waypoint(self):
         if self.curr_target is None:
             return
         waypoint = Float32MultiArray()
         waypoint.data = list(self.curr_target)
         self.waypoint_publisher.publish(waypoint)
-
 
 def main(args=None):
     rclpy.init(args=args)

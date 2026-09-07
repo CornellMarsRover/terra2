@@ -55,7 +55,6 @@ Gazebo replaces that final hardware backend, not perception or planning logic.
 | Localization | `new_kalman.py` | RTK GPS, IMU | global rover pose |
 | Detection | `object_detection.py` | camera image/depth | target object position |
 | Costmap | `costmap.py`, `costmap_core.py` | point cloud, pose, movement | obstacle cost cells |
-| Global planning | `global_planner.py` | global target, pose | local target |
 | Local planning | `local_planner.py`, `planner_core.py` | local target, pose, costmap | next waypoint |
 | Control | `controller.py`, `drive_command.py` | next waypoint, pose, stop | normalized chassis command |
 | Arbitration | `usama_control_testing.py` | autonomy and manual commands | Moteus drive/steer tasks |
@@ -69,8 +68,7 @@ Gazebo replaces that final hardware backend, not perception or planning logic.
   30-second safety delay.
 - `./run sim` starts simulated-input autonomy nodes, but does not launch Gazebo,
   spawn a rover, adapt odometry, synthesize camera data, or add a drive backend.
-- The real launch omits `global_planner`; the state machine currently publishes
-  the same selected target to both global and local target topics.
+- The state machine publishes its selected target directly to the local planner.
 - Rerun visualization defaults on in the real local planner and requires its
   configured remote endpoint unless disabled.
 

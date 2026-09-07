@@ -4,13 +4,12 @@ Autonomy core
 - /autonomy/pose/robot/global (TwistStamped)
   - Publishers: autonomous_navigation/new_kalman, autonomous_navigation/localization_sim,
     cmr_zed/zed_gnss_fusion (alt path)
-  - Subscribers: state_machine, global_planner, local_planner, controller, object_detection,
+  - Subscribers: state_machine, local_planner, controller, object_detection,
     costmap
 - /autonomy/target/global (Float32MultiArray)
   - Publisher: state_machine
-  - Subscriber: global_planner
 - /autonomy/target/local (Float32MultiArray)
-  - Publishers: state_machine, global_planner
+  - Publisher: state_machine
   - Subscriber: local_planner
 - /autonomy/path/next_waypoint (Float32MultiArray)
   - Publisher: local_planner

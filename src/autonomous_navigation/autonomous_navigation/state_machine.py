@@ -20,6 +20,7 @@ from ament_index_python.packages import get_package_share_directory
 from autonomous_navigation.state_machine_core import (
     north_west_meters, search_waypoints, select_target,
 )
+from autonomous_navigation.target_contract import encode_target_request
 
 
 class StateMachineNode(Node):
@@ -80,10 +81,10 @@ class StateMachineNode(Node):
             1: ('coordinate', 2.0, 10.0),
             2: ('coordinate', 2.0, 10.0),
             3: ('ar1', 2.0, 10.0),
-            4: ('ar2`', 2.0, 10.0),
-            5: ('ar3`', 2.0, 15.0),
-            6: ('coordinate`', 2.0, 10.0),
-            7: ('coordinate`', 2.0, 10.0),
+            4: ('ar2', 2.0, 10.0),
+            5: ('ar3', 2.0, 15.0),
+            6: ('coordinate', 2.0, 10.0),
+            7: ('coordinate', 2.0, 10.0),
         }
 
         self.r_step = 0.2
@@ -268,7 +269,9 @@ class StateMachineNode(Node):
 
     def publish_target_name(self):
         m = String()
-        m.data = self.current_object
+        m.data = encode_target_request(
+            self.current_waypoint_index, self.current_object
+        )
         self.name_pub.publish(m)
 
 

@@ -7,7 +7,6 @@ from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import TwistStamped
 
-from tf2_ros import TransformBroadcaster
 from tf_transformations import euler_from_quaternion
 
 import math
@@ -50,7 +49,6 @@ class LocalizationSim(Node):
         # Pose in format [linear.x = d_north (m), linear.y = d_west(m), angular.z = yaw (rad)]
         self.pose_publisher = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
         self.velocity_publisher = self.create_publisher(Float32MultiArray, '/autonomy/velocity', 10)
-        self.tf_broadcaster = TransformBroadcaster(self)
 
         # Subscriptions
         self.create_subscription(NavSatFix, '/gps_exact', self.gps_odom_callback, 10)
@@ -222,41 +220,6 @@ class LocalizationSim(Node):
         delta_north = delta_lat * R
         delta_east = delta_lon * R * math.cos(mean_lat)
         return delta_north, -delta_east  # West is negative east
-
-    def quaternion_from_yaw(self, yaw):
-        """
-        Converts yaw angle to a quaternion.
-        """
-        return [0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0)]
-
-    '''
-    def publish_map_to_odom_transform(self):
-        """
-        Publishes the map -> odom transform based on localization data.
-        """
-        delta_north = self.current_map_position[0] - self.last_map_position[0]
-        delta_west = self.current_map_position[1] - self.last_map_position[1]
-        delta_yaw = self.current_map_yaw - self.last_map_yaw
-
-        # Update last position
-        self.last_map_position = self.current_map_position
-
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'map'
-        t.child_frame_id = 'odom'
-        t.transform.translation.x = delta_north
-        t.transform.translation.y = delta_west
-        t.transform.translation.z = 0.0
-
-        q = self.quaternion_from_yaw(delta_yaw)
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
-
-        self.tf_broadcaster.sendTransform(t)
-    '''
 
 def main(args=None):
     rclpy.init(args=args)

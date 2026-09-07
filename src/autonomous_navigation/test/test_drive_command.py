@@ -5,6 +5,7 @@ import pytest
 from autonomous_navigation.drive_command import (
     ChassisCommand,
     forward_heading_command,
+    inputs_fresh,
     point_turn_command,
     waypoint_reached,
 )
@@ -53,3 +54,29 @@ def test_nonpositive_heading_bound_is_rejected():
 
 def test_zero_command_is_all_zero():
     assert ChassisCommand() == ChassisCommand(0.0, 0.0, 0.0)
+
+
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_drive_commands_reject_nonfinite_values(value):
+    with pytest.raises(ValueError, match="finite"):
+        point_turn_command(value)
+
+
+@pytest.mark.parametrize(
+    "now,pose,waypoint,timeout,expected",
+    [
+        (10, 10, 10, 1, True), (10, 9, 9, 1, True),
+        (10, 8.99, 10, 1, False), (10, 10, 8.99, 1, False),
+        (10, None, 10, 1, False), (10, 10, None, 1, False),
+        (10, 10.01, 10, 1, False), (10, 10, 10.01, 1, False),
+        (10, math.nan, 10, 1, False), (10, 10, math.inf, 1, False),
+    ],
+)
+def test_input_freshness_matrix(now, pose, waypoint, timeout, expected):
+    assert inputs_fresh(now, pose, waypoint, timeout) is expected
+
+
+@pytest.mark.parametrize("timeout", [0, -1, math.inf, math.nan])
+def test_input_freshness_rejects_invalid_timeout(timeout):
+    with pytest.raises(ValueError, match="timeout"):
+        inputs_fresh(1, 1, 1, timeout)

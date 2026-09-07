@@ -110,6 +110,7 @@ class LocalPlannerNode(Node):
         self.waypoint_threshold = 0.3
         self.invalidation_count = 0
         self.invalidated_segments = dict()
+        self.path_hold = False
         # Timers
         self.path_check_timer = self.create_timer(0.5, self.validate_path)
         self.publish_waypoint_timer = self.create_timer(0.1, self.publish_waypoint)
@@ -275,6 +276,7 @@ class LocalPlannerNode(Node):
         if not self.current_path or self.next_target is None:
             return
 
+        path_blocked = False
         # Build a list of points including the robot position at front
         path_points = [self.robot_position] + list(self.current_path)
 
@@ -287,6 +289,7 @@ class LocalPlannerNode(Node):
             #self.get_logger().info(f"Segment {i}: start={start_pt}, end={end_pt}, max_cell={max_cell}, total={total}")
 
             if max_cell > self.max_cell_threshold:
+                path_blocked = True
                 segment = (i, i + 1)
                 self.invalidated_segments, confirmed = record_segment_observation(
                     self.invalidated_segments, segment, True
@@ -328,6 +331,7 @@ class LocalPlannerNode(Node):
                 self.invalidated_segments, _ = record_segment_observation(
                     self.invalidated_segments, (i, i + 1), False
                 )
+        self.path_hold = path_blocked
 
 
     def publish_waypoint(self):
@@ -351,9 +355,10 @@ class LocalPlannerNode(Node):
         waypoint_msg = Float32MultiArray()
         #use_stanley_flag = 1.0 if self.use_stanley else 0.0
         use_stanley_flag = 1.0
+        commanded_waypoint = self.robot_position if self.path_hold else self.next_waypoint
         waypoint_msg.data = [
-            float(self.next_waypoint[0]),
-            float(self.next_waypoint[1]),
+            float(commanded_waypoint[0]),
+            float(commanded_waypoint[1]),
             float(use_stanley_flag),
             float(len(self.current_path))
         ]

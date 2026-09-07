@@ -269,7 +269,7 @@ class CostmapNode(Node):
         detected ground plane polygon given by the ZED
         """
         if self.ground_plane is None:
-            return True
+            return False
         if (x,y) in self.ground_dict:
             return self.ground_dict[(x,y)]
         

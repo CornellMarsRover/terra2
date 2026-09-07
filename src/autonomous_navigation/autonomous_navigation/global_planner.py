@@ -13,6 +13,7 @@ import numpy as np
 import math
 from collections import deque
 import heapq  # For priority queue in A*
+from autonomous_navigation.planner_core import parse_planar_target
 
 
 class GlobalPlannerNode(Node):
@@ -43,7 +44,7 @@ class GlobalPlannerNode(Node):
         # Variables
         self.robot_position = [0.0, 0.0]
         self.yaw = 0.0
-        self.curr_target = [0.0, 0.0]
+        self.curr_target = None
         self.waypoints = deque()
         self.publish_timer = self.create_timer(0.5, self.publish_waypoint)
         self.get_logger().info("Global Planner Node initialized")
@@ -54,11 +55,16 @@ class GlobalPlannerNode(Node):
         self.yaw = msg.twist.angular.z
 
     def target_callback(self, msg):
-        self.curr_target = [float(msg.data[0]), float(msg.data[1])]
+        try:
+            self.curr_target, _ = parse_planar_target(msg.data)
+        except ValueError as error:
+            self.get_logger().error(f"Ignoring malformed target: {error}")
         
     def publish_waypoint(self):
+        if self.curr_target is None:
+            return
         waypoint = Float32MultiArray()
-        waypoint.data = self.curr_target
+        waypoint.data = list(self.curr_target)
         self.waypoint_publisher.publish(waypoint)
 
 

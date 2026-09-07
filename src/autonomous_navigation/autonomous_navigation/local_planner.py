@@ -20,6 +20,7 @@ from autonomous_navigation.planner_core import (
     neighbor_cost,
     nearest_clear_goal,
     parse_costmap,
+    parse_planar_target,
     path_is_dense,
     record_segment_observation,
     segment_traversable,
@@ -220,8 +221,6 @@ class LocalPlannerNode(Node):
         """
         Costmap callback – updates local costs and "obstacles".
         """
-        if not msg.data:
-            return
         try:
             self.costs, self.obstacles = parse_costmap(msg.data, self.threshold)
         except ValueError as error:
@@ -231,10 +230,11 @@ class LocalPlannerNode(Node):
         """
         Update the next target. If new, re-initialize path.
         """
-        if len(msg.data) == 3:
-            self.target_yaw = msg.data[2]
-
-        new_target = (msg.data[0], msg.data[1])
+        try:
+            new_target, self.target_yaw = parse_planar_target(msg.data)
+        except ValueError as error:
+            self.get_logger().error(f"Ignoring malformed target: {error}")
+            return
         if self.next_target != new_target:
             self.next_target = new_target
             self.current_path = deque()

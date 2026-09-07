@@ -6,6 +6,16 @@ from typing import Iterable, List, Sequence, Tuple
 Point = Tuple[float, float]
 
 
+def parse_planar_target(data: Sequence[float]):
+    """Parse a finite x/y target and optional yaw from a ROS array payload."""
+    if len(data) < 2:
+        raise ValueError("target must contain x and y")
+    values = tuple(float(value) for value in data[:3])
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("target values must be finite")
+    return values[:2], values[2] if len(values) == 3 else None
+
+
 def record_segment_observation(counts, segment, blocked, confirmations=3):
     """Track consecutive blocked observations and report confirmed blockage."""
     if confirmations < 1:

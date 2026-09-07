@@ -153,6 +153,9 @@ isolated on the `gazebo_sim` branch.
 
 ## Autonomy Testing Status
 
+See [the autonomy architecture map](docs/autonomy-architecture.md) for the node,
+topic, hardware, and Gazebo data paths.
+
 The `autonomy-fall2026` branch routes waypoint-following commands through
 `/cmd_vel_drives`, the same RoverNet swerve and Moteus path used by teleop.
 Teleop remains the manual input source and is not modified by autonomy.

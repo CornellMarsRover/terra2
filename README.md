@@ -178,6 +178,9 @@ files changed by a commit or pull request are formatted and checked with
 
 ### Autonomy Test Roadmap
 
+With Gazebo and its drive bridge running, use `scripts/check_drive_sim.sh` to
+compare physical motion from autonomy and tele-op inputs through one backend.
+
 - [x] Unit-test normalized forward, steering, point-turn, and stop commands.
 - [x] Build `cmr_msgs`, `cmr_rovernet`, and `autonomous_navigation` on Humble.
 - [x] Extract planner, costmap, and state-machine decisions into pure modules.

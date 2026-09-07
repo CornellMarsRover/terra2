@@ -5,6 +5,7 @@ from autonomous_navigation.planner_core import (
     neighbor_cost,
     nearest_clear_goal,
     parse_costmap,
+    parse_planar_target,
     path_is_dense,
     perpendicular_distance,
     record_segment_observation,
@@ -68,6 +69,24 @@ def test_parse_costmap_splits_costs_and_obstacles():
 def test_parse_costmap_rejects_incomplete_triple():
     with pytest.raises(ValueError, match="triples"):
         parse_costmap([1, 2], threshold=4)
+
+
+def test_empty_costmap_clears_all_planner_state():
+    assert parse_costmap([], threshold=4) == ({}, set())
+
+
+@pytest.mark.parametrize(
+    "data,expected",
+    [([1, 2], ((1.0, 2.0), None)), ([1, 2, 0.5], ((1.0, 2.0), 0.5))],
+)
+def test_parse_planar_target_accepts_optional_yaw(data, expected):
+    assert parse_planar_target(data) == expected
+
+
+@pytest.mark.parametrize("data", [[], [1], [float("nan"), 2], [1, float("inf")]])
+def test_parse_planar_target_rejects_malformed_payloads(data):
+    with pytest.raises(ValueError):
+        parse_planar_target(data)
 
 
 def test_advance_path_waits_outside_threshold():

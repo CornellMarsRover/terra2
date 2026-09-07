@@ -17,6 +17,8 @@ class ControllerNode(Node):
         self.declare_parameter('waypoint_tolerance', 0.3)
         self.waypoint_tolerance = self.get_parameter(
             'waypoint_tolerance').get_parameter_value().double_value
+        self.declare_parameter('input_timeout_s', 1.0)
+        self.input_timeout_s = self.get_parameter('input_timeout_s').value
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -48,6 +50,8 @@ class ControllerNode(Node):
         # Store current robot position
         self.robot_position = (0.0, 0.0)
         self.yaw = 0.0
+        self.last_pose_time_s = None
+        self.last_waypoint_time_s = None
 
         # Movement parameters
         self.point_turn_velocity = 0.4
@@ -83,7 +87,13 @@ class ControllerNode(Node):
           4. Otherwise, if 'use_stanley' is True, run Stanley logic for steering angle.
           5. If 'use_stanley' is False, use your original "ackerman" approach.
         """
-        if self.waypoint is None:
+        now_s = self.get_clock().now().nanoseconds * 1e-9
+        if self.waypoint is None or not drive_command.inputs_fresh(
+            now_s, self.last_pose_time_s, self.last_waypoint_time_s,
+            self.input_timeout_s,
+        ):
+            self.stop_robot()
+            self.publish_movement('stopped')
             return
 
         if self.stopped:
@@ -223,8 +233,13 @@ class ControllerNode(Node):
         """
         Callback function to update the robot position and yaw
         """
-        self.robot_position = (msg.twist.linear.x, msg.twist.linear.y)
-        self.yaw = msg.twist.angular.z
+        values = (msg.twist.linear.x, msg.twist.linear.y, msg.twist.angular.z)
+        if not all(math.isfinite(value) for value in values):
+            self.get_logger().error('Ignoring non-finite autonomy pose')
+            return
+        self.robot_position = values[:2]
+        self.yaw = values[2]
+        self.last_pose_time_s = self.get_clock().now().nanoseconds * 1e-9
 
     def update_waypoint(self, msg):
         """
@@ -234,8 +249,11 @@ class ControllerNode(Node):
         waypoint = None
         if self.waypoint is not None:
             waypoint = self.waypoint
-        if len(msg.data) >= 3:
-            self.waypoint = (msg.data[0], msg.data[1])
+        if len(msg.data) < 2 or not all(math.isfinite(v) for v in msg.data):
+            self.get_logger().error('Ignoring malformed autonomy waypoint')
+            return
+        self.waypoint = (msg.data[0], msg.data[1])
+        self.last_waypoint_time_s = self.get_clock().now().nanoseconds * 1e-9
         if len(msg.data) >= 4:
             self.use_stanley = (msg.data[2] == 1.0)  # 1.0 means True
             self.num_waypoints = msg.data[3]

@@ -3,7 +3,6 @@ import math
 import pytest
 
 from autonomous_navigation.costmap_core import (
-    GridObservation,
     decay_costs,
     observed_cost,
     project_point,

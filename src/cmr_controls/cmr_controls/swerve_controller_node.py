@@ -6,13 +6,7 @@ from cmr_msgs.msg import DriveCommand
 import asyncio
 import math
 import moteus
-import yaml
-import os
-import time
-import math
 
-L = 0.83 # wheelbase, distance between front and back wheels (m)
-W = 0.83 # wheeltrack, width/distance between left and right wheels (m)
 WHEEL_RADIUS = 0.127 # m
 WHEEL_CIRCUMFERENCE = WHEEL_RADIUS*2*math.pi
 SWERVE_RATIO = 50 # Swerve gearbox ratio
@@ -50,18 +44,8 @@ class SwerveControllerNode(Node):
             10
         )
 
-        self.move_type = 'ackerman'
-
-        self.pt_turn_constants = {
-            'wa1': (-45.0/360) * SWERVE_RATIO,
-            'wa2': (45.0/360) * SWERVE_RATIO,
-            'wa3': (-45.0/360) * SWERVE_RATIO,
-            'wa4': (45.0/360) * SWERVE_RATIO
-        }
-        
         self.transport = None
         self.servos = None
-        self.last_move = 'ackerman'
         self.loop = asyncio.get_event_loop()
 
         self.loop.run_until_complete(self.__async_initialize_moteus())
@@ -72,8 +56,9 @@ class SwerveControllerNode(Node):
         """
         Regular command velocity callback
         """
+        scale = msg.speed_rps * WHEEL_CIRCUMFERENCE / DRIVE_RATIO
         s1, s2, s3, s4, a1, a2, a3, a4 = self.wheelAnglesAndSpeeds(
-            msg.vx, msg.vy, msg.omega, 1.0, 1.0)
+            msg.vx * scale, msg.vy * scale, msg.omega * scale, 1.0, 1.0)
         self.set_drive(s1, s2, s3, s4, a1, a2, a3, a4)
 
     def stop_wheels(self):
@@ -114,7 +99,6 @@ class SwerveControllerNode(Node):
         #self.get_logger().info(f"{ws1} {ws2} {ws3} {ws4}")
 
         # Initialize Moteus transport and controllers
-        now = time.time()
         '''self.servos[2].make_position(
             position = math.nan,
             query=False,

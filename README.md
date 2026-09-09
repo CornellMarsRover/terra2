@@ -163,6 +163,9 @@ The `autonomy-fall2026` drive path uses these topics:
 - `/cmd_vel/autonomy`: waypoint controller `cmr_msgs/DriveCommand`
 - `/cmd_vel`: the only selected command accepted by the drive backend
 
+`/cmd_vel` is reserved for drive commands. The legacy arm IK keyboard utilities
+must be remapped before running in the same ROS domain because they use `Twist`.
+
 The command mux enforces a 0.5-second input timeout and `/cmd_vel/estop`. Launch
 mode selects the initial source; switch a running mux with:
 

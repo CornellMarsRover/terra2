@@ -2,7 +2,8 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, TwistStamped
+from cmr_msgs.msg import DriveCommand
+from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Float32MultiArray, String
 import math
 
@@ -19,6 +20,8 @@ class ControllerNode(Node):
             'waypoint_tolerance').get_parameter_value().double_value
         self.declare_parameter('input_timeout_s', 1.0)
         self.input_timeout_s = self.get_parameter('input_timeout_s').value
+        self.declare_parameter('drive_rps', 4.0)
+        self.drive_rps = abs(float(self.get_parameter('drive_rps').value))
 
         # Subscribe to the robot pose topic
         self.pose_subscription = self.create_subscription(
@@ -44,7 +47,8 @@ class ControllerNode(Node):
         self.stopped = False
 
         # The shared RoverNet drive node arbitrates this against manual input.
-        self.drive_publisher = self.create_publisher(Twist, '/cmd_vel_drives', 10)
+        self.drive_publisher = self.create_publisher(
+            DriveCommand, '/cmd_vel/autonomy', 10)
         self.movement_id_publisher = self.create_publisher(String, '/autonomy/move/move_type', 10)
 
         # Store current robot position
@@ -147,17 +151,15 @@ class ControllerNode(Node):
     def publish_point_turn(self, point_turn_velocity):
         """Publish a signed point turn to the shared drive implementation."""
         command = drive_command.point_turn_command(point_turn_velocity)
-        msg = Twist()
-        msg.linear.x = command.linear_x
-        msg.angular.z = command.angular_z
+        msg = DriveCommand(vx=command.linear_x, omega=command.angular_z,
+                           speed_rps=self.drive_rps)
         self.drive_publisher.publish(msg)
 
     def publish_ackerman(self, vel, steer_angle_deg):
         """Publish forward motion plus bounded heading correction."""
         command = drive_command.forward_heading_command(vel, steer_angle_deg)
-        drive_msg = Twist()
-        drive_msg.linear.x = command.linear_x
-        drive_msg.angular.z = command.angular_z
+        drive_msg = DriveCommand(vx=command.linear_x, omega=command.angular_z,
+                                 speed_rps=self.drive_rps)
         self.drive_publisher.publish(drive_msg)
 
     def update_pose(self, msg):

@@ -8,10 +8,13 @@ reset() {
   sleep 0.5
 }
 exercise() {
-  local topic=$1 type=$2 message=$3 start end
+  local source=$1 topic=$2 message=$3 start end
   reset
+  ros2 topic pub --once /cmd_vel/source std_msgs/msg/String \
+    "{data: $source}" >/dev/null
   start=$(pose)
-  ros2 topic pub --rate 10 --times 20 "$topic" "$type" "$message" >/dev/null
+  ros2 topic pub --rate 10 --times 20 "$topic" cmr_msgs/msg/DriveCommand \
+    "$message" >/dev/null
   sleep 0.3
   end=$(pose)
   awk -v start="$start" -v end="$end" 'BEGIN {
@@ -19,12 +22,24 @@ exercise() {
   }'
 }
 
-auto_dx=$(exercise /cmd_vel_drives geometry_msgs/msg/Twist \
-  '{linear: {x: 0.8}, angular: {z: 0.0}}')
-teleop_dx=$(exercise /drives_controller/cmd_vel geometry_msgs/msg/TwistStamped \
-  '{twist: {linear: {y: -0.8}, angular: {z: 0.0}}}')
-awk -v auto="$auto_dx" -v teleop="$teleop_dx" 'BEGIN {
+command='{vx: 0.8, vy: 0.0, omega: 0.0, speed_rps: 4.0}'
+auto_dx=$(exercise autonomy /cmd_vel/autonomy "$command")
+teleop_dx=$(exercise teleop /cmd_vel/teleop "$command")
+
+reset
+ros2 topic pub --once /cmd_vel/estop std_msgs/msg/Bool '{data: true}' >/dev/null
+start=$(pose)
+ros2 topic pub --rate 10 --times 10 /cmd_vel/teleop \
+  cmr_msgs/msg/DriveCommand "$command" >/dev/null
+sleep 0.3
+end=$(pose)
+ros2 topic pub --once /cmd_vel/estop std_msgs/msg/Bool '{data: false}' >/dev/null
+estop_dx=$(awk -v start="$start" -v end="$end" 'BEGIN {
+  split(start, a, " "); split(end, b, " "); print b[1] - a[1]
+}')
+awk -v auto="$auto_dx" -v teleop="$teleop_dx" -v estop="$estop_dx" 'BEGIN {
   delta = auto - teleop; if (delta < 0) delta = -delta
-  printf "autonomy dx=%.3f m, tele-op dx=%.3f m, delta=%.3f m\n", auto, teleop, delta
-  if (auto < 0.4 || teleop < 0.4 || delta > 0.25) exit 1
+  if (estop < 0) estop = -estop
+  printf "autonomy=%.3fm tele-op=%.3fm delta=%.3fm estop=%.3fm\n", auto, teleop, delta, estop
+  if (auto < 0.4 || teleop < 0.4 || delta > 0.25 || estop > 0.05) exit 1
 }'

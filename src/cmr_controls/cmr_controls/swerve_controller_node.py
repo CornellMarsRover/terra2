@@ -1,9 +1,7 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import Twist
-from cmr_msgs.msg import AutonomyDrive
-from std_msgs.msg import String
+from cmr_msgs.msg import DriveCommand
 
 import asyncio
 import math
@@ -45,28 +43,9 @@ class SwerveControllerNode(Node):
                           3 : "FR_DRIVE",
                           4  : "BR_DRIVE"}
 
-        # Autonomy drive command subscriptions
         self.subscription = self.create_subscription(
-            Twist,
-            '/autonomy/move/point_turn',
-            self.point_turn_callback,
-            10
-        )
-        self.subscription = self.create_subscription(
-            AutonomyDrive,
-            '/autonomy/move/ackerman',
-            self.ackerman_callback,
-            10
-        )
-        self.subscription = self.create_subscription(
-            String,
-            '/autonomy/move/move_type',
-            self.update_move_type,
-            10
-        )
-        self.subscription = self.create_subscription(
-            Twist,
-            '/cmd_vel_drives',
+            DriveCommand,
+            '/cmd_vel',
             self.cmd_vel_callback,
             10
         )
@@ -93,7 +72,8 @@ class SwerveControllerNode(Node):
         """
         Regular command velocity callback
         """
-        s1, s2, s3, s4, a1, a2, a3, a4 = self.wheelAnglesAndSpeeds(msg.linear.x, msg.linear.y, msg.angular.z, 1.0, 1.0)
+        s1, s2, s3, s4, a1, a2, a3, a4 = self.wheelAnglesAndSpeeds(
+            msg.vx, msg.vy, msg.omega, 1.0, 1.0)
         self.set_drive(s1, s2, s3, s4, a1, a2, a3, a4)
 
     def update_move_type(self, msg):

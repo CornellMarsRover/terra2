@@ -156,9 +156,19 @@ isolated on the `gazebo_sim` branch.
 See [the autonomy architecture map](docs/autonomy-architecture.md) for the node,
 topic, hardware, and Gazebo data paths.
 
-The `autonomy-fall2026` branch routes waypoint-following commands through
-`/cmd_vel_drives`, the same RoverNet swerve and Moteus path used by teleop.
-Teleop remains the manual input source and is not modified by autonomy.
+The `autonomy-fall2026` drive path uses these topics:
+
+- `/controller/drives/axes` and `/controller/drives/buttons`: raw controller data
+- `/cmd_vel/teleop`: converted manual `cmr_msgs/DriveCommand`
+- `/cmd_vel/autonomy`: waypoint controller `cmr_msgs/DriveCommand`
+- `/cmd_vel`: the only selected command accepted by the drive backend
+
+The command mux enforces a 0.5-second input timeout and `/cmd_vel/estop`. Launch
+mode selects the initial source; switch a running mux with:
+
+```bash
+ros2 topic pub --once /cmd_vel/source std_msgs/msg/String '{data: autonomy}'
+```
 
 Run the focused tests from the repository root in the CMR development image:
 
@@ -178,8 +188,8 @@ files changed by a commit or pull request are formatted and checked with
 
 ### Autonomy Test Roadmap
 
-With Gazebo and its drive bridge running, use `scripts/check_drive_sim.sh` to
-compare physical motion from autonomy and tele-op inputs through one backend.
+With Gazebo, the drive mux, and its bridge running, use
+`scripts/check_drive_sim.sh` to compare both sources and verify estop motion.
 
 - [x] Unit-test normalized forward, steering, point-turn, and stop commands.
 - [x] Build `cmr_msgs`, `cmr_rovernet`, and `autonomous_navigation` on Humble.

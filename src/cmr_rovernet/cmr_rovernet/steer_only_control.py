@@ -158,7 +158,7 @@ class SteerOnlyControlNode(Node):
 
         self.create_subscription(
             TwistStamped,
-            "/drives_controller/cmd_vel",
+            "/controller/drives/axes",
             self._controller_cmd_vel_cb,
             10,
         )

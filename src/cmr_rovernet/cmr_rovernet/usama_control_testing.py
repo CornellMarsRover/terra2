@@ -78,7 +78,6 @@ class ManualCommandState:
     vy: float = 0.0
     omega: float = 0.0
     speed_rps: float = 0.0
-    updated_at: float = 0.0
 
 
 @dataclass
@@ -278,13 +277,13 @@ class UsamaControlRosNode(Node):
 
         self.create_subscription(
             TwistStamped,
-            "/drives_controller/cmd_vel",
+            "/controller/drives/axes",
             self._controller_cmd_vel_cb,
             10,
         )
         self.create_subscription(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             self._controller_buttons_cb,
             10,
         )
@@ -358,7 +357,6 @@ class UsamaControlRosNode(Node):
             self._manual.vx = self._clamp(vx)
             self._manual.vy = self._clamp(vy)
             self._manual.omega = self._clamp(omega)
-            self._manual.updated_at = time.time()
 
         self.get_logger().info(
             f"controller cmd_vel vx={self._clamp(vx):+.3f} "
@@ -371,7 +369,7 @@ class UsamaControlRosNode(Node):
         decoded = self._decode_controller_buttons(list(msg.button_array))
         if decoded is None:
             self.get_logger().warn(
-                f"/drives_controller/cmd_buttons expected 2 or 8 entries, got "
+                f"/controller/drives/buttons expected 2 or 8 entries, got "
                 f"{len(msg.button_array)}",
                 throttle_duration_sec=2.0,
             )
@@ -387,26 +385,24 @@ class UsamaControlRosNode(Node):
         with self._lock:
             if estop_pressed and not self._estop_latched:
                 self._estop_latched = True
-                self._manual = ManualCommandState(updated_at=time.time())
+                self._manual = ManualCommandState()
                 self.get_logger().warn("Drive estop latched from controller buttons")
                 self._estop_publisher.publish(Bool(data=True))
                 return
 
             if self._estop_latched and not bool(l1) and not bool(triangle):
                 self._estop_latched = False
-                self._manual = ManualCommandState(updated_at=time.time())
+                self._manual = ManualCommandState()
                 self.get_logger().info("Drive estop released")
                 self._estop_publisher.publish(Bool(data=False))
 
             if self._estop_latched:
                 self._manual.speed_rps = 0.0
-                self._manual.updated_at = time.time()
                 return
 
             speed_rps = self._manual_speed_rps(l1=l1, r1=r1, l2=l2, r2=r2)
 
             self._manual.speed_rps = speed_rps
-            self._manual.updated_at = time.time()
 
         self.get_logger().info(
             f"controller buttons L1={l1} R1={r1} L2={l2} R2={r2} "

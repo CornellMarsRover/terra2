@@ -41,3 +41,13 @@ flowchart LR
 `DriveCommand` carries normalized `vx`, `vy`, and `omega`, plus signed
 `speed_rps`. The mux invalidates buffered commands on source changes, enforces a
 0.5-second timeout, latches estop, and publishes zeros when motion is unsafe.
+
+## Other domains
+
+- Arm: controller Joy -> MoveIt Servo -> joint trajectory -> RoverNet arm backend.
+- Cameras: USB/ZED nodes publish raw, rectified, stitched, and bird's-eye images.
+- Science: `astrotech_node` owns auger, Raman, environment, and mixing interfaces.
+- Fabric: lifecycle manager and fault handler supervise TOML-composed nodes.
+
+Legacy arm IK utilities also use `/cmd_vel` as `Twist`; remap them before
+co-launching because the canonical drive topic uses `DriveCommand`.

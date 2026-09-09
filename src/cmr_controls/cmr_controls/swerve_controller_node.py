@@ -76,35 +76,6 @@ class SwerveControllerNode(Node):
             msg.vx, msg.vy, msg.omega, 1.0, 1.0)
         self.set_drive(s1, s2, s3, s4, a1, a2, a3, a4)
 
-    def update_move_type(self, msg):
-        """
-        Update move type from autonomy controller
-        """
-        self.move_type = msg.data
-
-    def point_turn_callback(self, msg):
-        """
-        Point turn drive command, sets wheel angles to 45 degrees
-        and computes velocities to achieve desired rate of rotation
-        """
-        #if self.move_type == 'ackerman':
-        #    return
-        #self.get_logger().info(f"POINT TURN COMMAND {msg.angular.z}")
-        if msg.angular.z == 0.0 and self.last_move == 'ackerman':
-            self.stop_wheels()
-            self.last_move = 'point_turn'
-            return
-        
-        r = math.sqrt(((L/2)**2)+((W/2)**2))
-        v = ((msg.angular.z*r)/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
-        
-        self.set_drive(v,v,v,v,
-                       self.pt_turn_constants['wa1'],
-                       self.pt_turn_constants['wa2'],
-                       self.pt_turn_constants['wa3'],
-                       self.pt_turn_constants['wa4'])
-
-
     def ackerman_callback(self, msg):
         '''
         Ackerman drive command that sets wheel positions directly

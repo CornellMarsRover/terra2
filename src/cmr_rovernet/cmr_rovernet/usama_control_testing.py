@@ -82,7 +82,7 @@ class ManualCommandState:
 
 
 @dataclass
-class AutonomyCommandState:
+class SelectedCommandState:
     vx: float = 0.0
     vy: float = 0.0
     omega: float = 0.0
@@ -265,7 +265,7 @@ class UsamaControlRosNode(Node):
         )
 
         self._manual = ManualCommandState()
-        self._autonomy = AutonomyCommandState()
+        self._selected = SelectedCommandState()
         self._estop_latched = False
         self._last_source = "idle"
         self._lock = threading.Lock()
@@ -430,12 +430,12 @@ class UsamaControlRosNode(Node):
             self.get_logger().error("Ignoring non-finite selected drive command")
             return
         with self._lock:
-            self._autonomy.vx = self._clamp(msg.vx)
-            self._autonomy.vy = self._clamp(msg.vy)
-            self._autonomy.omega = self._clamp(msg.omega)
+            self._selected.vx = self._clamp(msg.vx)
+            self._selected.vy = self._clamp(msg.vy)
+            self._selected.omega = self._clamp(msg.omega)
             speed_limit = self.drive_rps * self.triple_speed_multiplier
-            self._autonomy.speed_rps = self._clamp(msg.speed_rps, speed_limit)
-            self._autonomy.updated_at = time.monotonic()
+            self._selected.speed_rps = self._clamp(msg.speed_rps, speed_limit)
+            self._selected.updated_at = time.monotonic()
 
         self.get_logger().info(
             f"selected cmd_vel vx={self._clamp(msg.vx):+.3f} "
@@ -525,16 +525,16 @@ class UsamaControlRosNode(Node):
     def _select_command(self) -> dict[str, object]:
         now = time.monotonic()
         with self._lock:
-            autonomy = AutonomyCommandState(**self._autonomy.__dict__)
+            selected = SelectedCommandState(**self._selected.__dict__)
 
-        selected_active = (now - autonomy.updated_at) <= self.command_timeout_s and any(
+        selected_active = (now - selected.updated_at) <= self.command_timeout_s and any(
             abs(value) > COMMAND_EPSILON
             for value in (
-                autonomy.vx, autonomy.vy, autonomy.omega, autonomy.speed_rps
+                selected.vx, selected.vy, selected.omega, selected.speed_rps
             )
         )
         if selected_active:
-            return self._autonomy_command(autonomy)
+            return self._selected_command(selected)
         return {"mode": "idle", "source": "idle"}
 
     def _manual_drive_axis_sign(self, vx: float) -> float:
@@ -542,14 +542,14 @@ class UsamaControlRosNode(Node):
             self._last_manual_drive_axis_sign = 1.0 if vx >= 0.0 else -1.0
         return self._last_manual_drive_axis_sign
 
-    def _autonomy_command(self, autonomy: AutonomyCommandState) -> dict[str, object]:
+    def _selected_command(self, selected: SelectedCommandState) -> dict[str, object]:
         return {
             "mode": "swerve",
             "source": "selected_cmd_vel",
-            "vx": autonomy.vx,
-            "vy": autonomy.vy,
-            "omega": autonomy.omega,
-            "speed_rps": autonomy.speed_rps,
+            "vx": selected.vx,
+            "vy": selected.vy,
+            "omega": selected.omega,
+            "speed_rps": selected.speed_rps,
         }
 
     def destroy_node(self):

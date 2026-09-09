@@ -161,8 +161,7 @@ class SwerveControllerNode(Node):
                 maximum_torque=self.swerves_max_torque
             )
         ]
-        result = await self.transport.cycle(commands)
-        #self.get_logger().info(str(result))
+        await self.transport.cycle(commands)
 
 
     #Script to calculate swerve speed and angles
@@ -234,7 +233,6 @@ class SwerveControllerNode(Node):
         a2 *= SWERVE_RATIO/360.0
         a3 *= SWERVE_RATIO/360.0
         a4 *= SWERVE_RATIO/360.0
-        k=7.2
         
 
         return -1 * s1, s2, s3, -1 * s4, a1, a2, a3, a4

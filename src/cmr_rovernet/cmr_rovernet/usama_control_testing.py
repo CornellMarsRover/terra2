@@ -431,12 +431,17 @@ class UsamaControlRosNode(Node):
         ))
 
     def _selected_cmd_vel_cb(self, msg: DriveCommand) -> None:
+        values = (msg.vx, msg.vy, msg.omega, msg.speed_rps)
+        if not all(math.isfinite(value) for value in values):
+            self.get_logger().error("Ignoring non-finite selected drive command")
+            return
         with self._lock:
             self._autonomy.vx = self._clamp(msg.vx)
             self._autonomy.vy = self._clamp(msg.vy)
             self._autonomy.omega = self._clamp(msg.omega)
-            self._autonomy.speed_rps = msg.speed_rps
-            self._autonomy.updated_at = time.time()
+            speed_limit = self.drive_rps * self.triple_speed_multiplier
+            self._autonomy.speed_rps = self._clamp(msg.speed_rps, speed_limit)
+            self._autonomy.updated_at = time.monotonic()
 
         self.get_logger().info(
             f"selected cmd_vel vx={self._clamp(msg.vx):+.3f} "
@@ -524,32 +529,17 @@ class UsamaControlRosNode(Node):
             self.get_logger().error(f"Drive initialization error: {exc!r}")
 
     def _select_command(self) -> dict[str, object]:
-        now = time.time()
+        now = time.monotonic()
         with self._lock:
-            if self._estop_latched:
-                return {"mode": "estop", "source": "controller_estop"}
-            manual = ManualCommandState(**self._manual.__dict__)
             autonomy = AutonomyCommandState(**self._autonomy.__dict__)
 
-        manual_active = (now - manual.updated_at) <= self.command_timeout_s and (
-            abs(manual.speed_rps) > COMMAND_EPSILON
-            or any(
-                abs(value) > self.controller_deadzone
-                for value in (manual.vx, manual.vy, manual.omega)
+        selected_active = (now - autonomy.updated_at) <= self.command_timeout_s and any(
+            abs(value) > COMMAND_EPSILON
+            for value in (
+                autonomy.vx, autonomy.vy, autonomy.omega, autonomy.speed_rps
             )
         )
-        autonomy_active = (now - autonomy.updated_at) <= self.command_timeout_s and any(
-            abs(value) > COMMAND_EPSILON
-            for value in (autonomy.vx, autonomy.vy, autonomy.omega)
-        )
-
-        if manual_active and self.manual_override_priority:
-            return self._manual_command(manual)
-        if autonomy_active and self.autonomy_priority:
-            return self._autonomy_command(autonomy)
-        if manual_active:
-            return self._manual_command(manual)
-        if autonomy_active:
+        if selected_active:
             return self._autonomy_command(autonomy)
         return {"mode": "idle", "source": "idle"}
 
@@ -573,11 +563,11 @@ class UsamaControlRosNode(Node):
     def _autonomy_command(self, autonomy: AutonomyCommandState) -> dict[str, object]:
         return {
             "mode": "swerve",
-            "source": "autonomy_cmd_vel",
+            "source": "selected_cmd_vel",
             "vx": autonomy.vx,
             "vy": autonomy.vy,
             "omega": autonomy.omega,
-            "speed_rps": self.drive_rps,
+            "speed_rps": autonomy.speed_rps,
         }
 
     def destroy_node(self):

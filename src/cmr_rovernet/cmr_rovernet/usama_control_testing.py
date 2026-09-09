@@ -231,8 +231,6 @@ class UsamaControlRosNode(Node):
         self.declare_parameter("controller_deadzone", 0.1)
         self.declare_parameter("command_timeout_s", 0.5)
         self.declare_parameter("refresh_rate_hz", 10.0)
-        self.declare_parameter("manual_override_priority", True)
-        self.declare_parameter("autonomy_priority", True)
         self.declare_parameter("capture_steer_zero_on_start", True)
 
         self.port = str(self._setting("can_port", config))
@@ -262,10 +260,6 @@ class UsamaControlRosNode(Node):
         self.controller_deadzone = float(self._setting("controller_deadzone", config))
         self.command_timeout_s = float(self._setting("command_timeout_s", config))
         self.refresh_rate_hz = float(self._setting("refresh_rate_hz", config))
-        self.manual_override_priority = bool(
-            self._setting("manual_override_priority", config)
-        )
-        self.autonomy_priority = bool(self._setting("autonomy_priority", config))
         self.capture_steer_zero_on_start = bool(
             self._setting("capture_steer_zero_on_start", config)
         )
@@ -542,18 +536,6 @@ class UsamaControlRosNode(Node):
         if selected_active:
             return self._autonomy_command(autonomy)
         return {"mode": "idle", "source": "idle"}
-
-    def _manual_command(self, manual: ManualCommandState) -> dict[str, object]:
-        drive_axis_sign = self._manual_drive_axis_sign(manual.vx)
-        speed_rps = manual.speed_rps * drive_axis_sign
-        return {
-            "mode": "swerve",
-            "source": "controller_topics",
-            "vx": abs(manual.vx),
-            "vy": manual.vy,
-            "omega": manual.omega,
-            "speed_rps": speed_rps,
-        }
 
     def _manual_drive_axis_sign(self, vx: float) -> float:
         if abs(vx) > self.controller_deadzone:

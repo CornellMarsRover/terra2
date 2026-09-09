@@ -151,26 +151,11 @@ Run `./run sim` in the dev container. This starts the autonomy nodes in their
 simulated-input mode, but it does not start Gazebo. Full Gazebo tooling remains
 isolated on the `gazebo_sim` branch.
 
-## Codebase Map
+## Architecture Maps
 
-```mermaid
-flowchart TD
-  ROOT[terra2] --> RUN[run + scripts: setup, launch, test, sim checks]
-  ROOT --> DOCS[docs + codebase_index: architecture and operations]
-  ROOT --> SRC[src: ROS 2 workspace]
-  SRC --> CORE[Core: cmr_msgs, cmr_utils, cmr_fabric, cmr_fabric_wrappers]
-  SRC --> AUTO[Autonomy: autonomous_navigation]
-  SRC --> DRIVE[Drive: cmr_controller_remote, cmr_rovernet, cmr_controls]
-  SRC --> SENSE[Sensing: cmr_zed, cmr_cams, USB cameras, cmr_imu, cmr_rtkgps]
-  SRC --> ARM[Arm: cmr_arm_sim, cmr_arm_simulator, MoveIt Servo, servo control]
-  SRC --> SCI[Science: astrotech_rover]
-  SRC --> TOOLS[Tools: cmr_param_gui, autonomous_typing_package]
-  AUTO --> PURE[Pure planning, costmap, state machine, and drive logic]
-  AUTO --> ADAPTERS[ROS autonomy nodes]
-  DRIVE --> MUX[DriveCommand mux and shared Moteus backend]
-  CORE --> AUTO
-  CORE --> DRIVE
-```
+- [Codebase map](docs/codebase-map.md)
+- [ROS node and topic structure](docs/ros-structure.md)
+- [Autonomy architecture](docs/autonomy-architecture.md)
 
 ## ROS Map
 

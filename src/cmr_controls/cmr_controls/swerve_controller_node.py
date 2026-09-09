@@ -76,46 +76,6 @@ class SwerveControllerNode(Node):
             msg.vx, msg.vy, msg.omega, 1.0, 1.0)
         self.set_drive(s1, s2, s3, s4, a1, a2, a3, a4)
 
-    def ackerman_callback(self, msg):
-        '''
-        Ackerman drive command that sets wheel positions directly
-        Values are reversed so the rover drives backwards
-        '''
-        #if self.move_type == 'point_turn':
-        #    return
-        #self.get_logger().info(f"ACKERMAN COMMAND {msg.vel}")
-        
-        if msg.vel == 0.0 and self.last_move == 'point_turn':
-            self.stop_wheels()
-            self.last_move = 'ackerman'
-            return
-            
-        
-        s = (msg.vel/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
-        if abs(msg.fl_angle) > 1.0:
-            t = math.tan(math.radians(msg.fl_angle)) 
-            R = L/t
-            RL = R - (W/2)
-            RR = R + (W/2)
-            vl = s*(RL/R)
-            vr = s*(RR/R)
-            theta_l = math.degrees(math.atan(L/RL))
-            theta_r = math.degrees(math.atan(L/RR))
-        else:
-            theta_l = 0.0
-            theta_r = 0.0
-            vl = s
-            vr = s
-        #self.get_logger().info(f"Ackerman\nFront Left: Angle={theta_l} deg  Wheel Speed={vl} rad/s\nFront Right: Angle={theta_r} deg  Wheel Speed={vr}")
-        wa3 = -1.0 * (theta_l / 360) * SWERVE_RATIO
-        wa4 = -1.0 * (theta_r / 360) * SWERVE_RATIO
-        wa2 = 0.0
-        wa1 = 0.0
-        if msg.vel == 0.0:
-            self.set_drive(0.0, 0.0, 0.0, 0.0, wa1, wa2, wa3, wa4)
-        else:
-            self.set_drive(-1* vl, s, vr, -1 * s, wa1, wa2, wa3, wa4)
-    
     def stop_wheels(self):
         #self.get_logger().info("STOPPING WHEELS")
         return self.loop.run_until_complete(self.__async_stop_wheels())

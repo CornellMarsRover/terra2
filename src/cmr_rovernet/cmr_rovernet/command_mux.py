@@ -3,7 +3,7 @@ import time
 import rclpy
 from cmr_msgs.msg import DriveCommand
 from rclpy.node import Node
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 
 from cmr_rovernet.command_mux_core import CommandMux
 
@@ -16,12 +16,14 @@ class DriveCommandMux(Node):
         self.mux = CommandMux(float(self.get_parameter("command_timeout_s").value))
         self.mux.select(str(self.get_parameter("active_source").value))
         self.estop = False
+        self.last_status = None
         self.output = self.create_publisher(DriveCommand, "/cmd_vel", 10)
         self.create_subscription(DriveCommand, "/cmd_vel/teleop",
                                  lambda msg: self.receive("teleop", msg), 10)
         self.create_subscription(DriveCommand, "/cmd_vel/autonomy",
                                  lambda msg: self.receive("autonomy", msg), 10)
         self.create_subscription(Bool, "/cmd_vel/estop", self.set_estop, 10)
+        self.create_subscription(String, "/cmd_vel/source", self.set_source, 10)
         self.create_timer(0.05, self.publish_selected)
 
     def receive(self, source, msg):
@@ -36,8 +38,21 @@ class DriveCommandMux(Node):
             self.mux.reset()
         self.estop = msg.data
 
+    def set_source(self, msg):
+        try:
+            self.mux.select(msg.data)
+        except ValueError as exc:
+            self.get_logger().error(str(exc))
+            return
+        self.get_logger().info(f"Drive source selected: {msg.data}")
+
     def publish_selected(self):
-        values = self.mux.output(time.monotonic()) or (0.0,) * 4
+        selected = self.mux.output(time.monotonic())
+        status = "estop" if self.estop else self.mux.source if selected else "timeout"
+        if status != self.last_status:
+            self.get_logger().info(f"Drive mux status: {status}")
+            self.last_status = status
+        values = selected or (0.0,) * 4
         self.output.publish(DriveCommand(
             vx=values[0], vy=values[1], omega=values[2], speed_rps=values[3]))
 

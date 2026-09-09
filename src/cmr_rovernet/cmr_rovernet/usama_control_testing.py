@@ -11,15 +11,16 @@ from pathlib import Path
 
 import rclpy
 import toml
-from cmr_msgs.msg import ControllerReading
+from cmr_msgs.msg import ControllerReading, DriveCommand
 from cmr_rovernet.moteus_drive_gui import (
     make_transport_and_controllers,
     query_one,
     read_value,
     stop_compat,
 )
-from geometry_msgs.msg import Twist, TwistStamped
+from geometry_msgs.msg import TwistStamped
 from rclpy.node import Node
+from std_msgs.msg import Bool
 
 
 DRIVE_IDS = [1, 2, 3, 4]
@@ -85,6 +86,7 @@ class AutonomyCommandState:
     vx: float = 0.0
     vy: float = 0.0
     omega: float = 0.0
+    speed_rps: float = 0.0
     updated_at: float = 0.0
 
 
@@ -276,6 +278,9 @@ class UsamaControlRosNode(Node):
         self._shutdown = threading.Event()
         self._steer_center_offsets = dict(STEER_CENTER_OFFSETS)
         self._last_manual_drive_axis_sign = 1.0
+        self._teleop_publisher = self.create_publisher(
+            DriveCommand, "/cmd_vel/teleop", 10)
+        self._estop_publisher = self.create_publisher(Bool, "/cmd_vel/estop", 10)
 
         self.create_subscription(
             TwistStamped,
@@ -290,9 +295,9 @@ class UsamaControlRosNode(Node):
             10,
         )
         self.create_subscription(
-            Twist,
-            "/cmd_vel_drives",
-            self._autonomy_cmd_vel_cb,
+            DriveCommand,
+            "/cmd_vel",
+            self._selected_cmd_vel_cb,
             10,
         )
 
@@ -300,8 +305,8 @@ class UsamaControlRosNode(Node):
         self._worker.start()
 
         self.get_logger().info(
-            "usama_control_testing_node started. Inputs: /drives_controller/cmd_vel, "
-            "/drives_controller/cmd_buttons, /cmd_vel_drives"
+            "Drive backend: controller adapter -> /cmd_vel/teleop; "
+            "selected /cmd_vel -> Moteus"
         )
         self.get_logger().info(
             f"Using direct moteus command behavior on {self.port}: "
@@ -412,17 +417,18 @@ class UsamaControlRosNode(Node):
             throttle_duration_sec=1.0,
         )
 
-    def _autonomy_cmd_vel_cb(self, msg: Twist) -> None:
+    def _selected_cmd_vel_cb(self, msg: DriveCommand) -> None:
         with self._lock:
-            self._autonomy.vx = self._clamp(msg.linear.x)
-            self._autonomy.vy = self._clamp(msg.linear.y)
-            self._autonomy.omega = self._clamp(msg.angular.z)
+            self._autonomy.vx = self._clamp(msg.vx)
+            self._autonomy.vy = self._clamp(msg.vy)
+            self._autonomy.omega = self._clamp(msg.omega)
+            self._autonomy.speed_rps = msg.speed_rps
             self._autonomy.updated_at = time.time()
 
         self.get_logger().info(
-            f"autonomy cmd_vel vx={self._clamp(msg.linear.x):+.3f} "
-            f"vy={self._clamp(msg.linear.y):+.3f} "
-            f"omega={self._clamp(msg.angular.z):+.3f}",
+            f"selected cmd_vel vx={self._clamp(msg.vx):+.3f} "
+            f"vy={self._clamp(msg.vy):+.3f} omega={self._clamp(msg.omega):+.3f} "
+            f"speed_rps={msg.speed_rps:+.3f}",
             throttle_duration_sec=1.0,
         )
 

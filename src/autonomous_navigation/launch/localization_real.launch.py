@@ -8,9 +8,14 @@ def generate_launch_description():
         get_package_share_directory("cmr_rovernet"), "config", "drivesnet.toml"
     )
     return launch.LaunchDescription([
+        launch_ros.actions.Node(
+            package='cmr_rovernet',
+            executable='drive_command_mux',
+            name='drive_command_mux',
+            parameters=[{'active_source': 'autonomy'}],
+        ),
 
-        # Use the same drive node as teleop. It arbitrates manual commands with
-        # autonomy's /cmd_vel_drives input before shared swerve/Moteus handling.
+        # The same backend consumes the mux-selected command in every mode.
         launch_ros.actions.Node(
             package='cmr_rovernet',
             executable='usama_control_testing_node',

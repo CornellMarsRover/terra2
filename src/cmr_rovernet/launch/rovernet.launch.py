@@ -47,6 +47,12 @@ def generate_launch_description():
                 description="Launch controller UDP bridge",
             ),
             Node(
+                package="cmr_rovernet",
+                executable="drive_command_mux",
+                name="drive_command_mux",
+                parameters=[{"active_source": "teleop"}],
+            ),
+            Node(
                 package="cmr_fabric",
                 executable="fault_handler",
                 namespace=composition_ns,

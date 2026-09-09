@@ -3,6 +3,12 @@ import launch_ros.actions
 
 def generate_launch_description():
     return launch.LaunchDescription([
+        launch_ros.actions.Node(
+            package='cmr_rovernet',
+            executable='drive_command_mux',
+            name='drive_command_mux',
+            parameters=[{'active_source': 'autonomy'}],
+        ),
         # Start state_machine & object detection nodes first
         launch_ros.actions.Node(
             package='autonomous_navigation',

@@ -153,10 +153,10 @@ isolated on the `gazebo_sim` branch.
 
 ## Autonomy Testing Status
 
-See [the autonomy architecture map](docs/autonomy-architecture.md) for the node,
-topic, hardware, and Gazebo data paths.
+See the [codebase map](docs/codebase-map.md), [ROS structure](docs/ros-structure.md),
+and [autonomy architecture](docs/autonomy-architecture.md).
 
-The `autonomy-fall2026` drive path uses these topics:
+The `autonomy_fall2026` drive path uses these topics:
 
 - `/controller/drives/axes` and `/controller/drives/buttons`: raw controller data
 - `/cmd_vel/teleop`: converted manual `cmr_msgs/DriveCommand`

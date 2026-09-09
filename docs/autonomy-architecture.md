@@ -1,6 +1,6 @@
 # Autonomy architecture
 
-This map describes the current `autonomy-fall2026` data path. Solid edges are
+This map describes the current `autonomy_fall2026` data path. Solid edges are
 shared runtime behavior; dashed edges are Gazebo adapters used only at system
 boundaries. Arm packages are intentionally outside this document.
 

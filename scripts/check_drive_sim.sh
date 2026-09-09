@@ -2,9 +2,20 @@
 set -euo pipefail
 
 MODEL=${GAZEBO_MODEL:-drives}
-pose() { gz model -m "$MODEL" -p; }
+retry_gz() {
+  local output
+  for _ in 1 2 3; do
+    if output=$(timeout 5 gz "$@" 2>/dev/null); then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  done
+  return 1
+}
+pose() { retry_gz model -m "$MODEL" -p; }
 reset() {
-  gz model -m "$MODEL" -x 0 -y 0 -z 0.12 -R 0 -P 0 -Y 0 >/dev/null
+  retry_gz model -m "$MODEL" -x 0 -y 0 -z 0.12 \
+    -R 0 -P 0 -Y 0 >/dev/null
   sleep 0.5
 }
 exercise() {

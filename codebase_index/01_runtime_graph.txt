@@ -4,14 +4,15 @@ A) Teleop drives + arm control
 1) cmr_controller_remote/connect_node
    - Listens on UDP ports 5010, 5020, 5030.
    - Publishes:
-     - /drives_controller/cmd_vel (TwistStamped)
-     - /drives_controller/cmd_buttons (ControllerReading)
+     - /controller/drives/axes (TwistStamped)
+     - /controller/drives/buttons (ControllerReading)
      - /arm_controller/cmd_vel (Joy)
      - /arm_controller/cmd_buttons (ControllerReading)
      - /mini_arm_controller/cmd_pos (MiniArmDegree)
-2) cmr_rovernet/drivesnet_node
-   - Subscribes /drives_controller/cmd_vel + /drives_controller/cmd_buttons.
-   - Translates commands to moteus/serial output for drive + swerve motors.
+2) cmr_rovernet drive path
+   - Converts controller axes/buttons to /cmd_vel/teleop.
+   - Mux selects teleop or /cmd_vel/autonomy and publishes /cmd_vel.
+   - Drive backend translates /cmd_vel to Moteus drive + swerve output.
 3) moveit_servo::JoyToServoPub (in moveit_servo launch)
    - Subscribes /arm_controller/cmd_vel.
    - Publishes /servo_node/delta_twist_cmds and /servo_node/delta_joint_cmds.
@@ -60,11 +61,9 @@ B) Autonomy perception -> planning -> control
      - /autonomy/pose/robot/global
      - /autonomy/path/next_waypoint
      - /autonomy/stop
-   - Publishes:
-     - /autonomy/move/ackerman (AutonomyDrive)
-     - /autonomy/move/point_turn (Twist)
-     - /autonomy/move/move_type (String)
-   - cmr_controls/swerve_controller_node subscribes those move topics + /cmd_vel_drives.
+   - Publishes /cmd_vel/autonomy (DriveCommand).
+   - drive_command_mux publishes selected /cmd_vel (DriveCommand).
+   - Drive backends subscribe only to /cmd_vel.
 
 C) Fabric lifecycle/fault management
 - cmr_fabric/fault_handler service: /<composition_ns>/recover_fault

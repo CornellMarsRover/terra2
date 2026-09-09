@@ -5,27 +5,33 @@ nodes or external systems. Dashed edges are simulation boundary adapters.
 
 ```mermaid
 flowchart LR
-  PAD[Controller] -->|UDP 5010| RX[connect_node]
-  RX -->|/controller/drives/axes + buttons| DRIVE[drivesnet adapter/backend]
-  DRIVE -->|/cmd_vel/teleop: DriveCommand| MUX[drive_command_mux]
-  GPS[RTK GPS] --> LOC[new_kalman]
-  IMU[IMU] --> LOC
-  ZED[ZED camera] -->|/camera/points| CM[costmap]
-  ZED -->|/zed/image| OD[object_detection]
-  LOC -->|/autonomy/pose/robot/global| SM[state_machine] & CM & LP & CTRL
-  SM -->|/autonomy/target/local| LP[local_planner]
-  OD -->|/autonomy/target_object/position| SM
+  PAD["Controller"] -->|"UDP 5010"| RX["connect_node"]
+  RX -->|"controller drive topics"| DRIVE["drivesnet adapter/backend"]
+  DRIVE -->|"/cmd_vel/teleop"| MUX["drive_command_mux"]
+  GPS["RTK GPS"] --> LOC["new_kalman"]
+  IMU["IMU"] --> LOC
+  ZED["ZED camera"] -->|"/camera/points"| CM["costmap"]
+  ZED -->|"/zed/image"| OD["object_detection"]
+  LOC -->|"global autonomy pose"| SM["state_machine"]
+  LOC --> CM
+  LOC --> LP["local_planner"]
+  LOC --> CTRL["controller"]
+  SM -->|"/autonomy/target/local"| LP
+  OD -->|"target object position"| SM
   OD --> CM
-  CM -->|/autonomy/costmap| LP
-  LP -->|/autonomy/path/next_waypoint| CTRL[controller]
-  CTRL -->|/cmd_vel/autonomy: DriveCommand| MUX
-  SAFE[/cmd_vel/source + /cmd_vel/estop] --> MUX
-  MUX -->|/cmd_vel: DriveCommand| DRIVE
-  DRIVE -->|swerve targets| MOT[Moteus drive + steer motors]
-  GZ[Gazebo] -. /drives/odom .-> POSE[pose adapter]
-  POSE -. /autonomy/pose/robot/global .-> SM & CM & LP & CTRL
-  MUX -. selected command .-> GB[Gazebo drive adapter]
-  GB -. /drives/cmd_vel .-> GZ
+  CM -->|"/autonomy/costmap"| LP
+  LP -->|"/autonomy/path/next_waypoint"| CTRL
+  CTRL -->|"/cmd_vel/autonomy"| MUX
+  SAFE["source selection and estop"] --> MUX
+  MUX -->|"/cmd_vel"| DRIVE
+  DRIVE -->|"swerve targets"| MOT["Moteus drive and steer motors"]
+  GZ["Gazebo"] -.-> POSE["pose adapter"]
+  POSE -.-> SM
+  POSE -.-> CM
+  POSE -.-> LP
+  POSE -.-> CTRL
+  MUX -.-> GB["Gazebo drive adapter"]
+  GB -.-> GZ
 ```
 
 ## Drive contract

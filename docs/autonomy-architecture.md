@@ -11,40 +11,39 @@ flowchart LR
   Camera --> OD[Object detection]
   GPS[RTK GPS + IMU] --> LOC[Localization]
   LOC -->|/autonomy/pose/robot/global| SM
-  LOC -->|pose| GP[Global planner]
   LOC -->|pose| CM
   LOC -->|pose| LP[Local planner]
   LOC -->|pose| CTRL[Controller]
   OD -->|/autonomy/target_object/position| SM
   OD -->|target object| CM
-  SM -->|/autonomy/target/global| GP
   SM -->|/autonomy/target/local| LP
-  GP -->|/autonomy/target/local| LP
   CM -->|/autonomy/costmap| LP
   LP -->|/autonomy/path/next_waypoint| CTRL
-  CTRL -->|/cmd_vel_drives| DRIVE[Shared RoverNet drive node]
+  CTRL -->|/cmd_vel/autonomy| MUX[Drive command mux]
   UDP[Controller UDP] --> RX[cmr_controller_remote]
-  RX -->|manual TwistStamped + buttons| DRIVE
+  RX -->|/controller/drives/axes + buttons| ADAPT[Tele-op adapter]
+  ADAPT -->|/cmd_vel/teleop| MUX
+  ADAPT -->|/cmd_vel/estop| MUX
+  MUX -->|/cmd_vel| DRIVE[Shared RoverNet drive node]
   DRIVE --> KIN[Swerve kinematics + Moteus worker]
   KIN --> HW[Drive and steer motors]
 
   GZ[Gazebo rover + obstacles] -. /drives/odom .-> OA[Odometry pose adapter]
   OA -. pose .-> SM
-  OA -. pose .-> GP
   OA -. pose .-> CM
   OA -. pose .-> LP
   OA -. pose .-> CTRL
   PC[Simulated camera adapter] -. /camera/points .-> CM
-  CTRL -. /cmd_vel_drives .-> GB[Gazebo drive bridge]
+  MUX -. /cmd_vel .-> GB[Gazebo drive bridge]
   GB -. /drives/cmd_vel .-> GZ
 ```
 
 ## Convergence boundary
 
-Tele-op and autonomy differ only before the shared drive node. Tele-op produces
-manual controller topics; autonomy produces normalized `Twist` commands on
-`/cmd_vel_drives`. The RoverNet node arbitrates those inputs and owns the same
-swerve geometry, Moteus transport, watchdog, and motor command path for both.
+Tele-op and autonomy differ only before the command mux. Both produce a
+`cmr_msgs/DriveCommand`; launch mode or `/cmd_vel/source` selects one source.
+The mux enforces input timeout and estop, then publishes only `/cmd_vel`.
+RoverNet owns the shared swerve geometry, Moteus transport, and watchdog.
 Gazebo replaces that final hardware backend, not perception or planning logic.
 
 ## Node ownership
@@ -57,8 +56,8 @@ Gazebo replaces that final hardware backend, not perception or planning logic.
 | Costmap | `costmap.py`, `costmap_core.py` | point cloud, pose, movement | obstacle cost cells |
 | Local planning | `local_planner.py`, `planner_core.py` | local target, pose, costmap | next waypoint |
 | Control | `controller.py`, `drive_command.py` | next waypoint, pose, stop | normalized chassis command |
-| Arbitration | `usama_control_testing.py` | autonomy and manual commands | Moteus drive/steer tasks |
-| Manual input | `cmr_controller_remote/connect.py` | UDP controller packets | manual drive topics |
+| Arbitration | `command_mux.py`, `command_mux_core.py` | named drive commands, estop | selected `/cmd_vel` |
+| Manual input | `connect.py`, `usama_control_testing.py` | UDP controller data | `/cmd_vel/teleop` |
 | Messages | `cmr_msgs` | shared schemas | ROS interfaces |
 
 ## Launch behavior
@@ -74,8 +73,8 @@ Gazebo replaces that final hardware backend, not perception or planning logic.
 
 ## Gazebo feedback-loop validation
 
-A headless three-obstacle test exercised the real costmap, global planner, local
-planner, controller, and `/cmd_vel_drives` interface. Only odometry, camera,
+A headless three-obstacle test exercised the real costmap, local planner,
+controller, and selected `/cmd_vel` interface. Only odometry, camera,
 goal, and drive-backend adapters were simulation-specific.
 
 - Goal: `(6.0, 0.0)`; reached the 0.3 m tolerance at 98.4 seconds.
@@ -83,8 +82,8 @@ goal, and drive-backend adapters were simulation-specific.
 - Path length: 7.462 m; two obstacle-driven replans occurred.
 - Minimum obstacle center clearance: 1.255 m.
 - ROS bag: 5,748 messages over 130.4 seconds with no runtime errors.
-- Every distinct `/drives/cmd_vel` value matched a controller value from
-  `/cmd_vel_drives`, and both streams ended with a zero command.
+- Every distinct Gazebo command matched the selected `/cmd_vel`, and both
+  streams ended with a zero command.
 
 ## Remaining gaps
 

@@ -371,6 +371,7 @@ class UsamaControlRosNode(Node):
             f"vy={self._clamp(vy):+.3f} omega={self._clamp(omega):+.3f}",
             throttle_duration_sec=1.0,
         )
+        self._publish_manual()
 
     def _controller_buttons_cb(self, msg: ControllerReading) -> None:
         decoded = self._decode_controller_buttons(list(msg.button_array))
@@ -394,12 +395,14 @@ class UsamaControlRosNode(Node):
                 self._estop_latched = True
                 self._manual = ManualCommandState(updated_at=time.time())
                 self.get_logger().warn("Drive estop latched from controller buttons")
+                self._estop_publisher.publish(Bool(data=True))
                 return
 
             if self._estop_latched and not bool(l1) and not bool(triangle):
                 self._estop_latched = False
                 self._manual = ManualCommandState(updated_at=time.time())
                 self.get_logger().info("Drive estop released")
+                self._estop_publisher.publish(Bool(data=False))
 
             if self._estop_latched:
                 self._manual.speed_rps = 0.0
@@ -416,6 +419,16 @@ class UsamaControlRosNode(Node):
             f"speed_rps={speed_rps:+.3f}",
             throttle_duration_sec=1.0,
         )
+        self._publish_manual()
+
+    def _publish_manual(self) -> None:
+        with self._lock:
+            manual = ManualCommandState(**self._manual.__dict__)
+            speed_rps = manual.speed_rps * self._manual_drive_axis_sign(manual.vx)
+        self._teleop_publisher.publish(DriveCommand(
+            vx=abs(manual.vx), vy=manual.vy, omega=manual.omega,
+            speed_rps=speed_rps,
+        ))
 
     def _selected_cmd_vel_cb(self, msg: DriveCommand) -> None:
         with self._lock:

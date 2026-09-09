@@ -40,7 +40,7 @@ def forward_heading_command(
     heading_error_deg: float,
     max_heading_error_deg: float = 35.0,
 ) -> ChassisCommand:
-    """Map forward demand and heading error to ``/cmd_vel_drives`` axes."""
+    """Map forward demand and heading error to normalized drive axes."""
     if max_heading_error_deg <= 0.0:
         raise ValueError("max_heading_error_deg must be positive")
     heading = max(

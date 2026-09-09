@@ -164,7 +164,7 @@ class SteerOnlyControlNode(Node):
         )
         self.create_subscription(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             self._controller_buttons_cb,
             10,
         )

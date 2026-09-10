@@ -1,31 +1,36 @@
 # ROS structure
 
 Read this graph from top to bottom. Operator and sensor inputs are furthest from
-the rover; the physical wheels and steering are the lowest layer.
+the rover; the physical wheels and steering are the lowest layer. It shows the
+primary driving topics in the committed real-hardware path.
 
 ```mermaid
 flowchart TD
-  PAD["Controller"] -->|"UDP 5010"| RX["connect_node"]
-  RX -->|"controller drive topics"| TELEOP["tele-op command adapter"]
-  TELEOP -->|"/cmd_vel/teleop"| MUX["drive_command_mux"]
-  GPS["RTK GPS"] --> LOC["new_kalman"]
-  IMU["IMU"] --> LOC
-  ZED["ZED camera"] -->|"/camera/points"| CM["costmap"]
+  PAD["Controller"] -->|"UDP 5010"| RX["controller_connect<br/>connect_node executable"]
+  RX -->|"/controller/drives/axes<br/>/controller/drives/buttons"| DRIVE["drivesnet<br/>usama_control_testing_node"]
+  DRIVE -->|"/cmd_vel/teleop"| MUX["drive_command_mux"]
+  DRIVE -->|"/cmd_vel/estop"| MUX
+  GPS["gps_rover"] -->|"/rtk/navsatfix_data"| LOC["new_kalman"]
+  ZED["zed_autonomy<br/>threaded executable"] -->|"/zed/pose"| LOC
+  ZED -->|"/camera/points<br/>/camera/ground_plane"| CM["costmap"]
+  ZED -->|"/camera/ground_plane"| LP["local_planner"]
   ZED -->|"/zed/image"| OD["object_detection"]
-  LOC -->|"global autonomy pose"| SM["state_machine"]
-  LOC --> CM
-  LOC --> LP["local_planner"]
-  LOC --> CTRL["controller"]
+  LOC -->|"/autonomy/pose/robot/global"| SM["state_machine"]
+  LOC -->|"/autonomy/pose/robot/global"| CM
+  LOC -->|"/autonomy/pose/robot/global"| LP
+  LOC -->|"/autonomy/pose/robot/global"| CTRL["controller"]
   SM -->|"/autonomy/target/local"| LP
-  OD -->|"target object position"| SM
-  OD --> CM
+  SM -->|"/autonomy/target_object/name"| OD
+  OD -->|"/autonomy/target_object/position"| SM
+  OD -->|"/autonomy/target_object/position"| CM
+  CTRL -->|"/autonomy/move/move_type"| CM
   CM -->|"/autonomy/costmap"| LP
   LP -->|"/autonomy/path/next_waypoint"| CTRL
   CTRL -->|"/cmd_vel/autonomy"| MUX
-  SAFE["source selection and estop"] --> MUX
-  MUX -->|"/cmd_vel"| BACKEND["shared RoverNet drive backend"]
-  BACKEND -->|"swerve targets"| MOT["Moteus motor controllers"]
-  MOT --> ROBOT["physical rover wheels and steering"]
+  MODE["active_source parameter<br/>or /cmd_vel/source"] --> MUX
+  MUX -->|"/cmd_vel"| DRIVE
+  DRIVE -->|"fdcanusb Moteus commands"| MOT["Moteus controllers"]
+  MOT --> ROBOT["physical drive and steer motors"]
 ```
 
 Gazebo replaces the three lowest hardware layers during simulation:

@@ -1,3 +1,6 @@
+import os
+from glob import glob
+
 from setuptools import setup
 
 package_name = "cmr_rovernet"
@@ -9,6 +12,7 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
+        (os.path.join("share", package_name, "config"), glob("config/*.toml")),
         (
             'share/' + package_name + '/launch',
             [
@@ -31,6 +35,7 @@ setup(
             "armnet_node = cmr_rovernet.armnet:main",
             # PHOBOS_APPEND
             'drivesnet_node = cmr_rovernet.drivesnet:main',
+            'drive_command_mux = cmr_rovernet.command_mux:main',
             'usama_control_testing_node = cmr_rovernet.usama_control_testing:ros_main',
             'steer_only_control_node = cmr_rovernet.steer_only_control:ros_main',
             'drive_only_control_node = cmr_rovernet.drive_only_control:ros_main',

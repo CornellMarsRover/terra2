@@ -14,7 +14,7 @@ class DrivesnetDiagnostic(Node):
 
         self.create_subscription(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             self.listener_button_callback,
             10,
         )

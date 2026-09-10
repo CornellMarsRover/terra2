@@ -3,6 +3,12 @@ import launch_ros.actions
 
 def generate_launch_description():
     return launch.LaunchDescription([
+        launch_ros.actions.Node(
+            package='cmr_rovernet',
+            executable='drive_command_mux',
+            name='drive_command_mux',
+            parameters=[{'active_source': 'autonomy'}],
+        ),
         # Start state_machine & object detection nodes first
         launch_ros.actions.Node(
             package='autonomous_navigation',
@@ -18,14 +24,6 @@ def generate_launch_description():
             output='screen',
             parameters=[{'real': False, 'use_sim_time': True}]
         ),
-        launch_ros.actions.Node(
-            package='autonomous_navigation',
-            executable='led_node',
-            name='led_node',
-            output='screen',
-            parameters=[{}]
-        ),
-
         # Start localization after state_machine starts
         launch.actions.TimerAction(
             period=1.0,
@@ -67,19 +65,6 @@ def generate_launch_description():
                 ),
             ],
         ),
-        launch.actions.TimerAction(
-            period=4.0,
-            actions=[
-                launch_ros.actions.Node(
-                    package='autonomous_navigation',
-                    executable='global_planner',
-                    name='global_planner',
-                    output='screen',
-                    parameters=[{'real': False}]
-                ),
-            ],
-        ),
-
         # Start controller after planner starts
         launch.actions.TimerAction(
             period=6.0,

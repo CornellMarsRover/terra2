@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import sys
-
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
@@ -9,8 +7,7 @@ from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-import os
-from ament_index_python.packages import get_package_share_directory
+from autonomous_navigation.target_contract import decode_target_request
 
 class ObjectDetectionNode(Node):
     def __init__(self):
@@ -24,13 +21,8 @@ class ObjectDetectionNode(Node):
         cell_size = self.get_parameter('tag_cell_size').value
         grid_size = self.get_parameter('tag_grid_size').value
         self.marker_length = cell_size * grid_size  # e.g. 0.10 m
-        model_path = os.path.join(
-            get_package_share_directory('autonomous_navigation'),
-            'best.pt'
-        )
-
-        # set to False if you want to read CameraInfo over the wire
-        self.real = True
+        self.declare_parameter('real', True)
+        self.real = self.get_parameter('real').value
 
         # state
         self.current_target_id = None
@@ -99,40 +91,34 @@ class ObjectDetectionNode(Node):
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(
             cv2.aruco.DICT_4X4_50
         )
-        self.aruco_params = cv2.aruco.DetectorParameters()
-        self.aruco_detector = cv2.aruco.ArucoDetector(
-            self.aruco_dict,
-            self.aruco_params
-        )
+        if hasattr(cv2.aruco, 'ArucoDetector'):
+            self.aruco_params = cv2.aruco.DetectorParameters()
+            self.aruco_detector = cv2.aruco.ArucoDetector(
+                self.aruco_dict, self.aruco_params
+            )
+        else:
+            self.aruco_params = cv2.aruco.DetectorParameters_create()
+            self.aruco_detector = None
 
-        self.object_ids = {
-            "ar1": 2,
-            "ar2": 2,
-            "ar3": 4,
-            "mallet": 5,
-            "bottle": 6
-        }
         self.mallet_pos = None
         self.bottle_pos = None
-        self.curr_id = 2
-        self.get_logger().info("Object Detection Node initialized ooga booga")
+        self.curr_id = None
+        self.get_logger().info("Object detection node initialized")
     def name_cb(self, msg: String):
-        name = msg.data
-        #self.get_logger().info(f"{name}")
+        try:
+            self.curr_id, name, marker_id = decode_target_request(msg.data)
+        except ValueError as exc:
+            self.get_logger().warn(str(exc))
+            return
         if name == 'coordinate':
             self.current_target_id = None
             self.target_found = False
             return
-        if name in self.object_ids:
-            self.curr_id = self.object_ids[name]
-        try:
-            # assume names like "ar1"
-            tid = int(name[-1])
-            #self.get_logger().info(f'New target requested: AR#{tid}')
-            self.current_target_id = tid
-            self.target_found = False
-        except ValueError:
-            self.get_logger().warn(f"Bad target name '{name}'")
+        if marker_id is None:
+            self.get_logger().warn(f"Unsupported visual target '{name}'")
+            return
+        self.current_target_id = marker_id
+        self.target_found = False
 
     def pose_cb(self, msg: TwistStamped):
         self.robot_x     = msg.twist.linear.x
@@ -152,15 +138,6 @@ class ObjectDetectionNode(Node):
         if self.current_target_id is None:
             return
 
-        '''# if we've already seen it once, just re-publish the last coords
-        if self.target_found:
-            out = Twist()
-            out.linear.x  = float(self.target_coordinates[0])
-            out.linear.y  = float(self.target_coordinates[1])
-            out.angular.z = 0.0
-            self.pub_target.publish(out)
-            return'''
-
         # need intrinsics
         if self.camera_matrix is None:
             self.get_logger().warn('No camera intrinsics yet.')
@@ -171,7 +148,12 @@ class ObjectDetectionNode(Node):
         gray   = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
 
         # detect all markers
-        corners, ids, _ = self.aruco_detector.detectMarkers(gray)
+        if self.aruco_detector is not None:
+            corners, ids, _ = self.aruco_detector.detectMarkers(gray)
+        else:
+            corners, ids, _ = cv2.aruco.detectMarkers(
+                gray, self.aruco_dict, parameters=self.aruco_params
+            )
         if ids is None or len(ids) == 0:
             return
 

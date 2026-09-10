@@ -2,10 +2,6 @@
 
 import rclpy
 from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-from message_filters import Subscriber, ApproximateTimeSynchronizer
-
-from sensor_msgs.msg import Image
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import TwistStamped
 from cmr_msgs.msg import GroundPlaneStamped
@@ -15,7 +11,23 @@ import math
 from collections import deque
 import heapq  # For priority queue in A*
 
-import rerun as rr
+from autonomous_navigation.planner_core import (
+    advance_path,
+    neighbor_cost,
+    nearest_clear_goal,
+    parse_costmap,
+    parse_planar_target,
+    path_is_dense,
+    record_segment_observation,
+    segment_traversable,
+    segment_cost,
+    simplify_path,
+)
+
+try:
+    import rerun as rr
+except ModuleNotFoundError:
+    rr = None
 
 class LocalPlannerNode(Node):
     def __init__(self):
@@ -26,7 +38,9 @@ class LocalPlannerNode(Node):
         self.declare_parameter('real', True)  # False if running sim
         self.real = self.get_parameter('real').get_parameter_value().bool_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
-        self.visualize = True
+        if self.visualize and rr is None:
+            self.get_logger().warning("Rerun is unavailable; planner visualization disabled.")
+            self.visualize = False
         
         # ------------------------------------
         # Tunable parameters for cost-based path planning
@@ -86,7 +100,6 @@ class LocalPlannerNode(Node):
         self.threshold = 4  
         
         self.cell_size = 0.25
-        self.k = 4
 
         # Path control
         self.current_path = deque()
@@ -95,12 +108,12 @@ class LocalPlannerNode(Node):
         self.waypoint_threshold = 0.3
         self.invalidation_count = 0
         self.invalidated_segments = dict()
+        self.path_hold = False
         # Timers
         self.path_check_timer = self.create_timer(0.5, self.validate_path)
         self.publish_waypoint_timer = self.create_timer(0.1, self.publish_waypoint)
         self.use_stanley = False
         
-        # For demonstration
         self.get_logger().info("Planner Node initialized")
         self.ground_plane = []
 
@@ -203,30 +216,20 @@ class LocalPlannerNode(Node):
         """
         Costmap callback – updates local costs and "obstacles".
         """
-        if len(msg.data) == 0:
-            return
-        self.costs = dict()
-        for i in range(0, len(msg.data), 3):
-            xx = msg.data[i]
-            yy = msg.data[i+1]
-            cost_val = msg.data[i+2]
-
-            if cost_val > self.threshold:
-                self.obstacles.add((xx, yy))
-            else:
-                if (xx, yy) in self.obstacles:
-                    self.obstacles.discard((xx, yy))
-
-            self.costs[(xx, yy)] = cost_val
+        try:
+            self.costs, self.obstacles = parse_costmap(msg.data, self.threshold)
+        except ValueError as error:
+            self.get_logger().error(f"Ignoring malformed costmap: {error}")
 
     def next_target_callback(self, msg):
         """
         Update the next target. If new, re-initialize path.
         """
-        if len(msg.data) == 3:
-            self.target_yaw = msg.data[2]
-
-        new_target = (msg.data[0], msg.data[1])
+        try:
+            new_target, self.target_yaw = parse_planar_target(msg.data)
+        except ValueError as error:
+            self.get_logger().error(f"Ignoring malformed target: {error}")
+            return
         if self.next_target != new_target:
             self.next_target = new_target
             self.current_path = deque()
@@ -243,16 +246,18 @@ class LocalPlannerNode(Node):
         self.yaw = msg.twist.angular.z
 
         if self.next_waypoint is not None:
-            dx = self.next_waypoint[0] - self.robot_position[0]
-            dy = self.next_waypoint[1] - self.robot_position[1]
-            distance = math.sqrt(dx**2 + dy**2)
-            if distance < self.waypoint_threshold:
+            path, waypoint, reached = advance_path(
+                self.robot_position,
+                self.next_target,
+                self.current_path,
+                self.next_waypoint,
+                self.waypoint_threshold,
+            )
+            if reached is not None:
                 self.invalidated_segments = dict()
-                if len(self.current_path) == 0:
-                    self.next_waypoint = self.next_target
-                else:
-                    self.next_waypoint = self.current_path[0]
-                    self.previous_points.append(self.current_path.popleft())
+                self.current_path = deque(path)
+                self.next_waypoint = waypoint
+                self.previous_points.append(reached)
     # -------------------------------------------------------------------------
     # Path Checking and Publishing
     # -------------------------------------------------------------------------
@@ -267,6 +272,7 @@ class LocalPlannerNode(Node):
         if not self.current_path or self.next_target is None:
             return
 
+        path_blocked = False
         # Build a list of points including the robot position at front
         path_points = [self.robot_position] + list(self.current_path)
 
@@ -276,11 +282,14 @@ class LocalPlannerNode(Node):
             end_pt = path_points[i + 1]
             max_cell, total = self.compute_segment_cost(start_pt, end_pt, gap=2)
 
-            #self.get_logger().info(f"Segment {i}: start={start_pt}, end={end_pt}, max_cell={max_cell}, total={total}")
 
             if max_cell > self.max_cell_threshold:
-                self.invalidated_segments[(i, i+1)] = 1 + self.invalidated_segments.get((i, i+1), 0)
-                if self.invalidated_segments[(i, i+1)] >= 3:
+                path_blocked = True
+                segment = (i, i + 1)
+                self.invalidated_segments, confirmed = record_segment_observation(
+                    self.invalidated_segments, segment, True
+                )
+                if confirmed:
                     self.get_logger().info(
                         f"Segment from {start_pt} to {end_pt} above threshold with cost {max_cell}. "
                         f"Re-planning from {start_pt} to final target."
@@ -313,13 +322,17 @@ class LocalPlannerNode(Node):
                     else:
                         self.current_path.append((self.next_target[0], self.next_target[1]))
                     break  # We only re-plan once per validation cycle
+            else:
+                self.invalidated_segments, _ = record_segment_observation(
+                    self.invalidated_segments, (i, i + 1), False
+                )
+        self.path_hold = path_blocked
 
 
     def publish_waypoint(self):
         """
         Publish the next waypoint plus a flag for using Stanley vs. pure pursuit.
         """
-        #self.get_logger().info("PUBLISHING WAYPOINT")
         if self.next_waypoint is None:
             if self.next_target is None:
                 return
@@ -328,40 +341,20 @@ class LocalPlannerNode(Node):
         if len(self.current_path) == 0 or self.current_path[-1] != self.next_target:
             self.current_path.append(self.next_target)
 
-        #self.get_logger().info(f"Waypoint: {self.next_waypoint}")
-        #self.get_logger().info(f"Current path: {self.current_path}")
         # Simple "dense" path heuristic
-        self.use_stanley = self.is_path_segment_dense()
+        self.use_stanley = path_is_dense(list(self.current_path))
 
         waypoint_msg = Float32MultiArray()
         #use_stanley_flag = 1.0 if self.use_stanley else 0.0
         use_stanley_flag = 1.0
+        commanded_waypoint = self.robot_position if self.path_hold else self.next_waypoint
         waypoint_msg.data = [
-            float(self.next_waypoint[0]),
-            float(self.next_waypoint[1]),
+            float(commanded_waypoint[0]),
+            float(commanded_waypoint[1]),
             float(use_stanley_flag),
             float(len(self.current_path))
         ]
         self.next_waypoint_publisher.publish(waypoint_msg)
-
-    def is_path_segment_dense(self):
-        """
-        Example heuristic: if at least 3 consecutive points are within 1m, label it "dense".
-        """
-        path_list = list(self.current_path)
-        if len(path_list) < 3:
-            return False
-        
-        distance_threshold = 1.0
-        for i in range(len(path_list) - 2):
-            p1 = path_list[i]
-            p2 = path_list[i + 1]
-            p3 = path_list[i + 2]
-            d12 = math.dist(p1, p2)
-            d23 = math.dist(p2, p3)
-            if d12 < distance_threshold and d23 < distance_threshold:
-                return True
-        return False
 
     # -------------------------------------------------------------------------
     # Cost-Based Segment Check
@@ -371,22 +364,7 @@ class LocalPlannerNode(Node):
         Get cost of neighboring diagonals. 
         'n' is the expansion in each direction, in 0.25m steps.
         """
-        cost = 0
-        for x in range(-n, n, 1):
-            for y in range(-n, n, 1):
-                if x == 0 and y == 0:
-                    continue
-                x1 = rx + (x * 0.25)
-                y1 = ry + (y * 0.25)
-                d = math.sqrt(((x * 0.25) ** 2) + ((y * 0.25) ** 2))
-                if d < 1e-6:
-                    continue
-                co = self.costs.get((x1, y1), 0.0)
-                if co == 1:
-                    co = 0
-                c = co * (weight / d)
-                cost += c
-        return cost
+        return weight * neighbor_cost(self.costs, (rx, ry), self.cell_size, n)
     
     def compute_segment_cost(self, start, end, gap=4):
         """
@@ -394,36 +372,7 @@ class LocalPlannerNode(Node):
         the maximum local cost among all sample points plus neighbors, 
         and also sum the total cost for logging/analysis.
         """
-        dx = end[0] - start[0]
-        dy = end[1] - start[1]
-        distance = math.sqrt(dx**2 + dy**2)
-
-        # If there's effectively no length, treat as zero cost
-        if distance < 1e-6:
-            return (0.0, 0.0)
-
-        # Number of sample points
-        n = max(1, int(round(distance / (self.cell_size * 2))))
-        total_cost = 0.0
-        max_cost = 0.0
-        for i in range(n + 1):
-            t = i / n
-            sx = start[0] + t * dx
-            sy = start[1] + t * dy
-            
-            # Snap to nearest 0.25 for dictionary lookup
-            rx = round(sx * 4) / 4.0
-            ry = round(sy * 4) / 4.0
-
-            # Retrieve cost
-            c = self.costs.get((rx, ry), 0.0)
-            c2 = self.get_neighbor_costs(rx, ry, 1, gap)
-            total_here = c + c2
-
-            total_cost += total_here
-            max_cost = max(max_cost, total_here)
-
-        return max_cost, total_cost
+        return segment_cost(self.costs, start, end, self.cell_size, gap)
 
     # -------------------------------------------------------------------------
     # A* Path Planning (with length + cost)
@@ -452,22 +401,13 @@ class LocalPlannerNode(Node):
         y_vals = np.arange(min_y, max_y + step_size, step_size)
 
         goal = tuple(self.next_target)
-        # Clamp goal
-        gx = max(min(goal[0], max_x), min_x)
-        gy = max(min(goal[1], max_y), min_y)
-        cost = self.get_neighbor_costs(gx,gy,1,3)
-        #self.get_logger().info(f"Original goal: {gx},{gy} with cost: {cost}")
-        # Find a local goal without high cost
-        while (cost > self.max_cell_threshold*2):
-            x_rand = np.random.default_rng() - 1.0
-            y_rand = np.random.default_rng() - 1.0
-            dx = round(x_rand * self.k) / self.k
-            dy = round(y_rand * self.k) / self.k
-            gx += dx
-            gy += dy
-            cost = self.get_neighbor_costs(gx,gy,1,3)
-        #self.get_logger().info(f"Goal adjusted to: {gx},{gy} with cost: {cost}")
-        goal_clamped = (gx, gy)
+        goal_clamped = nearest_clear_goal(
+            goal,
+            (min_x, max_x, min_y, max_y),
+            lambda point: self.get_neighbor_costs(*point, 1, 3)
+            > self.max_cell_threshold * 2,
+            step_size,
+        )
 
         def get_index(xc, yc):
             i = int(round((xc - min_x) / step_size))
@@ -525,8 +465,8 @@ class LocalPlannerNode(Node):
 
                 nbr_coords = get_coords(ni, nj)
                 seg_cost, _ = self.compute_segment_cost(cur_coords, nbr_coords, gap=gap)
-                # If segment is "invalid", skip – in this example, if seg_cost is None, or we can skip
-                # if seg_cost > some threshold, depending on your usage. We'll just incorporate seg_cost directly:
+                if not segment_traversable(seg_cost, self.max_cell_threshold):
+                    continue
                 step_distance = math.dist(cur_coords, nbr_coords)
                 travel_cost = (self.distance_weight * step_distance) \
                               + (self.cost_weight * seg_cost)
@@ -586,67 +526,16 @@ class LocalPlannerNode(Node):
 
         # We'll do RDP with a chosen epsilon (tunable)
         epsilon = 0.3
-        smoothed = self.rdp_simplify(path_list, epsilon)
+        smoothed = simplify_path(path_list, epsilon)
         self.current_path = deque(smoothed)
 
         if len(self.current_path) > 0:
             self.next_waypoint = self.current_path[0]
 
-    def rdp_simplify(self, points, epsilon):
-        """
-        A basic Ramer-Douglas-Peucker line simplification.
-        'points' is a list of (x, y).
-        'epsilon' is distance threshold. Smaller -> keep more points.
-        """
-        if len(points) < 3:
-            return points
-
-        # Find the farthest point from the line formed by first and last
-        first = points[0]
-        last = points[-1]
-
-        max_dist = 0.0
-        index = 0
-        for i in range(1, len(points) - 1):
-            dist = self.perp_dist(points[i], first, last)
-            if dist > max_dist:
-                index = i
-                max_dist = dist
-
-        # If max distance is greater than epsilon, recursively simplify
-        if max_dist > epsilon:
-            left_part = self.rdp_simplify(points[: index+1], epsilon)
-            right_part = self.rdp_simplify(points[index:], epsilon)
-
-            # Combine, removing the repeated middle point
-            return left_part[:-1] + right_part
-        else:
-            # All points are close to a straight line from first to last
-            return [first, last]
-
-    @staticmethod
-    def perp_dist(point, line_start, line_end):
-        """
-        Perpendicular distance of `point` to the line formed by `line_start -> line_end`.
-        """
-        (x0, y0) = point
-        (x1, y1) = line_start
-        (x2, y2) = line_end
-
-        if (x1, y1) == (x2, y2):
-            # line_start and line_end are the same
-            return math.dist(point, line_start)
-
-        # Formula for distance from point to line
-        num = abs((y2 - y1)*x0 - (x2 - x1)*y0 + x2*y1 - y2*x1)
-        den = math.sqrt((y2 - y1)**2 + (x2 - x1)**2)
-        return num / den
 
 def main(args=None):
     rclpy.init(args=args)
     node = LocalPlannerNode()
-    executor = MultiThreadedExecutor(num_threads=4)
-    executor.add_node(node)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

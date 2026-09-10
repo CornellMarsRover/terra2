@@ -132,13 +132,13 @@ class DriveOnlyControlNode(Node):
 
         self.create_subscription(
             TwistStamped,
-            "/drives_controller/cmd_vel",
+            "/controller/drives/axes",
             self._controller_cmd_vel_cb,
             10,
         )
         self.create_subscription(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             self._controller_buttons_cb,
             10,
         )

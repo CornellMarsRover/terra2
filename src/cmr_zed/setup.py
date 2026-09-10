@@ -26,7 +26,7 @@ setup(
             'zed_publisher_node = cmr_zed.zed_camera_publisher:main',
             'zed_autonomy = cmr_zed.zed_autonomy:main',
             'threaded = cmr_zed.threaded:main',
-            'test_detection = cmr_zed.test_detection:main',
+            'test_detection = cmr_zed.detection_node:main',
         ],
     },
 )

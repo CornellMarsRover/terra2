@@ -20,6 +20,7 @@ def load_ee_control_module():
 
     repo_root = Path(__file__).resolve().parents[3]
     script_path = repo_root / "local_(no ROS)base_station_scripts" / "ee_control.py"
+    sys.path.insert(0, str(script_path.parent))
     spec = importlib.util.spec_from_file_location("ee_control_for_test", script_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

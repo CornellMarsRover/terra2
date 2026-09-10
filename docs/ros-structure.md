@@ -6,7 +6,7 @@ primary driving topics in the committed real-hardware path.
 
 ```mermaid
 flowchart TD
-  PAD["Controller"] -->|"UDP 5010"| RX["controller_connect<br/>connect_node executable"]
+  PAD["Controller"] -->|"UDP 5010 or 5005"| RX["controller_connect<br/>connect_node executable"]
   RX -->|"/controller/drives/axes<br/>/controller/drives/buttons"| DRIVE["drivesnet<br/>usama_control_testing_node"]
   DRIVE -->|"/cmd_vel/teleop"| MUX["drive_command_mux"]
   DRIVE -->|"/cmd_vel/estop"| MUX
@@ -33,22 +33,30 @@ flowchart TD
   MOT --> ROBOT["physical drive and steer motors"]
 ```
 
-Gazebo replaces the three lowest hardware layers during simulation:
-`/cmd_vel -> Gazebo drive adapter -> Gazebo rover -> odometry pose adapter`.
+`drivesnet` is intentionally shown on both sides of the mux because one node
+both converts controller input and sends the selected command to Moteus.
+
+## Simulation boundary
+
+The committed `sim_autonomy.launch.py` starts the mux and autonomy nodes, not
+Gazebo or a drive adapter. Its `localization_sim` input contract is `/gps_exact`,
+`/navsatfix`, and `/imu`; an external simulator must provide those inputs and
+consume `/cmd_vel`.
 
 ## Drive contract
 
 | Topic | Type | Owner |
 | --- | --- | --- |
-| `/cmd_vel/teleop` | `cmr_msgs/DriveCommand` | manual adapter |
-| `/cmd_vel/autonomy` | `cmr_msgs/DriveCommand` | autonomy controller |
-| `/cmd_vel/source` | `std_msgs/String` | operator/launch mode |
-| `/cmd_vel/estop` | `std_msgs/Bool` | safety inputs |
+| `/cmd_vel/teleop` | `cmr_msgs/DriveCommand` | `drivesnet` |
+| `/cmd_vel/autonomy` | `cmr_msgs/DriveCommand` | `controller` |
+| `/cmd_vel/source` | `std_msgs/String` | operator tooling |
+| `/cmd_vel/estop` | `std_msgs/Bool` | `drivesnet` |
 | `/cmd_vel` | `cmr_msgs/DriveCommand` | mux only; backend input |
 
 `DriveCommand` carries normalized `vx`, `vy`, and `omega`, plus signed
 `speed_rps`. The mux invalidates buffered commands on source changes, enforces a
-0.5-second timeout, latches estop, and publishes zeros when motion is unsafe.
+0.5-second timeout, and publishes zeros while estop is asserted or a command is
+stale.
 
 ## Other domains
 

@@ -1,13 +1,13 @@
 # ROS structure
 
-This graph shows the canonical runtime path. Labels are ROS topics; boxes are
-nodes or external systems. Dashed edges are simulation boundary adapters.
+Read this graph from top to bottom. Operator and sensor inputs are furthest from
+the rover; the physical wheels and steering are the lowest layer.
 
 ```mermaid
-flowchart LR
+flowchart TD
   PAD["Controller"] -->|"UDP 5010"| RX["connect_node"]
-  RX -->|"controller drive topics"| DRIVE["drivesnet adapter/backend"]
-  DRIVE -->|"/cmd_vel/teleop"| MUX["drive_command_mux"]
+  RX -->|"controller drive topics"| TELEOP["tele-op command adapter"]
+  TELEOP -->|"/cmd_vel/teleop"| MUX["drive_command_mux"]
   GPS["RTK GPS"] --> LOC["new_kalman"]
   IMU["IMU"] --> LOC
   ZED["ZED camera"] -->|"/camera/points"| CM["costmap"]
@@ -23,16 +23,13 @@ flowchart LR
   LP -->|"/autonomy/path/next_waypoint"| CTRL
   CTRL -->|"/cmd_vel/autonomy"| MUX
   SAFE["source selection and estop"] --> MUX
-  MUX -->|"/cmd_vel"| DRIVE
-  DRIVE -->|"swerve targets"| MOT["Moteus drive and steer motors"]
-  GZ["Gazebo"] -.-> POSE["pose adapter"]
-  POSE -.-> SM
-  POSE -.-> CM
-  POSE -.-> LP
-  POSE -.-> CTRL
-  MUX -.-> GB["Gazebo drive adapter"]
-  GB -.-> GZ
+  MUX -->|"/cmd_vel"| BACKEND["shared RoverNet drive backend"]
+  BACKEND -->|"swerve targets"| MOT["Moteus motor controllers"]
+  MOT --> ROBOT["physical rover wheels and steering"]
 ```
+
+Gazebo replaces the three lowest hardware layers during simulation:
+`/cmd_vel -> Gazebo drive adapter -> Gazebo rover -> odometry pose adapter`.
 
 ## Drive contract
 

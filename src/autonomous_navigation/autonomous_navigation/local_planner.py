@@ -282,6 +282,7 @@ class LocalPlannerNode(Node):
             start_pt = path_points[i]
             end_pt = path_points[i + 1]
             max_cell, total = self.compute_segment_cost(start_pt, end_pt, gap=4)
+            occupied_cell, _ = self.compute_segment_cost(start_pt, end_pt, gap=0)
 
 
             blocked = not transition_traversable(
@@ -289,7 +290,12 @@ class LocalPlannerNode(Node):
                 self.max_cell_threshold,
             )
             if blocked:
-                current_segment_blocked = current_segment_blocked or i == 0
+                current_segment_blocked = current_segment_blocked or (
+                    i == 0
+                    and not segment_traversable(
+                        occupied_cell, self.max_cell_threshold
+                    )
+                )
                 segment = (i, i + 1)
                 self.invalidated_segments, confirmed = record_segment_observation(
                     self.invalidated_segments, segment, True

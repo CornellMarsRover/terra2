@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "cmr_fabric/lifecycle_client.hpp"
 #include "cmr_fabric/lifecycle_helpers.hpp"
 #include "cmr_fabric/lifecycle_servers.hpp"
@@ -124,6 +126,11 @@ class FabricNode : public rclcpp_lifecycle::LifecycleNode
         m_recover_fault_client;
 
     bool m_processing_fault = false;
+
+    std::atomic<bool> m_error_transition_pending = false;
+    rclcpp::TimerBase::SharedPtr m_error_transition_timer;
+
+    void perform_error_transition();
 
   public:
     explicit FabricNode(const std::optional<FabricNodeConfig>& config = std::nullopt,

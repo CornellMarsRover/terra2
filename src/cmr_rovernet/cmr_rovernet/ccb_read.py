@@ -7,7 +7,7 @@ from cmr_rovernet.rovernet_utils import *
 
 class CCBReadPublisher(Node):
     """
-    This node subscribes to the /drives_controller/cmd_vel topic output by the 
+    This node subscribes to the /controller/drives/axes topic output by the
     drivescontroller node. It will then convert the output to a pre-defined 40-byte 
     format and send the output to the CCB via UART. 
     """
@@ -134,7 +134,6 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
 
 
 

@@ -1,7 +1,7 @@
-# Terra
+# Terra2
 [![Build and test](https://github.com/CornellMarsRover/terra2/actions/workflows/build-test.yaml/badge.svg?branch=main)](https://github.com/CornellMarsRover/terra2/actions/workflows/build-test.yaml)
 
-Terra contains all the code that is part of a ROS codebase and implements the brains of our devices. This main branch contains the current fully integrated and tested functionality for the rover.
+Terra2 contains all the code that is part of a ROS codebase and implements the brains of our devices. This main branch contains the current fully integrated and tested functionality for the rover.
 
 ## Current Functionality
 
@@ -107,9 +107,110 @@ A smoke test (build, launch, check topics/rates, call a service) is at
 [`src/astrotech_rover/scripts/smoke_test.sh`](./src/astrotech_rover/scripts/smoke_test.sh); run from the repo root
 on a ROS 2 Humble machine.
 
+## Driving Quick Start
+
+Run these short commands from the repository root. Use `./run help` at any time.
+
+| Command | Run it on | Purpose |
+| --- | --- | --- |
+| `./run setup` | Jetson or dev container | Install ROS dependencies once |
+| `./run build` | Jetson or dev container | Build drive and autonomy packages |
+| `./run teleop` | Jetson | Receive UDP input and drive the rover |
+| `./run controller` | Controller laptop | Send DualSense input to the rover |
+| `./run auto` | Jetson | Start hardware autonomy and shared rover driving |
+| `./run sim` | Dev container | Start autonomy in simulated-input mode |
+| `./run test` | Laptop or dev container | Run focused autonomy tests |
+
+### First Build
+
+Run `./run setup` once after cloning. Run `./run build` after setup, switching branches, or changing ROS packages.
+The launcher sources ROS 2 Humble and the workspace automatically. For tests,
+install missing tools with `python3 -m pip install coverage pytest`.
+
+### Hardware Tele-op
+
+On the controller laptop, run `./run controller setup` once.
+
+1. On the Jetson, run `./run teleop`.
+2. Connect the DualSense to the laptop.
+3. On the laptop, run `./run controller`.
+
+Use `./run controller --list-controllers` to list controller IDs, then select one
+with `./run controller --controller-serial SERIAL`. The tele-op shortcut
+explicitly disables arm startup; it does not change any controller mappings.
+
+### Hardware Autonomy
+
+Run `./run auto` on the Jetson. This starts localization, perception, planning,
+the controller, and the same RoverNet motor path used by tele-op. The controller
+starts after the launch file's existing 30-second safety delay.
+
+### Simulation
+
+Run `./run sim` in the dev container. This starts the autonomy nodes in their
+simulated-input mode, but it does not start Gazebo. Full Gazebo tooling remains
+isolated on the `gazebo_sim` branch.
+
+## Architecture Maps
+
+- [Codebase map](docs/codebase-map.md)
+- [ROS node and topic structure](docs/ros-structure.md)
+- [Autonomy architecture](docs/autonomy-architecture.md)
+
+## Autonomy Testing Status
+
+The `autonomy_fall2026` drive path uses these topics:
+
+- `/controller/drives/axes` and `/controller/drives/buttons`: raw controller data
+- `/cmd_vel/teleop`: converted manual `cmr_msgs/DriveCommand`
+- `/cmd_vel/autonomy`: waypoint controller `cmr_msgs/DriveCommand`
+- `/cmd_vel`: the only selected command accepted by the drive backend
+
+`/cmd_vel` is reserved for drive commands. The legacy arm IK keyboard utilities
+must be remapped before running in the same ROS domain because they use `Twist`.
+
+The command mux enforces a 0.5-second input timeout and `/cmd_vel/estop`. Launch
+mode selects the initial source; switch a running mux with:
+
+```bash
+ros2 topic pub --once /cmd_vel/source std_msgs/msg/String '{data: autonomy}'
+```
+
+Run the focused tests from the repository root in the CMR development image:
+
+```bash
+bash scripts/test_autonomy.sh
+```
+
+CI enforces 100% line and branch coverage for the drive-command mapping and
+the extracted planner, costmap, and state-machine decisions. ROS adapter nodes
+still require integration coverage.
+
+Software-only safeguards covered by this gate include deterministic selection
+of a clear local goal, consecutive-frame path invalidation, and stopping inside
+the configurable `waypoint_tolerance`. Static analysis is incremental: only C++
+files changed by a commit or pull request are formatted and checked with
+`clang-tidy`.
+
+### Autonomy Test Roadmap
+
+With Gazebo, the drive mux, and its bridge running, use
+`scripts/check_drive_sim.sh` to compare both sources and verify estop motion.
+
+- [x] Unit-test normalized forward, steering, point-turn, and stop commands.
+- [x] Build `cmr_msgs`, `cmr_rovernet`, and `autonomous_navigation` on Humble.
+- [x] Extract planner, costmap, and state-machine decisions into pure modules.
+- [x] Add deterministic tests for waypoint completion and replanning failures.
+- [x] Run incremental C++ formatting and static analysis in CI.
+- [ ] Add recorded camera, point-cloud, GPS, and IMU fixture datasets.
+- [ ] Add Gazebo collision, blocked-path, sensor-dropout, and timeout tests.
+- [ ] Verify manual override, autonomy timeout, estop, and Moteus watchdog behavior.
+- [ ] Run repeatable Jetson hardware-in-the-loop tests with wheels lifted first.
+- [ ] Expand the coverage gate as each ROS node gains a testable core.
+
 ## TODO Functionality
 
-- **Autonomous Navigation:** [cmr_navigation](./src/cmr_navigation/)
+- **Autonomous Navigation:** [autonomous_navigation](./src/autonomous_navigation/)
 - **GPS Functionality** (inside of cmr_navigation in old main, gps.py)
 - **Arm Autonomy**
 - **ArUco Tag Detection**

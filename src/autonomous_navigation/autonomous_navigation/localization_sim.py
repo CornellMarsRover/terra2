@@ -7,7 +7,6 @@ from sensor_msgs.msg import NavSatFix, Imu
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import TwistStamped
 
-from tf2_ros import TransformBroadcaster
 from tf_transformations import euler_from_quaternion
 
 import math
@@ -50,7 +49,6 @@ class LocalizationSim(Node):
         # Pose in format [linear.x = d_north (m), linear.y = d_west(m), angular.z = yaw (rad)]
         self.pose_publisher = self.create_publisher(TwistStamped, '/autonomy/pose/robot/global', 10)
         self.velocity_publisher = self.create_publisher(Float32MultiArray, '/autonomy/velocity', 10)
-        self.tf_broadcaster = TransformBroadcaster(self)
 
         # Subscriptions
         self.create_subscription(NavSatFix, '/gps_exact', self.gps_odom_callback, 10)
@@ -61,7 +59,7 @@ class LocalizationSim(Node):
         self.kalman_timer = self.create_timer(1.0 / 10.0, self.run_kalman_filter)  # 10 Hz
 
         # Data from sensors
-        self.gps_measurement = np.array([0.0, 0.0])
+        self.gps_measurement = None
         self.imu_delta_position = [0.0, 0.0]
         self.imu_velocity = [0.0, 0.0, 0.0]  # [v_north, v_west, omega_z]
         self.yaw = 0.0 # Current yaw in radians
@@ -86,6 +84,9 @@ class LocalizationSim(Node):
         """
         Updates the GPS measurement for the Kalman filter.
         """
+        if not math.isfinite(msg.latitude) or not math.isfinite(msg.longitude):
+            self.get_logger().error("Ignoring non-finite simulated GPS fix")
+            return
         if self.initial_lat is None or self.initial_lon is None:
             self.initial_lat = msg.latitude
             self.initial_lon = msg.longitude
@@ -180,9 +181,11 @@ class LocalizationSim(Node):
         """
         Publishes the fused pose and velocity.
         """
+        if self.gps_measurement is None:
+            return
         pose_msg = TwistStamped()
-        pose_msg.twist.linear.x = self.gps_measurement[0]
-        pose_msg.twist.linear.y = self.gps_measurement[1]
+        pose_msg.twist.linear.x = self.state[0]
+        pose_msg.twist.linear.y = self.state[1]
         pose_msg.twist.angular.z = self.yaw
         pose_msg.header.stamp = self.get_clock().now().to_msg()  # Get current time
         self.pose_publisher.publish(pose_msg)
@@ -217,68 +220,6 @@ class LocalizationSim(Node):
         delta_north = delta_lat * R
         delta_east = delta_lon * R * math.cos(mean_lat)
         return delta_north, -delta_east  # West is negative east
-
-    def quaternion_from_yaw(self, yaw):
-        """
-        Converts yaw angle to a quaternion.
-        """
-        return [0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0)]
-
-    '''
-    def publish_odom_to_base_link_transform(self):
-        """
-        Publishes the odom -> base_link transform based on odometry data.
-        """
-        delta_north = self.current_odom_position[0] - self.last_odom_position[0]
-        delta_west = self.current_odom_position[1] - self.last_odom_position[1]
-        delta_yaw = self.current_odom_yaw - self.last_odom_yaw
-
-        # Update last position
-        self.last_odom_position = self.current_odom_position
-
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'odom'
-        t.child_frame_id = 'base_link'
-        t.transform.translation.x = delta_north
-        t.transform.translation.y = delta_west
-        t.transform.translation.z = 0.0
-
-        q = self.quaternion_from_yaw(delta_yaw)
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
-
-        self.tf_broadcaster.sendTransform(t)
-
-    def publish_map_to_odom_transform(self):
-        """
-        Publishes the map -> odom transform based on localization data.
-        """
-        delta_north = self.current_map_position[0] - self.last_map_position[0]
-        delta_west = self.current_map_position[1] - self.last_map_position[1]
-        delta_yaw = self.current_map_yaw - self.last_map_yaw
-
-        # Update last position
-        self.last_map_position = self.current_map_position
-
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'map'
-        t.child_frame_id = 'odom'
-        t.transform.translation.x = delta_north
-        t.transform.translation.y = delta_west
-        t.transform.translation.z = 0.0
-
-        q = self.quaternion_from_yaw(delta_yaw)
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
-
-        self.tf_broadcaster.sendTransform(t)
-    '''
 
 def main(args=None):
     rclpy.init(args=args)

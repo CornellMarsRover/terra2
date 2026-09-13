@@ -20,6 +20,7 @@ from autonomous_navigation.planner_core import (
     path_is_dense,
     record_segment_observation,
     segment_traversable,
+    transition_traversable,
     segment_cost,
     simplify_path,
 )
@@ -272,7 +273,7 @@ class LocalPlannerNode(Node):
         if not self.current_path or self.next_target is None:
             return
 
-        path_blocked = False
+        current_segment_blocked = False
         # Build a list of points including the robot position at front
         path_points = [self.robot_position] + list(self.current_path)
 
@@ -280,11 +281,15 @@ class LocalPlannerNode(Node):
         for i in range(len(path_points) - 1):
             start_pt = path_points[i]
             end_pt = path_points[i + 1]
-            max_cell, total = self.compute_segment_cost(start_pt, end_pt, gap=2)
+            max_cell, total = self.compute_segment_cost(start_pt, end_pt, gap=4)
 
 
-            if max_cell > self.max_cell_threshold:
-                path_blocked = True
+            blocked = not transition_traversable(
+                max_cell, self.point_risk(start_pt), self.point_risk(end_pt),
+                self.max_cell_threshold,
+            )
+            if blocked:
+                current_segment_blocked = current_segment_blocked or i == 0
                 segment = (i, i + 1)
                 self.invalidated_segments, confirmed = record_segment_observation(
                     self.invalidated_segments, segment, True
@@ -326,7 +331,7 @@ class LocalPlannerNode(Node):
                 self.invalidated_segments, _ = record_segment_observation(
                     self.invalidated_segments, (i, i + 1), False
                 )
-        self.path_hold = path_blocked
+        self.path_hold = current_segment_blocked
 
 
     def publish_waypoint(self):
@@ -366,6 +371,11 @@ class LocalPlannerNode(Node):
         """
         return weight * neighbor_cost(self.costs, (rx, ry), self.cell_size, n)
     
+    def point_risk(self, point, gap=4):
+        """Return occupied-cell plus neighboring inflation risk at a point."""
+        cell = tuple(round(value / self.cell_size) * self.cell_size for value in point)
+        return self.costs.get(cell, 0.0) + self.get_neighbor_costs(*cell, 1, gap)
+
     def compute_segment_cost(self, start, end, gap=4):
         """
         Sample points along the line segment from `start` to `end` and compute
@@ -377,7 +387,7 @@ class LocalPlannerNode(Node):
     # -------------------------------------------------------------------------
     # A* Path Planning (with length + cost)
     # -------------------------------------------------------------------------
-    def compute_path(self, gap=3):
+    def compute_path(self, gap=4):
         """
         Run an A* search within a local region around the robot. 
         Each neighbor transition cost is a weighted combination of 
@@ -465,7 +475,10 @@ class LocalPlannerNode(Node):
 
                 nbr_coords = get_coords(ni, nj)
                 seg_cost, _ = self.compute_segment_cost(cur_coords, nbr_coords, gap=gap)
-                if not segment_traversable(seg_cost, self.max_cell_threshold):
+                if not transition_traversable(
+                    seg_cost, self.point_risk(cur_coords, gap),
+                    self.point_risk(nbr_coords, gap), self.max_cell_threshold,
+                ):
                     continue
                 step_distance = math.dist(cur_coords, nbr_coords)
                 travel_cost = (self.distance_weight * step_distance) \
@@ -527,6 +540,17 @@ class LocalPlannerNode(Node):
         # We'll do RDP with a chosen epsilon (tunable)
         epsilon = 0.3
         smoothed = simplify_path(path_list, epsilon)
+        candidate = [self.robot_position] + smoothed
+        safe = all(
+            segment_traversable(
+                self.compute_segment_cost(start, end, gap=4)[0],
+                self.max_cell_threshold,
+            )
+            for start, end in zip(candidate, candidate[1:])
+        )
+        if not safe:
+            self.get_logger().info("Keeping dense path: smoothed path is blocked")
+            return
         self.current_path = deque(smoothed)
 
         if len(self.current_path) > 0:

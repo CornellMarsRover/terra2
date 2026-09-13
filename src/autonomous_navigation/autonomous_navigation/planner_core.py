@@ -153,6 +153,15 @@ def segment_traversable(maximum_cost: float, threshold: float) -> bool:
     return math.isfinite(maximum_cost) and maximum_cost <= threshold
 
 
+def transition_traversable(maximum_cost, start_risk, end_risk, threshold):
+    """Allow safe motion or a strict risk-reducing escape from inflation."""
+    return segment_traversable(maximum_cost, threshold) or (
+        all(map(math.isfinite, (start_risk, end_risk)))
+        and start_risk > threshold
+        and end_risk < start_risk
+    )
+
+
 def segment_cost(
     costs,
     start: Point,

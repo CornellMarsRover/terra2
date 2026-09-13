@@ -11,6 +11,7 @@ from autonomous_navigation.planner_core import (
     record_segment_observation,
     segment_cost,
     segment_traversable,
+    transition_traversable,
     simplify_path,
 )
 
@@ -168,3 +169,10 @@ def test_segment_traversability_enforces_threshold_and_finite_cost():
     assert segment_traversable(20, 20)
     assert not segment_traversable(20.01, 20)
     assert not segment_traversable(float("nan"), 20)
+
+
+def test_transition_traversability_allows_only_safe_or_decreasing_risk():
+    assert transition_traversable(10, 30, 40, 20)
+    assert transition_traversable(30, 40, 30, 20)
+    assert not transition_traversable(30, 40, 40, 20)
+    assert not transition_traversable(30, 30, 40, 20)

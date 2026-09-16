@@ -164,9 +164,7 @@ workflow runs `setup`, `check`, and `demo` through the same `./sim` interface.
 GitHub requires the workflow on the default branch and write access for the Run
 button. Other developers can fork the repository and enable Actions in the fork.
 
-`object_detection` also receives the simulated RGB/depth camera topics, but it
-identifies requested ArUco mission targets. Collision avoidance itself uses the
-physical depth point cloud and production costmap shown above.
+## Known limitations
 
 ## Acceptance result
 

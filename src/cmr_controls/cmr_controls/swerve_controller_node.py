@@ -1,20 +1,12 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import Twist
-from cmr_msgs.msg import AutonomyDrive
-from std_msgs.msg import String
+from cmr_msgs.msg import DriveCommand
 
 import asyncio
 import math
 import moteus
-import yaml
-import os
-import time
-import math
 
-L = 0.83 # wheelbase, distance between front and back wheels (m)
-W = 0.83 # wheeltrack, width/distance between left and right wheels (m)
 WHEEL_RADIUS = 0.127 # m
 WHEEL_CIRCUMFERENCE = WHEEL_RADIUS*2*math.pi
 SWERVE_RATIO = 50 # Swerve gearbox ratio
@@ -45,44 +37,15 @@ class SwerveControllerNode(Node):
                           3 : "FR_DRIVE",
                           4  : "BR_DRIVE"}
 
-        # Autonomy drive command subscriptions
         self.subscription = self.create_subscription(
-            Twist,
-            '/autonomy/move/point_turn',
-            self.point_turn_callback,
-            10
-        )
-        self.subscription = self.create_subscription(
-            AutonomyDrive,
-            '/autonomy/move/ackerman',
-            self.ackerman_callback,
-            10
-        )
-        self.subscription = self.create_subscription(
-            String,
-            '/autonomy/move/move_type',
-            self.update_move_type,
-            10
-        )
-        self.subscription = self.create_subscription(
-            Twist,
-            '/cmd_vel_drives',
+            DriveCommand,
+            '/cmd_vel',
             self.cmd_vel_callback,
             10
         )
 
-        self.move_type = 'ackerman'
-
-        self.pt_turn_constants = {
-            'wa1': (-45.0/360) * SWERVE_RATIO,
-            'wa2': (45.0/360) * SWERVE_RATIO,
-            'wa3': (-45.0/360) * SWERVE_RATIO,
-            'wa4': (45.0/360) * SWERVE_RATIO
-        }
-        
         self.transport = None
         self.servos = None
-        self.last_move = 'ackerman'
         self.loop = asyncio.get_event_loop()
 
         self.loop.run_until_complete(self.__async_initialize_moteus())
@@ -93,78 +56,11 @@ class SwerveControllerNode(Node):
         """
         Regular command velocity callback
         """
-        s1, s2, s3, s4, a1, a2, a3, a4 = self.wheelAnglesAndSpeeds(msg.linear.x, msg.linear.y, msg.angular.z, 1.0, 1.0)
+        scale = msg.speed_rps * WHEEL_CIRCUMFERENCE / DRIVE_RATIO
+        s1, s2, s3, s4, a1, a2, a3, a4 = self.wheelAnglesAndSpeeds(
+            msg.vx * scale, msg.vy * scale, msg.omega * scale, 1.0, 1.0)
         self.set_drive(s1, s2, s3, s4, a1, a2, a3, a4)
 
-    def update_move_type(self, msg):
-        """
-        Update move type from autonomy controller
-        """
-        self.move_type = msg.data
-
-    def point_turn_callback(self, msg):
-        """
-        Point turn drive command, sets wheel angles to 45 degrees
-        and computes velocities to achieve desired rate of rotation
-        """
-        #if self.move_type == 'ackerman':
-        #    return
-        #self.get_logger().info(f"POINT TURN COMMAND {msg.angular.z}")
-        if msg.angular.z == 0.0 and self.last_move == 'ackerman':
-            self.stop_wheels()
-            self.last_move = 'point_turn'
-            return
-        
-        r = math.sqrt(((L/2)**2)+((W/2)**2))
-        v = ((msg.angular.z*r)/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
-        
-        self.set_drive(v,v,v,v,
-                       self.pt_turn_constants['wa1'],
-                       self.pt_turn_constants['wa2'],
-                       self.pt_turn_constants['wa3'],
-                       self.pt_turn_constants['wa4'])
-
-
-    def ackerman_callback(self, msg):
-        '''
-        Ackerman drive command that sets wheel positions directly
-        Values are reversed so the rover drives backwards
-        '''
-        #if self.move_type == 'point_turn':
-        #    return
-        #self.get_logger().info(f"ACKERMAN COMMAND {msg.vel}")
-        
-        if msg.vel == 0.0 and self.last_move == 'point_turn':
-            self.stop_wheels()
-            self.last_move = 'ackerman'
-            return
-            
-        
-        s = (msg.vel/WHEEL_CIRCUMFERENCE)*DRIVE_RATIO
-        if abs(msg.fl_angle) > 1.0:
-            t = math.tan(math.radians(msg.fl_angle)) 
-            R = L/t
-            RL = R - (W/2)
-            RR = R + (W/2)
-            vl = s*(RL/R)
-            vr = s*(RR/R)
-            theta_l = math.degrees(math.atan(L/RL))
-            theta_r = math.degrees(math.atan(L/RR))
-        else:
-            theta_l = 0.0
-            theta_r = 0.0
-            vl = s
-            vr = s
-        #self.get_logger().info(f"Ackerman\nFront Left: Angle={theta_l} deg  Wheel Speed={vl} rad/s\nFront Right: Angle={theta_r} deg  Wheel Speed={vr}")
-        wa3 = -1.0 * (theta_l / 360) * SWERVE_RATIO
-        wa4 = -1.0 * (theta_r / 360) * SWERVE_RATIO
-        wa2 = 0.0
-        wa1 = 0.0
-        if msg.vel == 0.0:
-            self.set_drive(0.0, 0.0, 0.0, 0.0, wa1, wa2, wa3, wa4)
-        else:
-            self.set_drive(-1* vl, s, vr, -1 * s, wa1, wa2, wa3, wa4)
-    
     def stop_wheels(self):
         #self.get_logger().info("STOPPING WHEELS")
         return self.loop.run_until_complete(self.__async_stop_wheels())
@@ -203,7 +99,6 @@ class SwerveControllerNode(Node):
         #self.get_logger().info(f"{ws1} {ws2} {ws3} {ws4}")
 
         # Initialize Moteus transport and controllers
-        now = time.time()
         '''self.servos[2].make_position(
             position = math.nan,
             query=False,
@@ -266,8 +161,7 @@ class SwerveControllerNode(Node):
                 maximum_torque=self.swerves_max_torque
             )
         ]
-        result = await self.transport.cycle(commands)
-        #self.get_logger().info(str(result))
+        await self.transport.cycle(commands)
 
 
     #Script to calculate swerve speed and angles
@@ -339,7 +233,6 @@ class SwerveControllerNode(Node):
         a2 *= SWERVE_RATIO/360.0
         a3 *= SWERVE_RATIO/360.0
         a4 *= SWERVE_RATIO/360.0
-        k=7.2
         
 
         return -1 * s1, s2, s3, -1 * s4, a1, a2, a3, a4

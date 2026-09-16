@@ -1,0 +1,35 @@
+name: Run Gazebo demo
+on:
+  workflow_dispatch:
+    inputs:
+      course:
+        description: Obstacle course
+        type: choice
+        options: [basic, stress]
+        default: basic
+      seconds:
+        description: Maximum wall-clock run time (10-1800)
+        type: number
+        default: 600
+jobs:
+  demo:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build simulator image
+        run: ./sim setup
+      - name: Build and test ROS packages
+        run: ./sim check
+      - name: Record obstacle-avoidance demo
+        run: ./sim demo '${{ inputs.course }}' '${{ inputs.seconds }}'
+      - name: Upload video and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gazebo-demo-${{ inputs.course }}
+          path: validation/gazebo/logs/run_*/
+          if-no-files-found: warn
+          retention-days: 7

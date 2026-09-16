@@ -8,14 +8,17 @@ High-level logic for autonomy, with preplanned coarse waypoints
 import os
 import math
 import yaml
-import numpy as np
-
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TwistStamped
 from std_msgs.msg import Float32MultiArray, String
 from collections import deque
 from ament_index_python.packages import get_package_share_directory
+
+from autonomous_navigation.state_machine_core import (
+    north_west_meters, search_waypoints, select_target,
+)
+from autonomous_navigation.target_contract import encode_target_request
 
 
 class StateMachineNode(Node):
@@ -36,6 +39,7 @@ class StateMachineNode(Node):
             get_package_share_directory('autonomous_navigation'),
             waypoints_file
         )
+        waypoints_path = self.declare_parameter("waypoints_file", waypoints_path).value
         self.get_logger().info(f"Waypoints file: {waypoints_path}")
         self.waypoints = self.load_waypoints(waypoints_path)
         if not self.waypoints:
@@ -76,12 +80,17 @@ class StateMachineNode(Node):
             1: ('coordinate', 2.0, 10.0),
             2: ('coordinate', 2.0, 10.0),
             3: ('ar1', 2.0, 10.0),
-            4: ('ar2`', 2.0, 10.0),
-            5: ('ar3`', 2.0, 15.0),
-            6: ('coordinate`', 2.0, 10.0),
-            7: ('coordinate`', 2.0, 10.0),
+            4: ('ar2', 2.0, 10.0),
+            5: ('ar3', 2.0, 15.0),
+            6: ('coordinate', 2.0, 10.0),
+            7: ('coordinate', 2.0, 10.0),
         }
 
+        for index, waypoint in enumerate(self.waypoints[1:], 1):
+            if waypoint.get('type') == 'coordinate':
+                self.targets[index] = ('coordinate', float(waypoint.get('threshold', 2.0)), 10.0)
+
+        self.stop_pub = self.create_publisher(String, '/autonomy/stop', 10)
         self.r_step = 0.2
         self.theta_step = 15
         self.search_waypoint_threshold = 2.0
@@ -155,7 +164,7 @@ class StateMachineNode(Node):
           - set up object/search parameters
           - load preplanned coarse waypoints for this segment
         """
-        if self.current_waypoint_index not in self.targets:
+        if self.current_waypoint_index >= len(self.waypoints) or self.current_waypoint_index not in self.targets:
             return
 
         # assign search parameters
@@ -178,10 +187,15 @@ class StateMachineNode(Node):
 
         # compute global‐frame target position (north/west) of the GPS waypoint itself
         wp = self.waypoints[self.current_waypoint_index]
-        n, w = self.get_north_west_meters(wp['latitude'], wp['longitude'])
+        n, w = north_west_meters(
+            (self.initial_lat, self.initial_lon),
+            (wp['latitude'], wp['longitude']),
+        )
         self.next_coordinate = [n, w]
         if self.current_object != 'coordinate':
-            self.search_waypoints = deque(self.generate_search_waypoints(n,w,self.ang_step, self.r_step, self.search_radius))
+            self.search_waypoints = deque(search_waypoints(
+                (n, w), self.ang_step, self.r_step, self.search_radius
+            ))
             self.get_logger().info(f"search waypoints: {self.search_waypoints}")
         self.get_logger().info(
             f"Advancing to WP#{self.current_waypoint_index}: "
@@ -197,7 +211,8 @@ class StateMachineNode(Node):
         """
         # 2) global‐target / object search logic (as before)
         if self.current_waypoint_index >= len(self.waypoints):
-            self.get_logger().info('All waypoints reached.')
+            self.get_logger().info('All waypoints reached.', once=True)
+            self.stop_pub.publish(String(data='mission_complete'))
             return
 
         self.check_targets()
@@ -220,42 +235,20 @@ class StateMachineNode(Node):
         
         #if d > (self.search_radius * 2) or d > 10.0:
         
-        if d > 10.0:
-            if waypoint_dist is not None and waypoint_dist < 2.5:
-                self.coarse_waypoints.popleft()
-            if not (self.current_object != 'coordinate' and self.object_found):
-                if self.coarse_waypoints and len(self.coarse_waypoints) > 0:
-                    self.target_position = self.coarse_waypoints[0]
-                else:
-                    self.target_position = self.next_coordinate
-        else:
-            if self.current_object == 'coordinate':
-                if d < 2.0:
-                    reached = True
-                else:
-                    self.target_position = self.next_coordinate
-            elif not self.object_found:
-                if len(self.search_waypoints) == 0:
-                    timeout = True
-                else:
-                    sx, sy = self.search_waypoints[0]
-                    dx3, dy3 = self.north - sx, self.west - sy
-                    d3 = math.sqrt((dx3**2) + (dy3**2))
-                    if d3 < 2.0:
-                        self.search_waypoints.popleft()
-                        if len(self.search_waypoints) == 0:
-                            timeout = True
-                        else:
-                            self.target_position = self.search_waypoints[0]
-                    else:
-                        self.target_position = self.search_waypoints[0]
-                        self.publish_target_name()
-            else:
-                gx, gy = self.target_position[0], self.target_position[1]
-                dx4, dy4 = self.north - gx, self.west - gy
-                d4 = math.sqrt((dx4**2) + (dy4**2))
-                if d4 < 1.5:
-                    reached = True
+        decision = select_target(
+            (self.north, self.west), tuple(self.next_coordinate),
+            tuple(self.target_position), list(self.coarse_waypoints),
+            self.current_object, self.object_found, list(self.search_waypoints),
+            coordinate_threshold=self.threshold,
+        )
+        if decision.pop_coarse:
+            self.coarse_waypoints.popleft()
+        if decision.pop_search:
+            self.search_waypoints.popleft()
+        if decision.announce_object:
+            self.publish_target_name()
+        self.target_position = decision.target
+        reached, timeout = decision.reached, decision.timed_out
 
         if reached or timeout:
             if timeout:
@@ -265,24 +258,6 @@ class StateMachineNode(Node):
             self.blink_led()
             self.current_waypoint_index += 1
             self.update_search_params()
-
-    def generate_search_waypoints(self, x, y, a, r, max_r):
-        pts = []
-        curr_r = r
-        curr_a = 0.0
-        while curr_r < max_r:
-            if curr_a > 180:
-                curr_a = -1 * (360 - curr_a)
-            a_rad = math.radians(curr_a)
-            dx = curr_r * (math.cos(a_rad) - math.sin(a_rad))
-            dy = curr_r * (math.sin(a_rad) + math.sin(a_rad))
-            pts.append((x+dx, y+dy))
-            if curr_a < 0:
-                curr_a -= a
-            else:
-                curr_a += a
-            curr_r += r
-        return pts
 
     def publish_targets(self):
         local_msg = Float32MultiArray()
@@ -300,7 +275,9 @@ class StateMachineNode(Node):
 
     def publish_target_name(self):
         m = String()
-        m.data = self.current_object
+        m.data = encode_target_request(
+            self.current_waypoint_index, self.current_object
+        )
         self.name_pub.publish(m)
 
 
@@ -326,24 +303,6 @@ class StateMachineNode(Node):
         self.target_position = [msg.linear.x, msg.linear.y]
         self.get_logger().info(f"Found {self.current_object} @ {self.target_position}")
 
-
-    def get_north_west_meters(self, target_lat, target_lon):
-        """
-        Convert (lat,lon) → local (north,west) from the starting reference.
-        """
-        R = 6378137.0
-        φ1 = math.radians(self.initial_lat)
-        φ2 = math.radians(target_lat)
-        λ1 = math.radians(self.initial_lon)
-        λ2 = math.radians(target_lon)
-
-        dφ = φ2 - φ1
-        dλ = λ2 - λ1
-        meanφ = 0.5 * (φ1 + φ2)
-
-        north = dφ * R
-        west  = -dλ * R * math.cos(meanφ)
-        return north, west
 
 
 def main(args=None):

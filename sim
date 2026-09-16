@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+IMAGE="${SIM_IMAGE:-terra-dev:cycle}"
+mode="${1:-help}"
+case "$mode" in
+  help|-h|--help)
+    cat <<'HELP'
+Usage: ./sim COMMAND [COURSE] [SECONDS]
+  setup                    Build the reusable development image
+  doctor                   Check Docker and the Gazebo image
+  check                    Run autonomy tests and build in Docker
+  demo [stress|basic] [300] Run Gazebo, record video and analyze trajectory
+  report                   Show the newest session summary
+Results: validation/gazebo/logs/<session>/ (video, report, individual logs)
+SIM_IMAGE overrides the prebuilt image (default terra-dev:cycle).
+SECONDS is wall-clock recording time, not simulated time. Ctrl-C stops the run.
+HELP
+    exit 0 ;;
+  report)
+    latest=
+    for path in "$ROOT"/validation/gazebo/logs/run_*; do [[ ! -d $path ]] || latest="$path"; done
+    [[ -n $latest ]] || { echo "No sessions yet. Run ./sim demo"; exit 1; }
+    [[ -f $latest/summary.txt ]] || { echo "Run pending or interrupted: $latest"; exit 1; }
+    cat "$latest/summary.txt"; exit 0 ;;
+  setup|doctor|check|demo) ;;
+  *) echo "Unknown command: $mode. Use ./sim help" >&2; exit 2 ;;
+esac
+docker info >/dev/null 2>&1 || { echo 'Start Docker Desktop, then retry.' >&2; exit 1; }
+if [[ $mode == setup ]]; then
+  exec docker build --platform linux/amd64 -t "$IMAGE" -f "$ROOT/validation/gazebo/Dockerfile" "$ROOT/validation/gazebo"
+fi
+docker image inspect "$IMAGE" >/dev/null 2>&1 || {
+  echo "Missing image $IMAGE; see validation/gazebo/README.md." >&2; exit 1;
+}
+if [[ $mode == doctor ]]; then
+  docker run --rm --platform linux/amd64 --pull=never --entrypoint bash "$IMAGE" -lc 'source /opt/ros/humble/setup.bash; python3 -c "import coverage, pytest, shapely" || exit; for cmd in gzserver gzclient Xvfb ffmpeg ros2; do command -v "$cmd" || exit; done'
+  exit
+fi
+course="${2:-stress}"; seconds="${3:-300}"
+[[ $course == stress || $course == basic ]] || { echo 'Course must be stress or basic' >&2; exit 2; }
+[[ $seconds =~ ^[0-9]+$ && $seconds -ge 10 && $seconds -le 1800 ]] || { echo 'Seconds must be 10..1800' >&2; exit 2; }
+session="run_$(date +%Y%m%d_%H%M%S)_$$"
+result="$ROOT/validation/gazebo/logs/$session"
+mkdir -p "$result"
+git -C "$ROOT" rev-parse HEAD > "$result/revision.txt"
+git -C "$ROOT" diff --stat > "$result/changes.txt"
+name="terra-cycle-$$"
+trap 'docker stop -t 8 "$name" >/dev/null 2>&1 || true' INT TERM
+printf 'Session: %s\n' "$result"
+finish() {
+  code=$?
+  if [[ ! -f $result/summary.txt ]]; then
+    printf "Run exited %s; inspect logs in %s\n" "$code" "$result" > "$result/summary.txt"
+  fi
+  exit "$code"
+}
+trap finish EXIT
+ports=(--rm)
+if [[ $mode == demo ]]; then
+  dashboard_port=8765
+  while lsof -nP -iTCP:"$dashboard_port" -sTCP:LISTEN >/dev/null 2>&1; do
+    dashboard_port=$((dashboard_port+1))
+  done
+  ports=(--rm -p "127.0.0.1:$dashboard_port:8765")
+  echo "Live camera, costmap and path: http://localhost:$dashboard_port (while running)"
+fi
+if docker run --platform linux/amd64 "${ports[@]}" --pull=never --init --name "$name" --shm-size=1g \
+  -v "$ROOT:/cmr/terra2" -w /cmr/terra2 \
+  -e "SESSION_DIR=/cmr/terra2/validation/gazebo/logs/$session" \
+  --entrypoint bash "$IMAGE" validation/gazebo/cycle.sh "$mode" "$course" "$seconds"; then
+  run_code=0
+else
+  run_code=$?
+fi
+if [[ $mode == demo ]]; then
+  bash "$ROOT/validation/gazebo/short_video.sh" "$result" || true
+fi
+exit "$run_code"

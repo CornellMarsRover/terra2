@@ -248,3 +248,53 @@ iterated repeatedly against generated video and logs.
 
 ## Gazebo rover models and simulation
 
+### Early Gazebo stack
+
+- Added a Gazebo GUI helper and comprehensive runbook.
+- Added a simple planar robot for baseline topic testing.
+- Added a Gazebo drive bridge subscribing to direct, autonomy, and controller-derived drive topics.
+- Added launch files for the bridge and simple robot.
+- Diagnosed and fixed Gazebo scoped-joint lookup failures.
+- Added a direct validation harness covering controller UDP and ROS command topics.
+- Tested neutral, forward, reverse, point turns, arcs, lateral commands, and ignored axes.
+- Iterated from two failing checks to a final 16-of-16 passing validation report.
+
+### Shared mesh and URDF work
+
+- Imported `rover_26.stl` from the supplied rover CAD export.
+- Corrected mesh scale, origin, and orientation.
+- Reused the same mesh asset across simulation work.
+- Added a planar reference URDF, `drives_planar.urdf`.
+- Added a jointed swerve URDF with four steer modules and wheel joints.
+- Added module orientations and joint trajectories.
+- Set the Gazebo trajectory frame to `base_link`.
+- Verified lateral steering at approximately 90 degrees on all four modules.
+- Documented the distinction between the jointed `drives` model and planar `drives_planar` reference.
+
+### Current physical obstacle harness
+
+The latest harness is under `validation/gazebo`.
+
+- Added an exact shared rover mesh at `meshes/rover_26.stl`.
+- Added `rover_depth.urdf` with rover visual mesh, conservative box collision, planar-motion plugin, odometry, and an 80x60 depth camera.
+- Added `obstacle_course.world` with three colored physical box obstacles.
+- Added `/cmd_vel` `DriveCommand` to `/drives/cmd_vel` `Twist` adapter.
+- Added `/drives/odom` to `/autonomy/pose/robot/global` adapter.
+- Added a simple Gazebo launcher and a separate production-autonomy launcher.
+- Added per-node session logs.
+- Added cleanup handling for Gazebo server/client child processes.
+- Raised the default overview camera so the rover and all obstacles remain visible.
+- Kept the simulation adapters at sensor/actuator boundaries; mission, costmap, planner, controller, and mux logic remain shared.
+
+Current simulation control flow:
+
+```text
+physical Gazebo blocks
+  -> rover depth camera
+  -> /camera/points
+  -> production costmap
+  -> /autonomy/costmap
+  -> production local planner
+  -> /autonomy/path/next_waypoint
+  -> production controller
+  -> /cmd_vel/autonomy

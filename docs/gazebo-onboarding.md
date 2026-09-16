@@ -148,3 +148,40 @@ message boundary at a time from sensor to `/drives/odom`.
 5. Run `xmllint --noout` on XML assets and `./sim check`.
 6. Record a baseline with the old course and an acceptance run with the new one.
 7. Document obstacle shapes, goal coordinates, and known blind spots.
+
+A visually difficult course is not useful unless the goal forces interaction
+with its obstacles and the analyzer measures those obstacles.
+
+## Definition of done
+
+A Gazebo change is ready for review when:
+
+- `./sim check` passes.
+- Basic regression passes, or the failure is explicitly explained.
+- Stress acceptance passes for planner/costmap changes.
+- `summary.txt` and `report.json` agree with the visual result.
+- The live dashboard showed current camera, costmap, and path data.
+- The raw video was sampled for pauses or misleading frames.
+- Simulation-only code remains at a sensor, pose, or drive boundary.
+- Known hardware gaps are stated rather than implied to be tested.
+- Generated logs and videos remain ignored by Git.
+- The PR describes the exact course, command, runtime limit, and result folder.
+
+## Handoff template
+
+Leave this in a PR or issue when another developer continues the work:
+
+```text
+Branch/commit:
+Hypothesis/change:
+Commands run:
+Basic result:
+Stress result:
+Session folder(s):
+Observed regression or limitation:
+Next smallest experiment:
+```
+
+For harness internals and the topic table, read
+[`validation/gazebo/README.md`](../validation/gazebo/README.md). For the complete
+production control flow, read [`docs/ros-structure.md`](ros-structure.md).

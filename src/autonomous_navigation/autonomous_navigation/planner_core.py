@@ -187,3 +187,13 @@ def segment_cost(
             + neighbor_cost(costs, cell, cell_size, neighbor_radius)
         )
     return max(values), sum(values)
+
+
+def next_safety_gap(current: int, minimum: int):
+    """Return the next smaller inflation radius without violating the minimum."""
+    if minimum < 0:
+        raise ValueError("minimum safety gap must not be negative")
+    if current <= minimum:
+        return None
+    candidate = current - 1
+    return candidate if candidate >= minimum else None

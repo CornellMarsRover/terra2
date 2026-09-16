@@ -15,6 +15,7 @@ from autonomous_navigation.planner_core import (
     advance_path,
     neighbor_cost,
     nearest_clear_goal,
+    next_safety_gap,
     parse_costmap,
     parse_planar_target,
     path_is_dense,
@@ -79,6 +80,7 @@ class LocalPlannerNode(Node):
         )
         
         # Publisher for the next waypoint
+        self.path_debug_publisher = self.create_publisher(Float32MultiArray, '/autonomy/path/plan', 10)
         self.next_waypoint_publisher = self.create_publisher(Float32MultiArray, '/autonomy/path/next_waypoint', 10)
 
         # Initialize CvBridge for message conversion
@@ -282,20 +284,12 @@ class LocalPlannerNode(Node):
             start_pt = path_points[i]
             end_pt = path_points[i + 1]
             max_cell, total = self.compute_segment_cost(start_pt, end_pt, gap=4)
-            occupied_cell, _ = self.compute_segment_cost(start_pt, end_pt, gap=0)
-
-
             blocked = not transition_traversable(
                 max_cell, self.point_risk(start_pt), self.point_risk(end_pt),
                 self.max_cell_threshold,
             )
             if blocked:
-                current_segment_blocked = current_segment_blocked or (
-                    i == 0
-                    and not segment_traversable(
-                        occupied_cell, self.max_cell_threshold
-                    )
-                )
+                current_segment_blocked = current_segment_blocked or i == 0
                 segment = (i, i + 1)
                 self.invalidated_segments, confirmed = record_segment_observation(
                     self.invalidated_segments, segment, True
@@ -366,6 +360,8 @@ class LocalPlannerNode(Node):
             float(len(self.current_path))
         ]
         self.next_waypoint_publisher.publish(waypoint_msg)
+        self.path_debug_publisher.publish(Float32MultiArray(
+            data=[float(v) for point in self.current_path for v in point]))
 
     # -------------------------------------------------------------------------
     # Cost-Based Segment Check
@@ -406,7 +402,7 @@ class LocalPlannerNode(Node):
         
         # Define local search region
         start = self.robot_position
-        half_width = 5.0
+        half_width = 8.0
         step_size = 0.5
         min_x = start[0] - half_width - 1.0
         max_x = start[0] + half_width + 1.0
@@ -499,11 +495,14 @@ class LocalPlannerNode(Node):
                     heapq.heappush(open_set, (f_score, neighbor))
 
         if not found_path:
-            if gap > 1:
+            reduced_gap = next_safety_gap(gap, minimum=3)
+            if reduced_gap is not None:
                 self.get_logger().info("No path found. Trying reduced gap for cost sampling.")
-                self.compute_path(gap=gap - 1)
+                self.compute_path(gap=reduced_gap)
             else:
-                self.get_logger().error("A* planning failed to find any solution.")
+                self.get_logger().error(
+                    "A* found no route at the minimum safe clearance."
+                )
             return
 
         # Reconstruct path

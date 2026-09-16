@@ -4,6 +4,7 @@ from autonomous_navigation.planner_core import (
     advance_path,
     neighbor_cost,
     nearest_clear_goal,
+    next_safety_gap,
     parse_costmap,
     parse_planar_target,
     path_is_dense,
@@ -176,3 +177,13 @@ def test_transition_traversability_allows_only_safe_or_decreasing_risk():
     assert transition_traversable(30, 40, 30, 20)
     assert not transition_traversable(30, 40, 40, 20)
     assert not transition_traversable(30, 30, 40, 20)
+
+
+def test_safety_gap_never_drops_below_minimum():
+    assert next_safety_gap(4, 3) == 3
+    assert next_safety_gap(3, 3) is None
+
+
+def test_safety_gap_rejects_negative_minimum():
+    with pytest.raises(ValueError, match="negative"):
+        next_safety_gap(4, -1)

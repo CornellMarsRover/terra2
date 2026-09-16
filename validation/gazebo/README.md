@@ -116,6 +116,32 @@ a passing test.
 | `telemetry.jsonl` | Costmap, planned path, and target messages |
 | `odom.csv` | Recorded Gazebo odometry |
 | `state.log` | Mission progression and completion |
+| `costmap.log` | Perception-to-costmap node output |
+| `planner.log` | Planning, validation, and replan decisions |
+| `controller.log` | Autonomy command generation |
+| `mux.log` | Source selection, timeout, and estop status |
+| `drive.log` | Selected command translated for Gazebo |
+| `gazebo.log` | World, model, plugins, camera, and backend output |
+| `world.sdf` | Exact world copied into the run |
+| `revision.txt`, `changes.txt` | Source provenance at run start |
+
+Read `summary.txt` first. Use the owning log from the table instead of searching
+all output blindly.
+
+## Live view and video
+
+A demo prints a localhost URL, starting at port 8765 and selecting the next free
+port. The dashboard shows camera, cost cells, planned path, actual trajectory,
+and topic ages. `WAIT` means that topic has not arrived.
+
+`demo_short.mp4` changes playback speed only. Use `demo.mp4` to reason about
+pauses or timing. On Apple Silicon, the required Gazebo Classic amd64 container
+is emulated and can run far below real time.
+
+## Manual two-terminal mode
+
+Use this only when interactively inspecting ROS topics inside an already built
+ROS/Gazebo development container:
 
 ```bash
 # Terminal 1

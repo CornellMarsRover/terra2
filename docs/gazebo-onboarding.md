@@ -98,3 +98,53 @@ Do not put navigation decisions in an adapter. Adapters translate interfaces;
 production nodes decide where and how the rover moves.
 
 ## Read evidence in this order
+
+Each run is under `validation/gazebo/logs/run_<timestamp>_<pid>/`.
+
+1. `summary.txt`: acceptance result and final metrics.
+2. `report.json`: per-obstacle contacts/clearances and recorded trajectory data.
+3. `demo_short.mp4`: approximately one-minute accelerated visual review.
+4. `demo.mp4`: unaltered wall-clock recording for timing and pauses.
+5. `playback.txt`: acceleration applied to the short video.
+6. `state.log`: mission target selection and completion.
+7. `planner.log`: path generation, blocked segments, and replans.
+8. `costmap.log`: sensor ingestion and obstacle-map failures.
+9. `controller.log`, `mux.log`, `drive.log`: command generation and selection.
+10. `gazebo.log`, `odom.csv`: spawn/sensor/backend status and ground-truth motion.
+11. `telemetry.jsonl`: costmap, path, and target messages shown by the dashboard.
+12. `revision.txt`, `changes.txt`, `world.sdf`: exact source/world provenance.
+
+`demo_short.mp4` is presentation material. Never use its apparent speed to make
+a real-time control claim. Shutdown-only `ExternalShutdownException` or
+`rcl_shutdown already called` traces are noisy cleanup behavior; a traceback
+before motion stops is a runtime failure and must be investigated.
+
+## Failure routing
+
+| Symptom | Check first | Likely layer |
+| --- | --- | --- |
+| `Start Docker Desktop, then retry` | `docker info` | Host setup |
+| Missing image | `./sim setup`, then `./sim doctor` | Container setup |
+| No odometry in 90 seconds | `gazebo.log`, spawn lines, `/drives/odom` | Gazebo/model/backend |
+| Camera says `WAIT` | camera plugin lines in `gazebo.log` | URDF sensor/plugin |
+| Camera live, costs absent | `costmap.log`, `/camera/points` | Costmap/input contract |
+| Costs live, path absent | `planner.log`, target entries in `state.log` | Planner/mission target |
+| Path live, rover stationary | `controller.log`, `mux.log`, `drive.log` | Control/arbitration/backend |
+| Rover moves through blocks | `report.json`, costmap view, footprint assumptions | Perception/costmap/model |
+| Rover loops or stalls | repeated replans in `planner.log`, path overlay | Planner or stale costs |
+| Video exists but summary fails | goal distances, contacts, mission flag | Navigation acceptance |
+| Demo looks frozen on ARM Mac | compare sim seconds with wall time | amd64 GUI emulation |
+
+Do not fix a downstream symptom by bypassing an upstream contract. Trace one
+message boundary at a time from sensor to `/drives/odom`.
+
+## Changing a course safely
+
+1. Copy an existing `.world` file and give every obstacle a unique model name.
+2. Keep visible and collision geometry aligned.
+3. Update `course_waypoints.yaml` only when the mission must change.
+4. Extend `analyze_course.py` if the new geometry is not represented in its
+   collision/clearance calculations.
+5. Run `xmllint --noout` on XML assets and `./sim check`.
+6. Record a baseline with the old course and an acceptance run with the new one.
+7. Document obstacle shapes, goal coordinates, and known blind spots.

@@ -146,6 +146,7 @@ ROS/Gazebo development container:
 ```bash
 # Terminal 1
 ./validation/gazebo/start_sim.sh
+
 # Terminal 2
 ./validation/gazebo/start_autonomy.sh
 ```

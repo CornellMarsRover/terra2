@@ -548,3 +548,53 @@ the recoverable work history.
 - `9d649ab` Add multi-obstacle autonomy sim demo (`agupt0318 <anantg001@gmail.com>`)
 - `b1481a2` Document and test autonomy obstacle avoidance sim (`agupt0318 <anantg001@gmail.com>`)
 
+### 2026-05-04
+
+- `21d3756` Improve autonomy obstacle avoidance path stability (`agupt0318 <anantg001@gmail.com>`)
+- `3ad00c3` Fix single obstacle autonomy sim launch (`agupt0318 <anantg001@gmail.com>`)
+- `6d82990` Stabilize autonomy sim arrival and respawn (`agupt0318 <anantg001@gmail.com>`)
+- `ad5f57c` Fix autonomy obstacle avoidance stall modes (`agupt0318 <anantg001@gmail.com>`)
+
+### 2026-07-07
+
+- `05a6bc4` Log true target bearing in arrival diagnostics (`agupt0318 <anantg001@gmail.com>`)
+- `0a5567b` Reset search state and retarget detector on waypoint advance (`agupt0318 <anantg001@gmail.com>`)
+- `4c3d001` Stop unbounded free-space growth in costmap grid (`agupt0318 <anantg001@gmail.com>`)
+- `526fd23` Wrap yaw delta in sim localization angular velocity (`agupt0318 <anantg001@gmail.com>`)
+- `5e3bea6` Fix asymmetric neighbor sampling in local planner cost check (`agupt0318 <anantg001@gmail.com>`)
+- `9983fd7` Use sim time for planners and controller in sim autonomy launch (`agupt0318 <anantg001@gmail.com>`)
+- `a54453b` Drop unused pyubx2 import that breaks state machine startup (`agupt0318 <anantg001@gmail.com>`)
+- `b26e74a` Fix costmap FOV crash and game-object clearing patch size (`agupt0318 <anantg001@gmail.com>`)
+- `bd821e0` Suppress stale detector positions briefly after waypoint advance (`agupt0318 <anantg001@gmail.com>`)
+- `df03fa3` Fix kalman localization topic, yaw units, and origin capture (`agupt0318 <anantg001@gmail.com>`)
+
+### 2026-09-06
+
+- `00e562f` Use pure planner density decision (`agupt0318 <anantg001@gmail.com>`)
+- `0740ec9` Simplify controller dependency setup (`agupt0318 <anantg001@gmail.com>`)
+- `0786519` Cover pure autonomy decision modules (`agupt0318 <anantg001@gmail.com>`)
+- `0a9a18e` Add simple rover run command (`agupt0318 <anantg001@gmail.com>`)
+- `0c8e458` Test mission waypoint decisions (`agupt0318 <anantg001@gmail.com>`)
+- `0ca3b67` Test mission search decisions (`agupt0318 <anantg001@gmail.com>`)
+- `0fd5054` Document controller laptop setup (`agupt0318 <anantg001@gmail.com>`)
+- `13ace0c` Fix no-hardware autonomy startup (`agupt0318 <anantg001@gmail.com>`)
+- `16f809c` Test pure costmap projection (`agupt0318 <anantg001@gmail.com>`)
+- `19f22ff` Make drive launch paths portable (`agupt0318 <anantg001@gmail.com>`)
+- `1b8c01d` Separate rosdep setup commands (`agupt0318 <anantg001@gmail.com>`)
+- `1cec649` Test deterministic planner safeguards (`agupt0318 <anantg001@gmail.com>`)
+- `1d0cc40` Explain autonomy test dependencies (`agupt0318 <anantg001@gmail.com>`)
+- `1e1a413` Make planner visualization optional (`agupt0318 <anantg001@gmail.com>`)
+- `20f5e9e` Make autonomy coverage container safe (`agupt0318 <anantg001@gmail.com>`)
+- `2431554` Correct planner cost expectation (`agupt0318 <anantg001@gmail.com>`)
+- `26a415c` Extract mission search decisions (`agupt0318 <anantg001@gmail.com>`)
+- `26eef54` Stop autonomy at reached waypoints (`agupt0318 <anantg001@gmail.com>`)
+- `2775571` Centralize pure mission state selection (`agupt0318 <anantg001@gmail.com>`)
+- `2b128e1` Use pure costmap obstacle updates (`agupt0318 <anantg001@gmail.com>`)
+- `2b76620` Use shared drive scaling in simulation (`agupt0318 <anantg001@gmail.com>`)
+- `2dcfd7d` Add CI rosdep compatibility wrapper (`agupt0318 <anantg001@gmail.com>`)
+- `2f2f605` Extract planner path-shape decisions (`agupt0318 <anantg001@gmail.com>`)
+- `3116424` Source ROS safely in run helper (`agupt0318 <anantg001@gmail.com>`)
+- `321aca6` Extract planner segment cost decisions (`agupt0318 <anantg001@gmail.com>`)
+- `32f6fb4` Set Gazebo joint trajectory frame (`agupt0318 <anantg001@gmail.com>`)
+- `3369d0d` Document autonomy testing roadmap (`agupt0318 <anantg001@gmail.com>`)
+- `3630bbb` Correct end effector test assumptions (`agupt0318 <anantg001@gmail.com>`)

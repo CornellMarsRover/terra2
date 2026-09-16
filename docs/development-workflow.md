@@ -98,3 +98,48 @@ Review for:
 
 - topic/message compatibility and launch/config installation;
 - stale inputs, timeouts, estop, zero-command behavior, and shutdown;
+- incorrect units, frames, signs, axes, and coordinate conversions;
+- blocking work in ROS callbacks;
+- tests that cover failure and boundary cases, not only a happy path;
+- generated logs, media, build output, secrets, or machine paths;
+- unrelated edits accidentally included in the change; and
+- documentation that names exact commands and limitations.
+
+## 5. Commit and hand off
+
+The project convention for this work is no more than 50 changed lines per commit.
+Split by coherent behavior, not arbitrary file chunks: pure logic, tests, adapter,
+launch/config, then docs are usually sensible boundaries. Never rewrite or amend
+someone else's work unless explicitly requested.
+
+Use imperative commit messages such as `Reject stale autonomy commands`. Before
+pushing, state which tests passed and which were not run. A PR description should
+include:
+
+```text
+Problem:
+Behavioral change:
+ROS/package interfaces changed:
+Tests and exact commands:
+Simulation or hardware evidence:
+Known limitations:
+Follow-up work:
+```
+
+CI is not a substitute for local focused checks. Diagnose failures by job:
+`Static Analysis` is C++ formatting/tidy; `Build and test` covers ROS builds,
+unit/integration tests, and coverage; `Run Gazebo demo` is an optional recorded
+system test.
+
+## Repository-local agent skills
+
+Future coding agents should use the skills under `.agents/skills/`:
+
+| Skill | Use it for |
+| --- | --- |
+| `terra-development` | Default issue-to-PR workflow and architecture discipline |
+| `terra-ros-python` | Python ROS nodes, pure cores, topics, packaging, shutdown |
+| `terra-cpp` | C++17 ROS packages, CMake, format, tidy, tests |
+| `terra-testing-ci` | Selecting tests, builds, coverage, and CI diagnosis |
+| `terra-git-review` | Dirty worktrees, small commits, review, and handoff |
+| `terra-gazebo` | Driving/autonomy simulation and recorded evidence |

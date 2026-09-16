@@ -48,3 +48,53 @@ Prefer a small change in the existing architecture over a parallel path.
 - Do not modify arm code during a drive/autonomy task.
 
 Match surrounding naming and layout. Use ASCII unless an existing file requires
+otherwise. Comments should explain non-obvious intent or safety constraints, not
+repeat the code.
+
+## 3. Add tests with the change
+
+Choose the narrowest test that proves the behavior:
+
+```bash
+# Focused Python test
+python3 -m pytest -q path/to/test_file.py
+
+# Autonomy pure modules and 100% line/branch gate
+./run test
+
+# Focused ROS build
+./run build --packages-select PACKAGE
+
+# Full workspace tests inside the prepared dev environment
+bash scripts/test_wd.sh
+```
+
+If `./run test` reports missing `coverage` or `pytest`, the command is running
+outside the prepared development environment. Enter the dev container, or use
+`./sim check` for the Docker-contained autonomy test and focused build; do not
+change project dependencies merely to repair the host Python installation.
+
+For C++, build first to generate `build/compile_commands.json`, then run:
+
+```bash
+bash scripts/check_wd.sh path/to/changed.cpp path/to/changed.hpp
+```
+
+For driving or autonomy behavior, follow `docs/gazebo-onboarding.md`: run
+`./sim check`, basic regression, then stress acceptance when relevant. Hardware
+claims require hardware testing; simulation results must retain their stated
+boundaries.
+
+## 4. Review before committing
+
+```bash
+git diff --check
+git diff --stat
+git diff -- path/to/files
+git status --short
+```
+
+Review for:
+
+- topic/message compatibility and launch/config installation;
+- stale inputs, timeouts, estop, zero-command behavior, and shutdown;

@@ -498,3 +498,53 @@ Notable final videos:
 - `validation/gazebo/README.md`
 - `docs/autonomy-architecture.md`
 - `docs/codebase-map.md`
+- `docs/ros-structure.md`
+- `run`
+- `scripts/check_drive_sim.sh`
+- `scripts/test_autonomy.sh`
+
+## Exhaustive attributable commit ledger
+
+The ledger below is intentionally exhaustive rather than editorialized. Merge
+commits and superseded intermediate fixes remain listed because they are part of
+the recoverable work history.
+
+### 2026-03-08
+
+- `c8d8a66` Added logging for swerve position values (`Anant Gupta <ag987@cornell.edu>`)
+
+### 2026-03-15
+
+- `3001dc2` Changed everything to terra2 (`Anant Gupta <ag987@cornell.edu>`)
+
+### 2026-03-22
+
+- `43b4c84` Gazebo sim changes (`Anant Gupta <ag987@cornell.edu>`)
+
+### 2026-03-25
+
+- `d40b06d` Added some random changes to make gazebo inteface with controller and also move, need to update with actual robot urdf file and also make joystick commands more clear and interface those more directly with ros (`Anant Gupta <ag987@cornell.edu>`)
+
+### 2026-04-20
+
+- `9176686` Unify rover drive path and add session logging (`Anant <anantg001@gmail>`)
+- `f8f23de` Fix zenny drive worker loop and estop reset (`Anant <anantg001@gmail>`)
+
+### 2026-04-22
+
+- `4be1aa4` Update Gazebo rover sim drive path (`Anant <anantg001@gmail>`)
+- `7409243` Fix Gazebo rover mesh orientation (`Anant <anantg001@gmail>`)
+- `7ba1dac` Merge branch 'gazebo_sim' (`Anant <anantg001@gmail>`)
+- `ad8667a` Add jointed swerve Gazebo rover model (`Anant <anantg001@gmail>`)
+
+### 2026-05-03
+
+- `019a674` Updated the autonomous navigation (`agupt0318 <anantg001@gmail.com>`)
+- `2208e24` Add autonomy obstacle avoidance sim pipeline (`agupt0318 <anantg001@gmail.com>`)
+- `583c86c` Unify autonomy sim with shared rover asset (`agupt0318 <anantg001@gmail.com>`)
+- `6218211` Route sim obstacles through shared autonomy costmap path (`agupt0318 <anantg001@gmail.com>`)
+- `6c39431` Tighten autonomy sim path following (`agupt0318 <anantg001@gmail.com>`)
+- `84072e0` Merge autonomy into obstacle avoidance feature (`agupt0318 <anantg001@gmail.com>`)
+- `9d649ab` Add multi-obstacle autonomy sim demo (`agupt0318 <anantg001@gmail.com>`)
+- `b1481a2` Document and test autonomy obstacle avoidance sim (`agupt0318 <anantg001@gmail.com>`)
+

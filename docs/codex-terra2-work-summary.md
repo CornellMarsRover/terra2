@@ -448,3 +448,53 @@ Notable final videos:
 
 ## Accuracy and limitations
 
+- The synchronized sensor video uses live `/camera/image_raw`, `/camera/depth/image_raw`, `/autonomy/costmap`, `/autonomy/pose/robot/global`, and `/autonomy/path/next_waypoint` data. Only the panel colors, labels, coordinate projection, and layout are custom visualization.
+- The synchronized panel shows the active waypoint and actual driven trail, not the planner's complete predicted path.
+- The newest obstacle harness uses a planar Gazebo movement plugin. It validates ROS perception/planning/control flow and chassis motion, but not individual wheel-force or steering-joint physics.
+- The separate `gazebo_sim` jointed model validates module orientation/joint commands but is not the backend in the newest depth-camera obstacle video.
+- The Gazebo depth sensor is 80x60 and synthetic; it is useful for deterministic software testing but does not reproduce every ZED artifact.
+- Generic collision avoidance comes from depth point-cloud geometry and the costmap. The `object_detection` node is for requested ArUco mission targets, not generic colored-block classification.
+- ROS nodes still print some double-shutdown `rclpy` traces after intentional signals. Those traces occur after successful runs and should still be cleaned up.
+- The current local branch has 12 unpushed commits. Generated logs and media are intentionally ignored and will not appear after a fresh clone.
+- `main` is locally divergent from `origin/main`; it should not be pushed without deliberate reconciliation.
+- Current Git history does not verify that the unrelated IMU PDFs were removed by this work. Their availability depends on branch ancestry.
+- Local tests and Gazebo runs do not replace Jetson, CAN-FD, Moteus, camera, GPS/IMU, RF-network, or field validation.
+- The current GitHub Actions status cannot be inferred from local workflow edits alone; a pushed commit and completed remote run are required.
+
+## Recommended next work
+
+- Push the 12 local `autonomy_fall2026` commits after review.
+- Clean up idempotent ROS shutdown in state machine, planner, costmap, detector, and mux nodes.
+- Turn the physical obstacle harness into an automated launch test with collision assertions.
+- Add rosbag fixtures for camera, point cloud, GPS, and IMU dropout/regression testing.
+- Parameterize planner inflation, thresholds, grid size, and controller gains.
+- Add the full predicted local path to the synchronized visualization.
+- Run wheel-lifted Jetson/Moteus tests before field motion.
+- Validate source switching, estop, command timeout, and Moteus watchdog on hardware.
+- Decide whether the jointed swerve backend should replace the planar obstacle-test backend once its dynamics are stable.
+
+## Key committed files
+
+- `src/cmr_msgs/msg/DriveCommand.msg`
+- `src/cmr_rovernet/cmr_rovernet/command_mux.py`
+- `src/cmr_rovernet/cmr_rovernet/command_mux_core.py`
+- `src/autonomous_navigation/autonomous_navigation/drive_command.py`
+- `src/autonomous_navigation/autonomous_navigation/planner_core.py`
+- `src/autonomous_navigation/autonomous_navigation/costmap_core.py`
+- `src/autonomous_navigation/autonomous_navigation/state_machine_core.py`
+- `src/autonomous_navigation/autonomous_navigation/target_contract.py`
+- `src/autonomous_navigation/test/test_drive_command.py`
+- `src/autonomous_navigation/test/test_planner_core.py`
+- `src/autonomous_navigation/test/test_costmap_core.py`
+- `src/autonomous_navigation/test/test_state_machine_core.py`
+- `src/autonomous_navigation/test/test_target_contract.py`
+- `src/cmr_rovernet/test/test_command_mux_core.py`
+- `validation/gazebo/assets/rover_depth.urdf`
+- `validation/gazebo/assets/obstacle_course.world`
+- `validation/gazebo/adapters/drive_command_to_gazebo.py`
+- `validation/gazebo/adapters/odom_to_autonomy_pose.py`
+- `validation/gazebo/start_sim.sh`
+- `validation/gazebo/start_autonomy.sh`
+- `validation/gazebo/README.md`
+- `docs/autonomy-architecture.md`
+- `docs/codebase-map.md`

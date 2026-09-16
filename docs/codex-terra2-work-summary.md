@@ -98,3 +98,53 @@ Branch tips at this audit:
 
 ## Unified hardware drive node
 
+The `anant-test-driving` work created and reviewed a dedicated rover movement
+node based on the existing Moteus GUI behavior.
+
+- Added `zenny_drives_node.py` to consume controller-derived ROS topics and command drive/steer Moteus controllers.
+- Preserved the controller mapping for triggers, steering, and emergency stop.
+- Added steer-zero capture at startup.
+- Added drive and steer watchdog refresh behavior.
+- Added session logging for commands and motor state.
+- Added documentation in `docs/driving_stack.md`.
+- Added a documentation updater script for the driving guide.
+- Ignored generated drive-session data in Git.
+- Reviewed the node for safety, shutdown, queueing, and command-state bugs.
+- Fixed the `asyncio` failure where locks/events were bound to a different event loop.
+- Consolidated Moteus work onto a stable worker/event-loop model.
+- Fixed emergency-stop release/reset behavior.
+- Avoided modifying arm-control behavior during the drive-focused work.
+
+## Explicit drive command contract
+
+A dedicated message was selected instead of forcing the existing controls into a
+standard `Twist`, because the rover requires normalized chassis axes and a
+separate signed wheel-speed limit.
+
+`cmr_msgs/DriveCommand` now carries:
+
+| Field | Meaning |
+| --- | --- |
+| `vx` | Normalized rover-frame forward demand in `[-1, 1]` |
+| `vy` | Normalized rover-frame lateral demand in `[-1, 1]` |
+| `omega` | Normalized rover-frame rotation demand in `[-1, 1]` |
+| `speed_rps` | Signed maximum wheel speed in revolutions per second |
+
+Canonical drive topics:
+
+| Topic | Type | Purpose |
+| --- | --- | --- |
+| `/controller/drives/axes` | controller data | Raw controller drive axes |
+| `/controller/drives/buttons` | controller data | Raw controller buttons |
+| `/cmd_vel/teleop` | `cmr_msgs/DriveCommand` | Converted manual command |
+| `/cmd_vel/autonomy` | `cmr_msgs/DriveCommand` | Autonomous command |
+| `/cmd_vel/source` | `std_msgs/String` | Runtime source selection |
+| `/cmd_vel/estop` | `std_msgs/Bool` | Emergency-stop state |
+| `/cmd_vel` | `cmr_msgs/DriveCommand` | Only selected backend input |
+
+Implemented convergence changes:
+
+- Added the `DriveCommand` message to `cmr_msgs`.
+- Added pure `CommandMux` safety logic.
+- Added the ROS `drive_command_mux` node.
+- Registered the mux as a RoverNet executable.

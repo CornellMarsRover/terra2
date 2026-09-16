@@ -798,3 +798,25 @@ images that predated this work are excluded.
 - `logs/lower_control_convergence_20260906/same_commands_preview.png`
 - `logs/lower_control_convergence_20260906/same_commands_side_by_side.mp4` (24.00 s)
 - `logs/lower_control_convergence_20260906/teleop_same_commands.mp4` (24.00 s)
+- `validation/gazebo/videos/contact_sheet.png`
+- `validation/gazebo/videos/elevated_preflight.png`
+- `validation/gazebo/videos/elevated_preflight2.png`
+- `validation/gazebo/videos/elevated_preflight3.png`
+- `validation/gazebo/videos/elevated_preflight4.png`
+- `validation/gazebo/videos/follow_view.png`
+- `validation/gazebo/videos/obstacle_avoidance_camera_costmap.mp4` (46.50 s)
+- `validation/gazebo/videos/obstacle_avoidance_camera_costmap_contact.png`
+- `validation/gazebo/videos/obstacle_avoidance_demo.mp4` (65.00 s)
+- `validation/gazebo/videos/obstacle_avoidance_elevated.mp4` (62.13 s)
+- `validation/gazebo/videos/obstacle_avoidance_elevated_contact.png`
+- `validation/gazebo/videos/obstacle_avoidance_elevated_raw.mp4` (124.23 s)
+- `validation/gazebo/videos/obstacle_avoidance_raw.mp4` (130.00 s)
+- `validation/gazebo/videos/preflight.png`
+- `validation/gazebo/videos/reset_view.png`
+- `validation/gazebo/videos/revised_follow_view.png`
+- `validation/gazebo/videos/revised_view.png`
+- `validation/gazebo/videos/sensor_demo_gazebo_raw.mp4` (100.00 s)
+- `validation/gazebo/videos/sensor_demo_ros_check.png`
+- `validation/gazebo/videos/sensor_demo_ros_contact.png`
+- `validation/gazebo/videos/sensor_demo_ros_raw.avi` (93.10 s)
+

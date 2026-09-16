@@ -66,6 +66,56 @@ depth point cloud and production costmap.
 ## Commands and ownership
 
 | Command | Runs | Output |
+| --- | --- | --- |
+| `./sim setup` | Docker build from `osrf/ros:humble-desktop-jammy` | `terra-dev:cycle` image |
+| `./sim doctor` | Dependency probe | executable paths or nonzero exit |
+| `./sim check` | 120 autonomy tests, harness tests, focused `colcon` build | session test/build logs |
+| `./sim demo basic N` | Three-block world, complete ROS stack, recorder | session evidence |
+| `./sim demo stress N` | Mixed-shape course, complete ROS stack, recorder | session evidence |
+| `./sim report` | Newest `summary.txt` | concise acceptance result |
+
+The test count may increase; the command result, not this table, is authoritative.
+Only `setup` downloads packages. The remaining commands use the local image.
+`SIM_IMAGE=name` selects another compatible image.
+
+## Courses and mission
+
+- `obstacle_course.world`: small three-block regression.
+- `stress_course.world`: cylinder, curb, angled wall, gate, concave pocket, and
+  sphere.
+- `course_waypoints.yaml`: start plus local targets near `(5,0)`, `(10,10)`, and
+  `(15,15)`, each with a 1 m threshold.
+
+The stress goal lies beyond the obstacle field so the rover must interact with
+the course. `analyze_course.py` evaluates the recorded footprint against the
+world geometry and computes goal distances and path length.
+
+## Acceptance contract
+
+`summarize.py` returns success only when all of these are true:
+
+- every configured goal came within 1 m;
+- final pose is within 1 m of `(15,15)`;
+- `state.log` contains `All waypoints reached.`;
+- obstacle footprint intersection samples equal zero;
+- more than ten odometry samples exist; and
+- `demo.mp4` is valid and longer than one second.
+
+The summary explicitly says `PASS` or `INCOMPLETE/FAIL`. A video by itself is not
+a passing test.
+
+## Session contents
+
+| File | Meaning |
+| --- | --- |
+| `summary.txt` | Human-readable acceptance decision |
+| `report.json` | Trajectory, goals, obstacle contacts, and clearances |
+| `demo.mp4` | Unaltered 1280x720 Gazebo/dashboard recording |
+| `demo_short.mp4` | Accelerated review copy capped near one minute |
+| `playback.txt` | Raw duration, short duration, and speed factor |
+| `telemetry.jsonl` | Costmap, planned path, and target messages |
+| `odom.csv` | Recorded Gazebo odometry |
+| `state.log` | Mission progression and completion |
 
 ```bash
 # Terminal 1

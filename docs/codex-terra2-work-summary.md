@@ -148,3 +148,53 @@ Implemented convergence changes:
 - Added pure `CommandMux` safety logic.
 - Added the ROS `drive_command_mux` node.
 - Registered the mux as a RoverNet executable.
+- Published autonomy commands on `/cmd_vel/autonomy`.
+- Converted tele-op commands to `/cmd_vel/teleop` without changing controller mappings.
+- Made `/cmd_vel` the selected output only.
+- Added launch-time source selection for tele-op and autonomy modes.
+- Added runtime source switching via `/cmd_vel/source`.
+- Added a 0.5-second command timeout.
+- Added emergency-stop latching behavior at the mux boundary.
+- Cleared buffered commands on source changes and estop transitions.
+- Rejected non-finite commands.
+- Published zeros on timeout or estop.
+- Removed hidden drive-priority arbitration and bypass callbacks.
+- Routed keyboard control and the compatibility swerve path through the mux.
+- Made the shared RoverNet backend consume only the selected command.
+- Preserved one shared Moteus/kinematics backend for both tele-op and autonomy.
+- Renamed ambiguous raw and selected drive topics throughout code, launch files, summaries, and architecture maps.
+- Documented that legacy arm utilities using `/cmd_vel` as `Twist` must be remapped before co-launching.
+
+## Autonomy control convergence
+
+- Added normalized autonomy drive conversion in `drive_command.py`.
+- Routed the autonomy controller into the same `DriveCommand` and mux interface as tele-op.
+- Launched the same RoverNet drive backend for autonomy hardware mode.
+- Used the same drive scaling in simulation.
+- Added mapping tests for forward, heading correction, point turn, stop, clamping, and invalid values.
+- Verified tele-op and autonomy with identical semantic command sequences.
+- Confirmed both sources produced the same selected commands at the shared lower-level interface.
+- Measured a 0.0498 m endpoint difference and 0.00664 rad yaw difference in the accepted non-video convergence run.
+- Measured a 0.0787 m endpoint difference and 0.0257 rad yaw difference in the recorded convergence run.
+- Verified manual override, autonomy resume, lateral motion, and turn arbitration in Gazebo.
+
+## Autonomy modularization
+
+Pure, ROS-independent logic was extracted so decisions can be tested without a
+running graph or hardware.
+
+- Added `planner_core.py` for target parsing, path progression, density checks, simplification, neighbor costs, segment costs, traversability, deterministic goal selection, and invalidation confirmation.
+- Added `costmap_core.py` for point projection, obstacle scoring, and cost decay.
+- Added `state_machine_core.py` for waypoint selection, search behavior, mission-object transitions, coordinate conversion, and arrival decisions.
+- Added `target_contract.py` for perception/mission target matching.
+- Added `drive_command.py` for normalized autonomy command mapping and freshness checks.
+- Rewired ROS nodes to call these pure modules.
+- Removed duplicated node-bound helper implementations after extraction.
+- Kept ROS subscriptions, publications, and launch behavior in adapter nodes.
+
+## Autonomy safety and correctness fixes
+
+- Added deterministic nearest-clear-goal selection.
+- Added deterministic local replanning behavior.
+- Required consecutive blocked observations before invalidating a path.
+- Rejected unsafe above-threshold planner transitions.

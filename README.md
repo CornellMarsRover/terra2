@@ -148,11 +148,12 @@ starts after the launch file's existing 30-second safety delay.
 ### Simulation
 
 Run `./run sim` in the dev container. This starts the autonomy nodes in their
-simulated-input mode, but it does not start Gazebo. Full Gazebo tooling remains
-isolated on the `gazebo_sim` branch.
+simulated-input mode, but it does not start Gazebo. Use `./sim` for the full Docker/Gazebo harness; see the
+[Gazebo onboarding guide](docs/gazebo-onboarding.md).
 
 ## Architecture Maps
 
+- [Development workflow](docs/development-workflow.md)
 - [Codebase map](docs/codebase-map.md)
 - [ROS node and topic structure](docs/ros-structure.md)
 - [Autonomy architecture](docs/autonomy-architecture.md)
@@ -217,6 +218,16 @@ With Gazebo, the drive mux, and its bridge running, use
 - **Drives Simulation**
 - **AruCo Tag Navigation (Spiral Algorithm)**
 - **Bird's Eye View**
-- **Obstacle Detection:** [cmr_obstacle_data](./src/cmr_obstacle_data/)
+- **Obstacle Detection and Avoidance:** [autonomous_navigation](./src/autonomous_navigation/)
 - **Drives GUI:** [cmr_param_gui](./src/cmr_param_gui/)
 - **Improved camera integration**
+
+### Docker and Gazebo development
+
+Start with the [Gazebo autonomy onboarding guide](docs/gazebo-onboarding.md).
+It gives the first-run commands, shared ROS boundary, evidence contract,
+debugging table, normal iteration loop, and handoff checklist. Harness internals
+and generated-file meanings are in the [Gazebo reference](validation/gazebo/README.md).
+
+[Run a Gazebo demo with GitHub Actions](https://github.com/CornellMarsRover/terra2/actions/workflows/gazebo-demo.yaml)
+(builds its own Docker container and uploads the video; see the Gazebo guide for access and setup).

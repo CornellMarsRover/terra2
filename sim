@@ -48,3 +48,32 @@ git -C "$ROOT" diff --stat > "$result/changes.txt"
 name="terra-cycle-$$"
 trap 'docker stop -t 8 "$name" >/dev/null 2>&1 || true' INT TERM
 printf 'Session: %s\n' "$result"
+finish() {
+  code=$?
+  if [[ ! -f $result/summary.txt ]]; then
+    printf "Run exited %s; inspect logs in %s\n" "$code" "$result" > "$result/summary.txt"
+  fi
+  exit "$code"
+}
+trap finish EXIT
+ports=(--rm)
+if [[ $mode == demo ]]; then
+  dashboard_port=8765
+  while lsof -nP -iTCP:"$dashboard_port" -sTCP:LISTEN >/dev/null 2>&1; do
+    dashboard_port=$((dashboard_port+1))
+  done
+  ports=(--rm -p "127.0.0.1:$dashboard_port:8765")
+  echo "Live camera, costmap and path: http://localhost:$dashboard_port (while running)"
+fi
+if docker run --platform linux/amd64 "${ports[@]}" --pull=never --init --name "$name" --shm-size=1g \
+  -v "$ROOT:/cmr/terra2" -w /cmr/terra2 \
+  -e "SESSION_DIR=/cmr/terra2/validation/gazebo/logs/$session" \
+  --entrypoint bash "$IMAGE" validation/gazebo/cycle.sh "$mode" "$course" "$seconds"; then
+  run_code=0
+else
+  run_code=$?
+fi
+if [[ $mode == demo ]]; then
+  bash "$ROOT/validation/gazebo/short_video.sh" "$result" || true
+fi
+exit "$run_code"

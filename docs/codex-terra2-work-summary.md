@@ -198,3 +198,53 @@ running graph or hardware.
 - Added deterministic local replanning behavior.
 - Required consecutive blocked observations before invalidating a path.
 - Rejected unsafe above-threshold planner transitions.
+- Held unsafe current paths while replanning.
+- Added risk-reducing transitions so a rover already inside an inflated region can escape.
+- Kept obstacle replanning mobile while preserving collision-safe smoothing.
+- Distinguished actual occupied cells from soft costmap inflation when deciding whether to stop.
+- Prevented the rover from deadlocking inside a newly observed safety-inflation band.
+- Validated smoothed paths against inflated collision costs and retained dense paths when smoothing cut through obstacles.
+- Used a wider cost sampling/inflation gap for physical rover clearance.
+- Added target parsing checks for malformed, short, non-finite, and optional-yaw payloads.
+- Added costmap payload validation.
+- Added stale pose/waypoint fail-closed behavior.
+- Required GPS initialization before publishing real autonomy pose.
+- Published an initialized filtered simulation pose.
+- Defined safe waypoint arrival and commanded a stop at reached waypoints.
+- Added true target-bearing arrival diagnostics.
+- Wrapped simulated yaw deltas correctly.
+- Fixed localization topic, yaw-unit, and origin-capture behavior.
+- Fixed asymmetric neighbor sampling in planner cost checks.
+- Fixed costmap field-of-view failures.
+- Fixed costmap game-object clearing dimensions.
+- Stopped unbounded free-space growth in the costmap.
+- Reset search state and detector targets when advancing waypoints.
+- Suppressed stale detector positions briefly after waypoint transitions.
+- Removed an unused `pyubx2` import that prevented state-machine startup.
+- Made planner visualization optional when Rerun is unavailable.
+- Used simulated time consistently for planner/controller nodes in simulation.
+
+## Obstacle avoidance computer vision and planning
+
+The initial feature branch created a modular obstacle-avoidance pipeline and was
+iterated repeatedly against generated video and logs.
+
+- Created `feature/autonomy-obstacle-avoidance-cv` from autonomy work.
+- Inspected the existing state machine, costmap, planner, controller, messages, configs, and launches.
+- Used Gazebo work as reference without merging the `gazebo_sim` branch into the feature branch.
+- Added simulated vision obstacle detection and pure visibility logic.
+- Added obstacle-guard logic and a pure obstacle-guard core.
+- Added simulation point-cloud generation so obstacles enter the shared costmap path.
+- Added odometry-to-autonomy-pose and simulation-drive adapters.
+- Added repeatable single- and multi-obstacle launch scenarios.
+- Added physical block models and deterministic spawning.
+- Added goal publication and demo telemetry logging.
+- Added map rendering that showed rover pose, goal, obstacles, visible obstacles, local target, next waypoint, and commands.
+- Reused the production costmap, local planner, controller, and autonomy messages instead of retaining a parallel simulation-only avoidance controller.
+- Tightened synthetic obstacle visibility at startup.
+- Improved path following, replanning, arrival, respawn, and stall recovery over multiple iterations.
+- Fixed the single-obstacle launch after the multi-obstacle work.
+- Documented simulation execution, architecture, copied assets, limitations, and next steps.
+
+## Gazebo rover models and simulation
+

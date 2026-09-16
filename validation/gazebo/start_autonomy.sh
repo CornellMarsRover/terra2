@@ -19,9 +19,11 @@ start drive python3 "$ROOT/validation/gazebo/adapters/drive_command_to_gazebo.py
 start mux "$ROOT/install/cmr_rovernet/lib/cmr_rovernet/drive_command_mux" \
   "${args[@]}" -p active_source:=autonomy
 start state "$ROOT/install/autonomous_navigation/lib/autonomous_navigation/state_machine" \
-  "${args[@]}" -p real:=false
-start detector "$ROOT/install/autonomous_navigation/lib/autonomous_navigation/object_detection" \
-  "${args[@]}" -p real:=false
+  "${args[@]}" -p real:=false -p "waypoints_file:=$ROOT/validation/gazebo/assets/course_waypoints.yaml"
+if [[ ${SIM_COORDINATE_ONLY:-false} != true ]]; then
+  start detector "$ROOT/install/autonomous_navigation/lib/autonomous_navigation/object_detection" \
+    "${args[@]}" -p real:=false
+fi
 sleep 2
 start costmap "$ROOT/install/autonomous_navigation/lib/autonomous_navigation/costmap" \
   "${args[@]}" -p real:=false

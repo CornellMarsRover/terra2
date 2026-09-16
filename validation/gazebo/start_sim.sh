@@ -18,7 +18,8 @@ if ! pgrep -f "Xvfb $DISPLAY" >/dev/null; then
   Xvfb "$DISPLAY" -screen 0 1280x720x24 +extension GLX +render -noreset &
   pids+=("$!")
 fi
-gzserver "$ROOT/validation/gazebo/assets/obstacle_course.world" \
+WORLD="${WORLD:-$ROOT/validation/gazebo/assets/obstacle_course.world}"
+gzserver "$WORLD" \
   -s libgazebo_ros_init.so -s libgazebo_ros_factory.so &
 pids+=("$!")
 sleep 6

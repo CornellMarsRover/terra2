@@ -48,3 +48,16 @@ truth. Footprint analysis does not establish wheel/contact dynamics.
 
 Fix the owner of the first broken boundary. Do not compensate downstream.
 Shutdown-only `ExternalShutdownException` and duplicate-shutdown traces are
+known cleanup noise; the same traces during motion are failures.
+
+## Iteration method
+
+Record a baseline, state one hypothesis, make one focused change, run relevant
+unit tests, run basic, then stress when warranted. Compare metrics and inspect
+visuals. Retain only evidence-supported changes. Keep generated sessions ignored.
+If committing, respect the repository's 50-changed-lines-per-commit convention;
+do not infer permission to commit or push.
+
+Report exact commands, course, wall-time limit, session path, acceptance status,
+metrics, visual observations, and remaining hardware limitations. Never present
+planar simulation as proof of physical swerve or Moteus behavior.

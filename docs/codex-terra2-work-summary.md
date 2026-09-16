@@ -48,3 +48,53 @@ point cloud, production costmap, production planner/controller, shared command
 mux, and simulation-only boundary adapters. It produced synchronized Gazebo,
 RGB, depth, costmap, pose, waypoint, and trajectory evidence.
 
+CI was repaired and expanded to build the ROS workspace, install missing ROS and
+Python dependencies, run focused autonomy coverage, isolate flaky integration
+tests, and run incremental C++ static analysis. The pure autonomy and mux cores
+are held to 100% line and branch coverage by `scripts/test_autonomy.sh`.
+
+## Git and branch management
+
+- Preserved and committed existing work before branch switches.
+- Created and used `anant-test-driving` for unified hardware-drive experiments.
+- Renamed the drive-testing branch to the requested snake-style name.
+- Created `feature/autonomy-obstacle-avoidance-cv` from autonomy work.
+- Kept Gazebo reference work separate from the obstacle-avoidance branch rather than merging `gazebo_sim` into it.
+- Created `anant/sim-bugfix-2026-07-07` for focused autonomy simulation fixes.
+- Created `codex/document-stale-branches` and documented inactive branches for contributors and future agents.
+- Created and developed `autonomy_fall2026` as the converged autonomy/drive branch.
+- Resolved local branch divergence and non-fast-forward situations without discarding recoverable work.
+- Kept commits intentionally small during the September work; the explicit constraint was no more than 50 changed lines per commit.
+- Configured the local repository identity as `agupt0318 <anantg001@gmail.com>`.
+- Pointed `origin` at the Cornell Mars Rover Terra2 repository.
+- Diagnosed why GitHub can display a profile name independently of `git config user.name`: attribution follows the commit email linked to the GitHub account.
+- Recovered/started Docker Desktop sufficiently to run repeated ROS 2 and Gazebo sessions in the `terra-sim` container.
+
+Branch tips at this audit:
+
+| Branch | Local tip | Tracking status |
+| --- | --- | --- |
+| `autonomy_fall2026` | `b37995e` | 12 commits ahead of `origin/autonomy_fall2026` |
+| `gazebo_sim` | `ad8667a` | 2 commits behind `origin/gazebo_sim` |
+| `feature/autonomy-obstacle-avoidance-cv` | `3ad00c3` | matches its origin ref |
+| `anant-test-driving` | `f8f23de` | 5 commits behind its origin ref |
+| `anant/sim-bugfix-2026-07-07` | `bd821e0` | matches its origin ref |
+| `codex/document-stale-branches` | `c33d814` | matches its origin ref |
+| `main` | `7ba1dac` | locally divergent: 6 ahead and 75 behind `origin/main` |
+
+## Initial drive and controller debugging
+
+- Traced UDP controller packets from the laptop to the Jetson-side ROS receiver.
+- Verified that controller packets reached `connect_node` and produced ROS drive messages.
+- Diagnosed Gazebo failures where commands arrived but joint effort calls failed with `Joint not found`.
+- Investigated scoped versus unscoped Gazebo joint names.
+- Added clearer drive-command and controller-packet logging.
+- Added a simple planar URDF as a known-good Gazebo baseline.
+- Added a Sony/DualSense UDP sender for direct end-to-end testing.
+- Documented controller sender startup and controller selection.
+- Explained ROS package discovery, workspace sourcing, and package listing.
+- Documented hardware startup order: controller on laptop, UDP receiver/mux/drive backend on Jetson, then optional autonomy.
+- Investigated unreachable Jetson SSH and network connectivity separately from ROS behavior.
+
+## Unified hardware drive node
+

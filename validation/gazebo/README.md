@@ -1,7 +1,4 @@
-# Gazebo obstacle-avoidance validation
-This harness uses the rover mesh from `gazebo_sim` without merging that branch.
-The depth camera and planar-motion plugin are simulation boundaries; planning,
-control, command arbitration, and messages are the production implementations.
+# Gazebo obstacle-avoidance harness
 
 ## Run
 

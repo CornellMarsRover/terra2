@@ -4,7 +4,9 @@ This directory is the repeatable ROS/Gazebo validation harness for rover driving
 and autonomy. New developers should begin with the
 [Gazebo autonomy onboarding guide](../../docs/gazebo-onboarding.md).
 
-Build once inside the ROS/Gazebo development container:
+## Quick reference
+
+From the repository root:
 
 ```bash
 cd /cmr/terra2

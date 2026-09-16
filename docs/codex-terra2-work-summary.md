@@ -348,3 +348,53 @@ Accepted result:
 - Command arbitration phases: autonomy, manual lateral, autonomy resume, manual turn, and second autonomy resume all passed.
 - Accepted logs had no critical runtime hits; headless ALSA warnings were nonfunctional audio warnings.
 
+### Physical obstacle validation
+
+The accepted three-obstacle run documented in `validation/gazebo/README.md`:
+
+- Reached two coordinate goals.
+- Detected all three blocks in `/autonomy/costmap`.
+- Evaluated 1,044 pose samples.
+- Recorded zero rover-footprint intersections.
+- Minimum center-block clearance: 0.601 m.
+- Minimum right-block clearance: 0.432 m.
+- Minimum left-block clearance: 0.833 m.
+
+The later elevated-camera run also logged two `TARGET REACHED` transitions before
+advancing to waypoint 3. The synchronized camera/costmap run logged waypoint 1 as
+reached before advancing to waypoint 2.
+
+## CI/CD and test framework
+
+- Added a local `rosdep` compatibility wrapper for CI.
+- Installed missing ROS control, controller, xacro, robot-state-publisher, RViz, Moteus, serial, coverage, and lint dependencies.
+- Refreshed the ROS apt signing key and source inside CI.
+- Removed a broken Xpra apt source from CI containers.
+- Hardened checkout and container user behavior.
+- Avoided discovering the ZED runtime node as a test module.
+- Routed flaky Fabric/watchdog checks through a retried integration stage.
+- Deferred Fabric callback teardown errors to avoid false test crashes.
+- Corrected end-effector test assumptions encountered by full-repository CI.
+- Made autonomy coverage output safe inside the development container.
+- Added `scripts/test_autonomy.sh`.
+- Enforced 100% line and branch coverage for extracted autonomy and mux cores.
+- Uploaded autonomy coverage as a GitHub Actions artifact.
+- Repaired the static-analysis environment.
+- Limited C++ formatting and `clang-tidy` to changed files.
+- Replaced the deprecated changed-files action with a direct Git diff.
+- Increased build/test workflow timeout to 45 minutes.
+- Documented remaining sensor-fixture, Gazebo, dropout, override, watchdog, and hardware-in-the-loop tests.
+
+## Code cleanup and reduction
+
+- Removed unused autonomy code paths and stale commentary.
+- Collapsed duplicate waypoint steering logic.
+- Removed unused Stanley-controller state.
+- Removed duplicate and obsolete global-target relay state/wiring.
+- Deleted the unused `global_planner.py` relay.
+- Removed dead odometry/simulation transform drafts.
+- Removed stale costmap test imports.
+- Removed bypassed point-turn and Ackermann callbacks after mux convergence.
+- Removed unused swerve backend values.
+- Refreshed generated package/topic summaries after each naming change.
+- Preserved arm runtime behavior; arm-related edits in the September diff were limited to CI/test compatibility, not drive architecture.

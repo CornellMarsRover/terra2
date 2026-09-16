@@ -48,3 +48,21 @@ result = {"samples": len(poses)}
 result["duration_s"] = poses[-1][0] - poses[0][0]
 result["path_length_m"] = sum(math.dist(a[1:3], b[1:3]) for a, b in zip(poses, poses[1:]))
 result["final_pose"] = poses[-1][1:3]
+result["goal_minimum_m"] = {
+    goal: min(math.dist(pose[1:3], tuple(map(float, goal.split(",")))) for pose in poses)
+    for goal in args.goal
+}
+result["obstacles"] = {}
+for name, obstacle in obstacles.items():
+    distances = [
+        rectangle(x, y, 1.08, 1.14, yaw).distance(obstacle)
+        for _, x, y, yaw in poses
+    ]
+    result["obstacles"][name] = {
+        "minimum_clearance_m": min(distances),
+        "intersection_samples": sum(distance <= 1e-6 for distance in distances),
+    }
+text = json.dumps(result, indent=2)
+print(text)
+if args.output:
+    open(args.output, "w", encoding="utf-8").write(text + "\n")

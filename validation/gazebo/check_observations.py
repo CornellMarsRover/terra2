@@ -48,3 +48,17 @@ with open(args.telemetry, encoding='utf-8') as stream:
             for name, shape in shapes.items():
                 if abs(x-shape.centroid.x) > 5 or abs(y-shape.centroid.y) > 5:
                     continue
+                distance = point.distance(shape)
+                if distance < seen[name]['nearest_cost_cell_m']:
+                    seen[name]['nearest_cost_cell_m'] = distance
+                if distance <= 0.6 and seen[name]['first_seen_sim_s'] is None:
+                    seen[name]['first_seen_sim_s'] = event['time_ns'] * 1e-9
+for result in seen.values():
+    if math.isinf(result['nearest_cost_cell_m']):
+        result['nearest_cost_cell_m'] = None
+    result['costmap_seen'] = result['first_seen_sim_s'] is not None
+text = json.dumps(seen, indent=2)
+print(text)
+if args.output:
+    with open(args.output, 'w', encoding='utf-8') as stream:
+        stream.write(text + '\n')

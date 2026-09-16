@@ -83,3 +83,13 @@ def test_decay_costs_defaults_to_all_cells():
 def test_decay_costs_rejects_negative_amount():
     with pytest.raises(ValueError, match="negative"):
         decay_costs({}, -1)
+
+
+def test_real_point_accepts_wide_zed_edge_bearing():
+    left = 2.0 * math.tan(math.radians(50.0))
+
+    result = project_point(
+        (2.0, left, -0.8), (0, 0), IDENTITY, True, 1, 1.2, 6, 0.25
+    )
+
+    assert result is not None

@@ -22,6 +22,7 @@ def project_point(
     min_depth: float,
     max_depth: float,
     cell_size: float,
+    max_bearing_deg: float = 55.0,
 ) -> Optional[GridObservation]:
     """Project one real or simulated camera point into a global grid cell."""
     if real:
@@ -29,7 +30,11 @@ def project_point(
         height = camera_height + point[2]
         distance = math.hypot(forward, left)
         bearing = math.degrees(math.atan2(left, forward))
-        if distance > max_depth or distance < min_depth or abs(bearing) > 45.0:
+        if (
+            distance > max_depth
+            or distance < min_depth
+            or abs(bearing) > max_bearing_deg
+        ):
             return None
     else:
         forward, left = point[2], point[0]

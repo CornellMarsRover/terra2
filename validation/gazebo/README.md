@@ -151,8 +151,9 @@ ROS/Gazebo development container:
 ./validation/gazebo/start_autonomy.sh
 ```
 
-The second script prints its per-session log directory. Stop each script with
-Ctrl-C. Generated logs and videos are ignored by Git.
+Both terminals must use the same `ROS_DOMAIN_ID` (default 96) and sourced
+workspace. This mode does not automatically record or score a run; prefer
+`./sim demo` for repeatable evidence.
 
 ## Shared control flow
 

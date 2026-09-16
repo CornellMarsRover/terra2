@@ -298,3 +298,53 @@ physical Gazebo blocks
   -> /autonomy/path/next_waypoint
   -> production controller
   -> /cmd_vel/autonomy
+  -> production command mux
+  -> /cmd_vel
+  -> Gazebo drive adapter
+  -> /drives/cmd_vel
+  -> Gazebo planar-motion backend
+  -> /drives/odom
+  -> autonomy pose adapter
+  -> /autonomy/pose/robot/global
+```
+
+## Testing performed
+
+### Automated tests
+
+- Added 549 lines of focused tests across planner, costmap, state-machine, drive-command, target-contract, and mux core files.
+- Reached 116 passing autonomy tests in the latest ROS container run.
+- Reached 51 passing focused planner/costmap tests after the inflation deadlock fix.
+- Built `cmr_msgs` and `autonomous_navigation` after the final planner change.
+- Previously built `cmr_msgs`, `cmr_rovernet`, and `autonomous_navigation` together during convergence testing.
+- Added malformed-message, finite-number, bounds, timeout, estop, source-switch, target, geometry, path, decay, and mission-transition cases.
+- Added ROS message contract tests.
+- Added repeatable drive-simulation checks with bounded retries.
+
+### April drive validation
+
+Three 16-case validation runs were retained:
+
+| Report | Result | Remaining failures |
+| --- | --- | --- |
+| `20260422_055516` | 14/16 | Ackermann-left threshold and lateral UDP mapping |
+| `20260422_055920` | 15/16 | Ackermann-left threshold |
+| `20260422_060333` | 16/16 | None |
+
+### September tele-op/autonomy convergence validation
+
+Accepted result:
+
+- Tele-op neutral start: passed.
+- Tele-op forward: 2.636 m translation.
+- Tele-op lateral: 2.132 m translation.
+- Tele-op left turn: 1.143 rad yaw change with negligible translation.
+- Tele-op reverse: 2.019 m translation.
+- Tele-op neutral end: passed.
+- Autonomy target: `(3.0, 1.0)`.
+- Autonomy final error: 0.242138 m.
+- Joint trajectory frame: `base_link`.
+- Joint count observed: 8.
+- Command arbitration phases: autonomy, manual lateral, autonomy resume, manual turn, and second autonomy resume all passed.
+- Accepted logs had no critical runtime hits; headless ALSA warnings were nonfunctional audio warnings.
+

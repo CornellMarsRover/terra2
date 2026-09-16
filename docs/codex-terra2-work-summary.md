@@ -398,3 +398,53 @@ reached before advancing to waypoint 2.
 - Removed unused swerve backend values.
 - Refreshed generated package/topic summaries after each naming change.
 - Preserved arm runtime behavior; arm-related edits in the September diff were limited to CI/test compatibility, not drive architecture.
+
+## Quality-of-life tooling and documentation
+
+- Added the top-level `./run` helper.
+- Added `./run setup`, `build`, `teleop`, `controller`, `auto`, `sim`, and `test` modes.
+- Made drive launch paths portable.
+- Made ROS setup sourcing safe and automatic.
+- Forwarded extra ROS launch arguments.
+- Added one-command dependency setup and rosdep initialization.
+- Scoped setup to the driving/autonomy packages.
+- Added controller dependency setup and controller-laptop instructions.
+- Added test-tool preflight checks.
+- Added `scripts/check_drive_sim.sh`.
+- Added `scripts/test_autonomy.sh`.
+- Added `docs/autonomy-architecture.md`.
+- Added `docs/codebase-map.md`.
+- Added `docs/ros-structure.md`.
+- Added README links to architecture maps rather than relying on oversized inline diagrams.
+- Fixed Mermaid compatibility and then corrected the diagrams against actual source topics/nodes.
+- Oriented the ROS control graph vertically with hardware at the bottom.
+- Documented the simulation boundary so diagrams do not imply Gazebo starts when it does not.
+- Added and refreshed generated package/topic/runtime indexes.
+- Documented stale branches on a dedicated branch.
+
+## Logging and generated evidence
+
+- Added per-session hardware-drive logging and ignored generated session data.
+- Added telemetry capture for pose, commands, joint state, waypoints, costmaps, and process logs.
+- Added JSON pass/fail summaries for Gazebo controller validation.
+- Added JSON convergence comparisons for identical tele-op/autonomy commands.
+- Added contact sheets for quick video review.
+- Kept pre-fix and aborted diagnostic logs where useful instead of presenting them as successful runs.
+- Added `.gitignore` coverage for generated Gazebo logs and videos.
+
+Notable final videos:
+
+| Artifact | Duration | What it shows |
+| --- | ---: | --- |
+| `logs/gazebo_validation/videos/udp_controller_demo.mp4` | 16 s | Controller-style UDP through ROS into Gazebo |
+| `logs/gazebo_validation/videos/direct_cmd_vel_drives_demo.mp4` | 16 s | Direct legacy drive topic validation |
+| `logs/gazebo_validation/videos/jointed_swerve_demo.mp4` | 12 s | Jointed swerve model behavior |
+| `logs/gazebo_convergence_20260906_020403/teleop_udp_demo.mp4` | 40 s | Accepted tele-op Gazebo run |
+| `logs/gazebo_convergence_20260906_020403/autonomy_waypoint_demo.mp4` | 22 s | Accepted autonomy waypoint run |
+| `logs/lower_control_convergence_20260906/same_commands_side_by_side.mp4` | 24 s | Same lower-level signals through tele-op and autonomy |
+| `validation/gazebo/videos/obstacle_avoidance_demo.mp4` | 65 s | Physical three-obstacle avoidance |
+| `validation/gazebo/videos/obstacle_avoidance_elevated.mp4` | 62.13 s | Higher overview of the same autonomy path |
+| `validation/gazebo/videos/obstacle_avoidance_camera_costmap.mp4` | 46.5 s | Synchronized Gazebo, RGB, depth, live costmap, pose trail, heading, and waypoint |
+
+## Accuracy and limitations
+

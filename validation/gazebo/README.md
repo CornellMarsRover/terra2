@@ -166,8 +166,10 @@ button. Other developers can fork the repository and enable Actions in the fork.
 
 ## Known limitations
 
-## Acceptance result
-
-The run reached two coordinate goals and detected all three blocks in the costmap.
-Across 1,044 poses it had zero footprint intersections; center, right, and left
-clearances were 0.601 m, 0.432 m, and 0.833 m.
+- The planar backend does not validate physical swerve wheel behavior.
+- The costmap lacks complete ray-traced free-space clearing.
+- Several planner/controller values remain code constants instead of ROS params.
+- Gazebo Classic is amd64-only in this setup and slow on ARM hosts.
+- Timed shutdown can print duplicate `rclpy.shutdown()` tracebacks after evidence
+  is already saved; runtime tracebacks before cleanup remain failures.
+- The coordinate-only course does not test ArUco target detection.

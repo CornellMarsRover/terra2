@@ -157,17 +157,12 @@ workspace. This mode does not automatically record or score a run; prefer
 
 ## GitHub-hosted run
 
-```text
-physical Gazebo blocks
-  -> rover depth camera -> /camera/points
-  -> production costmap -> /autonomy/costmap
-  -> production local planner -> /autonomy/path/next_waypoint
-  -> production controller -> /cmd_vel/autonomy (cmr_msgs/DriveCommand)
-  -> production command mux -> /cmd_vel
-  -> simulation drive adapter -> /drives/cmd_vel
-  -> Gazebo planar-motion plugin -> /drives/odom
-  -> simulation pose adapter -> /autonomy/pose/robot/global
-```
+Maintainers can use
+[Run Gazebo demo](https://github.com/CornellMarsRover/terra2/actions/workflows/gazebo-demo.yaml),
+choose a course and wall-time limit, then download the seven-day artifact. The
+workflow runs `setup`, `check`, and `demo` through the same `./sim` interface.
+GitHub requires the workflow on the default branch and write access for the Run
+button. Other developers can fork the repository and enable Actions in the fork.
 
 `object_detection` also receives the simulated RGB/depth camera topics, but it
 identifies requested ArUco mission targets. Collision avoidance itself uses the

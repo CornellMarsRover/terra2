@@ -48,3 +48,5 @@ while (( SECONDS < deadline )); do
 done
 cleanup
 video_pid=; pids=()
+python3 validation/gazebo/analyze_course.py "$WORLD" "$SESSION_DIR/odom.csv" --goal 15,15 --output "$SESSION_DIR/report.json" > "$SESSION_DIR/analysis.log"
+python3 validation/gazebo/summarize.py "$SESSION_DIR"

@@ -123,3 +123,9 @@ def test_select_target_routes_each_mission_mode(
     )
 
     assert decision.target == expected
+
+
+def test_select_target_respects_coordinate_threshold():
+    args = ((1.5, 0), (0, 0), (0, 0), [], 'coordinate', False, [])
+    assert select_target(*args, coordinate_threshold=1.0).reached is False
+    assert select_target(*args, coordinate_threshold=2.0).reached is True

@@ -122,6 +122,7 @@ def select_target(
     object_found: bool,
     search_points: Sequence[Point],
     far_threshold: float = 10.0,
+    coordinate_threshold: float = 2.0,
 ) -> TargetDecision:
     """Select the active mission target from the complete navigation state."""
     if math.dist(position, goal) > far_threshold:
@@ -133,7 +134,7 @@ def select_target(
             current_object != "coordinate" and object_found,
         )
     if current_object == "coordinate":
-        return coordinate_target(position, goal)
+        return coordinate_target(position, goal, coordinate_threshold)
     if not object_found:
         return search_target(position, current_target, search_points)
     return object_target(position, current_target)

@@ -39,6 +39,7 @@ class StateMachineNode(Node):
             get_package_share_directory('autonomous_navigation'),
             waypoints_file
         )
+        waypoints_path = self.declare_parameter("waypoints_file", waypoints_path).value
         self.get_logger().info(f"Waypoints file: {waypoints_path}")
         self.waypoints = self.load_waypoints(waypoints_path)
         if not self.waypoints:
@@ -85,6 +86,11 @@ class StateMachineNode(Node):
             7: ('coordinate', 2.0, 10.0),
         }
 
+        for index, waypoint in enumerate(self.waypoints[1:], 1):
+            if waypoint.get('type') == 'coordinate':
+                self.targets[index] = ('coordinate', float(waypoint.get('threshold', 2.0)), 10.0)
+
+        self.stop_pub = self.create_publisher(String, '/autonomy/stop', 10)
         self.r_step = 0.2
         self.theta_step = 15
         self.search_waypoint_threshold = 2.0
@@ -158,7 +164,7 @@ class StateMachineNode(Node):
           - set up object/search parameters
           - load preplanned coarse waypoints for this segment
         """
-        if self.current_waypoint_index not in self.targets:
+        if self.current_waypoint_index >= len(self.waypoints) or self.current_waypoint_index not in self.targets:
             return
 
         # assign search parameters
@@ -205,7 +211,8 @@ class StateMachineNode(Node):
         """
         # 2) global‐target / object search logic (as before)
         if self.current_waypoint_index >= len(self.waypoints):
-            self.get_logger().info('All waypoints reached.')
+            self.get_logger().info('All waypoints reached.', once=True)
+            self.stop_pub.publish(String(data='mission_complete'))
             return
 
         self.check_targets()
@@ -232,6 +239,7 @@ class StateMachineNode(Node):
             (self.north, self.west), tuple(self.next_coordinate),
             tuple(self.target_position), list(self.coarse_waypoints),
             self.current_object, self.object_found, list(self.search_waypoints),
+            coordinate_threshold=self.threshold,
         )
         if decision.pop_coarse:
             self.coarse_waypoints.popleft()

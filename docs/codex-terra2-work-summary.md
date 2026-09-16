@@ -648,3 +648,53 @@ the recoverable work history.
 - `e94c475` Test pure planner transitions (`agupt0318 <anantg001@gmail.com>`)
 - `ebe8733` Use deterministic local replanning (`agupt0318 <anantg001@gmail.com>`)
 - `ed205ce` Initialize rosdep during setup (`agupt0318 <anantg001@gmail.com>`)
+- `ed74ade` Document simple driving commands (`agupt0318 <anantg001@gmail.com>`)
+- `ee96c64` Preflight autonomy test tools (`agupt0318 <anantg001@gmail.com>`)
+- `f8ebdfa` Remove node-bound smoothing helpers (`agupt0318 <anantg001@gmail.com>`)
+
+### 2026-09-07
+
+- `082a54e` Test autonomy planner message contracts (`agupt0318 <anantg001@gmail.com>`)
+- `09fa89c` Cover autonomy target contracts in CI (`agupt0318 <anantg001@gmail.com>`)
+- `1a43f01` Add shared drive simulation check (`agupt0318 <anantg001@gmail.com>`)
+- `209de63` Publish initialized filtered simulation pose (`agupt0318 <anantg001@gmail.com>`)
+- `2d57fda` Remove dead odometry transform draft (`agupt0318 <anantg001@gmail.com>`)
+- `3239be1` Delete obsolete global target relay (`agupt0318 <anantg001@gmail.com>`)
+- `334d336` Trim dead controller commentary (`agupt0318 <anantg001@gmail.com>`)
+- `392df72` Define autonomy perception target contract (`agupt0318 <anantg001@gmail.com>`)
+- `4ffb285` Remove unused autonomy code paths (`agupt0318 <anantg001@gmail.com>`)
+- `5302be5` Delete inert autonomy code blocks (`agupt0318 <anantg001@gmail.com>`)
+- `53c320f` Stop autonomy on stale navigation data (`agupt0318 <anantg001@gmail.com>`)
+- `5825355` Fail closed on stale autonomy inputs (`agupt0318 <anantg001@gmail.com>`)
+- `5a80a7e` Test autonomy perception target contract (`agupt0318 <anantg001@gmail.com>`)
+- `5da7531` Remove deprecated changed-files action (`agupt0318 <anantg001@gmail.com>`)
+- `69dd679` Delete unused simulation transform draft (`agupt0318 <anantg001@gmail.com>`)
+- `6ee23b5` Match perception detections to mission steps (`agupt0318 <anantg001@gmail.com>`)
+- `799d311` Remove unused Stanley controller state (`agupt0318 <anantg001@gmail.com>`)
+- `9f3b4b8` Remove duplicate target relay wiring (`agupt0318 <anantg001@gmail.com>`)
+- `a8a2bca` Require GPS before publishing autonomy pose (`agupt0318 <anantg001@gmail.com>`)
+- `ac4e953` Harden autonomy planner message inputs (`agupt0318 <anantg001@gmail.com>`)
+- `af7dd64` Collapse duplicate waypoint steering paths (`agupt0318 <anantg001@gmail.com>`)
+- `b0333ae` Strip dead global relay state (`agupt0318 <anantg001@gmail.com>`)
+- `b2a5026` Reject unsafe autonomy planner transitions (`agupt0318 <anantg001@gmail.com>`)
+- `c1bfda3` Test autonomy planner safety boundaries (`agupt0318 <anantg001@gmail.com>`)
+- `c892b6b` Document autonomy nodes and Gazebo validation (`agupt0318 <anantg001@gmail.com>`)
+- `db45ed4` Map autonomy control architecture (`agupt0318 <anantg001@gmail.com>`)
+- `e0a9a04` Hold unsafe autonomy paths before replanning (`agupt0318 <anantg001@gmail.com>`)
+- `fe6e872` Link autonomy architecture guide (`agupt0318 <anantg001@gmail.com>`)
+
+### 2026-09-08
+
+- `5f15515` Remove stale costmap test import (`agupt0318 <anantg001@gmail.com>`)
+
+### 2026-09-09
+
+- `01f2ab3` Add selected drive command endpoint (`agupt0318 <anantg001@gmail.com>`)
+- `045dcb4` Register drive command mux node (`agupt0318 <anantg001@gmail.com>`)
+- `06fde04` Delete bypassed Ackermann callback (`agupt0318 <anantg001@gmail.com>`)
+- `1766e03` Add runtime drive source selection (`agupt0318 <anantg001@gmail.com>`)
+- `1ced9f6` Fix ROS Mermaid compatibility (`agupt0318 <anantg001@gmail.com>`)
+- `2fc80e8` Define normalized rover drive command (`agupt0318 <anantg001@gmail.com>`)
+- `3175892` Test drive command mux safety (`agupt0318 <anantg001@gmail.com>`)
+- `3366fa5` Publish named autonomy drive commands (`agupt0318 <anantg001@gmail.com>`)
+- `3de939a` Link architecture maps from README (`agupt0318 <anantg001@gmail.com>`)

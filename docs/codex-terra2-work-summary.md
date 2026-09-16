@@ -748,3 +748,53 @@ the recoverable work history.
 - `9fa125e` Bridge Gazebo odometry into autonomy pose (`agupt0318 <anantg001@gmail.com>`)
 - `aa068fb` Avoid stopping inside soft costmap inflation (`agupt0318 <anantg001@gmail.com>`)
 - `af6fe7c` Document physical obstacle avoidance validation (`agupt0318 <anantg001@gmail.com>`)
+- `b37995e` Raise Gazebo obstacle course camera (`agupt0318 <anantg001@gmail.com>`)
+- `c663dfc` Keep obstacle replanning mobile and collision-safe (`agupt0318 <anantg001@gmail.com>`)
+
+### Additional clearly associated GitHub commit
+
+- `ad3d169` Clarify instructions for running Sony controller sender (`Anant Gupta <97643890+agupt0318@users.noreply.github.com>`)
+
+## Generated media inventory
+
+These files are local evidence and are generally ignored by Git. Calibration
+images that predated this work are excluded.
+
+- `logs/autonomy_demo/autonomy_obstacle_avoidance_demo.mp4` (26.00 s)
+- `logs/autonomy_demo/gazebo_demo_raw.mp4` (26.00 s)
+- `logs/autonomy_demo/map_demo.mp4` (26.00 s)
+- `logs/autonomy_multi/map_demo.mp4` (10.00 s)
+- `logs/autonomy_multi_demo/autonomy_multi_obstacle_demo.mp4` (16.00 s)
+- `logs/autonomy_multi_demo/gazebo_demo_raw.mp4` (16.00 s)
+- `logs/autonomy_multi_demo/map_demo.mp4` (16.00 s)
+- `logs/autonomy_shared_demo/autonomy_obstacle_avoidance_demo_shared_path.mp4` (18.00 s)
+- `logs/autonomy_shared_demo/gazebo_demo_raw.mp4` (18.00 s)
+- `logs/autonomy_shared_demo/map_demo.mp4` (18.00 s)
+- `logs/autonomy_shared_demo_cleaner/autonomy_obstacle_avoidance_demo_shared_path_cleaner.mp4` (39.90 s)
+- `logs/autonomy_shared_demo_cleaner/gazebo_demo_raw.mp4` (40.00 s)
+- `logs/autonomy_shared_demo_cleaner/map_demo.mp4` (38.60 s)
+- `logs/autonomy_shared_demo_regen/autonomy_obstacle_avoidance_demo_regen.mp4` (32.00 s)
+- `logs/autonomy_shared_demo_regen/gazebo_demo_raw.mp4` (32.00 s)
+- `logs/autonomy_shared_demo_regen/map_demo.mp4` (32.00 s)
+- `logs/gazebo_convergence_20260906_020403/autonomy_baseline_slow.mp4` (14.00 s)
+- `logs/gazebo_convergence_20260906_020403/autonomy_contact_sheet.png`
+- `logs/gazebo_convergence_20260906_020403/autonomy_waypoint_demo.mp4` (22.00 s)
+- `logs/gazebo_convergence_20260906_020403/gazebo_follow.png`
+- `logs/gazebo_convergence_20260906_020403/gazebo_framed.png`
+- `logs/gazebo_convergence_20260906_020403/gazebo_initial.png`
+- `logs/gazebo_convergence_20260906_020403/teleop_contact_sheet.png`
+- `logs/gazebo_convergence_20260906_020403/teleop_udp_demo.mp4` (40.00 s)
+- `logs/gazebo_convergence_20260906_020403/teleop_udp_demo_raw.mp4` (18.00 s)
+- `logs/gazebo_convergence_20260906_020403/teleop_udp_demo_raw_clean.mp4` (18.00 s)
+- `logs/gazebo_validation/videos/autonomy_gzprobe.png`
+- `logs/gazebo_validation/videos/direct_cmd_vel_drives_demo.mp4` (16.00 s)
+- `logs/gazebo_validation/videos/host_screen_check.png`
+- `logs/gazebo_validation/videos/host_screen_check2.png`
+- `logs/gazebo_validation/videos/jointed_swerve_demo.mp4` (12.00 s)
+- `logs/gazebo_validation/videos/udp_controller_demo.mp4` (16.00 s)
+- `logs/lower_control_convergence_20260906/autonomy_same_commands.mp4` (24.00 s)
+- `logs/lower_control_convergence_20260906/gui_probe.mp4` (2.00 s)
+- `logs/lower_control_convergence_20260906/labels.png`
+- `logs/lower_control_convergence_20260906/same_commands_preview.png`
+- `logs/lower_control_convergence_20260906/same_commands_side_by_side.mp4` (24.00 s)
+- `logs/lower_control_convergence_20260906/teleop_same_commands.mp4` (24.00 s)

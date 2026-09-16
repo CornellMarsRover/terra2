@@ -98,3 +98,31 @@ def main():
             frame = self.path.startswith('/frame')
             body = node.jpeg if frame else b'<html><body style="background:#181818;color:white"><h3>Live ROS telemetry</h3><img id="feed" src="/frame"><script>setInterval(()=>feed.src="/frame?t="+Date.now(),500)</script></body></html>'
             self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg' if frame else 'text/html')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+        def log_message(self, *_):
+            pass
+    server = ThreadingHTTPServer(('0.0.0.0', 8765), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        last = 0
+        while rclpy.ok():
+            rclpy.spin_once(node, timeout_sec=.05)
+            if time.monotonic() - last > 0.5:
+                node.render()
+                last = time.monotonic()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.events.close()
+        server.shutdown()
+        node.destroy_node()
+        cv2.destroyAllWindows()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

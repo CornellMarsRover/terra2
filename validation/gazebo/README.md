@@ -9,9 +9,12 @@ and autonomy. New developers should begin with the
 From the repository root:
 
 ```bash
-cd /cmr/terra2
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install --packages-select cmr_msgs cmr_rovernet autonomous_navigation
+./sim setup                 # Build the public-base Docker image once
+./sim doctor                # Verify ROS, Gazebo, Xvfb, ffmpeg, and Python tools
+./sim check                 # Run tests and build the three driving packages
+./sim demo basic 300        # Fast regression and video
+./sim demo stress 420       # Full obstacle-course acceptance and video
+./sim report                # Print the newest summary
 ```
 
 Use two container terminals with the same optional `ROS_DOMAIN_ID` (default 96):

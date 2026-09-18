@@ -12,6 +12,12 @@ from pathlib import Path
 import rclpy
 import toml
 from cmr_msgs.msg import ControllerReading
+from cmr_rovernet.drive_modes import (
+    DriveMode,
+    drive_mode_for_dpad,
+    parse_drive_mode,
+    shape_motion_for_mode,
+)
 from cmr_rovernet.moteus_drive_gui import (
     make_transport_and_controllers,
     query_one,
@@ -232,6 +238,10 @@ class UsamaControlRosNode(Node):
         self.declare_parameter("manual_override_priority", True)
         self.declare_parameter("autonomy_priority", True)
         self.declare_parameter("capture_steer_zero_on_start", True)
+        self.declare_parameter(
+            "drive_mode",
+            DriveMode.TRANSLATION_ROTATION.value,
+        )
 
         self.port = str(self._setting("can_port", config))
         self.timeout_s = float(self._setting("timeout_s", config))
@@ -267,6 +277,15 @@ class UsamaControlRosNode(Node):
         self.capture_steer_zero_on_start = bool(
             self._setting("capture_steer_zero_on_start", config)
         )
+        configured_drive_mode = str(self._setting("drive_mode", config))
+        try:
+            self._drive_mode = parse_drive_mode(configured_drive_mode)
+        except ValueError:
+            self.get_logger().warn(
+                f"Unknown drive_mode={configured_drive_mode!r}; using "
+                f"{DriveMode.TRANSLATION_ROTATION.value}"
+            )
+            self._drive_mode = DriveMode.TRANSLATION_ROTATION
 
         self._manual = ManualCommandState()
         self._autonomy = AutonomyCommandState()
@@ -276,6 +295,7 @@ class UsamaControlRosNode(Node):
         self._shutdown = threading.Event()
         self._steer_center_offsets = dict(STEER_CENTER_OFFSETS)
         self._last_manual_drive_axis_sign = 1.0
+        self._mode_change_pending = False
 
         self.create_subscription(
             TwistStamped,
@@ -310,6 +330,10 @@ class UsamaControlRosNode(Node):
             f"half={self.half_speed_multiplier:.2f}x, "
             f"double={self.double_speed_multiplier:.2f}x, "
             f"triple={self.triple_speed_multiplier:.2f}x"
+        )
+        self.get_logger().info(
+            f"Drive mode={self._drive_mode.value}. D-pad: up=translation+rotation, "
+            "right=Ackermann, down=point turn, left=steady heading"
         )
 
     def _load_node_config(self) -> dict[str, object]:
@@ -383,6 +407,7 @@ class UsamaControlRosNode(Node):
         l2 = decoded["l2"]
         r2 = decoded["r2"]
         estop_pressed = bool(l1) and bool(triangle)
+        requested_mode = drive_mode_for_dpad(msg.dpad)
 
         with self._lock:
             if estop_pressed and not self._estop_latched:
@@ -400,6 +425,15 @@ class UsamaControlRosNode(Node):
                 self._manual.speed_rps = 0.0
                 self._manual.updated_at = time.time()
                 return
+
+            if requested_mode is not None and requested_mode is not self._drive_mode:
+                previous_mode = self._drive_mode
+                self._drive_mode = requested_mode
+                self._mode_change_pending = True
+                self.get_logger().info(
+                    f"Drive mode changed: {previous_mode.value} -> "
+                    f"{requested_mode.value}; stopping before new-mode commands"
+                )
 
             speed_rps = self._manual_speed_rps(l1=l1, r1=r1, l2=l2, r2=r2)
 
@@ -437,7 +471,7 @@ class UsamaControlRosNode(Node):
                     f"selected drive command: {command}",
                     throttle_duration_sec=1.0,
                 )
-                if command["mode"] in {"idle", "estop"}:
+                if command["mode"] in {"idle", "estop", "mode_change"}:
                     if self._last_source != command["source"]:
                         self.get_logger().info(
                             f"Drive source switched to {command['source']}"
@@ -509,8 +543,15 @@ class UsamaControlRosNode(Node):
         with self._lock:
             if self._estop_latched:
                 return {"mode": "estop", "source": "controller_estop"}
+            if self._mode_change_pending:
+                self._mode_change_pending = False
+                return {
+                    "mode": "mode_change",
+                    "source": f"mode_change:{self._drive_mode.value}",
+                }
             manual = ManualCommandState(**self._manual.__dict__)
             autonomy = AutonomyCommandState(**self._autonomy.__dict__)
+            drive_mode = self._drive_mode
 
         manual_active = (now - manual.updated_at) <= self.command_timeout_s and (
             abs(manual.speed_rps) > COMMAND_EPSILON
@@ -525,14 +566,40 @@ class UsamaControlRosNode(Node):
         )
 
         if manual_active and self.manual_override_priority:
-            return self._manual_command(manual)
+            command = self._manual_command(manual)
+            return self._shape_command_for_drive_mode(command, drive_mode)
         if autonomy_active and self.autonomy_priority:
-            return self._autonomy_command(autonomy)
+            command = self._autonomy_command(autonomy)
+            return self._shape_command_for_drive_mode(command, drive_mode)
         if manual_active:
-            return self._manual_command(manual)
+            command = self._manual_command(manual)
+            return self._shape_command_for_drive_mode(command, drive_mode)
         if autonomy_active:
-            return self._autonomy_command(autonomy)
+            command = self._autonomy_command(autonomy)
+            return self._shape_command_for_drive_mode(command, drive_mode)
         return {"mode": "idle", "source": "idle"}
+
+    @staticmethod
+    def _shape_command_for_drive_mode(
+        command: dict[str, object],
+        drive_mode: DriveMode,
+    ) -> dict[str, object]:
+        vx, vy, omega = shape_motion_for_mode(
+            drive_mode,
+            float(command["vx"]),
+            float(command["vy"]),
+            float(command["omega"]),
+        )
+        shaped = dict(command)
+        shaped.update(
+            {
+                "drive_mode": drive_mode.value,
+                "vx": vx,
+                "vy": vy,
+                "omega": omega,
+            }
+        )
+        return shaped
 
     def _manual_command(self, manual: ManualCommandState) -> dict[str, object]:
         drive_axis_sign = self._manual_drive_axis_sign(manual.vx)

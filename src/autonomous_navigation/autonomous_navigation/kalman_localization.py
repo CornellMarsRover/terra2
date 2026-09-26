@@ -25,7 +25,6 @@ from typing import Iterable, Union
 import numpy as np
 import rclpy
 from geometry_msgs.msg import TwistStamped, TwistWithCovarianceStamped
-from nav_msgs.msg import Odometry  # (not used directly, kept for reference)
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
 

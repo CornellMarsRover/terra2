@@ -13,9 +13,9 @@ from cmr_rovernet.rovernet_utils import *
 class CmdVelSubscriber(Node):
     """
     Subscribes to:
-      - /drives_controller/cmd_vel
+      - /controller/drives/axes
       - /autonomy_move
-      - /drives_controller/cmd_buttons
+      - /controller/drives/buttons
 
     Sends drive velocity commands and steer position commands to moteus.
     """
@@ -25,7 +25,7 @@ class CmdVelSubscriber(Node):
 
         self.create_subscription(
             TwistStamped,
-            "/drives_controller/cmd_vel",
+            "/controller/drives/axes",
             self.listener_callback,
             10,
         )
@@ -37,7 +37,7 @@ class CmdVelSubscriber(Node):
         )
         self.create_subscription(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             self.listener_button_callback,
             10,
         )

@@ -1,6 +1,10 @@
 import unittest
 
-from cmr_zed.gesture_core import GestureResult, GestureStabilizer, classify_pose
+from astronaut_autonomy.gesture_core import (
+    GestureResult,
+    GestureStabilizer,
+    classify_pose,
+)
 
 
 def pose_template():

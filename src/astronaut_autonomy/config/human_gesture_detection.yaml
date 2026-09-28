@@ -1,7 +1,6 @@
 human_gesture_detection:
   ros__parameters:
-    # Copy this model onto the rover before offline field use. Ultralytics will
-    # otherwise attempt to download it the first time the node starts.
+    # Prepare this model with ./run gesture-setup before offline field use.
     model_path: "yolo26n-pose.pt"
     image_topic: "/zed/image"
     confidence_threshold: 0.50

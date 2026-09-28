@@ -1,7 +1,8 @@
-# CMR ZED Human Gesture Detection
+# Astronaut Autonomy
 
-This package contains the ZED camera publisher and an experimental human
-gesture detector for astronaut autonomy. The gesture detector uses an
+This ROS 2 package contains the experimental human gesture detector for
+astronaut autonomy. It consumes images from a camera package such as `cmr_zed`
+without depending on a specific camera implementation. The detector uses an
 Ultralytics YOLO pose model to locate a person's body keypoints and classify
 simple static arm gestures.
 
@@ -67,9 +68,9 @@ The commands perform these tasks:
 
 - `./run setup` installs ROS package dependencies declared in `package.xml`.
 - `./run gesture-setup` installs `ultralytics` from `requirements.txt` and
-  downloads `yolo26n-pose.pt` into `src/cmr_zed/config`.
+  downloads `yolo26n-pose.pt` into `src/astronaut_autonomy/config`.
 - `./run build` builds the ROS workspace and copies the configuration and pose
-  weights into the installed `cmr_zed` package.
+  weights into the installed `astronaut_autonomy` package.
 
 `requirements.txt` contains the Ultralytics package dependency. It does not
 contain the model weights themselves. The weights are downloaded by
@@ -96,7 +97,8 @@ Leave that process running. In a second terminal at the repository root, run:
 ```
 
 `./run gesture` loads the installed configuration and `yolo26n-pose.pt`, then
-starts the `human_gesture_detection` ROS node.
+starts the `human_gesture_detection` node from the `astronaut_autonomy`
+package.
 
 ## Verifying the system
 

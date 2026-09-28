@@ -18,9 +18,9 @@ source /opt/ros/humble/setup.bash
 source "$ROOT/install/setup.bash"
 set -u
 
-package_prefix="$(ros2 pkg prefix cmr_zed)"
-config="$package_prefix/share/cmr_zed/config/human_gesture_detection.yaml"
-model="$package_prefix/share/cmr_zed/config/yolo26n-pose.pt"
+package_prefix="$(ros2 pkg prefix astronaut_autonomy)"
+config="$package_prefix/share/astronaut_autonomy/config/human_gesture_detection.yaml"
+model="$package_prefix/share/astronaut_autonomy/config/yolo26n-pose.pt"
 
 if [[ ! -f "$config" || ! -f "$model" ]]; then
   echo "Gesture configuration or model is missing." >&2
@@ -28,7 +28,7 @@ if [[ ! -f "$config" || ! -f "$model" ]]; then
   exit 1
 fi
 
-exec ros2 run cmr_zed human_gesture_detection --ros-args \
+exec ros2 run astronaut_autonomy human_gesture_detection --ros-args \
   --params-file "$config" \
   -p "model_path:=$model" \
   "$@"

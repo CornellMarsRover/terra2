@@ -27,13 +27,13 @@ case "$mode" in
     exec python3 drive_control.py "$@"
     ;;
   gesture-setup)
-    python3 -m pip install -r src/cmr_zed/requirements.txt "$@"
+    python3 -m pip install -r src/astronaut_autonomy/requirements.txt "$@"
     (
-      cd src/cmr_zed/config
+      cd src/astronaut_autonomy/config
       python3 -c 'from ultralytics import YOLO; YOLO("yolo26n-pose.pt")'
     )
-    if [[ ! -f src/cmr_zed/config/yolo26n-pose.pt ]]; then
-      echo "Ultralytics did not place yolo26n-pose.pt in src/cmr_zed/config." >&2
+    if [[ ! -f src/astronaut_autonomy/config/yolo26n-pose.pt ]]; then
+      echo "Ultralytics did not place yolo26n-pose.pt in src/astronaut_autonomy/config." >&2
       exit 1
     fi
     echo "Gesture prerequisites ready. Run: ./run build"
@@ -59,12 +59,12 @@ set -u
 if [[ "$mode" == setup ]]; then
   [[ -f /etc/ros/rosdep/sources.list.d/20-default.list ]] || sudo rosdep init
   rosdep update
-  paths=(src/{cmr_msgs,cmr_utils,cmr_fabric,cmr_controller_remote,cmr_rovernet,cmr_zed,autonomous_navigation})
+  paths=(src/{cmr_msgs,cmr_utils,cmr_fabric,cmr_controller_remote,cmr_rovernet,cmr_zed,astronaut_autonomy,autonomous_navigation})
   exec rosdep install --from-paths "${paths[@]}" --ignore-src -r -y "$@"
 fi
 if [[ "$mode" == build ]]; then
   exec colcon build --symlink-install --packages-up-to \
-    cmr_fabric cmr_controller_remote cmr_rovernet cmr_zed autonomous_navigation "$@"
+    cmr_fabric cmr_controller_remote cmr_rovernet cmr_zed astronaut_autonomy autonomous_navigation "$@"
 fi
 if [[ ! -f install/setup.bash ]]; then
   echo "Workspace is not built. Run: ./run build" >&2

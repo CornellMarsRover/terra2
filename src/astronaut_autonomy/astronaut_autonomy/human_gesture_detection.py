@@ -13,7 +13,11 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Float32, String
 from ultralytics import YOLO
 
-from cmr_zed.gesture_core import GestureResult, GestureStabilizer, classify_pose
+from astronaut_autonomy.gesture_core import (
+    GestureResult,
+    GestureStabilizer,
+    classify_pose,
+)
 
 
 class HumanGestureDetectionNode(Node):

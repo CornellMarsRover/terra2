@@ -1,4 +1,4 @@
-"""Pure human-pose gesture classification and temporal stabilization."""
+"""Pure astronaut-pose gesture classification and temporal stabilization."""
 
 from __future__ import annotations
 

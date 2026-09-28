@@ -23,9 +23,10 @@ Run this once while the rover has internet access, then build the workspace:
 ```
 
 `gesture-setup` installs the Python dependency from `requirements.txt` and asks
-Ultralytics to download `yolo26n-pose.pt` into `src/cmr_zed/config`. The weight
-file is ignored by Git but is copied into the installed ROS package by the next
-build, allowing later field runs without internet access.
+Ultralytics to download `yolo26n-pose.pt` into
+`src/astronaut_autonomy/config`. The weight file is ignored by Git but is
+copied into the installed ROS package by the next build, allowing later field
+runs without internet access.
 
 PyTorch installation is platform-specific. On a Jetson, install the NVIDIA-
 compatible PyTorch build before running `gesture-setup` if the device does not

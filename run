@@ -11,6 +11,7 @@ Usage: ./run MODE
   teleop      Start controller receiver and rover drive hardware
   controller  Send input; add `setup` once on the laptop
   auto        Start hardware autonomy and rover drive hardware
+  gesture     Start human gesture detection separately
   sim         Start autonomy with simulated sensor inputs
   test        Run focused autonomy tests
   help        Show this guide
@@ -45,7 +46,7 @@ case "$mode" in
     }
     exec bash scripts/test_autonomy.sh "$@"
     ;;
-  build|setup|teleop|auto|sim) ;;
+  build|setup|teleop|auto|gesture|sim) ;;
   *) echo "Unknown mode: $mode" >&2; usage >&2; exit 2 ;;
 esac
 if [[ ! -f /opt/ros/humble/setup.bash ]]; then
@@ -75,5 +76,6 @@ set -u
 case "$mode" in
   teleop) exec ros2 launch cmr_rovernet rovernet.launch.py enable_arm:=false "$@" ;;
   auto) exec ros2 launch autonomous_navigation localization_real.launch.py "$@" ;;
+  gesture) exec bash scripts/run_human_gesture_detection.sh "$@" ;;
   sim) exec ros2 launch autonomous_navigation sim_autonomy.launch.py "$@" ;;
 esac

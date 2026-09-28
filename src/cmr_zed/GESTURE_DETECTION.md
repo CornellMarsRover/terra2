@@ -33,20 +33,25 @@ already have it.
 
 ## Run it
 
-Start the ZED publisher, then start the gesture node manually:
+Start the ZED publisher, then run the gesture detector in a separate terminal:
 
 ```bash
 ros2 run cmr_zed threaded
-ros2 run cmr_zed human_gesture_detection --ros-args \
-  --params-file "$(ros2 pkg prefix cmr_zed)/share/cmr_zed/config/human_gesture_detection.yaml" \
-  -p "model_path:=$(ros2 pkg prefix cmr_zed)/share/cmr_zed/config/yolo26n-pose.pt"
+./run gesture
 ```
 
-Or enable the experimental node with the real autonomy launch:
+The regular `./run auto` command does not start gesture detection. The existing
+bottle/mallet detector and the new gesture detector remain separate, and both
+can subscribe to `/zed/image` at the same time. For example, run the existing
+detector in one terminal and the gesture detector in another:
 
 ```bash
-./run auto enable_gesture_detection:=true
+ros2 run cmr_zed test_detection
+./run gesture
 ```
+
+Running both neural networks simultaneously increases GPU usage, so verify the
+frame rate and thermals on the Jetson.
 
 The node publishes:
 

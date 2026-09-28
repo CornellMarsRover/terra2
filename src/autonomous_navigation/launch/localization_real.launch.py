@@ -2,12 +2,39 @@ import launch
 import launch_ros.actions
 from os import path
 from ament_index_python.packages import get_package_share_directory
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     drive_config = path.join(
         get_package_share_directory("cmr_rovernet"), "config", "drivesnet.toml"
     )
+    gesture_config = path.join(
+        get_package_share_directory("cmr_zed"),
+        "config",
+        "human_gesture_detection.yaml",
+    )
+    gesture_model = path.join(
+        get_package_share_directory("cmr_zed"),
+        "config",
+        "yolo26n-pose.pt",
+    )
+    enable_gesture_detection = LaunchConfiguration("enable_gesture_detection")
     return launch.LaunchDescription([
+        DeclareLaunchArgument(
+            "enable_gesture_detection",
+            default_value="false",
+            description="Run the experimental human gesture detector",
+        ),
+        launch_ros.actions.Node(
+            package="cmr_zed",
+            executable="human_gesture_detection",
+            name="human_gesture_detection",
+            output="screen",
+            parameters=[gesture_config, {"model_path": gesture_model}],
+            condition=IfCondition(enable_gesture_detection),
+        ),
         launch_ros.actions.Node(
             package='cmr_rovernet',
             executable='drive_command_mux',

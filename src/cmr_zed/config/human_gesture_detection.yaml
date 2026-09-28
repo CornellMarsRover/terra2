@@ -1,0 +1,11 @@
+human_gesture_detection:
+  ros__parameters:
+    # Copy this model onto the rover before offline field use. Ultralytics will
+    # otherwise attempt to download it the first time the node starts.
+    model_path: "yolo26n-pose.pt"
+    image_topic: "/zed/image"
+    confidence_threshold: 0.50
+    keypoint_threshold: 0.35
+    confirmation_frames: 5
+    clear_frames: 5
+    publish_debug_image: true

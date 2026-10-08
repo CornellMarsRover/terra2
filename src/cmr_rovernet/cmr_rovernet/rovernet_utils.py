@@ -211,6 +211,38 @@ async def _query_moteus_async(controller: moteus.Controller):
     return await controller.query()
 
 
+async def _query_moteus_batch_async(transport, controllers):
+    """Query every controller in one fdcanusb cycle."""
+    results = await transport.cycle(
+        [controller.make_query() for controller in controllers.values()]
+    )
+    results_by_id = {result.id: result for result in results}
+    return {
+        joint_name: results_by_id.get(controller.id)
+        for joint_name, controller in controllers.items()
+    }
+
+
+async def _send_moteus_position_batch_async(transport, commands):
+    """Send simultaneous position commands and request motor status replies."""
+    moteus_commands = []
+    for command in commands:
+        moteus_commands.append(
+            command["controller"].make_position(
+                position=command["position"],
+                velocity=command.get("velocity", math.nan),
+                maximum_torque=command["maximum_torque"],
+                velocity_limit=command["velocity_limit"],
+                accel_limit=command["accel_limit"],
+                feedforward_torque=command.get("feedforward_torque", 0.0),
+                query=True,
+            )
+        )
+
+    results = await transport.cycle(moteus_commands)
+    return {result.id: result for result in results}
+
+
 async def _make_moteus_transport_and_controllers_async(
     can_port: str,
     motor_ids: dict[str, int],
@@ -250,6 +282,32 @@ def query_moteus_sync(controller: moteus.Controller, timeout_s: float = 0.2):
         raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
 
     future = asyncio.run_coroutine_threadsafe(_query_moteus_async(controller), _moteus_loop)
+    return future.result(timeout=timeout_s)
+
+
+def query_moteus_batch_sync(transport, controllers, timeout_s: float = 0.5):
+    """Synchronously query a controller mapping in one CAN transaction."""
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        _query_moteus_batch_async(transport, controllers),
+        _moteus_loop,
+    )
+    return future.result(timeout=timeout_s)
+
+
+def send_moteus_position_batch_sync(transport, commands, timeout_s: float = 0.5):
+    """Synchronously send a group of position commands in one CAN transaction."""
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(
+        _send_moteus_position_batch_async(transport, commands),
+        _moteus_loop,
+    )
     return future.result(timeout=timeout_s)
 
 

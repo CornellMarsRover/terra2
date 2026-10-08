@@ -9,6 +9,13 @@ restart_delay = 10
 
 [node]
 can_port = "/dev/serial/by-id/usb-mjbots_fdcanusb_F4344687-if01"
-publish_hardware_joint_states = false
-use_legacy_ik_command_mapping = true
+publish_hardware_joint_states = true
+use_legacy_ik_command_mapping = false
 start_in_moveit_mode = true
+require_hardware_state = true
+hardware_state_timeout_s = 0.5
+max_joint_command_delta_rad = 0.15
+motor_velocity_limit = 2.0
+motor_accel_limit = 2.0
+maximum_torque = 0.7
+joint_state_rate_hz = 10.0

@@ -5,6 +5,7 @@ from cmr_msgs.msg import MiniArmDegree
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory
 import time
+import math
 import serial
 import toml
 from cmr_rovernet.rovernet_utils import *
@@ -75,11 +76,32 @@ class JSInputSubscriber(Node):
         self.moveit_mode = int(bool(node_config.get("start_in_moveit_mode", False)))
         self.arm_can_port = str(node_config.get("can_port", "/dev/ttyACM1"))
         self.publish_hardware_joint_states = bool(
-            node_config.get("publish_hardware_joint_states", False)
+            node_config.get("publish_hardware_joint_states", True)
         )
         self.use_legacy_ik_command_mapping = bool(
-            node_config.get("use_legacy_ik_command_mapping", True)
+            node_config.get("use_legacy_ik_command_mapping", False)
         )
+        self.require_hardware_state = bool(
+            node_config.get("require_hardware_state", True)
+        )
+        self.hardware_state_timeout_s = float(
+            node_config.get("hardware_state_timeout_s", 0.5)
+        )
+        self.max_joint_command_delta_rad = float(
+            node_config.get("max_joint_command_delta_rad", 0.15)
+        )
+        self.motor_velocity_limit = float(
+            node_config.get("motor_velocity_limit", 0.5)
+        )
+        self.motor_accel_limit = float(
+            node_config.get("motor_accel_limit", 1.0)
+        )
+        self.maximum_torque = float(node_config.get("maximum_torque", MAX_TORQUE))
+        self.joint_state_rate_hz = float(node_config.get("joint_state_rate_hz", 10.0))
+        self.latest_joint_positions = None
+        self.last_hardware_state_time = None
+        self.hardware_state_ready_logged = False
+        self.hardware_fault_active = False
         self.arm_transport, self.controllers = make_moteus_transport_and_controllers_sync(
             self.arm_can_port,
             JOINT_MOTOR_IDS,
@@ -88,13 +110,20 @@ class JSInputSubscriber(Node):
         self.joint_state_timer = None
         if self.publish_hardware_joint_states:
             self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
-            self.joint_state_timer = self.create_timer(0.1, self.publish_joint_states)
+            timer_period = 1.0 / max(self.joint_state_rate_hz, 1.0)
+            self.joint_state_timer = self.create_timer(timer_period, self.publish_joint_states)
         self.get_logger().info(f"Arm moteus fdcanusb transport: {self.arm_can_port}")
         self.get_logger().info(
             f"Arm hardware joint-state publishing: {self.publish_hardware_joint_states}"
         )
         self.get_logger().info(
             f"Arm legacy IK command mapping: {self.use_legacy_ik_command_mapping}"
+        )
+        self.get_logger().info(
+            "Arm safety limits: "
+            f"velocity={self.motor_velocity_limit} rev/s, "
+            f"acceleration={self.motor_accel_limit} rev/s^2, "
+            f"max joint step={self.max_joint_command_delta_rad} rad"
         )
         self.get_logger().info(f"Arm initial mode: {'IK' if self.moveit_mode else 'mini arm'}")
         
@@ -196,15 +225,21 @@ class JSInputSubscriber(Node):
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = list(JOINT_MOTOR_IDS.keys())
-        positions = []
-        velocities = []
-
         try:
+            results = query_moteus_batch_sync(self.arm_transport, self.controllers)
+            positions = []
+            velocities = []
             for joint_name in msg.name:
-                result = query_moteus_sync(self.controllers[joint_name])
+                result = results.get(joint_name)
+                if result is None:
+                    raise RuntimeError(f"no reply from {joint_name}")
                 fault = result.values.get(moteus.Register.FAULT)
                 if fault not in (None, 0):
-                    self.get_logger().warn(f"{joint_name} moteus fault={fault}")
+                    self.hardware_fault_active = True
+                    self.get_logger().error(
+                        f"BLOCKING ARM COMMANDS: {joint_name} moteus fault={fault}",
+                        throttle_duration_sec=1.0,
+                    )
                     return
 
                 motor_position = result.values.get(moteus.Register.POSITION)
@@ -217,14 +252,22 @@ class JSInputSubscriber(Node):
                 velocities.append(self.motor_rotation_to_joint_angle(joint_name, motor_velocity or 0.0))
         except Exception as exc:
             self.get_logger().warn(
-                f"Could not publish moteus joint states: {exc}",
+                f"Could not read arm hardware state ({type(exc).__name__}): {exc!r}",
                 throttle_duration_sec=1.0,
             )
             return
 
+        self.hardware_fault_active = False
+        self.latest_joint_positions = dict(zip(msg.name, positions))
+        self.last_hardware_state_time = time.monotonic()
         msg.position = positions
         msg.velocity = velocities
         self.joint_state_pub.publish(msg)
+        if not self.hardware_state_ready_logged:
+            self.get_logger().info(
+                "Arm hardware state ready; MoveIt commands are now allowed."
+            )
+            self.hardware_state_ready_logged = True
 
     def send_arm_position(self, joint_name, position, velocity_limit, maximum_torque=MAX_TORQUE, accel_limit=MAX_ACCEL):
         motor_id = JOINT_MOTOR_IDS[joint_name]
@@ -286,56 +329,108 @@ class JSInputSubscriber(Node):
             )
             return []
 
+        positions_by_name = dict(zip(msg.joint_names, point.positions))
+        missing_joints = [name for name in JOINT_MOTOR_IDS if name not in positions_by_name]
+        if missing_joints:
+            self.get_logger().error(
+                f"Ignoring incomplete JointTrajectory; missing {missing_joints}."
+            )
+            return []
+
         commands = []
         for index, joint_name in enumerate(msg.joint_names):
             if joint_name not in JOINT_MOTOR_IDS:
                 self.get_logger().warning(f"Ignoring unknown arm joint: {joint_name}")
                 continue
 
-            velocity_limit = 6
-            if index < len(point.velocities) and point.velocities[index] > 0:
-                velocity_limit = min(point.velocities[index], 6)
+            joint_position = point.positions[index]
+            if not math.isfinite(joint_position):
+                self.get_logger().error(
+                    f"Ignoring non-finite target for {joint_name}: {joint_position}"
+                )
+                return []
 
             commands.append(
                 (
                     joint_name,
                     self.controllers[joint_name],
                     JOINT_MOTOR_IDS[joint_name],
-                    self.translate_joint_to_electrical(joint_name, point.positions[index]),
-                    velocity_limit,
+                    self.translate_joint_to_electrical(joint_name, joint_position),
+                    self.motor_velocity_limit,
                 )
             )
-
-        self.get_logger().info(
-            f"JointTrajectory commands: {[(name, position, velocity) for name, _, _, position, velocity in commands]}"
-        )
         return commands
+
+    def hardware_state_is_fresh(self):
+        if self.hardware_fault_active or self.last_hardware_state_time is None:
+            return False
+        return (
+            time.monotonic() - self.last_hardware_state_time
+            <= self.hardware_state_timeout_s
+        )
+
+    def trajectory_is_safe(self, msg):
+        if not msg.points:
+            return False
+        if self.require_hardware_state and not self.hardware_state_is_fresh():
+            self.get_logger().error(
+                "Ignoring trajectory: arm hardware state is missing, stale, or faulted.",
+                throttle_duration_sec=1.0,
+            )
+            return False
+
+        if self.latest_joint_positions is None:
+            return not self.require_hardware_state
+
+        point = msg.points[0]
+        targets = dict(zip(msg.joint_names, point.positions))
+        for joint_name, current_position in self.latest_joint_positions.items():
+            if joint_name not in targets:
+                continue
+            delta = abs(targets[joint_name] - current_position)
+            if delta > self.max_joint_command_delta_rad:
+                self.get_logger().error(
+                    "Ignoring unsafe trajectory jump: "
+                    f"{joint_name} delta={delta:.3f} rad exceeds "
+                    f"{self.max_joint_command_delta_rad:.3f} rad.",
+                    throttle_duration_sec=1.0,
+                )
+                return False
+        return True
+
+    def send_arm_position_batch(self, commands):
+        batch = [
+            {
+                "controller": controller,
+                "position": position,
+                "maximum_torque": self.maximum_torque,
+                "velocity_limit": velocity_limit,
+                "accel_limit": self.motor_accel_limit,
+            }
+            for _, controller, _, position, velocity_limit in commands
+        ]
+        try:
+            results = send_moteus_position_batch_sync(self.arm_transport, batch)
+            for joint_name, _, motor_id, _, _ in commands:
+                result = results.get(motor_id)
+                if result is None:
+                    raise RuntimeError(f"no command reply from {joint_name} motor {motor_id}")
+                fault = result.values.get(moteus.Register.FAULT)
+                if fault not in (None, 0):
+                    self.hardware_fault_active = True
+                    self.get_logger().error(
+                        f"{joint_name} motor {motor_id} faulted while commanding: {fault}"
+                    )
+        except Exception as exc:
+            self.get_logger().error(
+                f"Failed to command arm batch ({type(exc).__name__}): {exc!r}",
+                throttle_duration_sec=1.0,
+            )
 
 
     def listener_callback(self, msg):
         if self.moveit_mode:
-            if self.use_legacy_ik_command_mapping:
-                if not msg.points:
-                    self.get_logger().warning("Ignoring empty JointTrajectory.")
-                    return
-
-                point = msg.points[0]
-                if len(point.positions) < 6:
-                    self.get_logger().error(
-                        "Ignoring JointTrajectory with fewer than 6 positions."
-                    )
-                    return
-
-                positions, velocities = self.translate_to_electrical(
-                    point.positions,
-                    point.velocities,
-                )
-                for joint_name, position, velocity_limit in zip(
-                    JOINT_MOTOR_IDS.keys(),
-                    positions,
-                    velocities,
-                ):
-                    self.send_arm_position(joint_name, position, velocity_limit)
+            if not self.trajectory_is_safe(msg):
                 return
 
             commands = self.iter_joint_commands(msg)
@@ -352,8 +447,8 @@ class JSInputSubscriber(Node):
             # send_number(self.serial_port, wrist_tilt)
             # send_number(self.serial_port, wrist_rotate_2)
 
-            for joint_name, _, _, position, velocity_limit in commands:
-                self.send_arm_position(joint_name, position, velocity_limit)
+            if len(commands) == len(JOINT_MOTOR_IDS):
+                self.send_arm_position_batch(commands)
 
 
 

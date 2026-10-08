@@ -40,7 +40,6 @@
 
 #include <control_msgs/msg/joint_jog.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
-#include <moveit_msgs/msg/planning_scene.hpp>
 #include <rclcpp/client.hpp>
 #include <rclcpp/experimental/buffers/intra_process_buffer.hpp>
 #include <rclcpp/node.hpp>
@@ -52,7 +51,6 @@
 #include <rclcpp/utilities.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 #include <std_srvs/srv/trigger.hpp>
-#include <thread>
 
 // We'll just set up parameters here
 const std::string JOY_TOPIC = "/arm_controller/cmd_vel";
@@ -107,19 +105,33 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
                      std::unique_ptr<geometry_msgs::msg::TwistStamped>& twist,
                      std::unique_ptr<control_msgs::msg::JointJog>& joint)
 {
+    const auto axis = [&axes](std::size_t index) -> double {
+        return index < axes.size() ? axes[index] : 0.0;
+    };
+    const auto button = [&buttons](std::size_t index) -> int {
+        return index < buttons.size() ? buttons[index] : 0;
+    };
+
+    // The direct USB DualSense reports six axes:
+    // left X/Y, right X/Y, L2, R2. Its triggers rest at 0.0. The existing
+    // competition/UDP controller message uses the eight-axis Xbox layout and
+    // its triggers rest at 1.0. Handle both without indexing past the message.
+    const bool dualsense_layout = axes.size() == 6;
+
     // Give joint jogging priority because it is only buttons
     // If any joint jog command is requested, we are only publishing joint commands
-    if (buttons[B] || buttons[Y] || axes[D_PAD_X] || axes[D_PAD_Y]) {
+    if (!dualsense_layout &&
+        (button(B) || button(Y) || axis(D_PAD_X) || axis(D_PAD_Y))) {
         // Map the D_PAD to the proximal joints
         joint->joint_names.push_back("base_joint");
-        joint->velocities.push_back(axes[D_PAD_X]);
+        joint->velocities.push_back(axis(D_PAD_X));
         joint->joint_names.push_back("shoulder_joint");
-        joint->velocities.push_back(axes[D_PAD_Y]);
+        joint->velocities.push_back(axis(D_PAD_Y));
 
         // Map square/circle to gearbox six roll. X/triangle are reserved for
         // end-effector servos and should not produce IK commands.
         joint->joint_names.push_back("wrist_rotate_two");
-        joint->velocities.push_back(buttons[Y] - buttons[B]);
+        joint->velocities.push_back(button(Y) - button(B));
         return false;
     }
 
@@ -130,16 +142,20 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     //   - left stick up/down     -> pitch (up = pitch down, down = pitch up)
     //   - left stick left/right  -> yaw
     //   - square/circle          -> direct gearbox six roll joint jog above
-    twist->twist.linear.z = axes[RIGHT_STICK_Y];
-    twist->twist.linear.x = axes[RIGHT_STICK_X];
+    const std::size_t right_stick_x = dualsense_layout ? 2 : RIGHT_STICK_X;
+    const std::size_t right_stick_y = dualsense_layout ? 3 : RIGHT_STICK_Y;
+    twist->twist.linear.z = axis(right_stick_y);
+    twist->twist.linear.x = axis(right_stick_x);
 
-    double lin_forward_right =
-        0.5 * (axes[RIGHT_TRIGGER] - AXIS_DEFAULTS.at(RIGHT_TRIGGER));
-    double lin_backward_r1 = buttons[RIGHT_BUMPER];
+    const double lin_forward_right = dualsense_layout
+                                         ? -axis(RIGHT_TRIGGER)
+                                         : 0.5 * (axis(RIGHT_TRIGGER) -
+                                                  AXIS_DEFAULTS.at(RIGHT_TRIGGER));
+    const double lin_backward_r1 = button(RIGHT_BUMPER);
     twist->twist.linear.y = lin_forward_right + lin_backward_r1;
 
-    twist->twist.angular.x = -axes[LEFT_STICK_Y];
-    twist->twist.angular.z = axes[LEFT_STICK_X];
+    twist->twist.angular.x = -axis(LEFT_STICK_Y);
+    twist->twist.angular.z = axis(LEFT_STICK_X);
 
     twist->twist.angular.y = 0.0;
 
@@ -151,7 +167,7 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
  * @param frame_name Set the command frame to this
  * @param buttons The vector of discrete controller button values
  */
-void updateCmdFrame(std::string& frame_name, const std::vector<int>& buttons)
+void updateCmdFrame(std::string& frame_name, const std::vector<int>&)
 {
     frame_name = BASE_FRAME_ID;
 }
@@ -175,9 +191,6 @@ class JoyToServoPub : public rclcpp::Node
             TWIST_TOPIC, rclcpp::SystemDefaultsQoS());
         joint_pub_ = this->create_publisher<control_msgs::msg::JointJog>(
             JOINT_TOPIC, rclcpp::SystemDefaultsQoS());
-        collision_pub_ = this->create_publisher<moveit_msgs::msg::PlanningScene>(
-            "/planning_scene", rclcpp::SystemDefaultsQoS());
-
         // Create a service client to start the ServoNode
         servo_start_client_ =
             this->create_client<std_srvs::srv::Trigger>("/servo_node/start_servo");
@@ -185,51 +198,6 @@ class JoyToServoPub : public rclcpp::Node
         servo_start_client_->async_send_request(
             std::make_shared<std_srvs::srv::Trigger::Request>());
 
-        // Load the collision scene asynchronously
-        collision_pub_thread_ = std::thread([this]() {
-            rclcpp::sleep_for(std::chrono::seconds(3));
-            // Create collision object, in the way of servoing
-            moveit_msgs::msg::CollisionObject collision_object;
-            collision_object.header.frame_id = "panda_link0";
-            collision_object.id = "box";
-
-            shape_msgs::msg::SolidPrimitive table_1;
-            table_1.type = table_1.BOX;
-            table_1.dimensions = {0.4, 0.6, 0.03};
-
-            geometry_msgs::msg::Pose table_1_pose;
-            table_1_pose.position.x = 0.6;
-            table_1_pose.position.y = 0.0;
-            table_1_pose.position.z = 0.4;
-
-            shape_msgs::msg::SolidPrimitive table_2;
-            table_2.type = table_2.BOX;
-            table_2.dimensions = {0.6, 0.4, 0.03};
-
-            geometry_msgs::msg::Pose table_2_pose;
-            table_2_pose.position.x = 0.0;
-            table_2_pose.position.y = 0.5;
-            table_2_pose.position.z = 0.25;
-
-            collision_object.primitives.push_back(table_1);
-            collision_object.primitive_poses.push_back(table_1_pose);
-            collision_object.primitives.push_back(table_2);
-            collision_object.primitive_poses.push_back(table_2_pose);
-            collision_object.operation = collision_object.ADD;
-
-            moveit_msgs::msg::PlanningSceneWorld psw;
-            psw.collision_objects.push_back(collision_object);
-
-            auto ps = std::make_unique<moveit_msgs::msg::PlanningScene>();
-            ps->world = psw;
-            ps->is_diff = true;
-            collision_pub_->publish(std::move(ps));
-        });
-    }
-
-    ~JoyToServoPub() override
-    {
-        if (collision_pub_thread_.joinable()) collision_pub_thread_.join();
     }
 
     void joyCB(const sensor_msgs::msg::Joy::ConstSharedPtr& msg)
@@ -250,7 +218,7 @@ class JoyToServoPub : public rclcpp::Node
         } else {
             // publish the JointJog
             joint_msg->header.stamp = this->now();
-            joint_msg->header.frame_id = "panda_link3";
+            joint_msg->header.frame_id = BASE_FRAME_ID;
             joint_pub_->publish(std::move(joint_msg));
         }
     }
@@ -259,12 +227,9 @@ class JoyToServoPub : public rclcpp::Node
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
     rclcpp::Publisher<control_msgs::msg::JointJog>::SharedPtr joint_pub_;
-    rclcpp::Publisher<moveit_msgs::msg::PlanningScene>::SharedPtr collision_pub_;
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr servo_start_client_;
 
     std::string frame_to_publish_;
-
-    std::thread collision_pub_thread_;
 };  // class JoyToServoPub
 
 }  // namespace moveit_servo

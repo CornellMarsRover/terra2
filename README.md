@@ -3,6 +3,172 @@
 
 Terra2 contains all the code that is part of a ROS codebase and implements the brains of our devices. This main branch contains the current fully integrated and tested functionality for the rover.
 
+## Mac/ZED Astronaut Gesture Test
+
+[`gesture_test.py`](./gesture_test.py) is a standalone, rule-based gesture
+recognizer for local testing. It uses OpenCV and MediaPipe Pose and does not
+require ROS, the ZED SDK, networking, or rover hardware.
+
+### Recognized gestures
+
+| Command | Pose |
+| --- | --- |
+| `FOLLOW` | Stand upright with both hands on the corresponding hips and elbows out |
+| `STAY` | Extend both arms horizontally in a T-pose |
+| `FETCH` | Keep the left hand on the stomach and point with the extended right arm |
+| `COME` | Hold both hands together above the face with relaxed, roof-shaped arms |
+| `GIVE` | Cross both forearms over the chest in an X |
+
+The camera window shows the skeleton, confidence, and stable command. FETCH
+also shows whether the right arm points left or right in the mirrored display.
+The terminal prints only when the stable command changes, including `NONE`.
+
+### Requirements
+
+- macOS 11 or newer
+- Python 3.11
+- A ZED USB camera in UVC mode, or the Mac's built-in webcam
+- Camera permission for Terminal, iTerm, or whichever application starts Python
+
+The direct Python dependencies are pinned in
+[`requirements-gesture-test.txt`](./requirements-gesture-test.txt):
+
+- MediaPipe 0.10.21
+- OpenCV Contrib Python 4.11.0.86
+- NumPy 1.26.4
+- PyObjC AVFoundation 12.2.2
+
+### Install
+
+From the repository root:
+
+```bash
+brew install python@3.11
+python3.11 -m venv .venv-gesture
+source .venv-gesture/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-gesture-test.txt
+```
+
+When macOS prompts for camera access, allow it. The setting can also be changed
+under **System Settings > Privacy & Security > Camera**.
+
+### Run with the Mac camera
+
+The built-in Mac camera is currently the recommended fallback while the ZED
+UVC connection is unstable. It runs the full gesture recognizer without opening
+the external ZED camera:
+
+```bash
+source .venv-gesture/bin/activate
+python gesture_test.py --no-zed
+```
+
+The program auto-detects the FaceTime HD Camera and prints the verified OpenCV
+index, resolution, and frame rate. Press `Q` in the camera window to quit.
+
+### Run with the ZED camera
+
+Connect the ZED over USB 3, then run:
+
+```bash
+source .venv-gesture/bin/activate
+python gesture_test.py --zed
+```
+
+The program enumerates native AVFoundation device names and formats, locates a
+device named `ZED`, then probes OpenCV indices until one actually returns a
+verified ZED stereo resolution. It does not assume that the AVFoundation list
+position and OpenCV index are the same. The preferred format is 2560x720 YUYV
+at 30 FPS; lower and higher advertised ZED modes are fallback probes. Only
+after a side-by-side frame is verified does the program send its left-eye half
+to MediaPipe.
+
+List cameras and their advertised formats without opening one:
+
+```bash
+python gesture_test.py --list-cameras
+```
+
+Test the selected ZED feed without starting MediaPipe:
+
+```bash
+python gesture_test.py --zed --preview
+```
+
+Normally `--zed` needs no numeric index. To restrict its probe to an index shown
+in the diagnostic output:
+
+```bash
+python gesture_test.py --zed --camera 0
+```
+
+To explicitly open an OpenCV index as a normal single-image camera:
+
+```bash
+python gesture_test.py --no-zed --camera 0
+```
+
+Press `Q` in the camera window to quit. Keep the shoulders, arms, and hips
+visible for the most reliable results.
+
+### Tuning
+
+The default landmark/gesture confidence is `0.65`:
+
+```bash
+python gesture_test.py --confidence 0.70
+```
+
+FETCH has three adjustable normalized thresholds:
+
+```bash
+python gesture_test.py \
+  --fetch-min-arm-angle 145 \
+  --fetch-min-extension 0.80 \
+  --fetch-stomach-radius 0.55
+```
+
+- `--fetch-min-arm-angle` controls how straight the right elbow must be.
+- `--fetch-min-extension` is the shoulder-to-wrist distance measured in
+  shoulder widths.
+- `--fetch-stomach-radius` is the allowed horizontal error between the left
+  wrist and torso center, also measured in shoulder widths.
+
+COME's hand separation and elbow-height tolerances are also adjustable:
+
+```bash
+python gesture_test.py \
+  --come-hand-gap 0.35 \
+  --come-elbow-tolerance 0.25
+```
+
+- `--come-hand-gap` is the maximum wrist-to-wrist distance in shoulder widths.
+- `--come-elbow-tolerance` is how far either elbow may sit below its shoulder,
+  measured in torso heights.
+
+Use `python gesture_test.py --help` to see every option.
+
+### Notes and troubleshooting
+
+- The final video is mirrored for an intuitive selfie view, but pose inference
+  runs on the unmirrored frame so anatomical left/right landmarks stay correct.
+- `FOLLOW` requires both wrists near their corresponding hips, both elbows
+  pointing outward, and an approximately upright torso. It uses MediaPipe world
+  landmarks for the upright check when available and falls back to the 2-D
+  torso axis otherwise.
+- If the camera cannot open, close other programs using it, verify macOS camera
+  permission, and inspect `--list-cameras` plus the automatic probe output.
+- OpenCV's AVFoundation indices may not match AVFoundation's native list order.
+  Trust the verified `Selected OpenCV[...]` line rather than assuming index 0
+  or 1 belongs to a particular camera.
+- ZED capture on macOS uses the standard UVC stream. The full ZED SDK is not
+  available on macOS, so this script cannot use native ZED depth sensing.
+- The script does not split an image merely because `--zed` was requested. It
+  first verifies a wide, advertised side-by-side ZED frame; otherwise it exits
+  with diagnostics rather than silently selecting the Mac camera.
+- Bright, even lighting and a full-body view reduce landmark jitter.
+
 ## Current Functionality
 
 ### RoverNet: [cmr_rovernet](./src/cmr_rovernet/)

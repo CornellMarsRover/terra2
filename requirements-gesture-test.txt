@@ -2,6 +2,11 @@
 # Python 3.11 is recommended; this MediaPipe release provides universal macOS
 # wheels for both Apple Silicon and Intel Macs.
 numpy==1.26.4
-mediapipe==0.10.21
+# The standard PyPI project does not publish the required Linux ARM64/Jetson
+# wheel. Install a compatible 0.10.x ARM64 build separately on that platform.
+mediapipe==0.10.21; platform_machine != "aarch64"
 opencv-contrib-python==4.11.0.86
 pyobjc-framework-AVFoundation==12.2.2; sys_platform == "darwin"
+
+# Do not add pyzed here. The official ZED SDK installs pyzed.sl on supported
+# NVIDIA/Linux hosts; gesture-only and mock modes deliberately do not require it.

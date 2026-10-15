@@ -5,9 +5,10 @@ Terra2 contains all the code that is part of a ROS codebase and implements the b
 
 ## Mac/ZED Astronaut Gesture Test
 
-[`gesture_test.py`](./gesture_test.py) is a standalone, rule-based gesture
-recognizer for local testing. It uses OpenCV and MediaPipe Pose and does not
-require ROS, the ZED SDK, networking, or rover hardware.
+[`gesture_test.py`](./gesture_test.py) is a standalone, perception-only
+prototype. It uses OpenCV and MediaPipe Pose for gestures and can optionally use
+the official Stereolabs ZED SDK for synchronized metric depth. It does not
+require ROS, networking, motor control, or other rover hardware.
 
 ### Recognized gestures
 
@@ -19,17 +20,19 @@ require ROS, the ZED SDK, networking, or rover hardware.
 | `COME` | Hold both hands together above the face with relaxed, roof-shaped arms |
 | `GIVE` | Cross both forearms over the chest in an X |
 
-The camera window shows the skeleton, confidence, and stable command. FETCH
+The camera window shows the skeleton, stable command, astronaut presence,
+distance, camera-relative direction, X/Y/Z position, and depth status. FETCH
 also shows whether the right arm points left, right, or forward in the mirrored
-display. The terminal prints only when the stable command changes, including
-`NONE`.
+display. The terminal prints a tracking report at 2 Hz by default.
 
 ### Requirements
 
-- macOS 11 or newer
-- Python 3.11
-- A ZED USB camera in UVC mode, or the Mac's built-in webcam
-- Camera permission for Terminal, iTerm, or whichever application starts Python
+- Mac development: Python 3.11
+- macOS webcam development: macOS 11 or newer and camera permission for the
+  application that starts Python
+- Real depth deployment: a supported NVIDIA Jetson/Linux host, a Python version
+  supported by its JetPack/ZED SDK combination, the SDK's `pyzed.sl` API, and a
+  connected ZED camera
 
 The direct Python dependencies are pinned in
 [`requirements-gesture-test.txt`](./requirements-gesture-test.txt):
@@ -38,6 +41,19 @@ The direct Python dependencies are pinned in
 - OpenCV Contrib Python 4.11.0.86
 - NumPy 1.26.4
 - PyObjC AVFoundation 12.2.2
+
+`pyzed.sl` is intentionally not a pip requirement. It is supplied by the ZED
+SDK on supported systems and is imported only when `--zed` is requested.
+
+### Architecture
+
+- [`gesture_test.py`](./gesture_test.py) owns camera-mode selection, the existing
+  MediaPipe gesture rules, visualization, and rate-limited terminal reports.
+- [`zed_depth.py`](./zed_depth.py) lazily wraps official `pyzed.sl` synchronized
+  capture and provides the explicitly simulated mock source.
+- [`astronaut_tracker.py`](./astronaut_tracker.py) maps torso landmarks into the
+  aligned XYZ image, filters depth, calculates 3D position/direction, smooths
+  valid measurements, and handles stale tracking.
 
 ### Install
 
@@ -54,11 +70,9 @@ python -m pip install -r requirements-gesture-test.txt
 When macOS prompts for camera access, allow it. The setting can also be changed
 under **System Settings > Privacy & Security > Camera**.
 
-### Run with the Mac camera
+### Run with the Mac camera (gesture only)
 
-The built-in Mac camera is currently the recommended fallback while the ZED
-UVC connection is unstable. It runs the full gesture recognizer without opening
-the external ZED camera:
+This preserves the built-in Mac camera workflow and does not report distance:
 
 ```bash
 source .venv-gesture/bin/activate
@@ -66,24 +80,51 @@ python gesture_test.py --no-zed
 ```
 
 The program auto-detects the FaceTime HD Camera and prints the verified OpenCV
-index, resolution, and frame rate. Press `Q` in the camera window to quit.
+index, resolution, and frame rate. Depth status is `DISABLED`, and distance is
+always `UNAVAILABLE` rather than estimated from body size.
 
-### Run with the ZED camera
+### Test the depth pipeline on a Mac (simulated)
 
-Connect the ZED over USB 3, then run:
+Mock mode uses the selected webcam and exercises torso mapping, smoothing,
+display, stale tracking, and terminal output with an explicitly simulated map:
 
 ```bash
 source .venv-gesture/bin/activate
+python gesture_test.py --mock-depth --mock-distance 3.0
+```
+
+The overlay and terminal use `Depth Status: SIMULATED`. Mock measurements are
+never labeled `VALID` and are never selected silently.
+
+### Run with real ZED depth on a Jetson/Linux host
+
+Install the official ZED SDK and its Python API for the Jetson, connect the ZED,
+and install a compatible MediaPipe 0.10.x ARM64 build that exposes
+`mediapipe.solutions.pose`. The standard MediaPipe PyPI release does not provide
+the required Jetson/Linux ARM64 wheel, so that package is skipped by this
+repository's requirements file on `aarch64`. Then verify all three native
+bindings before launching:
+
+```bash
+python3 -m venv --system-site-packages .venv-gesture
+source .venv-gesture/bin/activate
+python -m pip install -r requirements-gesture-test.txt
+python -c "import cv2, mediapipe, pyzed.sl; print('Perception APIs ready')"
 python gesture_test.py --zed
 ```
 
-The program enumerates native AVFoundation device names and formats, locates a
-device named `ZED`, then probes OpenCV indices until one actually returns a
-verified ZED stereo resolution. It does not assume that the AVFoundation list
-position and OpenCV index are the same. The preferred format is 2560x720 YUYV
-at 30 FPS; lower and higher advertised ZED modes are fallback probes. Only
-after a side-by-side frame is verified does the program send its left-eye half
-to MediaPipe.
+If `import mediapipe` fails, install or build a JetPack/Python-compatible ARM64
+MediaPipe wheel before running this application. Do not substitute mock depth
+for hardware validation.
+
+`--zed` opens `sl.Camera`, retrieves `sl.VIEW.LEFT`, `sl.MEASURE.XYZ`, and
+`sl.MEASURE.CONFIDENCE` from each synchronized grab, and configures image
+coordinates in meters. MediaPipe torso landmarks are mapped into the aligned
+XYZ image; the displayed position is the filtered median of valid torso
+samples. The default camera setup is HD720 at 30 FPS with NEURAL depth.
+
+If `pyzed.sl` is absent, the camera cannot open, or the host is macOS, `--zed`
+exits with a clear error. It does not fall back to a webcam or mock values.
 
 List cameras and their advertised formats without opening one:
 
@@ -91,17 +132,10 @@ List cameras and their advertised formats without opening one:
 python gesture_test.py --list-cameras
 ```
 
-Test the selected ZED feed without starting MediaPipe:
+Preview the SDK camera without starting MediaPipe:
 
 ```bash
 python gesture_test.py --zed --preview
-```
-
-Normally `--zed` needs no numeric index. To restrict its probe to an index shown
-in the diagnostic output:
-
-```bash
-python gesture_test.py --zed --camera 0
 ```
 
 To explicitly open an OpenCV index as a normal single-image camera:
@@ -150,6 +184,25 @@ python gesture_test.py \
 
 Use `python gesture_test.py --help` to see every option.
 
+Depth and reporting controls include:
+
+```bash
+python gesture_test.py --zed \
+  --output-rate 2 \
+  --depth-min 0.2 \
+  --depth-max 20 \
+  --depth-confidence 80 \
+  --depth-smoothing 0.35 \
+  --depth-stale-seconds 1.0
+```
+
+Run the standalone tests on the Mac without a ZED SDK installation:
+
+```bash
+source .venv-gesture/bin/activate
+python -m unittest discover -s tests -v
+```
+
 ### Notes and troubleshooting
 
 - The final video is mirrored for an intuitive selfie view, but pose inference
@@ -163,11 +216,12 @@ Use `python gesture_test.py --help` to see every option.
 - OpenCV's AVFoundation indices may not match AVFoundation's native list order.
   Trust the verified `Selected OpenCV[...]` line rather than assuming index 0
   or 1 belongs to a particular camera.
-- ZED capture on macOS uses the standard UVC stream. The full ZED SDK is not
-  available on macOS, so this script cannot use native ZED depth sensing.
-- The script does not split an image merely because `--zed` was requested. It
-  first verifies a wide, advertised side-by-side ZED frame; otherwise it exits
-  with diagnostics rather than silently selecting the Mac camera.
+- A ZED opened through OpenCV/UVC provides images, not calibrated SDK metric
+  depth. This application therefore reserves `--zed` for `pyzed.sl` and never
+  presents UVC capture as real distance.
+- `VALID` means filtered SDK XYZ samples. `SIMULATED` means explicit mock mode,
+  `STALE` means the last valid estimate is being held briefly, and
+  `UNAVAILABLE` means no reliable measurement exists.
 - Bright, even lighting and a full-body view reduce landmark jitter.
 
 ## Current Functionality

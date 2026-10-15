@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recognize five astronaut gestures with a Mac webcam and MediaPipe Pose.
+"""Recognize astronaut gestures and optionally track ZED SDK metric depth.
 
 Recommended setup on macOS (MediaPipe 0.10.21 supports Python 3.11):
 
@@ -8,15 +8,15 @@ Recommended setup on macOS (MediaPipe 0.10.21 supports Python 3.11):
     source .venv-gesture/bin/activate
     python -m pip install --upgrade pip
     python -m pip install -r requirements-gesture-test.txt
-    python gesture_test.py --zed
+    python gesture_test.py --no-zed
 
 Allow Terminal (or the terminal application being used) under System Settings >
 Privacy & Security > Camera when macOS asks. Stand far enough away that the
 camera can see your shoulders, arms, and hips, and press Q in the camera window
-to quit.
-With --zed (the default), the program discovers the ZED by name and verifies it
-by capturing one of its advertised stereo modes instead of assuming an index.
-Use --no-zed --camera INDEX to explicitly select a regular webcam.
+to quit. Use --no-zed for gesture-only webcam testing or --mock-depth for an
+explicitly simulated visualization pipeline. On a supported Jetson/Linux host,
+--zed uses the official ``pyzed.sl`` SDK for synchronized image and metric XYZ.
+It never treats a UVC/OpenCV ZED stream as real depth.
 
 This is intentionally a small rule-based demo. Gestures use normalized 2-D
 joint geometry. FOLLOW also uses MediaPipe world landmarks, when available, to
@@ -30,8 +30,16 @@ import math
 import platform
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable, Sequence
+
+from astronaut_tracker import AstronautTracker, TrackingResult
+from zed_depth import (
+    MockDepthProvider,
+    ZedDepthCamera,
+    ZedDepthError,
+    ZedSdkUnavailable,
+)
 
 try:
     import cv2
@@ -46,11 +54,9 @@ except ImportError as exc:
 try:
     import AVFoundation
     import CoreMedia
-except ImportError as exc:
-    raise SystemExit(
-        "Missing macOS AVFoundation bindings. Run: "
-        "python -m pip install -r requirements-gesture-test.txt"
-    ) from exc
+except ImportError:
+    AVFoundation = None
+    CoreMedia = None
 
 
 POSE = mp.solutions.pose
@@ -635,7 +641,7 @@ def _fourcc_text(code: int) -> str:
 
 def enumerate_avfoundation_cameras() -> list[CameraDeviceInfo]:
     """Return native macOS camera names and advertised capture formats."""
-    if platform.system() != "Darwin":
+    if platform.system() != "Darwin" or AVFoundation is None or CoreMedia is None:
         return []
 
     devices = AVFoundation.AVCaptureDevice.devicesWithMediaType_(
@@ -681,6 +687,15 @@ def enumerate_avfoundation_cameras() -> list[CameraDeviceInfo]:
 
 
 def print_camera_inventory(devices: Sequence[CameraDeviceInfo]) -> None:
+    if platform.system() != "Darwin":
+        print("AVFoundation camera enumeration is only available on macOS.")
+        return
+    if AVFoundation is None:
+        print(
+            "AVFoundation bindings are unavailable. Install "
+            "requirements-gesture-test.txt to enumerate named Mac cameras."
+        )
+        return
     permission_codes = {
         int(AVFoundation.AVAuthorizationStatusNotDetermined): "not determined",
         int(AVFoundation.AVAuthorizationStatusRestricted): "restricted",
@@ -738,10 +753,11 @@ def probe_opencv_camera(
     fps: float,
     attempts: int = 20,
 ):
-    camera = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
+    backend = cv2.CAP_AVFOUNDATION if platform.system() == "Darwin" else cv2.CAP_ANY
+    camera = cv2.VideoCapture(index, backend)
     if not camera.isOpened():
         camera.release()
-        return None, f"OpenCV could not open AVFoundation index {index}"
+        return None, f"OpenCV could not open camera index {index}"
 
     set_width = camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     set_height = camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
@@ -784,93 +800,6 @@ def probe_opencv_camera(
     )
 
 
-def zed_probe_modes(device: CameraDeviceInfo) -> list[CaptureFormat]:
-    preferred_sizes = ((2560, 720), (1344, 376), (3840, 1080), (4416, 1242))
-    by_size = {(item.width, item.height): item for item in device.formats}
-    ordered = [by_size[size] for size in preferred_sizes if size in by_size]
-    ordered.extend(item for item in device.formats if item not in ordered)
-    return ordered
-
-
-def open_zed_camera(
-    devices: Sequence[CameraDeviceInfo], requested_index: int | None
-) -> CameraSession | None:
-    zed_devices = [device for device in devices if "zed" in device.name.casefold()]
-    if not zed_devices:
-        print(
-            "ZED selection failed: AVFoundation does not report a device whose "
-            "name contains 'ZED'.",
-            file=sys.stderr,
-        )
-        return None
-    zed = zed_devices[0]
-    modes = zed_probe_modes(zed)
-    if not modes:
-        print(
-            f"ZED selection failed: {zed.name} advertises no video formats.",
-            file=sys.stderr,
-        )
-        return None
-
-    indices = (
-        [requested_index]
-        if requested_index is not None
-        else list(range(len(devices)))
-    )
-    errors = []
-    print(f"Locating {zed.name!r} across OpenCV indices {indices}...")
-    for item in modes:
-        fps = 30.0 if any(rate >= 30.0 for rate in item.frame_rates) else max(
-            item.frame_rates, default=15.0
-        )
-        for index in indices:
-            session, error = probe_opencv_camera(
-                index,
-                item.width,
-                item.height,
-                fps,
-            )
-            if session is None:
-                errors.append(error)
-                print(f"  probe OpenCV[{index}] failed: {error}")
-                continue
-
-            actual = (session.actual_width, session.actual_height)
-            expected = (item.width, item.height)
-            print(
-                f"  probe OpenCV[{index}] requested {item.width}x{item.height} "
-                f"{item.pixel_format}@{fps:g}; captured "
-                f"{session.actual_width}x{session.actual_height} BGR@"
-                f"{session.actual_fps:g}"
-            )
-            if actual == expected and session.actual_width / session.actual_height > 2.4:
-                session.device_name = zed.name
-                session.source_pixel_format = item.pixel_format
-                session.stereo_side_by_side = True
-                return session
-            session.capture.release()
-            errors.append(
-                f"OpenCV[{index}] negotiated {actual[0]}x{actual[1]}, "
-                f"not ZED mode {expected[0]}x{expected[1]}"
-            )
-
-    print(
-        "ZED selection failed: AVFoundation sees the camera, but OpenCV could "
-        "not capture any advertised side-by-side ZED mode. No webcam fallback "
-        "was selected.",
-        file=sys.stderr,
-    )
-    for error in errors:
-        print(f"  - {error}", file=sys.stderr)
-    print(
-        "Check macOS Camera permission, close other camera applications, use a "
-        "USB 3 port/cable, and try --preview. The full ZED SDK is not available "
-        "on macOS; this program relies on the camera's UVC stream.",
-        file=sys.stderr,
-    )
-    return None
-
-
 def identify_regular_camera(
     devices: Sequence[CameraDeviceInfo], width: int, height: int
 ) -> str:
@@ -887,6 +816,15 @@ def identify_regular_camera(
 def open_regular_camera(
     devices: Sequence[CameraDeviceInfo], requested_index: int | None
 ) -> CameraSession | None:
+    if not devices and platform.system() != "Darwin":
+        index = 0 if requested_index is None else requested_index
+        session, error = probe_opencv_camera(index, 1280, 720, 30.0)
+        if session is None:
+            print(f"Camera selection failed: {error}", file=sys.stderr)
+            return None
+        session.device_name = f"OpenCV camera {index}"
+        return session
+
     if requested_index is not None:
         session, error = probe_opencv_camera(requested_index, 1280, 720, 30.0)
         if session is None:
@@ -935,8 +873,10 @@ def open_regular_camera(
     return None
 
 
-def prepare_camera_frame(session: CameraSession, frame):
-    if not session.stereo_side_by_side:
+def prepare_camera_frame(session: CameraSession | None, frame):
+    # Official SDK frames are already the rectified left image. Webcam frames
+    # need no conversion unless a legacy stereo CameraSession is supplied.
+    if session is None or not session.stereo_side_by_side:
         return frame
     height, width = frame.shape[:2]
     if width != session.actual_width or height != session.actual_height:
@@ -1014,48 +954,151 @@ def run_camera_preview(session: CameraSession) -> int:
         cv2.destroyAllWindows()
 
 
-def draw_status(frame, detection: Detection, fps: float) -> None:
+def run_zed_sdk_preview(source: ZedDepthCamera) -> int:
+    print("ZED SDK preview active. Press Q in the preview window to quit.")
+    try:
+        while True:
+            packet = source.grab()
+            view = cv2.flip(packet.image_bgr, 1)
+            cv2.putText(
+                view,
+                "ZED SDK | REAL DEPTH ENABLED | Q: quit",
+                (20, 36),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (40, 220, 40),
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.imshow("ZED SDK Preview", view)
+            if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
+                return 0
+    except KeyboardInterrupt:
+        return 0
+    except ZedDepthError as exc:
+        print(f"ZED preview failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        source.close()
+        cv2.destroyAllWindows()
+
+
+def _distance_text(tracking: TrackingResult) -> str:
+    return (
+        "UNAVAILABLE"
+        if tracking.distance_m is None
+        else f"{tracking.distance_m:.2f} m"
+    )
+
+
+def _position_text(tracking: TrackingResult) -> str:
+    if tracking.position_m is None:
+        return "X/Y/Z: UNAVAILABLE"
+    x_m, y_m, z_m = tracking.position_m
+    return f"X {x_m:+.2f}  Y {y_m:+.2f}  Z {z_m:+.2f} m"
+
+
+def draw_status(
+    frame,
+    detection: Detection,
+    tracking: TrackingResult,
+    fps: float,
+) -> None:
     color = (40, 210, 40) if detection.label != "NONE" else (80, 80, 255)
     detail = f" ({detection.detail})" if detection.detail else ""
-    cv2.rectangle(frame, (0, 0), (frame.shape[1], 92), (20, 20, 20), -1)
+    cv2.rectangle(frame, (0, 0), (frame.shape[1], 168), (20, 20, 20), -1)
     cv2.putText(
         frame,
         f"Gesture: {detection.label}{detail}",
-        (22, 42),
+        (22, 36),
         cv2.FONT_HERSHEY_SIMPLEX,
-        1.05,
+        0.90,
         color,
         2,
         cv2.LINE_AA,
     )
+    detected = "YES" if tracking.astronaut_detected else "NO"
     cv2.putText(
         frame,
-        f"confidence {detection.confidence:.2f}   {fps:.0f} FPS   Q: quit",
-        (24, 76),
+        f"Astronaut: {detected}   Distance: {_distance_text(tracking)}   "
+        f"Direction: {tracking.direction}",
+        (22, 72),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.55,
         (225, 225, 225),
         1,
         cv2.LINE_AA,
     )
+    cv2.putText(
+        frame,
+        _position_text(tracking),
+        (22, 106),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.55,
+        (225, 225, 225),
+        1,
+        cv2.LINE_AA,
+    )
+    stale = (
+        f" ({tracking.stale_age_s:.1f}s old)"
+        if tracking.depth_status == "STALE"
+        else ""
+    )
+    cv2.putText(
+        frame,
+        f"Depth: {tracking.depth_status}{stale}   confidence "
+        f"{detection.confidence:.2f}   {fps:.0f} FPS   Q: quit",
+        (22, 140),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.55,
+        (60, 210, 255) if tracking.simulated else (225, 225, 225),
+        1,
+        cv2.LINE_AA,
+    )
+
+
+def print_tracking_report(detection: Detection, tracking: TrackingResult) -> None:
+    print(
+        f"Astronaut Detected: {'YES' if tracking.astronaut_detected else 'NO'}\n"
+        f"Gesture: {detection.label}\n"
+        f"Distance: {_distance_text(tracking)}\n"
+        f"Direction: {tracking.direction}\n"
+        f"{_position_text(tracking)}\n"
+        f"Depth Status: {tracking.depth_status}\n",
+        flush=True,
+    )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    camera_mode = parser.add_mutually_exclusive_group()
+    camera_mode.add_argument(
+        "--zed",
+        dest="camera_mode",
+        action="store_const",
+        const="zed",
+        help="use official ZED SDK video and real stereo depth",
+    )
+    camera_mode.add_argument(
+        "--no-zed",
+        dest="camera_mode",
+        action="store_const",
+        const="webcam",
+        help="use a normal webcam with gesture recognition and no depth",
+    )
+    camera_mode.add_argument(
+        "--mock-depth",
+        dest="camera_mode",
+        action="store_const",
+        const="mock",
+        help="use a webcam with clearly labeled simulated depth",
+    )
+    parser.set_defaults(camera_mode="webcam")
     parser.add_argument(
         "--camera",
         type=int,
         default=None,
-        help=(
-            "limit ZED probing to one OpenCV index, or select this index with "
-            "--no-zed (default: auto-detect by verified capture format)"
-        ),
-    )
-    parser.add_argument(
-        "--zed",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="auto-detect ZED UVC stereo and select its left eye (default: enabled)",
+        help="OpenCV camera index for --no-zed or --mock-depth",
     )
     parser.add_argument(
         "--list-cameras",
@@ -1065,7 +1108,73 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--preview",
         action="store_true",
-        help="show the selected camera without running MediaPipe",
+        help="show the selected camera without running MediaPipe tracking",
+    )
+    parser.add_argument(
+        "--output-rate",
+        type=float,
+        default=2.0,
+        help="terminal tracking reports per second (default: 2)",
+    )
+    parser.add_argument(
+        "--depth-min",
+        type=float,
+        default=0.20,
+        help="minimum accepted real or mock depth in meters (default: 0.20)",
+    )
+    parser.add_argument(
+        "--depth-max",
+        type=float,
+        default=20.0,
+        help="maximum accepted real or mock depth in meters (default: 20)",
+    )
+    parser.add_argument(
+        "--depth-confidence",
+        type=float,
+        default=80.0,
+        help="maximum accepted ZED confidence-map value (default: 80)",
+    )
+    parser.add_argument(
+        "--depth-smoothing",
+        type=float,
+        default=0.35,
+        help="3D position exponential smoothing factor (default: 0.35)",
+    )
+    parser.add_argument(
+        "--depth-stale-seconds",
+        type=float,
+        default=1.0,
+        help="retain the last valid depth this long (default: 1.0)",
+    )
+    parser.add_argument(
+        "--pose-grace-seconds",
+        type=float,
+        default=0.6,
+        help="retain tracking through a short pose dropout (default: 0.6)",
+    )
+    parser.add_argument(
+        "--mock-distance",
+        type=float,
+        default=3.0,
+        help="simulated depth distance in meters for --mock-depth (default: 3)",
+    )
+    parser.add_argument(
+        "--zed-resolution",
+        choices=("HD720", "HD1080", "HD2K", "VGA"),
+        default="HD720",
+        help="ZED SDK camera resolution (default: HD720)",
+    )
+    parser.add_argument(
+        "--zed-fps",
+        type=int,
+        default=30,
+        help="ZED SDK camera frame rate (default: 30)",
+    )
+    parser.add_argument(
+        "--zed-depth-mode",
+        choices=("NEURAL", "ULTRA", "QUALITY", "PERFORMANCE"),
+        default="NEURAL",
+        help="ZED SDK depth mode (default: NEURAL)",
     )
     parser.add_argument(
         "--confidence",
@@ -1119,28 +1228,71 @@ def parse_args() -> argparse.Namespace:
         parser.error("--come-hand-gap must be positive")
     if args.come_elbow_tolerance <= 0.0:
         parser.error("--come-elbow-tolerance must be positive")
+    if args.output_rate <= 0.0:
+        parser.error("--output-rate must be positive")
+    if args.depth_min <= 0.0 or args.depth_max <= args.depth_min:
+        parser.error("--depth-min/--depth-max specify an invalid range")
+    if not 0.0 <= args.depth_confidence <= 100.0:
+        parser.error("--depth-confidence must be between 0 and 100")
+    if not 0.0 < args.depth_smoothing <= 1.0:
+        parser.error("--depth-smoothing must be in (0, 1]")
+    if args.depth_stale_seconds < 0.0 or args.pose_grace_seconds < 0.0:
+        parser.error("stale and pose-grace durations cannot be negative")
+    if args.mock_distance <= 0.0:
+        parser.error("--mock-distance must be positive")
+    if args.zed_fps <= 0:
+        parser.error("--zed-fps must be positive")
+    if args.camera_mode == "zed" and args.camera is not None:
+        parser.error("--camera is for webcam/mock mode, not ZED SDK selection")
     return args
 
 
 def main() -> int:
     args = parse_args()
-    devices = enumerate_avfoundation_cameras()
-    print_camera_inventory(devices)
+    devices = []
+    if args.camera_mode != "zed" or args.list_cameras:
+        devices = enumerate_avfoundation_cameras()
+        print_camera_inventory(devices)
     if args.list_cameras:
         return 0
 
-    session = (
-        open_zed_camera(devices, args.camera)
-        if args.zed
-        else open_regular_camera(devices, args.camera)
-    )
-    if session is None:
-        return 1
-    print_selected_camera(session)
-    if args.preview:
-        return run_camera_preview(session)
+    session = None
+    zed_source = None
+    mock_provider = None
+    if args.camera_mode == "zed":
+        zed_source = ZedDepthCamera(
+            resolution=args.zed_resolution,
+            fps=args.zed_fps,
+            depth_mode=args.zed_depth_mode,
+            confidence_threshold=int(args.depth_confidence),
+        )
+        try:
+            zed_source.open()
+        except (ZedSdkUnavailable, ZedDepthError) as exc:
+            print(f"ZED SDK mode unavailable: {exc}", file=sys.stderr)
+            return 1
+        print(
+            "Selected official ZED SDK source: "
+            f"{args.zed_resolution}@{args.zed_fps}, "
+            f"depth={args.zed_depth_mode}, units=meters, coordinates=IMAGE"
+        )
+        if args.preview:
+            return run_zed_sdk_preview(zed_source)
+    else:
+        session = open_regular_camera(devices, args.camera)
+        if session is None:
+            return 1
+        print_selected_camera(session)
+        if args.preview:
+            return run_camera_preview(session)
+        if args.camera_mode == "mock":
+            mock_provider = MockDepthProvider(args.mock_distance)
+            print(
+                "Mock depth enabled: all distance and XYZ values are SIMULATED, "
+                "not ZED measurements."
+            )
 
-    camera = session.capture
+    camera = None if session is None else session.capture
     recognizer = GestureRecognizer(
         args.confidence,
         fetch_min_arm_angle=args.fetch_min_arm_angle,
@@ -1150,14 +1302,24 @@ def main() -> int:
         come_elbow_tolerance=args.come_elbow_tolerance,
     )
     stabilizer = GestureStabilizer()
-    last_printed = None
+    tracker = AstronautTracker(
+        minimum_distance_m=args.depth_min,
+        maximum_distance_m=args.depth_max,
+        maximum_confidence=args.depth_confidence,
+        smoothing_alpha=args.depth_smoothing,
+        stale_after_s=args.depth_stale_seconds,
+        pose_grace_s=args.pose_grace_seconds,
+    )
     last_frame_time = time.monotonic()
     smoothed_fps = 0.0
+    next_report_time = 0.0
+    consecutive_zed_failures = 0
 
     print("Stand where your shoulders, arms, and hips are visible.")
     print("Press Q in the camera window to quit.")
-    pending_frame = session.first_frame
-    session.first_frame = None
+    pending_frame = None if session is None else session.first_frame
+    if session is not None:
+        session.first_frame = None
     try:
         with POSE.Pose(
             static_image_mode=False,
@@ -1168,7 +1330,20 @@ def main() -> int:
             min_tracking_confidence=0.55,
         ) as pose:
             while True:
-                if pending_frame is not None:
+                depth_frame = None
+                if zed_source is not None:
+                    try:
+                        depth_frame = zed_source.grab()
+                        frame = depth_frame.image_bgr
+                        consecutive_zed_failures = 0
+                    except ZedDepthError as exc:
+                        consecutive_zed_failures += 1
+                        print(f"ZED capture warning: {exc}", file=sys.stderr)
+                        if consecutive_zed_failures >= 8:
+                            print("ZED capture stopped after 8 consecutive failures.")
+                            break
+                        continue
+                elif pending_frame is not None:
                     frame = pending_frame
                     pending_frame = None
                 else:
@@ -1182,6 +1357,10 @@ def main() -> int:
                     print_capture_read_error(session, str(exc))
                     break
 
+                capture_time = time.monotonic()
+                if mock_provider is not None:
+                    depth_frame = mock_provider.frame_for(frame, capture_time)
+
                 # Run inference on the camera's unmirrored image so MediaPipe's
                 # LEFT/RIGHT landmark names remain anatomical.
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -1193,10 +1372,18 @@ def main() -> int:
                     results.pose_world_landmarks,
                 )
                 stable = stabilizer.update(observation, now)
+                tracking = tracker.update(
+                    results.pose_landmarks,
+                    depth_frame,
+                    (frame.shape[1], frame.shape[0]),
+                    now=now,
+                )
+                if args.camera_mode == "webcam" and tracking.astronaut_detected:
+                    tracking = replace(tracking, depth_status="DISABLED")
 
-                if stable.label != last_printed:
-                    print(f"Detected: {stable.label}", flush=True)
-                    last_printed = stable.label
+                if now >= next_report_time:
+                    print_tracking_report(stable, tracking)
+                    next_report_time = now + 1.0 / args.output_rate
 
                 if results.pose_landmarks is not None:
                     DRAWING.draw_landmarks(frame, results.pose_landmarks, CONNECTIONS)
@@ -1210,14 +1397,17 @@ def main() -> int:
                     instant_fps if smoothed_fps == 0.0 else 0.9 * smoothed_fps + 0.1 * instant_fps
                 )
                 last_frame_time = now
-                draw_status(frame, stable, smoothed_fps)
+                draw_status(frame, stable, tracking, smoothed_fps)
                 cv2.imshow("Astronaut Gesture Test", frame)
                 if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
                     break
     except KeyboardInterrupt:
         pass
     finally:
-        camera.release()
+        if camera is not None:
+            camera.release()
+        if zed_source is not None:
+            zed_source.close()
         cv2.destroyAllWindows()
     return 0
 

@@ -15,13 +15,14 @@ require ROS, the ZED SDK, networking, or rover hardware.
 | --- | --- |
 | `FOLLOW` | Stand upright with both hands on the corresponding hips and elbows out |
 | `STAY` | Extend both arms horizontally in a T-pose |
-| `FETCH` | Keep the left hand on the stomach and point with the extended right arm |
+| `FETCH` | Keep the left hand on the neck and point with the extended right arm |
 | `COME` | Hold both hands together above the face with relaxed, roof-shaped arms |
 | `GIVE` | Cross both forearms over the chest in an X |
 
 The camera window shows the skeleton, confidence, and stable command. FETCH
-also shows whether the right arm points left or right in the mirrored display.
-The terminal prints only when the stable command changes, including `NONE`.
+also shows whether the right arm points left, right, or forward in the mirrored
+display. The terminal prints only when the stable command changes, including
+`NONE`.
 
 ### Requirements
 
@@ -124,16 +125,16 @@ FETCH has three adjustable normalized thresholds:
 
 ```bash
 python gesture_test.py \
-  --fetch-min-arm-angle 145 \
-  --fetch-min-extension 0.80 \
-  --fetch-stomach-radius 0.55
+  --fetch-min-arm-angle 105 \
+  --fetch-min-extension 0.75 \
+  --fetch-neck-radius 0.55
 ```
 
 - `--fetch-min-arm-angle` controls how straight the right elbow must be.
 - `--fetch-min-extension` is the shoulder-to-wrist distance measured in
   shoulder widths.
-- `--fetch-stomach-radius` is the allowed horizontal error between the left
-  wrist and torso center, also measured in shoulder widths.
+- `--fetch-neck-radius` is the allowed normalized distance between the left
+  wrist and the estimated neck position.
 
 COME's hand separation and elbow-height tolerances are also adjustable:
 

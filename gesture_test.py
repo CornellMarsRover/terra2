@@ -141,6 +141,18 @@ def minimum_visibility(landmarks: Sequence, indexes: Iterable[int]) -> float:
     return min(float(landmarks[index].visibility) for index in indexes)
 
 
+def visibility_quality(
+    landmarks: Sequence,
+    indexes: Iterable[int],
+    minimum: float = 0.30,
+) -> float:
+    """Average visibility, rejecting only landmarks that are effectively lost."""
+    values = [float(landmarks[index].visibility) for index in indexes]
+    if not values or min(values) < minimum:
+        return 0.0
+    return sum(values) / len(values)
+
+
 def outward(shoulder, wrist, body_center_x: float) -> bool:
     """True when a wrist is farther from the body's center than its shoulder."""
     return (wrist.x - shoulder.x) * (shoulder.x - body_center_x) > 0.0
@@ -180,16 +192,16 @@ class GestureRecognizer:
     def __init__(
         self,
         confidence_threshold: float = 0.65,
-        fetch_min_arm_angle: float = 150.0,
-        fetch_min_extension: float = 0.85,
-        fetch_stomach_radius: float = 0.50,
+        fetch_min_arm_angle: float = 105.0,
+        fetch_min_extension: float = 0.75,
+        fetch_neck_radius: float = 0.55,
         come_hand_gap: float = 0.35,
         come_elbow_tolerance: float = 0.25,
     ):
         self.confidence_threshold = confidence_threshold
         self.fetch_min_arm_angle = fetch_min_arm_angle
         self.fetch_min_extension = fetch_min_extension
-        self.fetch_stomach_radius = fetch_stomach_radius
+        self.fetch_neck_radius = fetch_neck_radius
         self.come_hand_gap = come_hand_gap
         self.come_elbow_tolerance = come_elbow_tolerance
 
@@ -213,7 +225,12 @@ class GestureRecognizer:
         # immediately, so the three commands are mutually exclusive.
         for candidate in (
             self._give(landmarks, shoulder_width, torso_height),
-            self._fetch(landmarks, shoulder_width, torso_height),
+            self._fetch(
+                landmarks,
+                world_landmarks,
+                shoulder_width,
+                torso_height,
+            ),
             self._come(landmarks, shoulder_width, torso_height),
         ):
             if candidate.confidence >= self.confidence_threshold:
@@ -239,7 +256,7 @@ class GestureRecognizer:
         torso_height: float,
     ) -> Detection:
         """Upright pose with each hand on its matching hip and elbows out."""
-        visibility = minimum_visibility(lm, (LS, RS, LE, RE, LW, RW, LH, RH))
+        visibility = visibility_quality(lm, (LS, RS, LE, RE, LW, RW, LH, RH))
         if visibility < self.confidence_threshold:
             return Detection()
 
@@ -253,7 +270,7 @@ class GestureRecognizer:
 
         left_hip_gap = wrist_hip_gap(LW, LH)
         right_hip_gap = wrist_hip_gap(RW, RH)
-        hands_on_hips = left_hip_gap <= 0.52 and right_hip_gap <= 0.52
+        hands_on_hips = left_hip_gap <= 0.72 and right_hip_gap <= 0.72
 
         center_x = (lm[LS].x + lm[RS].x + lm[LH].x + lm[RH].x) / 4.0
         left_elbow_radius = abs(lm[LE].x - center_x) / shoulder_width
@@ -262,6 +279,12 @@ class GestureRecognizer:
         right_wrist_radius = abs(lm[RW].x - center_x) / shoulder_width
         left_elbow_angle = joint_angle(lm[LS], lm[LE], lm[LW])
         right_elbow_angle = joint_angle(lm[RS], lm[RE], lm[RW])
+        wrists_on_own_sides = (
+            (lm[LW].x - center_x) * (lm[LH].x - center_x) > 0.0
+            and (lm[RW].x - center_x) * (lm[RH].x - center_x) > 0.0
+            and left_wrist_radius >= 0.22
+            and right_wrist_radius >= 0.22
+        )
 
         elbows_out = (
             outward(lm[LH], lm[LE], center_x)
@@ -272,8 +295,8 @@ class GestureRecognizer:
             and right_elbow_radius >= 0.55
         )
         elbows_bent = (
-            35.0 <= left_elbow_angle <= 135.0
-            and 35.0 <= right_elbow_angle <= 135.0
+            25.0 <= left_elbow_angle <= 150.0
+            and 25.0 <= right_elbow_angle <= 150.0
         )
 
         shoulder_mid_x = (lm[LS].x + lm[RS].x) / 2.0
@@ -304,11 +327,17 @@ class GestureRecognizer:
                         math.degrees(math.atan2(horizontal, vertical)),
                     )
 
-        upright = torso_tilt <= 28.0
-        if not hands_on_hips or not elbows_out or not elbows_bent or not upright:
+        upright = torso_tilt <= 40.0
+        if (
+            not hands_on_hips
+            or not wrists_on_own_sides
+            or not elbows_out
+            or not elbows_bent
+            or not upright
+        ):
             return Detection()
 
-        proximity_score = 1.0 - clamp(max(left_hip_gap, right_hip_gap) / 0.52)
+        proximity_score = 1.0 - clamp(max(left_hip_gap, right_hip_gap) / 0.72)
         elbow_score = clamp(
             min(
                 left_elbow_radius - left_wrist_radius,
@@ -316,7 +345,7 @@ class GestureRecognizer:
             )
             / 0.35
         )
-        upright_score = clamp(1.0 - torso_tilt / 28.0)
+        upright_score = clamp(1.0 - torso_tilt / 40.0)
         return Detection(
             "FOLLOW",
             visibility
@@ -353,23 +382,26 @@ class GestureRecognizer:
         return Detection("STAY", visibility * (0.80 + 0.20 * shape_score))
 
     def _fetch(
-        self, lm: Sequence, shoulder_width: float, torso_height: float
+        self,
+        lm: Sequence,
+        world_landmarks,
+        shoulder_width: float,
+        torso_height: float,
     ) -> Detection:
-        """Left hand on stomach while the right arm points in either direction."""
+        """Left hand on the neck while the right arm points in any direction."""
         center_x = (lm[LS].x + lm[RS].x) / 2.0
         shoulder_y = (lm[LS].y + lm[RS].y) / 2.0
-        visibility = minimum_visibility(lm, (LS, RS, LW, RE, RW, LH, RH))
+        visibility = visibility_quality(lm, (LS, RS, LW, RE, RW, LH, RH))
         if visibility < self.confidence_threshold:
             return Detection()
 
         # Landmark names remain anatomical after the frame is mirrored for the
         # selfie display. Do not infer left/right from raw image x coordinates.
-        stomach_x_error = abs(lm[LW].x - center_x) / shoulder_width
-        stomach_y = (lm[LW].y - shoulder_y) / torso_height
-        left_hand_on_stomach = (
-            stomach_x_error <= self.fetch_stomach_radius
-            and 0.30 <= stomach_y <= 0.90
-        )
+        neck_y = shoulder_y - 0.18 * torso_height
+        neck_x_error = abs(lm[LW].x - center_x) / shoulder_width
+        neck_y_error = abs(lm[LW].y - neck_y) / torso_height
+        neck_distance = math.hypot(neck_x_error, neck_y_error)
+        left_hand_on_neck = neck_distance <= self.fetch_neck_radius
 
         right_angle = joint_angle(lm[RS], lm[RE], lm[RW])
         arm_dx = lm[RW].x - lm[RS].x
@@ -390,16 +422,13 @@ class GestureRecognizer:
         right_arm_points = (
             right_angle >= self.fetch_min_arm_angle
             and right_extension >= self.fetch_min_extension
-            and right_vertical >= -0.25
-            and 0.15 <= elbow_projection <= 0.90
+            and right_vertical >= -0.45
+            and 0.05 <= elbow_projection <= 1.05
         )
-        if not (left_hand_on_stomach and right_arm_points):
+        if not (left_hand_on_neck and right_arm_points):
             return Detection()
 
-        stomach_score = 0.5 * clamp(
-            1.0 - stomach_x_error / self.fetch_stomach_radius
-        )
-        stomach_score += 0.5 * clamp(1.0 - abs(stomach_y - 0.60) / 0.35)
+        neck_score = clamp(1.0 - neck_distance / self.fetch_neck_radius)
         pointing_score = 0.5 * clamp(
             (right_angle - self.fetch_min_arm_angle + 10.0) / 35.0
         )
@@ -407,12 +436,31 @@ class GestureRecognizer:
             (right_extension - self.fetch_min_extension + 0.15) / 0.85
         )
 
-        # Inference uses the unmirrored frame, but the user sees the final image
-        # mirrored. Reverse the x direction so this debug label matches the window.
+        # World z decreases toward the camera. Prefer FORWARD when depth motion
+        # clearly dominates the arm's sideways motion; otherwise reverse raw x
+        # so LEFT/RIGHT matches the mirrored preview seen by the user.
         screen_direction = "LEFT" if arm_dx > 0.0 else "RIGHT"
+        if world_landmarks is not None:
+            world = world_landmarks.landmark
+            if len(world) > max(LS, RS, RW):
+                world_shoulder_width = distance(
+                    world[LS], world[RS], dimensions=3
+                )
+                if world_shoulder_width > 1e-6:
+                    forward_reach = (
+                        world[RS].z - world[RW].z
+                    ) / world_shoulder_width
+                    lateral_reach = abs(
+                        world[RW].x - world[RS].x
+                    ) / world_shoulder_width
+                    if (
+                        forward_reach >= 0.40
+                        and forward_reach >= 0.75 * lateral_reach
+                    ):
+                        screen_direction = "FORWARD"
         return Detection(
             "FETCH",
-            visibility * (0.78 + 0.12 * stomach_score + 0.10 * pointing_score),
+            visibility * (0.78 + 0.12 * neck_score + 0.10 * pointing_score),
             f"points {screen_direction}",
         )
 
@@ -1028,20 +1076,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--fetch-min-arm-angle",
         type=float,
-        default=150.0,
-        help="minimum straightness of the pointing elbow in degrees (default: 150)",
+        default=105.0,
+        help="minimum straightness of the pointing elbow in degrees (default: 105)",
     )
     parser.add_argument(
         "--fetch-min-extension",
         type=float,
-        default=0.85,
-        help="minimum shoulder-to-wrist distance in shoulder widths (default: 0.85)",
+        default=0.75,
+        help="minimum shoulder-to-wrist distance in shoulder widths (default: 0.75)",
     )
     parser.add_argument(
-        "--fetch-stomach-radius",
+        "--fetch-neck-radius",
         type=float,
-        default=0.50,
-        help="maximum stomach center x-error in shoulder widths (default: 0.50)",
+        default=0.55,
+        help="maximum normalized left-wrist distance from the neck (default: 0.55)",
     )
     parser.add_argument(
         "--come-hand-gap",
@@ -1065,8 +1113,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--fetch-min-arm-angle must be from 90 up to 180 degrees")
     if args.fetch_min_extension <= 0.0:
         parser.error("--fetch-min-extension must be positive")
-    if args.fetch_stomach_radius <= 0.0:
-        parser.error("--fetch-stomach-radius must be positive")
+    if args.fetch_neck_radius <= 0.0:
+        parser.error("--fetch-neck-radius must be positive")
     if args.come_hand_gap <= 0.0:
         parser.error("--come-hand-gap must be positive")
     if args.come_elbow_tolerance <= 0.0:
@@ -1097,7 +1145,7 @@ def main() -> int:
         args.confidence,
         fetch_min_arm_angle=args.fetch_min_arm_angle,
         fetch_min_extension=args.fetch_min_extension,
-        fetch_stomach_radius=args.fetch_stomach_radius,
+        fetch_neck_radius=args.fetch_neck_radius,
         come_hand_gap=args.come_hand_gap,
         come_elbow_tolerance=args.come_elbow_tolerance,
     )

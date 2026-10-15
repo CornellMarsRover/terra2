@@ -6,10 +6,12 @@ usage() {
   cat <<'HELP'
 Usage: ./run MODE
   setup       Install ROS package dependencies
+  gesture-setup  Install Ultralytics and download the pose model
   build       Build driving and autonomy packages
   teleop      Start controller receiver and rover drive hardware
   controller  Send input; add `setup` once on the laptop
   auto        Start hardware autonomy and rover drive hardware
+  gesture     Start human gesture detection separately
   sim         Start autonomy with simulated sensor inputs
   test        Run focused autonomy tests
   help        Show this guide
@@ -24,6 +26,19 @@ case "$mode" in
     if [[ ${1:-} == setup ]]; then shift; exec python3 -m pip install -r requirements.txt "$@"; fi
     exec python3 drive_control.py "$@"
     ;;
+  gesture-setup)
+    python3 -m pip install -r src/astronaut_autonomy/requirements.txt "$@"
+    (
+      cd src/astronaut_autonomy/config
+      python3 -c 'from ultralytics import YOLO; YOLO("yolo26n-pose.pt")'
+    )
+    if [[ ! -f src/astronaut_autonomy/config/yolo26n-pose.pt ]]; then
+      echo "Ultralytics did not place yolo26n-pose.pt in src/astronaut_autonomy/config." >&2
+      exit 1
+    fi
+    echo "Gesture prerequisites ready. Run: ./run build"
+    exit 0
+    ;;
   test)
     python3 -c "import coverage, pytest" 2>/dev/null || {
       echo "Test tools missing. Run: python3 -m pip install coverage pytest" >&2
@@ -31,7 +46,7 @@ case "$mode" in
     }
     exec bash scripts/test_autonomy.sh "$@"
     ;;
-  build|setup|teleop|auto|sim) ;;
+  build|setup|teleop|auto|gesture|sim) ;;
   *) echo "Unknown mode: $mode" >&2; usage >&2; exit 2 ;;
 esac
 if [[ ! -f /opt/ros/humble/setup.bash ]]; then
@@ -44,12 +59,12 @@ set -u
 if [[ "$mode" == setup ]]; then
   [[ -f /etc/ros/rosdep/sources.list.d/20-default.list ]] || sudo rosdep init
   rosdep update
-  paths=(src/{cmr_msgs,cmr_utils,cmr_fabric,cmr_controller_remote,cmr_rovernet,autonomous_navigation})
+  paths=(src/{cmr_msgs,cmr_utils,cmr_fabric,cmr_controller_remote,cmr_rovernet,cmr_zed,astronaut_autonomy,autonomous_navigation})
   exec rosdep install --from-paths "${paths[@]}" --ignore-src -r -y "$@"
 fi
 if [[ "$mode" == build ]]; then
   exec colcon build --symlink-install --packages-up-to \
-    cmr_fabric cmr_controller_remote cmr_rovernet autonomous_navigation "$@"
+    cmr_fabric cmr_controller_remote cmr_rovernet cmr_zed astronaut_autonomy autonomous_navigation "$@"
 fi
 if [[ ! -f install/setup.bash ]]; then
   echo "Workspace is not built. Run: ./run build" >&2
@@ -61,5 +76,6 @@ set -u
 case "$mode" in
   teleop) exec ros2 launch cmr_rovernet rovernet.launch.py enable_arm:=false "$@" ;;
   auto) exec ros2 launch autonomous_navigation localization_real.launch.py "$@" ;;
+  gesture) exec bash scripts/run_human_gesture_detection.sh "$@" ;;
   sim) exec ros2 launch autonomous_navigation sim_autonomy.launch.py "$@" ;;
 esac

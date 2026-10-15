@@ -1,0 +1,10 @@
+human_gesture_detection:
+  ros__parameters:
+    # Prepare this model with ./run gesture-setup before offline field use.
+    model_path: "yolo26n-pose.pt"
+    image_topic: "/zed/image"
+    confidence_threshold: 0.50
+    keypoint_threshold: 0.35
+    confirmation_frames: 5
+    clear_frames: 5
+    publish_debug_image: true

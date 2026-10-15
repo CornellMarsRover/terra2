@@ -26,13 +26,13 @@ class CmdVelSubscriber(Node):
 
         self.create_subscription(
             TwistStamped,
-            "/drives_controller/cmd_vel",
+            "/controller/drives/axes",
             self.listener_callback,
             10,
         )
         self.create_subscription(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             self.listener_button_callback,
             10,
         )
@@ -88,8 +88,8 @@ class CmdVelSubscriber(Node):
             f"deadband={self.deadband}, controller_max={self.CONTROLLER_MAX_SPEED}, "
             f"motor_max={self.MOTOR_MAX_SPEED}"
         )
-        self.logger.info("Teleop input topic: /drives_controller/cmd_vel")
-        self.logger.info("Buttons topic: /drives_controller/cmd_buttons")
+        self.logger.info("Teleop input topic: /controller/drives/axes")
+        self.logger.info("Buttons topic: /controller/drives/buttons")
         self.logger.info("L1 + Triangle -> stop all motors")
         self.logger.info("R1 -> full speed mode, L1 -> slow mode")
 
@@ -357,7 +357,7 @@ class CmdVelSubscriber(Node):
 
     def autonomy_callback(self, msg: AutonomyDrive):
         self.logger.info(
-            "Ignoring legacy /autonomy_move command; teleop uses /drives_controller/cmd_vel"
+            "Ignoring legacy /autonomy_move command; teleop uses /controller/drives/axes"
         )
 
     def listener_button_callback(self, msg: ControllerReading):

@@ -6,6 +6,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
 
 composition_ns = "rover"
 
@@ -46,6 +47,12 @@ def generate_launch_description():
                 description="Launch controller UDP bridge",
             ),
             Node(
+                package="cmr_rovernet",
+                executable="drive_command_mux",
+                name="drive_command_mux",
+                parameters=[{"active_source": "teleop"}],
+            ),
+            Node(
                 package="cmr_fabric",
                 executable="fault_handler",
                 namespace=composition_ns,
@@ -56,7 +63,7 @@ def generate_launch_description():
                 namespace=composition_ns,
             ),
             *fabric_composition(
-                "/home/cmr/cmr/terra2/src/cmr_rovernet/config",
+                path.join(get_package_share_directory("cmr_rovernet"), "config"),
                 launch_switches,
             ),
         ]

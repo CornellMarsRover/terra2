@@ -2,6 +2,10 @@ from setuptools import find_packages, setup
 from glob import glob
 package_name = 'cmr_zed'
 
+config_files = [
+    'config/best.pt',
+]
+
 setup(
     name=package_name,
     version='0.0.0',
@@ -11,7 +15,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/srv', glob('srv/*.srv')),
-        ('share/' + package_name + '/config', ['config/best.pt']),
+        ('share/' + package_name + '/config', config_files),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -26,7 +30,7 @@ setup(
             'zed_publisher_node = cmr_zed.zed_camera_publisher:main',
             'zed_autonomy = cmr_zed.zed_autonomy:main',
             'threaded = cmr_zed.threaded:main',
-            'test_detection = cmr_zed.test_detection:main',
+            'test_detection = cmr_zed.detection_node:main',
         ],
     },
 )

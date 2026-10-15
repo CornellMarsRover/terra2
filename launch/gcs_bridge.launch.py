@@ -131,7 +131,7 @@ def generate_launch_description():
                         "best_effort_qos_topic_whitelist": BEST_EFFORT_TOPIC_REGEXES,
                         # Allow the GCS to call services (SiteAnalyze, lifecycle
                         # activate/deactivate, start_servo, etc.) and publish
-                        # commands back on /drives_controller/cmd_vel etc.
+                        # commands back on /controller/drives/axes etc.
                         "capabilities": [
                             "clientPublish",
                             "parameters",

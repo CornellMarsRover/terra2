@@ -6,7 +6,7 @@ udp_cmd_vel_node.py  (version with acceleration limiting)
 * Converts them to target velocities using KEY_TO_VEL.
 * Ramps current velocity toward the target, respecting
   max linear accel 0.2 m/s² and max angular accel 0.1 rad/s².
-* Publishes a Twist at 10 Hz.
+* Publishes a normalized tele-op drive command at 10 Hz.
 """
 
 import argparse
@@ -15,7 +15,7 @@ import socket
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from cmr_msgs.msg import DriveCommand
 
 # ------------------------------------------------------------- #
 KEY_TO_VEL = {
@@ -53,9 +53,10 @@ def clamp_delta(delta: float, limit: float) -> float:
 
 
 class UdpTeleopNode(Node):
-    def __init__(self, port: int, topic: str):
+    def __init__(self, port: int, topic: str, speed_rps: float):
         super().__init__("udp_teleop_node")
-        self.pub = self.create_publisher(Twist, topic, 10)
+        self.pub = self.create_publisher(DriveCommand, topic, 10)
+        self.speed_rps = abs(speed_rps)
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(("0.0.0.0", port))
@@ -109,22 +110,22 @@ class UdpTeleopNode(Node):
         self.ang_z += clamp_delta(tgt_z - self.ang_z, MAX_DW)
 
         # --- publish --------------------------------------------
-        twist = Twist()
-        twist.linear.x  = self.vel_x
-        twist.linear.y  = self.vel_y
-        twist.angular.z = self.ang_z
-        self.pub.publish(twist)
+        self.pub.publish(DriveCommand(
+            vx=self.vel_x, vy=self.vel_y, omega=self.ang_z,
+            speed_rps=self.speed_rps,
+        ))
 
 
 # ---------------------------------------------------------------- #
 def main():
-    parser = argparse.ArgumentParser(description="UDP → /cmd_vel_drives with accel limiting")
+    parser = argparse.ArgumentParser(description="UDP keyboard tele-op with accel limiting")
     parser.add_argument("--port",  type=int, default=5005, help="UDP port to listen on")
-    parser.add_argument("--topic", default="/cmd_vel_drives", help="Twist topic to publish")
+    parser.add_argument("--topic", default="/cmd_vel/teleop")
+    parser.add_argument("--speed-rps", type=float, default=4.0)
     args, _ = parser.parse_known_args()
 
     rclpy.init()
-    node = UdpTeleopNode(port=args.port, topic=args.topic)
+    node = UdpTeleopNode(args.port, args.topic, args.speed_rps)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

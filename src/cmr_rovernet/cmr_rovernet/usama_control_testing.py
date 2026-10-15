@@ -11,15 +11,22 @@ from pathlib import Path
 
 import rclpy
 import toml
-from cmr_msgs.msg import ControllerReading
+from cmr_msgs.msg import ControllerReading, DriveCommand
+from cmr_rovernet.drive_modes import (
+    DriveMode,
+    drive_mode_for_dpad,
+    parse_drive_mode,
+    shape_motion_for_mode,
+)
 from cmr_rovernet.moteus_drive_gui import (
     make_transport_and_controllers,
     query_one,
     read_value,
     stop_compat,
 )
-from geometry_msgs.msg import Twist, TwistStamped
+from geometry_msgs.msg import TwistStamped
 from rclpy.node import Node
+from std_msgs.msg import Bool
 
 
 DRIVE_IDS = [1, 2, 3, 4]
@@ -77,14 +84,14 @@ class ManualCommandState:
     vy: float = 0.0
     omega: float = 0.0
     speed_rps: float = 0.0
-    updated_at: float = 0.0
 
 
 @dataclass
-class AutonomyCommandState:
+class SelectedCommandState:
     vx: float = 0.0
     vy: float = 0.0
     omega: float = 0.0
+    speed_rps: float = 0.0
     updated_at: float = 0.0
 
 
@@ -229,9 +236,11 @@ class UsamaControlRosNode(Node):
         self.declare_parameter("controller_deadzone", 0.1)
         self.declare_parameter("command_timeout_s", 0.5)
         self.declare_parameter("refresh_rate_hz", 10.0)
-        self.declare_parameter("manual_override_priority", True)
-        self.declare_parameter("autonomy_priority", True)
         self.declare_parameter("capture_steer_zero_on_start", True)
+        self.declare_parameter(
+            "drive_mode",
+            DriveMode.TRANSLATION_ROTATION.value,
+        )
 
         self.port = str(self._setting("can_port", config))
         self.timeout_s = float(self._setting("timeout_s", config))
@@ -260,39 +269,48 @@ class UsamaControlRosNode(Node):
         self.controller_deadzone = float(self._setting("controller_deadzone", config))
         self.command_timeout_s = float(self._setting("command_timeout_s", config))
         self.refresh_rate_hz = float(self._setting("refresh_rate_hz", config))
-        self.manual_override_priority = bool(
-            self._setting("manual_override_priority", config)
-        )
-        self.autonomy_priority = bool(self._setting("autonomy_priority", config))
         self.capture_steer_zero_on_start = bool(
             self._setting("capture_steer_zero_on_start", config)
         )
+        configured_drive_mode = str(self._setting("drive_mode", config))
+        try:
+            self._drive_mode = parse_drive_mode(configured_drive_mode)
+        except ValueError:
+            self.get_logger().warn(
+                f"Unknown drive_mode={configured_drive_mode!r}; using "
+                f"{DriveMode.TRANSLATION_ROTATION.value}"
+            )
+            self._drive_mode = DriveMode.TRANSLATION_ROTATION
 
         self._manual = ManualCommandState()
-        self._autonomy = AutonomyCommandState()
+        self._selected = SelectedCommandState()
         self._estop_latched = False
         self._last_source = "idle"
         self._lock = threading.Lock()
         self._shutdown = threading.Event()
         self._steer_center_offsets = dict(STEER_CENTER_OFFSETS)
         self._last_manual_drive_axis_sign = 1.0
+        self._mode_change_pending = False
+        self._teleop_publisher = self.create_publisher(
+            DriveCommand, "/cmd_vel/teleop", 10)
+        self._estop_publisher = self.create_publisher(Bool, "/cmd_vel/estop", 10)
 
         self.create_subscription(
             TwistStamped,
-            "/drives_controller/cmd_vel",
+            "/controller/drives/axes",
             self._controller_cmd_vel_cb,
             10,
         )
         self.create_subscription(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             self._controller_buttons_cb,
             10,
         )
         self.create_subscription(
-            Twist,
-            "/cmd_vel_drives",
-            self._autonomy_cmd_vel_cb,
+            DriveCommand,
+            "/cmd_vel",
+            self._selected_cmd_vel_cb,
             10,
         )
 
@@ -300,8 +318,8 @@ class UsamaControlRosNode(Node):
         self._worker.start()
 
         self.get_logger().info(
-            "usama_control_testing_node started. Inputs: /drives_controller/cmd_vel, "
-            "/drives_controller/cmd_buttons, /cmd_vel_drives"
+            "Drive backend: controller adapter -> /cmd_vel/teleop; "
+            "selected /cmd_vel -> Moteus"
         )
         self.get_logger().info(
             f"Using direct moteus command behavior on {self.port}: "
@@ -310,6 +328,10 @@ class UsamaControlRosNode(Node):
             f"half={self.half_speed_multiplier:.2f}x, "
             f"double={self.double_speed_multiplier:.2f}x, "
             f"triple={self.triple_speed_multiplier:.2f}x"
+        )
+        self.get_logger().info(
+            f"Drive mode={self._drive_mode.value}. D-pad: up=translation+rotation, "
+            "right=Ackermann, down=point turn, left=steady heading"
         )
 
     def _load_node_config(self) -> dict[str, object]:
@@ -359,19 +381,19 @@ class UsamaControlRosNode(Node):
             self._manual.vx = self._clamp(vx)
             self._manual.vy = self._clamp(vy)
             self._manual.omega = self._clamp(omega)
-            self._manual.updated_at = time.time()
 
         self.get_logger().info(
             f"controller cmd_vel vx={self._clamp(vx):+.3f} "
             f"vy={self._clamp(vy):+.3f} omega={self._clamp(omega):+.3f}",
             throttle_duration_sec=1.0,
         )
+        self._publish_manual()
 
     def _controller_buttons_cb(self, msg: ControllerReading) -> None:
         decoded = self._decode_controller_buttons(list(msg.button_array))
         if decoded is None:
             self.get_logger().warn(
-                f"/drives_controller/cmd_buttons expected 2 or 8 entries, got "
+                f"/controller/drives/buttons expected 2 or 8 entries, got "
                 f"{len(msg.button_array)}",
                 throttle_duration_sec=2.0,
             )
@@ -383,46 +405,72 @@ class UsamaControlRosNode(Node):
         l2 = decoded["l2"]
         r2 = decoded["r2"]
         estop_pressed = bool(l1) and bool(triangle)
+        requested_mode = drive_mode_for_dpad(msg.dpad)
 
         with self._lock:
             if estop_pressed and not self._estop_latched:
                 self._estop_latched = True
-                self._manual = ManualCommandState(updated_at=time.time())
+                self._manual = ManualCommandState()
                 self.get_logger().warn("Drive estop latched from controller buttons")
+                self._estop_publisher.publish(Bool(data=True))
                 return
 
             if self._estop_latched and not bool(l1) and not bool(triangle):
                 self._estop_latched = False
-                self._manual = ManualCommandState(updated_at=time.time())
+                self._manual = ManualCommandState()
                 self.get_logger().info("Drive estop released")
+                self._estop_publisher.publish(Bool(data=False))
 
             if self._estop_latched:
                 self._manual.speed_rps = 0.0
-                self._manual.updated_at = time.time()
                 return
+
+            if requested_mode is not None and requested_mode is not self._drive_mode:
+                previous_mode = self._drive_mode
+                self._drive_mode = requested_mode
+                self._mode_change_pending = True
+                self.get_logger().info(
+                    f"Drive mode changed: {previous_mode.value} -> "
+                    f"{requested_mode.value}; stopping before new-mode commands"
+                )
 
             speed_rps = self._manual_speed_rps(l1=l1, r1=r1, l2=l2, r2=r2)
 
             self._manual.speed_rps = speed_rps
-            self._manual.updated_at = time.time()
 
         self.get_logger().info(
             f"controller buttons L1={l1} R1={r1} L2={l2} R2={r2} "
             f"speed_rps={speed_rps:+.3f}",
             throttle_duration_sec=1.0,
         )
+        self._publish_manual()
 
-    def _autonomy_cmd_vel_cb(self, msg: Twist) -> None:
+    def _publish_manual(self) -> None:
         with self._lock:
-            self._autonomy.vx = self._clamp(msg.linear.x)
-            self._autonomy.vy = self._clamp(msg.linear.y)
-            self._autonomy.omega = self._clamp(msg.angular.z)
-            self._autonomy.updated_at = time.time()
+            manual = ManualCommandState(**self._manual.__dict__)
+            speed_rps = manual.speed_rps * self._manual_drive_axis_sign(manual.vx)
+        self._teleop_publisher.publish(DriveCommand(
+            vx=abs(manual.vx), vy=manual.vy, omega=manual.omega,
+            speed_rps=speed_rps,
+        ))
+
+    def _selected_cmd_vel_cb(self, msg: DriveCommand) -> None:
+        values = (msg.vx, msg.vy, msg.omega, msg.speed_rps)
+        if not all(math.isfinite(value) for value in values):
+            self.get_logger().error("Ignoring non-finite selected drive command")
+            return
+        with self._lock:
+            self._selected.vx = self._clamp(msg.vx)
+            self._selected.vy = self._clamp(msg.vy)
+            self._selected.omega = self._clamp(msg.omega)
+            speed_limit = self.drive_rps * self.triple_speed_multiplier
+            self._selected.speed_rps = self._clamp(msg.speed_rps, speed_limit)
+            self._selected.updated_at = time.monotonic()
 
         self.get_logger().info(
-            f"autonomy cmd_vel vx={self._clamp(msg.linear.x):+.3f} "
-            f"vy={self._clamp(msg.linear.y):+.3f} "
-            f"omega={self._clamp(msg.angular.z):+.3f}",
+            f"selected cmd_vel vx={self._clamp(msg.vx):+.3f} "
+            f"vy={self._clamp(msg.vy):+.3f} omega={self._clamp(msg.omega):+.3f} "
+            f"speed_rps={msg.speed_rps:+.3f}",
             throttle_duration_sec=1.0,
         )
 
@@ -437,7 +485,7 @@ class UsamaControlRosNode(Node):
                     f"selected drive command: {command}",
                     throttle_duration_sec=1.0,
                 )
-                if command["mode"] in {"idle", "estop"}:
+                if command["mode"] in {"idle", "estop", "mode_change"}:
                     if self._last_source != command["source"]:
                         self.get_logger().info(
                             f"Drive source switched to {command['source']}"
@@ -505,60 +553,64 @@ class UsamaControlRosNode(Node):
             self.get_logger().error(f"Drive initialization error: {exc!r}")
 
     def _select_command(self) -> dict[str, object]:
-        now = time.time()
+        now = time.monotonic()
         with self._lock:
             if self._estop_latched:
                 return {"mode": "estop", "source": "controller_estop"}
-            manual = ManualCommandState(**self._manual.__dict__)
-            autonomy = AutonomyCommandState(**self._autonomy.__dict__)
+            if self._mode_change_pending:
+                self._mode_change_pending = False
+                return {
+                    "mode": "mode_change",
+                    "source": f"mode_change:{self._drive_mode.value}",
+                }
+            selected = SelectedCommandState(**self._selected.__dict__)
+            drive_mode = self._drive_mode
 
-        manual_active = (now - manual.updated_at) <= self.command_timeout_s and (
-            abs(manual.speed_rps) > COMMAND_EPSILON
-            or any(
-                abs(value) > self.controller_deadzone
-                for value in (manual.vx, manual.vy, manual.omega)
+        selected_active = (now - selected.updated_at) <= self.command_timeout_s and any(
+            abs(value) > COMMAND_EPSILON
+            for value in (
+                selected.vx, selected.vy, selected.omega, selected.speed_rps
             )
         )
-        autonomy_active = (now - autonomy.updated_at) <= self.command_timeout_s and any(
-            abs(value) > COMMAND_EPSILON
-            for value in (autonomy.vx, autonomy.vy, autonomy.omega)
-        )
-
-        if manual_active and self.manual_override_priority:
-            return self._manual_command(manual)
-        if autonomy_active and self.autonomy_priority:
-            return self._autonomy_command(autonomy)
-        if manual_active:
-            return self._manual_command(manual)
-        if autonomy_active:
-            return self._autonomy_command(autonomy)
+        if selected_active:
+            command = self._selected_command(selected)
+            return self._shape_command_for_drive_mode(command, drive_mode)
         return {"mode": "idle", "source": "idle"}
 
-    def _manual_command(self, manual: ManualCommandState) -> dict[str, object]:
-        drive_axis_sign = self._manual_drive_axis_sign(manual.vx)
-        speed_rps = manual.speed_rps * drive_axis_sign
-        return {
-            "mode": "swerve",
-            "source": "controller_topics",
-            "vx": abs(manual.vx),
-            "vy": manual.vy,
-            "omega": manual.omega,
-            "speed_rps": speed_rps,
-        }
-
+    @staticmethod
+    def _shape_command_for_drive_mode(
+        command: dict[str, object],
+        drive_mode: DriveMode,
+    ) -> dict[str, object]:
+        vx, vy, omega = shape_motion_for_mode(
+            drive_mode,
+            float(command["vx"]),
+            float(command["vy"]),
+            float(command["omega"]),
+        )
+        shaped = dict(command)
+        shaped.update(
+            {
+                "drive_mode": drive_mode.value,
+                "vx": vx,
+                "vy": vy,
+                "omega": omega,
+            }
+        )
+        return shaped
     def _manual_drive_axis_sign(self, vx: float) -> float:
         if abs(vx) > self.controller_deadzone:
             self._last_manual_drive_axis_sign = 1.0 if vx >= 0.0 else -1.0
         return self._last_manual_drive_axis_sign
 
-    def _autonomy_command(self, autonomy: AutonomyCommandState) -> dict[str, object]:
+    def _selected_command(self, selected: SelectedCommandState) -> dict[str, object]:
         return {
             "mode": "swerve",
-            "source": "autonomy_cmd_vel",
-            "vx": autonomy.vx,
-            "vy": autonomy.vy,
-            "omega": autonomy.omega,
-            "speed_rps": self.drive_rps,
+            "source": "selected_cmd_vel",
+            "vx": selected.vx,
+            "vy": selected.vy,
+            "omega": selected.omega,
+            "speed_rps": selected.speed_rps,
         }
 
     def destroy_node(self):

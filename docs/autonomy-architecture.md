@@ -54,6 +54,7 @@ Gazebo replaces that final hardware backend, not perception or planning logic.
 | Localization | `new_kalman.py` | RTK GPS, IMU | global rover pose |
 | Detection | `object_detection.py` | camera image/depth | target object position |
 | Costmap | `costmap.py`, `costmap_core.py` | point cloud, pose, movement | obstacle cost cells |
+| Global planning | `global_planner.py`, `global_planner_core.py` | global target, pose, costmap | persistent map, sub-goal |
 | Local planning | `local_planner.py`, `planner_core.py` | local target, pose, costmap | next waypoint |
 | Control | `controller.py`, `drive_command.py` | next waypoint, pose, stop | normalized chassis command |
 | Arbitration | `command_mux.py`, `command_mux_core.py` | named drive commands, estop | selected `/cmd_vel` |
@@ -67,7 +68,12 @@ Gazebo replaces that final hardware backend, not perception or planning logic.
   30-second safety delay.
 - `./run sim` starts simulated-input autonomy nodes, but does not launch Gazebo,
   spawn a rover, adapt odometry, synthesize camera data, or add a drive backend.
-- The state machine publishes its selected target directly to the local planner.
+- The state machine publishes its selected target directly to the local
+  planner. `publish_local_target:=false` suppresses that and hands the topic to
+  the global planner, which is what `sim_autonomy_global.launch.py` does.
+- `./run sim` does not include the global planner. It is opt-in until it has
+  been run outside on the rover, because only its logic tests and the Gazebo
+  harness have exercised it.
 - Rerun visualization defaults on in the real local planner and requires its
   configured remote endpoint unless disabled.
 
@@ -85,9 +91,34 @@ goal, and drive-backend adapters were simulation-specific.
 - Every distinct Gazebo command matched the selected `/cmd_vel`, and both
   streams ended with a zero command.
 
+## Global route memory
+
+The local planner searches an 8 m half-width window and clamps any goal outside
+it onto the window edge, and the costmap decays every cell on a timer. Together
+those mean a waypoint behind a wall reads as a waypoint through the wall, and an
+obstacle is forgotten shortly after it leaves the camera view. URC includes maze
+sections that require backtracking, so the rover needed a map that outlives the
+window.
+
+`global_planner_core.py` accumulates obstacle evidence per cell, weighting hits
+above misses, so a wall confirmed over several frames persists while a
+single-frame false positive fades. A* over that map produces the route, and the
+first route point beyond the local window is published as the sub-goal. When no
+route to the waypoint exists yet, the planner drives at a frontier: a reachable
+free cell touching ground never observed. That definition, rather than "the
+reachable cell nearest the goal", is what reverses the rover out of a pocket.
+
+Measured by `validation/global_planner/benchmark.py`, which gives both planners
+the same maps and the same A*: window-only reaches 1 of 3 maps, routing over the
+persistent map reaches 3 of 3.
+
 ## Remaining gaps
 
 - Convert the isolated Gazebo harness into a repeatable committed launch test.
-- Remove the duplicated global/local target path and launch one canonical route.
-- Move planner thresholds, grid sizes, and controller gains into ROS parameters.
+- Run the global planner outside on the rover, then fold it into `./run auto`
+  and retire the state machine's direct local publication.
+- Tune the global planner's cell size and inflation radius against the real ZED
+  costmap; both are currently set from sim and logic tests only.
+- Move the remaining planner thresholds, grid sizes, and controller gains into
+  ROS parameters. The global planner already declares all of its own.
 - Add sensor-dropout, no-path, manual-override, and watchdog system tests.

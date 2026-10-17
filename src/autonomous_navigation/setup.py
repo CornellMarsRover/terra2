@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/localization_real.launch.py']),
         ('share/' + package_name + '/launch', ['launch/sim_autonomy.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/sim_autonomy_global.launch.py']),
         ('share/' + package_name + '/config', ['config/sim_waypoints_condensed.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_engquad.yaml']),
         ('share/' + package_name + '/config', ['config/waypoints_engquad2.yaml']),
@@ -31,6 +32,7 @@ setup(
         'console_scripts': [
             'state_machine = autonomous_navigation.state_machine:main',
             'local_planner = autonomous_navigation.local_planner:main',
+            'global_planner = autonomous_navigation.global_planner:main',
             'costmap = autonomous_navigation.costmap:main',
             'controller = autonomous_navigation.controller:main',
             'kalman_localization = autonomous_navigation.kalman_localization:main',

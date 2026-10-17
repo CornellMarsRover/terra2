@@ -29,6 +29,13 @@ class StateMachineNode(Node):
         self.declare_parameter('real', True)
         self.real = self.get_parameter('real').get_parameter_value().bool_value
 
+        # Default True keeps the historical behaviour, where this node drives the
+        # local planner directly. Set False when global_planner is running, so
+        # that /autonomy/target/local has exactly one publisher.
+        self.declare_parameter('publish_local_target', True)
+        self.publish_local_target = self.get_parameter(
+            'publish_local_target').get_parameter_value().bool_value
+
         # Load GPS waypoints
         waypoints_file = (
             'config/waypoints_test_site_utah.yaml'
@@ -260,18 +267,22 @@ class StateMachineNode(Node):
             self.update_search_params()
 
     def publish_targets(self):
-        local_msg = Float32MultiArray()
-        local_msg.data = [
-            float(self.target_position[0]),
-            float(self.target_position[1])
-        ]
         global_msg = Float32MultiArray()
         global_msg.data = [
             float(self.target_position[0]),
             float(self.target_position[1])
         ]
-        self.local_pub.publish(local_msg)
         self.global_pub.publish(global_msg)
+        if not self.publish_local_target:
+            # The global planner owns /autonomy/target/local in this mode, so
+            # publishing here too would give the local planner two masters.
+            return
+        local_msg = Float32MultiArray()
+        local_msg.data = [
+            float(self.target_position[0]),
+            float(self.target_position[1])
+        ]
+        self.local_pub.publish(local_msg)
 
     def publish_target_name(self):
         m = String()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recognize astronaut gestures and optionally track ZED SDK metric depth.
+"""Recognize astronaut gesture/voice commands and optionally track ZED depth.
 
 Recommended setup on macOS (MediaPipe 0.10.21 supports Python 3.11):
 
@@ -13,7 +13,8 @@ Recommended setup on macOS (MediaPipe 0.10.21 supports Python 3.11):
 Allow Terminal (or the terminal application being used) under System Settings >
 Privacy & Security > Camera when macOS asks. Stand far enough away that the
 camera can see your shoulders, arms, and hips, and press Q in the camera window
-to quit. Use --no-zed for gesture-only webcam testing or --mock-depth for an
+to quit. Add --voice with a local Vosk model to recognize the same five spoken
+commands offline. Use --no-zed for webcam testing or --mock-depth for an
 explicitly simulated visualization pipeline. On a supported Jetson/Linux host,
 --zed uses the official ``pyzed.sl`` SDK for synchronized image and metric XYZ.
 It never treats a UVC/OpenCV ZED stream as real depth.
@@ -34,6 +35,12 @@ from dataclasses import dataclass, replace
 from typing import Iterable, Sequence
 
 from astronaut_tracker import AstronautTracker, TrackingResult
+from voice_recognizer import (
+    VoiceCommand,
+    VoiceCommandRecognizer,
+    VoiceRecognitionError,
+    list_audio_input_devices,
+)
 from zed_depth import (
     MockDepthProvider,
     ZedDepthCamera,
@@ -85,6 +92,27 @@ class Detection:
     label: str = "NONE"
     confidence: float = 0.0
     detail: str = ""
+
+
+@dataclass(frozen=True)
+class CommandDecision:
+    label: str = "NONE"
+    source: str = "NONE"
+    confidence: float = 0.0
+
+
+def select_command(
+    gesture: Detection,
+    voice: VoiceCommand | None,
+    now: float,
+    voice_hold_seconds: float,
+) -> CommandDecision:
+    """Prefer a recent spoken command; otherwise expose the stable gesture."""
+    if voice is not None and now - voice.timestamp <= voice_hold_seconds:
+        return CommandDecision(voice.label, "VOICE", voice.confidence)
+    if gesture.label != "NONE":
+        return CommandDecision(gesture.label, "GESTURE", gesture.confidence)
+    return CommandDecision()
 
 
 @dataclass(frozen=True)
@@ -1000,16 +1028,19 @@ def _position_text(tracking: TrackingResult) -> str:
 
 def draw_status(
     frame,
-    detection: Detection,
+    command: CommandDecision,
+    gesture: Detection,
+    voice: VoiceCommand | None,
+    voice_status: str,
     tracking: TrackingResult,
     fps: float,
 ) -> None:
-    color = (40, 210, 40) if detection.label != "NONE" else (80, 80, 255)
-    detail = f" ({detection.detail})" if detection.detail else ""
-    cv2.rectangle(frame, (0, 0), (frame.shape[1], 168), (20, 20, 20), -1)
+    color = (40, 210, 40) if command.label != "NONE" else (80, 80, 255)
+    detail = f" ({gesture.detail})" if gesture.detail else ""
+    cv2.rectangle(frame, (0, 0), (frame.shape[1], 202), (20, 20, 20), -1)
     cv2.putText(
         frame,
-        f"Gesture: {detection.label}{detail}",
+        f"Command: {command.label} [{command.source}]",
         (22, 36),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.90,
@@ -1017,12 +1048,24 @@ def draw_status(
         2,
         cv2.LINE_AA,
     )
+    voice_label = voice.label if voice is not None else "NONE"
+    cv2.putText(
+        frame,
+        f"Gesture: {gesture.label}{detail}   Voice: {voice_label} "
+        f"({voice_status})",
+        (22, 70),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.52,
+        (225, 225, 225),
+        1,
+        cv2.LINE_AA,
+    )
     detected = "YES" if tracking.astronaut_detected else "NO"
     cv2.putText(
         frame,
         f"Astronaut: {detected}   Distance: {_distance_text(tracking)}   "
         f"Direction: {tracking.direction}",
-        (22, 72),
+        (22, 104),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.55,
         (225, 225, 225),
@@ -1032,7 +1075,7 @@ def draw_status(
     cv2.putText(
         frame,
         _position_text(tracking),
-        (22, 106),
+        (22, 138),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.55,
         (225, 225, 225),
@@ -1047,8 +1090,8 @@ def draw_status(
     cv2.putText(
         frame,
         f"Depth: {tracking.depth_status}{stale}   confidence "
-        f"{detection.confidence:.2f}   {fps:.0f} FPS   Q: quit",
-        (22, 140),
+        f"{command.confidence:.2f}   {fps:.0f} FPS   Q: quit",
+        (22, 172),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.55,
         (60, 210, 255) if tracking.simulated else (225, 225, 225),
@@ -1057,10 +1100,21 @@ def draw_status(
     )
 
 
-def print_tracking_report(detection: Detection, tracking: TrackingResult) -> None:
+def print_tracking_report(
+    command: CommandDecision,
+    gesture: Detection,
+    voice: VoiceCommand | None,
+    voice_status: str,
+    tracking: TrackingResult,
+) -> None:
+    voice_text = "NONE" if voice is None else f"{voice.label} ({voice.confidence:.2f})"
     print(
         f"Astronaut Detected: {'YES' if tracking.astronaut_detected else 'NO'}\n"
-        f"Gesture: {detection.label}\n"
+        f"Command: {command.label}\n"
+        f"Command Source: {command.source}\n"
+        f"Gesture: {gesture.label}\n"
+        f"Voice: {voice_text}\n"
+        f"Voice Status: {voice_status}\n"
         f"Distance: {_distance_text(tracking)}\n"
         f"Direction: {tracking.direction}\n"
         f"{_position_text(tracking)}\n"
@@ -1104,6 +1158,50 @@ def parse_args() -> argparse.Namespace:
         "--list-cameras",
         action="store_true",
         help="list AVFoundation names and formats, then exit",
+    )
+    parser.add_argument(
+        "--voice",
+        action="store_true",
+        help="recognize the five spoken commands offline while gestures run",
+    )
+    parser.add_argument(
+        "--voice-model",
+        default="models/vosk-model-small-en-us-0.15",
+        help="path to an extracted Vosk English model directory",
+    )
+    parser.add_argument(
+        "--audio-device",
+        default=None,
+        help="microphone index or name fragment (default: system input)",
+    )
+    parser.add_argument(
+        "--list-audio-devices",
+        action="store_true",
+        help="list microphone input devices, then exit",
+    )
+    parser.add_argument(
+        "--voice-confidence",
+        type=float,
+        default=0.50,
+        help="minimum accepted Vosk word confidence from 0 to 1 (default: 0.50)",
+    )
+    parser.add_argument(
+        "--voice-input-gain",
+        type=float,
+        default=1.75,
+        help="software microphone gain before recognition (default: 1.75)",
+    )
+    parser.add_argument(
+        "--voice-hold-seconds",
+        type=float,
+        default=2.0,
+        help="how long a spoken command remains active (default: 2.0)",
+    )
+    parser.add_argument(
+        "--voice-cooldown-seconds",
+        type=float,
+        default=1.0,
+        help="minimum delay between accepted spoken commands (default: 1.0)",
     )
     parser.add_argument(
         "--preview",
@@ -1242,18 +1340,43 @@ def parse_args() -> argparse.Namespace:
         parser.error("--mock-distance must be positive")
     if args.zed_fps <= 0:
         parser.error("--zed-fps must be positive")
+    if not 0.0 < args.voice_confidence <= 1.0:
+        parser.error("--voice-confidence must be greater than 0 and at most 1")
+    if not 0.1 <= args.voice_input_gain <= 8.0:
+        parser.error("--voice-input-gain must be between 0.1 and 8.0")
+    if args.voice_hold_seconds <= 0.0:
+        parser.error("--voice-hold-seconds must be positive")
+    if args.voice_cooldown_seconds < 0.0:
+        parser.error("--voice-cooldown-seconds cannot be negative")
     if args.camera_mode == "zed" and args.camera is not None:
         parser.error("--camera is for webcam/mock mode, not ZED SDK selection")
+    if args.preview and args.voice:
+        parser.error("--voice cannot be combined with camera-only --preview")
     return args
 
 
 def main() -> int:
     args = parse_args()
+    if args.list_audio_devices:
+        try:
+            audio_devices = list_audio_input_devices()
+        except VoiceRecognitionError as exc:
+            print(f"Audio device enumeration failed: {exc}", file=sys.stderr)
+            return 1
+        print("Microphone input devices:")
+        if audio_devices:
+            for description in audio_devices:
+                print(f"  {description}")
+        else:
+            print("  none")
+        if not args.list_cameras:
+            return 0
+
     devices = []
     if args.camera_mode != "zed" or args.list_cameras:
         devices = enumerate_avfoundation_cameras()
         print_camera_inventory(devices)
-    if args.list_cameras:
+    if args.list_cameras or args.list_audio_devices:
         return 0
 
     session = None
@@ -1292,6 +1415,31 @@ def main() -> int:
                 "not ZED measurements."
             )
 
+    voice_recognizer = None
+    if args.voice:
+        voice_recognizer = VoiceCommandRecognizer(
+            model_path=args.voice_model,
+            device=args.audio_device,
+            minimum_confidence=args.voice_confidence,
+            cooldown_seconds=args.voice_cooldown_seconds,
+            input_gain=args.voice_input_gain,
+        )
+        try:
+            voice_recognizer.start()
+        except VoiceRecognitionError as exc:
+            print(f"Voice recognition unavailable: {exc}", file=sys.stderr)
+            if session is not None:
+                session.capture.release()
+            if zed_source is not None:
+                zed_source.close()
+            return 1
+        print(
+            f"Voice recognition listening on {voice_recognizer.device_name!r} "
+            f"at {voice_recognizer.sample_rate} Hz with "
+            f"{voice_recognizer.input_gain:g}x input gain."
+        )
+        print("Say one command: FOLLOW, STAY, FETCH, COME, or GIVE.")
+
     camera = None if session is None else session.capture
     recognizer = GestureRecognizer(
         args.confidence,
@@ -1314,6 +1462,9 @@ def main() -> int:
     smoothed_fps = 0.0
     next_report_time = 0.0
     consecutive_zed_failures = 0
+    latest_voice = None
+    last_announced_command = ("NONE", "NONE")
+    last_voice_status = "LISTENING" if voice_recognizer is not None else "DISABLED"
 
     print("Stand where your shoulders, arms, and hips are visible.")
     print("Press Q in the camera window to quit.")
@@ -1372,6 +1523,48 @@ def main() -> int:
                     results.pose_world_landmarks,
                 )
                 stable = stabilizer.update(observation, now)
+                if voice_recognizer is not None:
+                    voice_event = voice_recognizer.poll()
+                    if voice_event is not None:
+                        latest_voice = voice_event
+                    if voice_recognizer.status != last_voice_status:
+                        last_voice_status = voice_recognizer.status
+                        voice_error = (
+                            f" ({voice_recognizer.last_error})"
+                            if voice_recognizer.last_error
+                            else ""
+                        )
+                        print(
+                            f"Voice Status: {last_voice_status}{voice_error}",
+                            flush=True,
+                        )
+                voice_display_status = last_voice_status
+                if (
+                    voice_recognizer is not None
+                    and math.isfinite(voice_recognizer.audio_level_dbfs)
+                ):
+                    voice_display_status += (
+                        f", {voice_recognizer.audio_level_dbfs:.0f} dBFS"
+                    )
+                active_voice = (
+                    latest_voice
+                    if latest_voice is not None
+                    and now - latest_voice.timestamp <= args.voice_hold_seconds
+                    else None
+                )
+                command = select_command(
+                    stable,
+                    active_voice,
+                    now,
+                    args.voice_hold_seconds,
+                )
+                command_key = (command.label, command.source)
+                if command_key != last_announced_command:
+                    print(
+                        f"Detected: {command.label} ({command.source})",
+                        flush=True,
+                    )
+                    last_announced_command = command_key
                 tracking = tracker.update(
                     results.pose_landmarks,
                     depth_frame,
@@ -1382,7 +1575,13 @@ def main() -> int:
                     tracking = replace(tracking, depth_status="DISABLED")
 
                 if now >= next_report_time:
-                    print_tracking_report(stable, tracking)
+                    print_tracking_report(
+                        command,
+                        stable,
+                        active_voice,
+                        voice_display_status,
+                        tracking,
+                    )
                     next_report_time = now + 1.0 / args.output_rate
 
                 if results.pose_landmarks is not None:
@@ -1397,7 +1596,15 @@ def main() -> int:
                     instant_fps if smoothed_fps == 0.0 else 0.9 * smoothed_fps + 0.1 * instant_fps
                 )
                 last_frame_time = now
-                draw_status(frame, stable, tracking, smoothed_fps)
+                draw_status(
+                    frame,
+                    command,
+                    stable,
+                    active_voice,
+                    voice_display_status,
+                    tracking,
+                    smoothed_fps,
+                )
                 cv2.imshow("Astronaut Gesture Test", frame)
                 if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
                     break
@@ -1408,6 +1615,8 @@ def main() -> int:
             camera.release()
         if zed_source is not None:
             zed_source.close()
+        if voice_recognizer is not None:
+            voice_recognizer.stop()
         cv2.destroyAllWindows()
     return 0
 

@@ -3,12 +3,45 @@
 
 Terra2 contains all the code that is part of a ROS codebase and implements the brains of our devices. This main branch contains the current fully integrated and tested functionality for the rover.
 
+## Astronaut Mission Simulation
+
+The astronaut autonomy package includes a hardware-independent closed-loop
+mission simulator. It models rover and astronaut poses, derives range and
+bearing from those poses, applies the FOLLOW/COME velocity output to the mock
+rover, and runs the `FOLLOW -> STAY -> FETCH -> COME -> GIVE` sequence. Physical
+motor output stays disabled.
+
+Run it directly on macOS without ROS:
+
+```bash
+./run astronaut-pure-sim
+```
+
+Results are written to `artifacts/astronaut_sim/report.json` and
+`artifacts/astronaut_sim/trajectory.csv`.
+
+For a real ROS 2 Humble build and topic-level integration test, install and
+start Docker Desktop, then run:
+
+```bash
+./scripts/astronaut_docker.sh build
+./scripts/astronaut_docker.sh test
+```
+
+The image is based on Ubuntu 22.04 and ROS 2 Humble. It builds only `cmr_msgs`
+and `astronaut_autonomy`, verifies the generated messages import, starts the
+mission and mock-rover nodes, checks topic types, and validates the final
+simulation report. See
+[`src/astronaut_autonomy/README.md`](./src/astronaut_autonomy/README.md) for
+architecture, topic inspection, configuration, and remaining hardware tests.
+
 ## Mac/ZED Astronaut Gesture Test
 
 [`gesture_test.py`](./gesture_test.py) is a standalone, perception-only
 prototype. It uses OpenCV and MediaPipe Pose for gestures and can optionally use
-the official Stereolabs ZED SDK for synchronized metric depth. It does not
-require ROS, networking, motor control, or other rover hardware.
+offline Vosk speech recognition for the same five commands. It can also use the
+official Stereolabs ZED SDK for synchronized metric depth. It does not require
+ROS, networking, motor control, or other rover hardware.
 
 ### Recognized gestures
 
@@ -24,6 +57,9 @@ The camera window shows the skeleton, stable command, astronaut presence,
 distance, camera-relative direction, X/Y/Z position, and depth status. FETCH
 also shows whether the right arm points left, right, or forward in the mirrored
 display. The terminal prints a tracking report at 2 Hz by default.
+When voice input is enabled, the window shows the gesture, spoken command, and
+selected command source. A recent accepted voice command takes priority for two
+seconds, then control returns to the stable gesture.
 
 ### Requirements
 
@@ -41,6 +77,8 @@ The direct Python dependencies are pinned in
 - OpenCV Contrib Python 4.11.0.86
 - NumPy 1.26.4
 - PyObjC AVFoundation 12.2.2
+- SoundDevice 0.5.6
+- Vosk 0.3.44
 
 `pyzed.sl` is intentionally not a pip requirement. It is supplied by the ZED
 SDK on supported systems and is imported only when `--zed` is requested.
@@ -54,6 +92,8 @@ SDK on supported systems and is imported only when `--zed` is requested.
 - [`astronaut_tracker.py`](./astronaut_tracker.py) maps torso landmarks into the
   aligned XYZ image, filters depth, calculates 3D position/direction, smooths
   valid measurements, and handles stale tracking.
+- [`voice_recognizer.py`](./voice_recognizer.py) captures microphone audio in a
+  background thread and uses an offline, five-command Vosk grammar.
 
 ### Install
 
@@ -67,8 +107,40 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements-gesture-test.txt
 ```
 
-When macOS prompts for camera access, allow it. The setting can also be changed
-under **System Settings > Privacy & Security > Camera**.
+When macOS prompts for camera or microphone access, allow it. These settings can
+also be changed under **System Settings > Privacy & Security > Camera** and
+**Microphone**.
+
+### Add offline voice commands
+
+Download and extract the small English Vosk model once. The model is kept out
+of Git because it is a large generated/runtime asset:
+
+```bash
+mkdir -p models
+curl -LO https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+unzip vosk-model-small-en-us-0.15.zip -d models
+```
+
+List available microphones:
+
+```bash
+python gesture_test.py --list-audio-devices
+```
+
+Run the Mac camera with gestures and offline voice recognition together:
+
+```bash
+python gesture_test.py --no-zed --camera 0 --voice \
+  --voice-model models/vosk-model-small-en-us-0.15
+```
+
+Say `follow`, `stay`, `fetch`, `come`, or `give`. A successful spoken command
+prints output such as `Detected: COME (VOICE)`. Speech recognition runs locally;
+no cloud service or network connection is used after the model is downloaded.
+Use `--audio-device INDEX` to select a microphone shown by the listing command.
+If the model, dependency, or microphone cannot open, `--voice` exits with a
+clear error instead of silently continuing without voice input.
 
 ### Run with the Mac camera (gesture only)
 
@@ -106,12 +178,16 @@ repository's requirements file on `aarch64`. Then verify all three native
 bindings before launching:
 
 ```bash
+sudo apt install libportaudio2
 python3 -m venv --system-site-packages .venv-gesture
 source .venv-gesture/bin/activate
 python -m pip install -r requirements-gesture-test.txt
 python -c "import cv2, mediapipe, pyzed.sl; print('Perception APIs ready')"
 python gesture_test.py --zed
 ```
+
+Add `--voice --voice-model models/vosk-model-small-en-us-0.15` to the Jetson
+command to listen for spoken commands through its selected input microphone.
 
 If `import mediapipe` fails, install or build a JetPack/Python-compatible ARM64
 MediaPipe wheel before running this application. Do not substitute mock depth
@@ -184,6 +260,27 @@ python gesture_test.py \
 
 Use `python gesture_test.py --help` to see every option.
 
+Voice controls include:
+
+```bash
+python gesture_test.py --no-zed --voice \
+  --voice-confidence 0.50 \
+  --voice-input-gain 1.75 \
+  --voice-hold-seconds 2.0 \
+  --voice-cooldown-seconds 1.0
+```
+
+The constrained vocabulary accepts the five command words and a few natural
+variants such as `follow me`, `stay there`, `go fetch`, `come here`, and
+`give it`. It ignores partial recognition and only acts on finalized speech
+above the confidence threshold. Audio is processed in smaller low-latency
+blocks, and the default 1.75x software gain helps with quiet microphones.
+
+The live `Voice Status` includes the microphone level in dBFS. If speech stays
+very quiet, try `--voice-input-gain 2.5`. If clear speech is heard but rejected,
+try `--voice-confidence 0.40`. Higher gain and lower confidence increase
+sensitivity but can also increase false detections in a noisy room.
+
 Depth and reporting controls include:
 
 ```bash
@@ -223,6 +320,55 @@ python -m unittest discover -s tests -v
   `STALE` means the last valid estimate is being held briefly, and
   `UNAVAILABLE` means no reliable measurement exists.
 - Bright, even lighting and a full-body view reduce landmark jitter.
+
+### Run the ROS 2 ZED integration on the rover
+
+The ROS implementation is in
+[`src/astronaut_autonomy`](./src/astronaut_autonomy/README.md). It deliberately
+does not enable the microphone. Its mission controller publishes safe drive
+proposals, while the adapter to the rover's shared drive topic remains disabled
+by default. On the Jetson, build the workspace, start the one ZED owner, and
+start astronaut perception:
+
+```bash
+./run setup
+./run gesture-setup
+./run build
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run cmr_zed threaded
+```
+
+In a second terminal:
+
+```bash
+./run gesture
+```
+
+In a third terminal, start the mission state machine without physical drive
+output:
+
+```bash
+./run astronaut-mission
+```
+
+In another sourced ROS terminal, inspect the combined output:
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 topic echo /autonomy/astronaut/perception
+ros2 topic echo /autonomy/astronaut/mission_state
+ros2 topic echo /autonomy/astronaut/drive_command
+```
+
+The node synchronizes `/zed/image` with `/camera/points`, recognizes all five
+gestures, and publishes ZED-frame position, range, and bearing. FOLLOW and
+FETCH are emitted in the message's safe `command` field only while their
+current torso depth is valid. The mission node provides debounced IDLE,
+FOLLOWING, STAYING, FETCHING, COMING, GIVING, and ERROR behavior. See the
+package README for hardware-free simulation, tests, topics, safety behavior,
+and remaining rover integration work.
 
 ## Current Functionality
 
@@ -339,6 +485,8 @@ Run these short commands from the repository root. Use `./run help` at any time.
 | `./run teleop` | Jetson | Receive UDP input and drive the rover |
 | `./run controller` | Controller laptop | Send DualSense input to the rover |
 | `./run auto` | Jetson | Start hardware autonomy and shared rover driving |
+| `./run astronaut-mission` | Jetson or dev container | Start safe-by-default astronaut mission logic |
+| `./run astronaut-sim` | ROS dev container | Simulate all astronaut commands without hardware |
 | `./run sim` | Dev container | Start autonomy in simulated-input mode |
 | `./run test` | Laptop or dev container | Run focused autonomy tests |
 

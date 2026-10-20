@@ -2,16 +2,20 @@
 
 The gesture node is separate from the existing bottle/mallet detector. It uses
 the official Ultralytics `yolo26n-pose.pt` model to locate the 17 COCO human
-keypoints, then classifies and stabilizes these initial gestures:
+keypoints, then classifies and stabilizes these gestures:
 
-- `hands_up`
-- `left_arm_out`
-- `right_arm_out`
-- `both_arms_out`
-- `none`
+- `FOLLOW`: both hands on hips, elbows out
+- `STAY`: horizontal T-pose
+- `FETCH`: left hand at the neck and right arm pointing
+- `COME`: hands together above the head
+- `GIVE`: crossed forearms over the chest
+- `NONE`
 
-The labels describe the person's anatomical left and right. They are perception
-results only; they do not directly command the rover.
+The labels describe the person's anatomical left and right. Display mirroring
+does not swap these keypoint identities. The node also maps the detected torso
+into the synchronized organized ZED point cloud and obtains a robust median 3-D
+position. These are perception results only; they do not directly drive the
+rover.
 
 ## Prepare the rover
 
@@ -56,12 +60,22 @@ frame rate and thermals on the Jetson.
 
 The node publishes:
 
+- `/autonomy/astronaut/perception` (`cmr_msgs/AstronautCommand`)
+- `/autonomy/astronaut/distance` (`std_msgs/Float32`; NaN if unavailable)
+- `/autonomy/astronaut/target` (`geometry_msgs/PointStamped`)
 - `/autonomy/human_gesture` (`std_msgs/String`)
 - `/autonomy/human_gesture/confidence` (`std_msgs/Float32`)
 - `/autonomy/human_gesture/debug_image` (`sensor_msgs/Image`)
 
-The autonomy state machine does not act on these topics yet. That mapping must
-be reviewed, implemented, and tested separately.
+`AstronautCommand.gesture` is the stabilized observed pose. Its `command` is
+the safe value for a downstream state machine: FOLLOW and FETCH become NONE
+unless depth is currently `VALID`. A recently lost measurement may be exposed
+as `STALE` for diagnostics but never authorizes those commands. Coordinates are
+meters in the ZED frame: x forward, y left, z up.
+
+The autonomy state machine does not act on these topics yet. Motion behavior,
+stopping distances, obstacle handling, and command timeouts must be reviewed,
+implemented, and tested separately before this can move the rover.
 
 ## Custom gestures
 

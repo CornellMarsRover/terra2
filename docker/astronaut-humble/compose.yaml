@@ -1,0 +1,9 @@
+services:
+  astronaut-sim:
+    build:
+      context: ../..
+      dockerfile: docker/astronaut-humble/Dockerfile
+    image: terra2-astronaut-humble:local
+    command: ["bash", "scripts/test_astronaut_ros_pipeline.sh", "--pipeline-only"]
+    volumes:
+      - ../../artifacts/astronaut_sim:/tmp/astronaut_sim

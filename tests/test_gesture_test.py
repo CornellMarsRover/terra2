@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import gesture_test as gestures
 import numpy as np
+from voice_recognizer import VoiceCommand
 
 
 def point(x=0.5, y=0.5, z=0.0, visibility=0.99):
@@ -24,6 +25,20 @@ def classify(landmarks):
 
 
 class GestureRecognitionTests(unittest.TestCase):
+    def test_recent_voice_command_overrides_gesture(self):
+        gesture = gestures.Detection("STAY", 0.8)
+        voice = VoiceCommand("COME", 0.9, "come", 10.0)
+        command = gestures.select_command(gesture, voice, 10.5, 2.0)
+        self.assertEqual(command.label, "COME")
+        self.assertEqual(command.source, "VOICE")
+
+    def test_expired_voice_command_falls_back_to_gesture(self):
+        gesture = gestures.Detection("STAY", 0.8)
+        voice = VoiceCommand("COME", 0.9, "come", 10.0)
+        command = gestures.select_command(gesture, voice, 12.1, 2.0)
+        self.assertEqual(command.label, "STAY")
+        self.assertEqual(command.source, "GESTURE")
+
     def test_sdk_left_image_does_not_require_webcam_session(self):
         frame = np.zeros((12, 20, 3), dtype=np.uint8)
         self.assertIs(gestures.prepare_camera_frame(None, frame), frame)

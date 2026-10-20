@@ -3,8 +3,15 @@ human_gesture_detection:
     # Prepare this model with ./run gesture-setup before offline field use.
     model_path: "yolo26n-pose.pt"
     image_topic: "/zed/image"
+    pointcloud_topic: "/camera/points"
     confidence_threshold: 0.50
     keypoint_threshold: 0.35
     confirmation_frames: 5
     clear_frames: 5
+    sync_queue_size: 5
+    sync_slop_seconds: 0.12
+    minimum_distance_m: 0.30
+    maximum_distance_m: 15.0
+    depth_smoothing_alpha: 0.35
+    depth_stale_after_seconds: 0.60
     publish_debug_image: true

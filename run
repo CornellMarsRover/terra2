@@ -12,6 +12,9 @@ Usage: ./run MODE
   controller  Send input; add `setup` once on the laptop
   auto        Start hardware autonomy and rover drive hardware
   gesture     Start human gesture detection separately
+  astronaut-mission  Start the safe-by-default astronaut mission node
+  astronaut-sim  Run the hardware-free astronaut mission simulation
+  astronaut-pure-sim  Run the closed-loop mission without ROS or hardware
   sim         Start autonomy with simulated sensor inputs
   test        Run focused autonomy tests
   help        Show this guide
@@ -46,7 +49,10 @@ case "$mode" in
     }
     exec bash scripts/test_autonomy.sh "$@"
     ;;
-  build|setup|teleop|auto|gesture|sim) ;;
+  astronaut-pure-sim)
+    exec python3 scripts/run_astronaut_simulation.py "$@"
+    ;;
+  build|setup|teleop|auto|gesture|astronaut-mission|astronaut-sim|sim) ;;
   *) echo "Unknown mode: $mode" >&2; usage >&2; exit 2 ;;
 esac
 if [[ ! -f /opt/ros/humble/setup.bash ]]; then
@@ -77,5 +83,7 @@ case "$mode" in
   teleop) exec ros2 launch cmr_rovernet rovernet.launch.py enable_arm:=false "$@" ;;
   auto) exec ros2 launch autonomous_navigation localization_real.launch.py "$@" ;;
   gesture) exec bash scripts/run_human_gesture_detection.sh "$@" ;;
+  astronaut-mission) exec ros2 launch astronaut_autonomy astronaut_mission.launch.py "$@" ;;
+  astronaut-sim) exec ros2 launch astronaut_autonomy astronaut_mission_sim.launch.py "$@" ;;
   sim) exec ros2 launch autonomous_navigation sim_autonomy.launch.py "$@" ;;
 esac

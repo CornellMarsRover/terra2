@@ -14,7 +14,7 @@ RIGHT_SHOULDER = 6
 LEFT_HIP = 11
 RIGHT_HIP = 12
 TORSO_KEYPOINTS = (LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP)
-DISTANCE_COMMANDS = frozenset(("FOLLOW", "FETCH"))
+DISTANCE_COMMANDS = frozenset(("FOLLOW",))
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,12 @@ def command_requires_distance(command: str) -> bool:
 
 
 def safe_command_for(gesture: str, distance_valid: bool) -> str:
-    """Withhold motion-relevant commands until current metric depth is valid."""
+    """Withhold FOLLOW until current astronaut depth is valid.
+
+    FETCH recognition is intentionally independent of astronaut range. The arm
+    coordinator must perform its own nearby-hammer localization before moving.
+    COME is gated by the mission controller before it can produce drive output.
+    """
     normalized = gesture.upper()
     if normalized == "NONE":
         return "NONE"

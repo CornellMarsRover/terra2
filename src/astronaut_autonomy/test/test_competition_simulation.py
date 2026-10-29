@@ -66,6 +66,23 @@ class CompetitionSimulationTests(unittest.TestCase):
         self.assertTrue(report.succeeded, report.to_dict())
         self.assertTrue(math.isfinite(report.final_distance_m))
 
+    def test_all_command_modalities_complete_closed_loop(self):
+        for mode in ("gesture", "voice", "matching", "conflict"):
+            with self.subTest(mode=mode):
+                report = run_competition_simulation(
+                    CompetitionSimulationConfig(command_input_mode=mode)
+                )
+                self.assertTrue(report.succeeded, report.to_dict())
+                self.assertEqual(report.safety_violations, [])
+                self.assertIn("temporary_tracking_loss", report.injected_events)
+                if mode == "conflict":
+                    self.assertTrue(
+                        any(
+                            transition["reason"] == "conflict_safety_stop"
+                            for transition in report.state_transitions
+                        )
+                    )
+
     def test_csv_and_json_reports_are_written(self):
         with tempfile.TemporaryDirectory() as directory:
             csv_path = Path(directory) / "trajectory.csv"

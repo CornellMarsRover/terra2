@@ -22,6 +22,12 @@ def main() -> int:
     parser.add_argument("--output", default="artifacts/astronaut_sim")
     parser.add_argument("--range-noise", type=float, default=0.0)
     parser.add_argument("--bearing-noise", type=float, default=0.0)
+    parser.add_argument(
+        "--command-input-mode",
+        choices=("gesture", "voice", "matching", "conflict"),
+        default="gesture",
+        help="route commands through the selected fusion scenario",
+    )
     parser.add_argument("--no-failure-injection", action="store_true")
     args = parser.parse_args()
 
@@ -30,6 +36,7 @@ def main() -> int:
         range_noise_std_m=args.range_noise,
         bearing_noise_std_deg=args.bearing_noise,
         inject_failures=not args.no_failure_injection,
+        command_input_mode=args.command_input_mode,
     )
     report = run_competition_simulation(
         config,

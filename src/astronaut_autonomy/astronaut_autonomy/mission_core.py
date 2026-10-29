@@ -53,6 +53,9 @@ class PerceptionSample:
     depth_status: str = "UNAVAILABLE"
     distance_m: float = math.nan
     bearing_deg: float = math.nan
+    source: str = "INTERNAL"
+    decision_reason: str = ""
+    safety_stop: bool = False
 
     @property
     def valid_target(self) -> bool:
@@ -119,6 +122,7 @@ class AstronautMissionStateMachine:
         self._candidate = "NONE"
         self._candidate_since = None
         self._latched_command = None
+        self._latched_was_safety_stop = False
         self._pending_action = ManipulationAction.NONE
         self._manipulation_started_at = None
         self._manipulation_status = ManipulationStatus.IDLE
@@ -135,11 +139,16 @@ class AstronautMissionStateMachine:
             return "COMPLETE"
         return COMPETITION_SEQUENCE[self._sequence_index]
 
-    def observe_perception(self, sample: PerceptionSample, now_s: float) -> bool:
+    def observe_perception(
+        self, sample: PerceptionSample, now_s: float
+    ) -> bool:
         """Consume one perception update and return whether a command changed state."""
         self._require_time(now_s)
         command = sample.command.upper()
-        if command not in COMMANDS or sample.confidence < self.config.minimum_command_confidence:
+        if (
+            command not in COMMANDS
+            or sample.confidence < self.config.minimum_command_confidence
+        ):
             command = "NONE"
 
         self._perception = sample
@@ -153,7 +162,32 @@ class AstronautMissionStateMachine:
             # A neutral observation rearms the previous command. It does not
             # stop a mission; STAY is the explicit stop command.
             self._latched_command = None
+            self._latched_was_safety_stop = False
             return False
+
+        # STAY is the safety command and must not wait for the normal command
+        # debounce while the rover may be moving. Upstream classifiers already
+        # apply confidence and temporal filtering. A fusion-generated stop is
+        # deliberately prevented from advancing the competition sequence.
+        if command == "STAY":
+            if command == self._latched_command and not (
+                self._latched_was_safety_stop and not sample.safety_stop
+            ):
+                return False
+            if not self._can_accept(command) or not self._sequence_allows(command):
+                return False
+            self._candidate = command
+            self._candidate_since = float(now_s)
+            self._accept(
+                command,
+                float(now_s),
+                advance_sequence=not sample.safety_stop,
+            )
+            if sample.safety_stop:
+                self.reason = sample.decision_reason or "conflict_safety_stop"
+            self._latched_command = command
+            self._latched_was_safety_stop = sample.safety_stop
+            return True
 
         if command != self._candidate:
             self._candidate = command
@@ -171,12 +205,13 @@ class AstronautMissionStateMachine:
         if not self._sequence_allows(command):
             self.reason = f"out_of_order_expected_{self.expected_command.lower()}"
             return False
-        if command in ("FOLLOW", "COME", "FETCH") and not sample.valid_target:
+        if command in ("FOLLOW", "COME") and not sample.valid_target:
             self.reason = f"{command.lower()}_waiting_for_valid_depth"
             return False
 
         self._accept(command, float(now_s))
         self._latched_command = command
+        self._latched_was_safety_stop = False
         return True
 
     def observe_manipulation(
@@ -200,6 +235,7 @@ class AstronautMissionStateMachine:
                     self.state = MissionState.STAYING
                     self.reason = "emergency_stop"
                 self._latched_command = None
+                self._latched_was_safety_stop = False
                 self._candidate = "NONE"
                 self._candidate_since = float(now_s)
             self._estop_seen = True
@@ -222,6 +258,7 @@ class AstronautMissionStateMachine:
         self.state = MissionState.IDLE
         self.reason = "error_reset"
         self._latched_command = None
+        self._latched_was_safety_stop = False
         self._candidate = "NONE"
         self._candidate_since = None
         self._manipulation_started_at = None
@@ -252,14 +289,21 @@ class AstronautMissionStateMachine:
                 COMPETITION_SEQUENCE
             )
 
-    def _accept(self, command: str, now_s: float) -> None:
+    def _accept(
+        self,
+        command: str,
+        now_s: float,
+        *,
+        advance_sequence: bool = True,
+    ) -> None:
         if command == "STAY":
             if self.state in self._MANIPULATION_STATES:
                 self._pending_action = ManipulationAction.CANCEL
             self.state = MissionState.STAYING
             self.reason = "stay_command"
             self._manipulation_started_at = None
-            self._advance_sequence("STAY")
+            if advance_sequence:
+                self._advance_sequence("STAY")
             return
         if command == "FOLLOW":
             self.state = MissionState.FOLLOWING

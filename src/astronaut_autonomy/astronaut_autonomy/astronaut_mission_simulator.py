@@ -44,7 +44,7 @@ class AstronautMissionSimulator(Node):
         self.report_written = False
 
         self.perception_publisher = self.create_publisher(
-            AstronautCommand, "/autonomy/astronaut/perception", 10
+            AstronautCommand, "/autonomy/astronaut/gesture_perception", 10
         )
         self.estop_publisher = self.create_publisher(Bool, "/cmd_vel/estop", 10)
         self.pose_publisher = self.create_publisher(
@@ -210,8 +210,11 @@ class AstronautMissionSimulator(Node):
         message.gesture = sample.gesture
         message.command = sample.command
         message.confidence = sample.confidence
+        message.source = "GESTURE"
+        message.decision_reason = "simulation_input"
+        message.safety_stop = False
         message.astronaut_detected = sample.astronaut_detected
-        message.distance_required = sample.command in ("FOLLOW", "FETCH", "COME")
+        message.distance_required = sample.command in ("FOLLOW", "COME")
         message.distance_valid = sample.distance_valid
         message.depth_status = sample.depth_status
         message.distance_m = sample.distance_m

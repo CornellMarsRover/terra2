@@ -54,6 +54,9 @@ class MissionCoreTests(unittest.TestCase):
         accepted_first = self.machine.observe_perception(
             sample(command, **kwargs), start
         )
+        if command == "STAY":
+            self.assertTrue(accepted_first)
+            return start
         accepted_second = self.machine.observe_perception(
             sample(command, **kwargs), start + 0.31
         )
@@ -90,6 +93,62 @@ class MissionCoreTests(unittest.TestCase):
         decision = self.machine.tick(now)
         self.assertEqual(decision.state, MissionState.STAYING)
         self.assertTrue(decision.velocity.stopped)
+
+    def test_none_is_neutral_but_invalid_depth_stops_drive(self):
+        now = self.accept("FOLLOW")
+        self.assertFalse(self.machine.tick(now).velocity.stopped)
+        self.machine.observe_perception(
+            sample("NONE", confidence=0.0, distance=3.0), 0.4
+        )
+        self.assertFalse(self.machine.tick(0.4).velocity.stopped)
+        self.machine.observe_perception(
+            sample("NONE", confidence=0.0, valid=False), 0.5
+        )
+        self.assertTrue(self.machine.tick(0.5).velocity.stopped)
+
+    def test_fetch_command_is_independent_of_astronaut_depth(self):
+        now = self.accept("FETCH", valid=False, detected=True)
+        decision = self.machine.tick(now)
+        self.assertEqual(decision.state, MissionState.FETCHING)
+        self.assertEqual(
+            decision.manipulation_action,
+            ManipulationAction.START_FETCH,
+        )
+
+    def test_conflict_safety_stop_does_not_advance_sequence(self):
+        machine = AstronautMissionStateMachine(
+            mission_config=MissionConfig(
+                command_debounce_s=0.1,
+                perception_timeout_s=0.6,
+                manipulation_timeout_s=1.0,
+                enforce_competition_sequence=True,
+            )
+        )
+        machine.observe_perception(sample("FOLLOW"), 0.0)
+        self.assertTrue(machine.observe_perception(sample("FOLLOW"), 0.11))
+        self.assertEqual(machine.expected_command, "STAY")
+
+        conflict = PerceptionSample(
+            command="STAY",
+            confidence=0.9,
+            astronaut_detected=True,
+            distance_valid=True,
+            depth_status="VALID",
+            distance_m=3.0,
+            bearing_deg=0.0,
+            source="FUSION",
+            decision_reason="conflict_safety_stop",
+            safety_stop=True,
+        )
+        self.assertTrue(machine.observe_perception(conflict, 0.2))
+        self.assertEqual(machine.state, MissionState.STAYING)
+        self.assertEqual(machine.expected_command, "STAY")
+        self.assertTrue(machine.tick(0.2).velocity.stopped)
+
+        self.assertTrue(
+            machine.observe_perception(sample("STAY", valid=False), 0.3)
+        )
+        self.assertEqual(machine.expected_command, "FETCH")
 
     def test_tracking_stops_immediately_on_invalid_depth_then_errors(self):
         now = self.accept("FOLLOW")
@@ -232,7 +291,9 @@ class MissionCoreTests(unittest.TestCase):
         )
 
         def observe_twice(command, start, **kwargs):
-            machine.observe_perception(sample(command, **kwargs), start)
+            first = machine.observe_perception(sample(command, **kwargs), start)
+            if command == "STAY":
+                return first
             return machine.observe_perception(
                 sample(command, **kwargs), start + 0.11
             )

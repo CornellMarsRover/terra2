@@ -11,11 +11,16 @@ if [[ "${1:-}" != "--pipeline-only" ]]; then
 fi
 
 python3 - <<'PY'
-from cmr_msgs.msg import AstronautCommand, DriveCommand
+from cmr_msgs.msg import AstronautCommand, AstronautVoiceCommand, DriveCommand
 
 assert AstronautCommand is not None
+assert AstronautVoiceCommand is not None
 assert DriveCommand is not None
-print("AstronautCommand and DriveCommand imports succeeded")
+command = AstronautCommand()
+assert hasattr(command, "source")
+assert hasattr(command, "decision_reason")
+assert hasattr(command, "safety_stop")
+print("Astronaut command and drive message imports succeeded")
 PY
 
 rm -f /tmp/astronaut_sim/report.json /tmp/astronaut_sim/trajectory.csv
@@ -38,6 +43,10 @@ check_topic() {
 }
 
 check_topic /autonomy/astronaut/perception cmr_msgs/msg/AstronautCommand
+check_topic /autonomy/astronaut/gesture_perception cmr_msgs/msg/AstronautCommand
+check_topic /autonomy/astronaut/voice_command cmr_msgs/msg/AstronautVoiceCommand
+check_topic /autonomy/astronaut/command_source std_msgs/msg/String
+check_topic /autonomy/astronaut/fusion_detail std_msgs/msg/String
 check_topic /autonomy/astronaut/drive_command cmr_msgs/msg/DriveCommand
 check_topic /autonomy/astronaut/mission_state std_msgs/msg/String
 check_topic /autonomy/astronaut/manipulation/request std_msgs/msg/String

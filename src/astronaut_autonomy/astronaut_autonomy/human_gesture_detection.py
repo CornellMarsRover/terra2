@@ -105,7 +105,7 @@ class HumanGestureDetectionNode(Node):
             Float32, "/autonomy/human_gesture/confidence", 10
         )
         self.command_publisher = self.create_publisher(
-            AstronautCommand, "/autonomy/astronaut/perception", 10
+            AstronautCommand, "/autonomy/astronaut/gesture_perception", 10
         )
         self.distance_publisher = self.create_publisher(
             Float32, "/autonomy/astronaut/distance", 10
@@ -198,7 +198,7 @@ class HumanGestureDetectionNode(Node):
         )
         distance_valid = tracked.depth_status == "VALID"
         # A held stable label can outlive one bad pose frame. Never pair a
-        # lingering FOLLOW/FETCH label with another visible person's depth.
+        # lingering command label with another visible person's depth.
         depth_matches_gesture = observation.label == stable.label
         command = safe_command_for(
             stable.label,
@@ -323,6 +323,9 @@ class HumanGestureDetectionNode(Node):
         perception.gesture = stable.label
         perception.command = command
         perception.confidence = float(stable.confidence)
+        perception.source = "GESTURE"
+        perception.decision_reason = "gesture_perception"
+        perception.safety_stop = False
         perception.astronaut_detected = bool(tracked.astronaut_detected)
         perception.distance_required = command_requires_distance(stable.label)
         perception.distance_valid = tracked.depth_status == "VALID"

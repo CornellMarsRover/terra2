@@ -81,11 +81,13 @@ class DepthCoreTests(unittest.TestCase):
         self.assertEqual(horizontal_direction(3.0, -1.0)[0], "RIGHT")
         self.assertEqual(horizontal_direction(3.0, 0.1)[0], "CENTER")
 
-    def test_follow_and_fetch_require_current_depth(self):
+    def test_only_follow_is_gated_by_astronaut_depth(self):
         self.assertTrue(command_requires_distance("FOLLOW"))
-        self.assertTrue(command_requires_distance("FETCH"))
+        self.assertFalse(command_requires_distance("FETCH"))
+        self.assertFalse(command_requires_distance("COME"))
         self.assertEqual(safe_command_for("FOLLOW", False), "NONE")
-        self.assertEqual(safe_command_for("FETCH", True), "FETCH")
+        self.assertEqual(safe_command_for("FETCH", False), "FETCH")
+        self.assertEqual(safe_command_for("COME", False), "COME")
         self.assertEqual(safe_command_for("STAY", False), "STAY")
 
     def test_tracker_smooths_and_marks_old_measurement_stale(self):

@@ -6,9 +6,13 @@ import csv
 import json
 import math
 import random
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+from astronaut_autonomy.command_fusion import (
+    CommandFusion,
+    CommandObservation,
+)
 from astronaut_autonomy.mission_core import (
     AstronautMissionStateMachine,
     ManipulationAction,
@@ -47,6 +51,7 @@ class CompetitionSimulationConfig:
     random_seed: int = 2027
     inject_failures: bool = True
     minimum_safe_distance_m: float = 0.75
+    command_input_mode: str = "gesture"
 
     def __post_init__(self):
         positive = (
@@ -58,11 +63,22 @@ class CompetitionSimulationConfig:
             self.manipulation_duration_s,
         )
         if not all(math.isfinite(value) and value > 0.0 for value in positive):
-            raise ValueError("simulation timing, limits, and distances must be positive")
+            raise ValueError(
+                "simulation timing, limits, and distances must be positive"
+            )
         if self.remote_command_distance_m < 20.0:
             raise ValueError("competition FETCH/COME distance must be at least 20 m")
         if self.range_noise_std_m < 0.0 or self.bearing_noise_std_deg < 0.0:
             raise ValueError("noise standard deviations cannot be negative")
+        if self.command_input_mode not in {
+            "gesture",
+            "voice",
+            "matching",
+            "conflict",
+        }:
+            raise ValueError(
+                "command_input_mode must be gesture, voice, matching, or conflict"
+            )
 
 
 @dataclass(frozen=True)
@@ -201,6 +217,11 @@ class CompetitionScenario:
 
         if self.phase == "OUT_OF_ORDER":
             command = gesture = "GIVE"
+        elif self.phase == "FETCH":
+            # FETCH can be issued with the astronaut over 20 m away. Command
+            # recognition is independent of the arm's nearby-object ranging.
+            valid = False
+            depth_status = "UNAVAILABLE"
         elif self.phase == "COMPLETE":
             command = gesture = "NONE"
         elif self.phase == "COME" and self.config.inject_failures:
@@ -260,7 +281,15 @@ class CompetitionScenario:
         if self.phase == "FOLLOW":
             if (
                 elapsed >= self.config.follow_walk_duration_s
-                and state == MissionState.FOLLOWING
+                and state
+                in (
+                    MissionState.FOLLOWING,
+                    MissionState.STAYING,
+                )
+                and (
+                    state == MissionState.FOLLOWING
+                    or self.config.command_input_mode == "conflict"
+                )
                 and distance <= 3.0
             ):
                 self.follow_stop_distance_m = distance
@@ -346,7 +375,10 @@ class CompetitionScenario:
         moving = not command.stopped
         if observation.emergency_stop and moving:
             self._violation_once("nonzero controller output during emergency stop")
-        if (not observation.distance_valid or not observation.astronaut_detected) and moving:
+        if (
+            not observation.distance_valid
+            or not observation.astronaut_detected
+        ) and moving:
             self._violation_once("nonzero controller output with invalid perception")
         if state == MissionState.STAYING and moving:
             self._violation_once("nonzero controller output while STAYING")
@@ -469,15 +501,23 @@ def run_competition_simulation(
             maximum_angular=0.60,
         ),
     )
+    fusion = CommandFusion()
     now_s = 0.0
     failure_reason = ""
 
     while now_s <= simulation_config.maximum_duration_s and not scenario.complete:
         scenario.advance_world(now_s, simulation_config.time_step_s)
         observation = scenario.observation(now_s)
-        accepted = machine.observe_perception(observation.perception(), now_s)
+        fused_sample = _fuse_simulated_observation(
+            fusion,
+            observation,
+            now_s,
+            simulation_config.command_input_mode,
+        )
+        accepted = machine.observe_perception(fused_sample, now_s)
         if accepted:
-            scenario.note_command(observation.command)
+            if not fused_sample.safety_stop:
+                scenario.note_command(fused_sample.command)
 
         manipulation_status = scenario.manipulation_status(now_s)
         if manipulation_status is not None:
@@ -528,6 +568,62 @@ def run_competition_simulation(
     if report_path is not None:
         write_report_json(report_path, report)
     return report
+
+
+def _fuse_simulated_observation(
+    fusion: CommandFusion,
+    observation: ScenarioObservation,
+    now_s: float,
+    mode: str,
+) -> PerceptionSample:
+    """Route deterministic simulation inputs through the real fusion core."""
+    raw = observation.perception()
+    depth_only = replace(raw, command="NONE", gesture="NONE", confidence=0.0)
+
+    if mode in {"gesture", "matching", "conflict"}:
+        fusion.update_gesture(raw, now_s, received_at_s=now_s)
+    else:
+        fusion.update_gesture(depth_only, now_s, received_at_s=now_s)
+
+    voice_command = None
+    if mode in {"voice", "matching"} and raw.command != "NONE":
+        voice_command = raw.command
+    elif (
+        mode == "conflict"
+        and observation.phase == "FOLLOW"
+        and 7.0 <= observation.elapsed_s < 7.4
+    ):
+        voice_command = "COME"
+
+    if voice_command is not None:
+        fusion.update_voice(
+            CommandObservation(
+                command=voice_command,
+                confidence=0.95,
+                source="VOICE",
+                observed_at_s=now_s,
+                transcript=voice_command.lower(),
+            ),
+            received_at_s=now_s,
+        )
+
+    decision = fusion.resolve(now_s)
+    depth = decision.perception
+    return PerceptionSample(
+        command=decision.command,
+        gesture=depth.gesture if depth is not None else "NONE",
+        confidence=decision.confidence,
+        astronaut_detected=(
+            depth.astronaut_detected if depth is not None else False
+        ),
+        distance_valid=depth.distance_valid if depth is not None else False,
+        depth_status=depth.depth_status if depth is not None else "UNAVAILABLE",
+        distance_m=depth.distance_m if depth is not None else math.nan,
+        bearing_deg=depth.bearing_deg if depth is not None else math.nan,
+        source=decision.source,
+        decision_reason=decision.reason,
+        safety_stop=decision.safety_stop,
+    )
 
 
 def write_trajectory_csv(path: str | Path, rows: list[dict[str, object]]) -> None:

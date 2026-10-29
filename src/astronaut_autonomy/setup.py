@@ -7,7 +7,9 @@ package_name = "astronaut_autonomy"
 
 config_files = [
     "config/astronaut_mission.yaml",
+    "config/command_fusion.yaml",
     "config/human_gesture_detection.yaml",
+    "config/voice_command.yaml",
 ]
 config_files.extend(glob("config/yolo*-pose.pt"))
 launch_files = glob("launch/*.launch.py")
@@ -32,7 +34,7 @@ setup(
     zip_safe=True,
     maintainer="CMR",
     maintainer_email="team@cornellmarsrover.org",
-    description="Astronaut gesture perception and mission control",
+    description="Astronaut gesture/voice perception and mission control",
     license="MIT",
     tests_require=["pytest"],
     entry_points={
@@ -40,6 +42,10 @@ setup(
             "human_gesture_detection = "
             "astronaut_autonomy.human_gesture_detection:main",
             "astronaut_mission = astronaut_autonomy.astronaut_mission:main",
+            "astronaut_command_fusion = "
+            "astronaut_autonomy.command_fusion_node:main",
+            "astronaut_voice_command = "
+            "astronaut_autonomy.voice_command_node:main",
             "astronaut_mission_simulator = "
             "astronaut_autonomy.astronaut_mission_simulator:main",
         ],

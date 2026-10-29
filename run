@@ -7,6 +7,7 @@ usage() {
 Usage: ./run MODE
   setup       Install ROS package dependencies
   gesture-setup  Install Ultralytics and download the pose model
+  voice-setup  Install offline Vosk and microphone dependencies
   build       Build driving and autonomy packages
   teleop      Start controller receiver and rover drive hardware
   controller  Send input; add `setup` once on the laptop
@@ -41,6 +42,10 @@ case "$mode" in
     fi
     echo "Gesture prerequisites ready. Run: ./run build"
     exit 0
+    ;;
+  voice-setup)
+    exec python3 -m pip install \
+      -r src/astronaut_autonomy/requirements-voice.txt "$@"
     ;;
   test)
     python3 -c "import coverage, pytest" 2>/dev/null || {

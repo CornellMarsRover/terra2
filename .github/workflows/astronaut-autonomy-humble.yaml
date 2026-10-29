@@ -1,0 +1,41 @@
+name: Astronaut autonomy ROS Humble
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [autonomy_fall2026]
+    paths:
+      - ".github/workflows/astronaut-autonomy-humble.yaml"
+      - "docker/astronaut-humble/**"
+      - "scripts/test_astronaut_ros_pipeline.sh"
+      - "src/astronaut_autonomy/**"
+      - "src/cmr_msgs/**"
+  pull_request:
+    paths:
+      - ".github/workflows/astronaut-autonomy-humble.yaml"
+      - "docker/astronaut-humble/**"
+      - "scripts/test_astronaut_ros_pipeline.sh"
+      - "src/astronaut_autonomy/**"
+      - "src/cmr_msgs/**"
+
+jobs:
+  ros-humble-pipeline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Ubuntu 22.04 / ROS 2 Humble image
+        run: >-
+          docker build
+          --file docker/astronaut-humble/Dockerfile
+          --tag terra2-astronaut-humble:ci
+          .
+
+      - name: Run package and ROS graph integration tests
+        run: >-
+          docker run --rm
+          terra2-astronaut-humble:ci
+          bash scripts/test_astronaut_ros_pipeline.sh
+

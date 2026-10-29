@@ -37,6 +37,7 @@ rosidl_generate_interfaces(
   msg/AugerCommand.msg
   msg/AnalysisStatus.msg
   msg/AstronautCommand.msg
+  msg/AstronautVoiceCommand.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv

@@ -154,6 +154,12 @@ class AstronautMissionNode(Node):
             self.declare_parameter(name, value)
 
     def _perception_callback(self, message: AstronautCommand) -> None:
+        if message.source not in {"GESTURE", "VOICE", "FUSED", "FUSION"}:
+            self.get_logger().warning(
+                f"Ignoring astronaut command with invalid source: {message.source!r}",
+                throttle_duration_sec=2.0,
+            )
+            return
         sample = PerceptionSample(
             command=message.command,
             gesture=message.gesture,
@@ -163,9 +169,14 @@ class AstronautMissionNode(Node):
             depth_status=message.depth_status,
             distance_m=float(message.distance_m),
             bearing_deg=float(message.horizontal_angle_deg),
+            source=message.source,
+            decision_reason=message.decision_reason,
+            safety_stop=bool(message.safety_stop),
         )
-        self.mission.observe_perception(sample, self._now_s())
-        if not sample.valid_target:
+        accepted = self.mission.observe_perception(sample, self._now_s())
+        if (
+            accepted and self.mission.state.value == "STAYING"
+        ) or not sample.valid_target:
             # Do not wait for the periodic control callback to stop after a
             # stale range, invalid depth sample, or lost astronaut track.
             self._publish_drive(VelocityCommand(reason="invalid_perception"))

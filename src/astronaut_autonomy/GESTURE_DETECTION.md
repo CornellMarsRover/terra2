@@ -60,7 +60,7 @@ frame rate and thermals on the Jetson.
 
 The node publishes:
 
-- `/autonomy/astronaut/perception` (`cmr_msgs/AstronautCommand`)
+- `/autonomy/astronaut/gesture_perception` (`cmr_msgs/AstronautCommand`)
 - `/autonomy/astronaut/distance` (`std_msgs/Float32`; NaN if unavailable)
 - `/autonomy/astronaut/target` (`geometry_msgs/PointStamped`)
 - `/autonomy/human_gesture` (`std_msgs/String`)
@@ -68,14 +68,18 @@ The node publishes:
 - `/autonomy/human_gesture/debug_image` (`sensor_msgs/Image`)
 
 `AstronautCommand.gesture` is the stabilized observed pose. Its `command` is
-the safe value for a downstream state machine: FOLLOW and FETCH become NONE
-unless depth is currently `VALID`. A recently lost measurement may be exposed
-as `STALE` for diagnostics but never authorizes those commands. Coordinates are
-meters in the ZED frame: x forward, y left, z up.
+the safe value for a downstream state machine: FOLLOW becomes NONE unless
+astronaut depth is currently `VALID`. FETCH remains recognizable without
+astronaut depth because its nearby hammer localization belongs to the future
+arm coordinator. COME is checked for valid target localization by the mission
+controller before movement. A recently lost measurement may be exposed as
+`STALE` for diagnostics but never authorizes motion. Coordinates are meters in
+the ZED frame: x forward, y left, z up.
 
-The autonomy state machine does not act on these topics yet. Motion behavior,
-stopping distances, obstacle handling, and command timeouts must be reviewed,
-implemented, and tested separately before this can move the rover.
+The command-fusion node combines this topic with offline voice observations and
+publishes `/autonomy/astronaut/perception` for the existing mission state
+machine. The gesture node and fusion node never publish directly to the drive
+mux.
 
 ## Custom gestures
 

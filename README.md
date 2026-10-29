@@ -352,6 +352,22 @@ output:
 ./run astronaut-mission
 ```
 
+This launch also starts the gesture/voice command-fusion node. Offline Vosk
+voice input is opt-in and can use either a microphone or prerecorded PCM16 WAV:
+
+```bash
+./run voice-setup
+./run astronaut-mission enable_voice:=true \
+  voice_model_path:=/absolute/path/to/vosk-model-small-en-us-0.15
+```
+
+Gesture FOLLOW is primary when voice is unavailable, STAY has safety priority,
+and any confident cross-modal conflict produces a tagged immediate safety hold.
+FOLLOW and COME still require fresh ZED target localization. FETCH recognition
+is intentionally independent of astronaut depth because the arm must localize
+the nearby hammer separately. See `src/astronaut_autonomy/README.md` for WAV
+mode, configuration, and tests.
+
 In another sourced ROS terminal, inspect the combined output:
 
 ```bash
@@ -363,9 +379,9 @@ ros2 topic echo /autonomy/astronaut/drive_command
 ```
 
 The node synchronizes `/zed/image` with `/camera/points`, recognizes all five
-gestures, and publishes ZED-frame position, range, and bearing. FOLLOW and
-FETCH are emitted in the message's safe `command` field only while their
-current torso depth is valid. The mission node provides debounced IDLE,
+gestures, and publishes ZED-frame position, range, and bearing. FOLLOW is
+emitted in the message's safe `command` field only while current torso depth is
+valid; COME is checked again by the mission controller. The mission node provides debounced IDLE,
 FOLLOWING, STAYING, FETCHING, COMING, GIVING, and ERROR behavior. See the
 package README for hardware-free simulation, tests, topics, safety behavior,
 and remaining rover integration work.

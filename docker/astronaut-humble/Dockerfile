@@ -24,7 +24,7 @@ RUN . /opt/ros/humble/setup.sh \
     && colcon build --symlink-install \
         --packages-select cmr_msgs astronaut_autonomy \
     && . install/setup.sh \
-    && python3 -c "from cmr_msgs.msg import AstronautCommand, DriveCommand"
+    && python3 -c "from cmr_msgs.msg import AstronautCommand, AstronautVoiceCommand, DriveCommand"
 
 ENTRYPOINT ["/astronaut_entrypoint.sh"]
 CMD ["bash"]

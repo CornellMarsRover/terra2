@@ -1,10 +1,12 @@
 # Astronaut Autonomy
 
-This ROS 2 package contains hardware-separated astronaut perception and mission
-logic. Perception consumes synchronized images and organized XYZ point clouds
-from `cmr_zed`, recognizes the five commands, and measures ZED range and
-bearing. The mission node debounces those commands, applies state transitions,
-and calculates bounded FOLLOW/COME drive proposals.
+This ROS 2 package contains hardware-separated astronaut perception, offline
+voice fallback, command fusion, and mission logic. Gesture perception consumes
+synchronized images and organized XYZ point clouds from `cmr_zed`. A modular
+Vosk source recognizes the same five commands from a microphone or PCM16 WAV.
+The fusion node validates source, confidence, freshness, duplicates, and
+cross-modal conflicts before the existing mission node applies state
+transitions and calculates bounded FOLLOW/COME drive proposals.
 
 ## System overview
 
@@ -16,8 +18,16 @@ ZED camera node (`threaded`)
         | /zed/image + /camera/points
         v
 Human gesture detection node
+        | /autonomy/astronaut/gesture_perception
         |
-        | /autonomy/astronaut/perception
+        +--------------------+
+                             v
+Offline voice node ----> Command fusion node
+ /voice_command          | gesture FOLLOW primary
+                         | STAY safety priority
+                         | conflicts -> tagged safety STAY
+                         v
+              /autonomy/astronaut/perception
         v
 Astronaut mission node <--------- /cmd_vel/estop
         |
@@ -51,6 +61,8 @@ Before running the nodes, make sure the rover computer has:
 - The ZED SDK and its Python API
 - A working ROS `cv_bridge` installation
 - Python 3 and `pip`
+- Vosk plus a downloaded English model for voice input
+- PortAudio and an input device for live microphone use (not needed for WAV)
 - A Jetson-compatible PyTorch installation when running on a Jetson
 - Internet access during the first model setup
 - Enough GPU memory and compute capacity for real-time inference
@@ -66,6 +78,7 @@ Run these commands from the root of the `terra2` repository:
 ```bash
 ./run setup
 ./run gesture-setup
+./run voice-setup      # only when voice input is needed
 ./run build
 ```
 
@@ -74,6 +87,8 @@ The commands perform these tasks:
 - `./run setup` installs ROS package dependencies declared in `package.xml`.
 - `./run gesture-setup` installs `ultralytics` from `requirements.txt` and
   downloads `yolo26n-pose.pt` into `src/astronaut_autonomy/config`.
+- `./run voice-setup` installs Vosk and SoundDevice from
+  `requirements-voice.txt`. The acoustic model is downloaded separately.
 - `./run build` builds the ROS workspace and copies the configuration and pose
   weights into the installed `astronaut_autonomy` package.
 
@@ -106,11 +121,57 @@ starts the `human_gesture_detection` node from the `astronaut_autonomy`
 package.
 
 Start the mission state machine in a third terminal. This leaves physical drive
-output disabled:
+output disabled and starts command fusion, but leaves voice disabled:
 
 ```bash
 ./run astronaut-mission
 ```
+
+## Offline voice fallback
+
+Download and extract a small English Vosk model, such as
+[`vosk-model-small-en-us-0.15`](https://alphacephei.com/vosk/models/). Small
+models are intended for constrained/mobile deployments and are the starting
+point for Jetson evaluation. The model is not stored in Git.
+
+Start microphone recognition with fusion and the mission controller:
+
+```bash
+./run astronaut-mission \
+  enable_voice:=true \
+  voice_model_path:=/absolute/path/to/vosk-model-small-en-us-0.15
+```
+
+For a prerecorded mono, uncompressed, 16-bit PCM WAV file:
+
+```bash
+./run astronaut-mission \
+  enable_voice:=true \
+  voice_input_mode:=wav \
+  voice_model_path:=/absolute/path/to/vosk-model-small-en-us-0.15 \
+  voice_wav_file:=/absolute/path/to/command.wav
+```
+
+Vosk is constrained to FOLLOW, STAY, FETCH, COME, GIVE, supported short
+phrases, and `[unk]`. `minimum_confidence` and `ambiguity_margin` reject weak or
+closely competing results. The recognition engine is isolated behind
+`OfflineVoiceEngine`, so it can be replaced without changing ROS fusion.
+
+Fusion rules are intentionally conservative:
+
+- a fresh gesture FOLLOW is primary when voice is absent, weak, or stale;
+- STAY from either valid modality has safety priority;
+- matching commands become one `FUSED` command;
+- any confident disagreement publishes an immediate tagged safety `STAY`;
+- a conflict-generated stop does not advance the competition sequence;
+- voice is used when gesture command quality is low, neutral, or stale;
+- stale, low-confidence, duplicate, out-of-order, or invalid-source voice
+  observations are rejected; and
+- FOLLOW and COME require fresh ZED target localization before movement;
+  FETCH command recognition does not require astronaut depth.
+
+The current thresholds and time windows are in `config/voice_command.yaml` and
+`config/command_fusion.yaml`.
 
 ## Verifying the system
 
@@ -125,6 +186,10 @@ Read the recognized gesture and its confidence:
 ```bash
 ros2 topic echo /autonomy/human_gesture
 ros2 topic echo /autonomy/human_gesture/confidence
+ros2 topic echo /autonomy/astronaut/gesture_perception
+ros2 topic echo /autonomy/astronaut/voice_command
+ros2 topic echo /autonomy/astronaut/command_source
+ros2 topic echo /autonomy/astronaut/fusion_detail
 ros2 topic echo /autonomy/astronaut/perception
 ros2 topic echo /autonomy/astronaut/distance
 ros2 topic echo /autonomy/astronaut/mission_state
@@ -148,11 +213,14 @@ The gesture labels are:
 - `GIVE` — forearms crossed over the chest
 - `NONE`
 
-`/autonomy/astronaut/perception` also reports the 3-D target position in the
+`/autonomy/astronaut/gesture_perception` reports the raw gesture command and
+3-D target. `/autonomy/astronaut/perception` is the fused mission input and
+also reports the selected command with the same fresh target position in the
 ZED camera frame (`x=forward`, `y=left`, `z=up`), Euclidean distance, horizontal
 bearing, sample count, and `VALID`, `STALE`, `UNAVAILABLE`, or `NO_POSE` depth
-status. Perception gates FOLLOW and FETCH on `VALID` depth; the mission layer
-also requires valid range for COME before it can move.
+status. Gesture perception gates FOLLOW on `VALID` astronaut depth. The mission
+layer also requires valid target localization for COME before it can move.
+FETCH remains a valid command without astronaut depth.
 
 ## Mission state machine
 
@@ -170,10 +238,25 @@ The hardware-independent core has these states:
 
 Commands must remain stable for `command_debounce_s` and are latched until a
 neutral `NONE` observation, preventing a held FETCH or GIVE pose from repeatedly
-starting an operation. FOLLOW and COME stop immediately on invalid or stale
-target data and enter ERROR if valid tracking does not recover before
-`perception_timeout_s`. STAY is accepted without depth. An emergency stop
+starting an operation. STAY bypasses the mission debounce so a valid explicit
+stop or fusion conflict produces an immediate zero proposal. FOLLOW and COME
+stop immediately on invalid or stale target data and enter ERROR if valid
+tracking does not recover before `perception_timeout_s`. FETCH can start its
+stationary manipulation handshake without astronaut depth; its arm coordinator
+must independently localize the nearby hammer. The shared emergency stop
 cancels an active manipulation, enters STAYING, and always produces zero drive.
+
+Safety-input semantics are explicit:
+
+| Input/event | Mission and drive effect |
+| --- | --- |
+| `NONE` with valid target data | No new transition; active FOLLOW/COME may continue |
+| `NONE` with missing/invalid target data | Immediate zero proposal; tracking enters ERROR after the configured timeout |
+| Explicit `STAY` | Immediate STAYING state and zero proposal; may advance the expected sequence |
+| Fusion conflict | Immediate STAYING state and zero proposal; never advances the sequence |
+| Stale command | Rejected by fusion and cannot refresh a command |
+| Communication loss | Last safe target expires after `perception_timeout_s`; output becomes zero and ERROR latches |
+| Emergency stop | Independently enforced by the drive mux and mission callback; immediate zero and manipulation cancel |
 
 The FOLLOW/COME controller rotates in place for large bearing errors, combines
 bounded forward and angular demand for smaller errors, and stops at or inside
@@ -196,12 +279,15 @@ therefore uses this isolated handshake:
   or `manipulation_timeout_s`.
 
 The simulator implements this handshake. A future reviewed arm coordinator can
-replace it without changing the mission core.
+replace it without changing the mission core. That coordinator must perform
+hammer detection, range validation, grasp planning, and collision checks; the
+astronaut torso depth is not a substitute for hammer localization.
 
 ## Hardware-free development
 
-The state machine, controller, depth logic, gesture rules, and scripted
-scenario are pure Python and can be tested on macOS without ROS or a ZED:
+The state machine, controller, depth logic, gesture rules, voice parsing, WAV
+input, fusion rules, and scripted scenario are pure Python and can be tested
+on macOS without ROS, Vosk, a microphone, or a ZED:
 
 ```bash
 source .venv-gesture/bin/activate
@@ -216,14 +302,25 @@ Run the complete closed loop without ROS:
 ./run astronaut-pure-sim
 ```
 
+Exercise each command-input mode with separate reports:
+
+```bash
+for mode in gesture voice matching conflict; do
+  ./run astronaut-pure-sim \
+    --command-input-mode "$mode" \
+    --output "artifacts/astronaut_sim/$mode"
+done
+```
+
 This simulation has a 2-D rover pose and a moving astronaut pose. Range and
-bearing are calculated from those positions rather than replayed independently.
 Normalized `DriveCommand` values are limited and converted into mock linear and
-angular motion. The default scenario checks:
+angular motion. The scenario and its regression matrix check:
 
 - an astronaut walking away while FOLLOW converges inside 3 m;
 - a stationary rover during STAY;
 - FETCH and COME issued beyond 20 m;
+- FETCH recognized while astronaut depth is unavailable;
+- gesture-only, voice-only, matching, and conflicting modality paths;
 - held/repeated gestures and an out-of-order GIVE;
 - temporary tracking loss and stale depth;
 - an emergency stop during COME; and
@@ -257,13 +354,19 @@ Docker Desktop must be installed and running. From the repository root:
 
 `build` creates `terra2-astronaut-humble:local` from Ubuntu 22.04 / ROS 2
 Humble, builds `cmr_msgs` and `astronaut_autonomy` with `colcon`, and imports
-the generated `AstronautCommand` and `DriveCommand` Python classes. `test` runs
-the package tests and the complete topic pipeline:
+the generated `AstronautCommand`, `AstronautVoiceCommand`, and `DriveCommand`
+Python classes. `test` runs the package tests and the complete topic pipeline:
 
 ```text
-simulated astronaut -> AstronautCommand -> mission state machine
+simulated astronaut -> gesture_perception -> command fusion
+                    -> AstronautCommand -> mission state machine
                     -> DriveCommand -> closed-loop mock rover
 ```
+
+The repository also contains
+`.github/workflows/astronaut-autonomy-humble.yaml`, which performs the same
+Docker build and ROS graph test on an Ubuntu 22.04 GitHub runner. A newly added
+workflow must be treated as unverified until a GitHub Actions run completes.
 
 Run only the pipeline or open a sourced shell with:
 
@@ -308,7 +411,12 @@ The simulation launch explicitly keeps `enable_drive_adapter=false`.
 
 | Name | Type | Direction | Purpose |
 | --- | --- | --- | --- |
-| `/autonomy/astronaut/perception` | `cmr_msgs/AstronautCommand` | mission input | Stable command and 3-D target |
+| `/autonomy/astronaut/gesture_perception` | `cmr_msgs/AstronautCommand` | fusion input | Gesture command and ZED target |
+| `/autonomy/astronaut/voice_command` | `cmr_msgs/AstronautVoiceCommand` | fusion input | Timestamped offline voice result |
+| `/autonomy/astronaut/voice_status` | `std_msgs/String` | diagnostic | Listener/WAV/acceptance status |
+| `/autonomy/astronaut/command_source` | `std_msgs/String` | diagnostic | `GESTURE`, `VOICE`, `FUSED`, or `FUSION` |
+| `/autonomy/astronaut/fusion_detail` | `std_msgs/String` | diagnostic | Arbitration decision reason |
+| `/autonomy/astronaut/perception` | `cmr_msgs/AstronautCommand` | mission input | Fused command and fresh 3-D target |
 | `/cmd_vel/estop` | `std_msgs/Bool` | mission input | Existing shared emergency stop |
 | `/autonomy/astronaut/drive_command` | `cmr_msgs/DriveCommand` | output | Always-published proposed velocity |
 | `/cmd_vel/autonomy` | `cmr_msgs/DriveCommand` | optional output | Existing mux input; disabled by default |
@@ -334,8 +442,17 @@ The simulation launch explicitly keeps `enable_drive_adapter=false`.
   after those reviews should the mission be launched with
   `enable_drive_adapter:=true`.
 - Implement and review a real arm coordinator behind the FETCH/GIVE handshake.
+- Add hammer perception and manipulation-local depth checks to that coordinator;
+  FETCH recognition alone never authorizes arm motion.
 - Test the complete ZED-to-mission path on the Jetson and record CPU/GPU load,
   rate, latency, depth dropouts, and thermal behavior.
+- Record multiple speakers saying all commands outdoors at competition-like
+  distances and noise levels. Tune confidence/ambiguity thresholds from those
+  recordings; the deterministic WAV tests do not establish real-world speech
+  accuracy.
+- Validate the selected Vosk wheel, small English model, USB microphone,
+  PortAudio device selection, CPU load, latency, and acoustic performance on
+  the actual Jetson.
 - Validate the mock-to-real drive adapter and mux ownership on a secured rover
   test stand before enabling `enable_drive_adapter`; simulation never publishes
   `/cmd_vel/autonomy`.
@@ -381,3 +498,9 @@ installed package:
 
 Verify that the installed PyTorch build is compatible with the Jetson's JetPack
 and CUDA versions before reinstalling Ultralytics.
+
+**Voice node cannot start**
+
+Run `./run voice-setup`, verify the extracted model directory passed through
+`voice_model_path`, and confirm PortAudio can see the microphone. Use WAV mode
+first to separate model/configuration problems from microphone-driver issues.

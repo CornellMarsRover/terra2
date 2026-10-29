@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ROS 2 Humble's generated setup scripts inspect variables that may not exist.
+# Temporarily disable nounset while sourcing, then restore strict mode for the
+# actual integration test.
+set +u
 source /opt/ros/humble/setup.bash
 source /workspace/install/setup.bash
+set -u
 
 if [[ "${1:-}" != "--pipeline-only" ]]; then
   colcon test --packages-select cmr_msgs astronaut_autonomy \

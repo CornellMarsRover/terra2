@@ -1,0 +1,13 @@
+astronaut_voice_command:
+  ros__parameters:
+    # Download a small English Vosk model separately and pass its directory at
+    # launch. Models are not committed to Git.
+    model_path: ""
+    input_mode: "microphone"
+    wav_file: ""
+    audio_device: ""
+    sample_rate: 16000
+    minimum_confidence: 0.70
+    ambiguity_margin: 0.12
+    duplicate_cooldown_s: 1.50
+    wav_publish_interval_s: 1.0

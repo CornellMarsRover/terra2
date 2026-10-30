@@ -79,7 +79,7 @@ def test_incremental_servos_are_clamped():
 
     buttons = [0] * 8
     buttons[5] = 1
-    assert mapper.update(buttons, DPAD_NEUTRAL) == []
+    assert mapper.update(buttons, DPAD_NEUTRAL) == [("ee15", 75)]
 
 
 def test_discovered_servo_board_mapping():

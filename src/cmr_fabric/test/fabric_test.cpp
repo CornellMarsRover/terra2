@@ -87,7 +87,14 @@ static auto kill_node(const char* node_name)
     request->node_name = "really_i_should_make_new_service_type_for_this";
     auto response = cmr::send_request<cmr_msgs::srv::ActivateNode>(
         cmr::build_string("/", node_name, "/kill"), request);
-    return response && (*response)->success;
+    const bool success = response && (*response)->success;
+    for (auto retries = 0;
+         success && retries < 100 &&
+         get_lifecycle_state(node_name) != LifecycleState::Unconfigured;
+         ++retries) {
+        std::this_thread::sleep_for(1ms);
+    }
+    return success;
 }
 
 // Create a dependee node (based off `config_a`)

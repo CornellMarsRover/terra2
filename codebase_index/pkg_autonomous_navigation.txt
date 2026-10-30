@@ -5,7 +5,6 @@ Purpose
 
 Entry-point nodes
 - state_machine
-- global_planner
 - local_planner
 - costmap
 - controller
@@ -18,7 +17,6 @@ Entry-point nodes
 Core topic flow
 - Localization in: /zed/pose + /rtk/navsatfix_data -> /autonomy/pose/robot/global
 - Target generation: state_machine -> /autonomy/target/global and /autonomy/target/local
-- Global planner: /autonomy/target/global -> /autonomy/target/local
 - Local planner: /autonomy/target/local + /autonomy/costmap + pose -> /autonomy/path/next_waypoint
 - Controller: /autonomy/path/next_waypoint + pose -> /autonomy/move/*
 - Object detection: target name + camera image + pose -> /autonomy/target_object/position

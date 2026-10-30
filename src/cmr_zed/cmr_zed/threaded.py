@@ -133,12 +133,15 @@ class ZedAutonomy(Node):
         
         while self.running:
             if self.zed.grab(self.runtime_params) == sl.ERROR_CODE.SUCCESS:
+                # Use one timestamp for every product from this ZED grab so
+                # downstream image/point-cloud synchronization is meaningful.
+                acquisition_stamp = self.get_clock().now().to_msg()
 
                 # Point cloud
                 with self.pc_lock:
                     self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZ, sl.MEM.CPU, self.pc_res)
                     self.pc_data = self.point_cloud.get_data().copy()
-                    self.pc_stamp = self.get_clock().now().to_msg()
+                    self.pc_stamp = acquisition_stamp
                     self.pc_tracker.update()
                     self.log_frequency("PointCloud", self.pc_tracker)
             
@@ -146,7 +149,7 @@ class ZedAutonomy(Node):
                 #with self.pose_lock:
                     if self.zed.get_position(self.current_pose, sl.REFERENCE_FRAME.WORLD) == sl.POSITIONAL_TRACKING_STATE.OK:
                         self.pose_data = self.current_pose
-                        self.pose_stamp = self.get_clock().now().to_msg()
+                        self.pose_stamp = acquisition_stamp
                         self.pose_tracker.update()
                         self.log_frequency("Pose", self.pose_tracker)
 
@@ -157,14 +160,14 @@ class ZedAutonomy(Node):
                         #self.get_logger().info("pls goodness me")
                         if status == sl.ERROR_CODE.SUCCESS and self.ground_plane.type == sl.PLANE_TYPE.HORIZONTAL:
                             self.ground_data = self.ground_plane.get_bounds().copy()
-                            self.ground_stamp = self.get_clock().now().to_msg()
+                            self.ground_stamp = acquisition_stamp
                             self.ground_tracker.update()
                             self.log_frequency("GroundPlane", self.ground_tracker)
                             break
                 # Image
                     self.zed.retrieve_image(self.image_left, sl.VIEW.LEFT)
                     self.image_data = self.image_left.get_data().copy()
-                    self.image_stamp = self.get_clock().now().to_msg()
+                    self.image_stamp = acquisition_stamp
                     self.image_tracker.update()
                     self.log_frequency("Image", self.image_tracker)
 
@@ -184,6 +187,8 @@ class ZedAutonomy(Node):
         if self.image_data is not None:
             # Convert numpy array to ROS Image message
             image_msg = self.bridge.cv2_to_imgmsg(image_data, encoding="bgra8")
+            image_msg.header.stamp = image_stamp
+            image_msg.header.frame_id = "zed_camera_frame"
             self.image_publisher.publish(image_msg)
             self.publish_image_tracker.update()
             self.log_frequency("Image publish", self.publish_image_tracker)
@@ -197,6 +202,7 @@ class ZedAutonomy(Node):
             pose_data = self.pose_data
             pose_stamp = self.pose_stamp
             image_data = self.image_data
+            image_stamp = self.image_stamp
 
         if pc_data is not None:
             msg = self.convert_array_to_pointcloud2(pc_data, pc_stamp)
@@ -212,9 +218,11 @@ class ZedAutonomy(Node):
             self.publish_transform(pose_stamp)
             self.publish_pose_tracker.update()
             self.log_frequency("Pose publish", self.publish_pose_tracker)
-        if self.image_data is not None:
+        if image_data is not None:
             # Convert numpy array to ROS Image message
             image_msg = self.bridge.cv2_to_imgmsg(image_data, encoding="bgra8")
+            image_msg.header.stamp = image_stamp
+            image_msg.header.frame_id = "zed_camera_frame"
             self.image_publisher.publish(image_msg)
             self.publish_image_tracker.update()
             self.log_frequency("Image publish", self.publish_image_tracker)

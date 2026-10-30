@@ -57,6 +57,16 @@ FabricNode::FabricNode(const std::optional<FabricNodeConfig>& config,
             {param_config_data, std::get<std::string>(config->toml_config)});
         CMR_LOG(INFO, "Set config data");
     }
+
+    // Let an erroring service callback send its failure response before teardown
+    // destroys the lifecycle service that is currently handling the request.
+    m_error_transition_timer = create_wall_timer(1ms, [this]() {
+        m_error_transition_timer->cancel();
+        if (m_error_transition_pending.exchange(false)) {
+            perform_error_transition();
+        }
+    });
+    m_error_transition_timer->cancel();
 }
 
 FabricNode::~FabricNode() = default;
@@ -286,6 +296,13 @@ bool FabricNode::schedule_restart()
 }
 
 void FabricNode::error_transition()
+{
+    if (!m_error_transition_pending.exchange(true)) {
+        m_error_transition_timer->reset();
+    }
+}
+
+void FabricNode::perform_error_transition()
 {
     m_processing_fault = true;
     ALWAYS(this) { m_processing_fault = false; };

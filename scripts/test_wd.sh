@@ -19,7 +19,10 @@ if [ $test_result_code != 0 ]; then
     exit $test_result_code
 fi
 
-pytest --ignore=src/cmr_aruco --ignore=src/cmr_py_test
+# gesture_test.py is an interactive camera demo that intentionally requires a
+# separate MediaPipe environment. Its deterministic coverage lives in tests/.
+pytest --ignore=src/cmr_aruco --ignore=src/cmr_py_test \
+    --ignore=gesture_test.py
 test_result_code=$?
 if [[ $test_result_code != 0 && $test_result_code != 5 ]]; then 
     exit $test_result_code

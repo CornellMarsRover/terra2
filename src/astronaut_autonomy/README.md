@@ -71,6 +71,10 @@ The camera node must publish `sensor_msgs/Image` on `/zed/image` and an
 organized `sensor_msgs/PointCloud2` on `/camera/points`. The modified
 `cmr_zed threaded` node stamps both products from the same camera grab.
 
+For a copy-paste Jetson/Linux setup, including ZED SDK installation, the
+`pyzed` fix, minimal `colcon` build, launch commands, and topic checks, see
+[`JETSON_ZED_SETUP.md`](../../JETSON_ZED_SETUP.md).
+
 ## First-time setup
 
 Run these commands from the root of the `terra2` repository:

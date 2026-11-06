@@ -4,13 +4,12 @@ Autonomy core
 - /autonomy/pose/robot/global (TwistStamped)
   - Publishers: autonomous_navigation/new_kalman, autonomous_navigation/localization_sim,
     cmr_zed/zed_gnss_fusion (alt path)
-  - Subscribers: state_machine, global_planner, local_planner, controller, object_detection,
+  - Subscribers: state_machine, local_planner, controller, object_detection,
     costmap
 - /autonomy/target/global (Float32MultiArray)
   - Publisher: state_machine
-  - Subscriber: global_planner
 - /autonomy/target/local (Float32MultiArray)
-  - Publishers: state_machine, global_planner
+  - Publisher: state_machine
   - Subscriber: local_planner
 - /autonomy/path/next_waypoint (Float32MultiArray)
   - Publisher: local_planner
@@ -34,15 +33,20 @@ Autonomy core
   - Subscriber: led_node
 
 Drives teleop
-- /drives_controller/cmd_vel (TwistStamped)
+- /controller/drives/axes (TwistStamped)
   - Publisher: cmr_controller_remote/connect_node
   - Subscriber: cmr_rovernet/drivesnet_node
-- /drives_controller/cmd_buttons (ControllerReading)
+- /controller/drives/buttons (ControllerReading)
   - Publisher: cmr_controller_remote/connect_node
   - Subscriber: cmr_rovernet/drivesnet_node
-- /cmd_vel_drives (Twist)
-  - Publisher: cmr_controls/keyboard_listener (UDP teleop)
-  - Subscriber: cmr_controls/swerve_controller_node
+- /cmd_vel/teleop, /cmd_vel/autonomy (DriveCommand)
+  - Publishers: tele-op adapters and autonomy controller
+  - Subscriber: drive_command_mux
+- /cmd_vel (DriveCommand)
+  - Publisher: drive_command_mux
+  - Subscribers: RoverNet and legacy swerve drive backends
+- /cmd_vel/estop (Bool), /cmd_vel/source (String)
+  - Safety and source-selection inputs to drive_command_mux
 
 Arm control
 - /arm_controller/cmd_vel (sensor_msgs/Joy)

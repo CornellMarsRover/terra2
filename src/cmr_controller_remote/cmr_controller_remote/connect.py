@@ -63,12 +63,12 @@ class CmdVelPublisher(Node):
 
         self.publisher_ = self.create_publisher(
             TwistStamped,
-            "/drives_controller/cmd_vel",
+            "/controller/drives/axes",
             10,
         )
         self.button_publisher_ = self.create_publisher(
             ControllerReading,
-            "/drives_controller/cmd_buttons",
+            "/controller/drives/buttons",
             10,
         )
 
@@ -100,7 +100,7 @@ class CmdVelPublisher(Node):
         )
         self.logger.info(
             "Joystick UDP bridge publishes manual drive topics only: "
-            "/drives_controller/cmd_vel and /drives_controller/cmd_buttons"
+            "/controller/drives/axes and /controller/drives/buttons"
         )
 
     def publish_msg(self):

@@ -66,10 +66,10 @@ print(mini_arm_sock)
 class CmdVelPublisher(Node):
   def __init__(self):
     super().__init__('cmd_vel_publisher')
-    self.publisher_ = self.create_publisher(TwistStamped, '/drives_controller/cmd_vel', 10)
+    self.publisher_ = self.create_publisher(TwistStamped, '/controller/drives/axes', 10)
     self.arm_publisher_ = self.create_publisher(Joy, '/arm_controller/cmd_vel', 10)
 
-    self.button_publisher_ = self.create_publisher(ControllerReading, '/drives_controller/cmd_buttons', 10)
+    self.button_publisher_ = self.create_publisher(ControllerReading, '/controller/drives/buttons', 10)
     self.arm_button_publisher_ = self.create_publisher(ControllerReading, '/arm_controller/cmd_buttons', 10)
 
     self.mini_arm_publisher = self.create_publisher(MiniArmDegree, '/mini_arm_controller/cmd_pos', 10)
@@ -377,4 +377,3 @@ setup(
         ],
     },
 )
-

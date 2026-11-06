@@ -122,6 +122,7 @@ _deps
 devel/
 logs/
 build/
+artifacts/
 bin/
 lib/
 install/
@@ -226,6 +227,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 .codex
+
+# Local offline speech-recognition assets
+/models/vosk-model*/
+/vosk-model-*.zip
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -307,6 +313,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv-gesture/
 env/
 venv/
 ENV/
@@ -359,3 +366,14 @@ cython_debug/
 
 # Astrotech snapshot PNGs saved by the snapshot driver (fallback dir)
 /snapshots/
+
+# Downloaded Ultralytics pose weights (prepare with ./run gesture-setup)
+/src/astronaut_autonomy/config/yolo*-pose.pt
+
+# Downloaded offline speech models (prepare separately; never commit weights)
+/models/vosk-model*/
+/src/astronaut_autonomy/models/
+
+# Generated Gazebo validation artifacts
+/validation/gazebo/logs/
+/validation/gazebo/videos/

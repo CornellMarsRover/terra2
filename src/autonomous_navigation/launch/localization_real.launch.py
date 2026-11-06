@@ -1,16 +1,29 @@
 import launch
 import launch_ros.actions
+from os import path
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
+    drive_config = path.join(
+        get_package_share_directory("cmr_rovernet"), "config", "drivesnet.toml"
+    )
     return launch.LaunchDescription([
-
-        # Start drives node
         launch_ros.actions.Node(
-            package='cmr_controls',
-            executable='swerve_controller_node',
-            name='swerve_controller_node',
+            package='cmr_rovernet',
+            executable='drive_command_mux',
+            name='drive_command_mux',
+            parameters=[{'active_source': 'autonomy'}],
+        ),
+
+        # The same backend consumes the mux-selected command in every mode.
+        launch_ros.actions.Node(
+            package='cmr_rovernet',
+            executable='usama_control_testing_node',
+            name='drivesnet',
             output='screen',
-            parameters=[{}]
+            parameters=[{
+                'config_path': drive_config
+            }],
         ),
 
         # Start state machine node

@@ -3,19 +3,16 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
-from message_filters import Subscriber, ApproximateTimeSynchronizer
-
 from cmr_msgs.msg import GroundPlaneStamped
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Float32MultiArray, String
-from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist, TwistStamped
-from cv_bridge import CvBridge
 
 import numpy as np
-import math
 from shapely.geometry import Point, Polygon
+
+from autonomous_navigation.costmap_core import decay_costs, observed_cost, project_point
 
 
 class CostmapNode(Node):
@@ -24,7 +21,6 @@ class CostmapNode(Node):
 
         self.declare_parameter('real', True) # FALSE IF RUNNING IN SIMULATION
         self.real = self.get_parameter('real').get_parameter_value().bool_value
-        #self.real = True
 
         if self.real:
             self.ground_plane_sub = self.create_subscription(
@@ -71,7 +67,6 @@ class CostmapNode(Node):
 
         # Store all detected obstacles
         self.obstacles_global = set()
-        #self.curr_obstacles = set()
         # Maximum cost for occupied cells in the costmap
         self.max_cost = 100
 
@@ -85,7 +80,6 @@ class CostmapNode(Node):
         # Mounting height of camera
         self.camera_height = 1.0
         if self.real:
-            #self.camera_height = 1.2
             self.camera_height = 1.0
 
         self.expected_height = -1.0 * self.camera_height
@@ -114,8 +108,6 @@ class CostmapNode(Node):
 
         # Timer to decay cell costs uniformly
         self.decay_timer = self.create_timer(20.0, self.decay_cost)
-        # Timer to decay cells in ground plane
-        #self.decay_ground_timer = self.create_timer(0.1, self.decay_ground)
         # Timer to publish costmap
         self.pub_timer = self.create_timer(0.1, self.publish_obstacles)
 
@@ -148,14 +140,11 @@ class CostmapNode(Node):
             #return
         self.grid_init = True
         curr_obstacles = set()
-        #self.curr_obstacles = set()
         curr_free_space = set()
         north, west, R = self.interpolate_pose(msg.header.stamp)
         for pt in point_cloud2.read_points(msg, skip_nans=True):
             self.point_cloud_point_to_grid(pt, [north, west], R, curr_obstacles, curr_free_space)
 
-        #self.decay_cost(curr_obstacles, curr_free_space)
-        #self.get_logger().info(f"{self.grid_dict}")
 
     def point_cloud_point_to_grid(self, pt, pose, R, curr_obstacles, curr_free_space):
         '''
@@ -165,63 +154,34 @@ class CostmapNode(Node):
         the left (west), same as global coordinates in gazebo. Returns True if 
         new obstacle detected, False if not
         '''
-        if self.real:
-            # ZED coordinate system is same as Gazebo, and coord system we are using
-            # X forward, Y left, Z up
-            height = self.camera_height + pt[2]
-            x, y = pt[0], pt[1]
-            dist = math.sqrt((x**2) + (y**2))
-            # Discard points outside of 45 degree line of sight or too far
-            #if abs(y) > 1.0 and abs(math.degrees(math.atan(y/x))) > 45.0:
-            #    return
-            if dist > self.max_depth or dist < self.min_depth or abs(math.degrees(math.atan(y/x))) > 45.0:
-                return
-        else:
-            # Y points downwards in camera coordinate frame in Gazebo
-            height = self.camera_height - pt[1]
-            x, y = pt[2], pt[0]
-            #self.get_logger().info(f"x:  {x}  y:  {y}  height: {height}")
-            if x > self.max_depth or x < self.min_depth:
-                return
-        
-        rotated_pt = R.dot(np.array([x, y]))
-        if self.real:
-            x_rot = rotated_pt[0] + pose[0]
-            y_rot = rotated_pt[1] + pose[1]
-        else:
-            x_rot = rotated_pt[0] + pose[0]
-            y_rot = (-1.0*rotated_pt[1]) + pose[1]
-        
-        if x_rot is None or y_rot is None:
+        observation = project_point(
+            pt, pose, R, self.real, self.camera_height,
+            self.min_depth, self.max_depth, self.cell_size,
+        )
+        if observation is None:
             return
-
-        # discretize to 0.25 m
-        x_new = round(x_rot * self.k) / self.k
-        y_new = round(y_rot * self.k) / self.k
+        x_new, y_new = observation.cell
+        height = observation.height
         # don't update if out of grid bounds or previously detected an obstacle at that grid location
         if (x_new, y_new) in curr_obstacles or (self.real and self.in_ground_plane(x_new, y_new)):
             return
         if (x_new, y_new) not in self.grid_dict:
             self.grid_dict[(x_new, y_new)] = 0
-        # Store traversable cells to decay
-        if (self.ground_threshold < height < self.obstacle_threshold) or height > self.clearance_height:
+        cost = observed_cost(
+            self.grid_dict[(x_new, y_new)], height, self.ground_threshold,
+            self.obstacle_threshold, self.clearance_height, self.max_cost,
+        )
+        if cost is None:
             curr_free_space.add((x_new, y_new))
             return
-        # increment cell cost if height seems to represent obstacle
-        else:
-            self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+2)
-            if height > 0.5:
-                self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+5)
-            #self.grid_dict[(x_new, y_new)] = min(self.max_cost, self.grid_dict[(x_new, y_new)]+0)
-            curr_obstacles.add((x_new, y_new))
+        self.grid_dict[(x_new, y_new)] = cost
+        curr_obstacles.add((x_new, y_new))
         return
 
     def ground_plane_callback(self, msg):
         """
         Update costmap from vertices surrounding ground plane from ZED camera.
         """
-        '''if self.last_movement == "point_turn":
-            return'''
         pts = []
         north, west, R = self.interpolate_pose(msg.header.stamp)
         x = msg.x
@@ -233,10 +193,6 @@ class CostmapNode(Node):
         self.ground_plane = ground_polygon
         self.ground_dict = dict()
         self.decay_ground()
-        '''# Iterate over grid cells and reduce cost if inside the ground polygon
-        for (x, y) in list(self.grid_dict.keys()):
-            if ground_polygon.contains(Point(x, y)):
-                self.grid_dict[(x, y)] = max(self.grid_dict[(x, y)] - 3, 0)'''
 
     def publish_obstacles(self):
         """
@@ -255,32 +211,17 @@ class CostmapNode(Node):
         Linearly decay cost of grid cells if an 
         obstacle not actively detected in that region
         """
-        d = set()
-        for (x, y) in self.grid_dict.keys():
-            if self.in_ground_plane(x, y) == False:
-                continue
-            self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-4)
-            if self.grid_dict[(x, y)] == 0:
-                d.add((x,y))
-        # Delete all 0-cost cells
-        for c in d:
-            if c in self.grid_dict:
-                del self.grid_dict[c]
+        eligible = {
+            cell for cell in self.grid_dict if self.in_ground_plane(*cell)
+        }
+        self.grid_dict = decay_costs(self.grid_dict, 4, eligible)
 
     def decay_cost(self):
         """
         Linearly decay cost of grid cells if in ground plane
         at a higher frequency
         """
-        d = set()
-        for (x, y) in self.grid_dict.keys():
-            self.grid_dict[(x, y)] = max(0, self.grid_dict[(x, y)]-1)
-            if self.grid_dict[(x, y)] == 0:
-                d.add((x,y))
-        # Delete all 0-cost cells
-        for c in d:
-            if c in self.grid_dict:
-                del self.grid_dict[c]
+        self.grid_dict = decay_costs(self.grid_dict, 1)
                 
     def update_last_movement(self, msg):
         """
@@ -309,7 +250,7 @@ class CostmapNode(Node):
         detected ground plane polygon given by the ZED
         """
         if self.ground_plane is None:
-            return True
+            return False
         if (x,y) in self.ground_dict:
             return self.ground_dict[(x,y)]
         

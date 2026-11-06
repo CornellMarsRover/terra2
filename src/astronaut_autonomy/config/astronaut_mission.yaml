@@ -1,0 +1,23 @@
+astronaut_mission:
+  ros__parameters:
+    control_rate_hz: 10.0
+    command_debounce_s: 0.35
+    perception_timeout_s: 0.75
+    manipulation_timeout_s: 30.0
+    minimum_command_confidence: 0.50
+    enforce_competition_sequence: true
+
+    follow_distance_m: 2.0
+    come_distance_m: 1.25
+    distance_deadband_m: 0.15
+    bearing_deadband_deg: 4.0
+    rotate_in_place_deg: 30.0
+    linear_gain: 0.55
+    angular_gain: 1.20
+    maximum_linear: 0.50
+    maximum_angular: 0.60
+    drive_rps: 4.0
+
+    # Safety default: publish only /autonomy/astronaut/drive_command. Set true
+    # only after rover review to connect the adapter to /cmd_vel/autonomy.
+    enable_drive_adapter: false

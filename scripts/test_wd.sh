@@ -19,7 +19,11 @@ if [ $test_result_code != 0 ]; then
     exit $test_result_code
 fi
 
-pytest --ignore=src/cmr_aruco --ignore=src/cmr_py_test
+# The root gesture demo and tests/ use the separately documented MediaPipe
+# environment. Keep that hardware-facing suite out of the generic ROS pytest
+# sweep; run it with `python -m unittest discover -s tests -v` instead.
+pytest --ignore=src/cmr_aruco --ignore=src/cmr_py_test \
+    --ignore=gesture_test.py --ignore=tests
 test_result_code=$?
 if [[ $test_result_code != 0 && $test_result_code != 5 ]]; then 
     exit $test_result_code

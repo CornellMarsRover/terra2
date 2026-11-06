@@ -17,6 +17,7 @@ rosidl_generate_interfaces(
   msg/ArucoMarkers.msg
   msg/JoystickReading.msg
   msg/ControllerReading.msg
+  msg/DriveCommand.msg
   msg/AutonomyDrive.msg
   msg/ArmJointEffort.msg
   msg/Error.msg
@@ -35,6 +36,8 @@ rosidl_generate_interfaces(
   msg/AugerState.msg
   msg/AugerCommand.msg
   msg/AnalysisStatus.msg
+  msg/AstronautCommand.msg
+  msg/AstronautVoiceCommand.msg
   srv/RecoverFault.srv
   srv/ActivateNode.srv
   srv/DeactivateNode.srv

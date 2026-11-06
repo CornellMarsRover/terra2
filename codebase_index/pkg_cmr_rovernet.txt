@@ -5,15 +5,20 @@ Purpose
 
 Entry-point nodes
 - drivesnet_node
+- drive_command_mux
 - armnet_node
 - cmr_read_node (ccb_read)
 - debug_node
 
 Main topic IO
 - drivesnet_node subscribes:
-  - /drives_controller/cmd_vel
-  - /drives_controller/cmd_buttons
-  - /autonomy_move (legacy/alternate path)
+  - /controller/drives/axes
+  - /controller/drives/buttons
+  - /cmd_vel (selected DriveCommand)
+- drivesnet_node publishes:
+  - /cmd_vel/teleop
+  - /cmd_vel/estop
+- drive_command_mux selects /cmd_vel/teleop or /cmd_vel/autonomy and publishes /cmd_vel.
 - armnet_node subscribes:
   - /main_arm_controller/joint_trajectory
   - /mini_arm_controller/cmd_pos
@@ -27,4 +32,4 @@ Launch
 - rovernet.launch.py uses Fabric composition + config/*.toml.
 
 Interaction role
-- Final hardware bridge for both manual and MoveIt arm commands.
+- Shared drive backend for both tele-op and autonomy, plus arm I/O nodes.

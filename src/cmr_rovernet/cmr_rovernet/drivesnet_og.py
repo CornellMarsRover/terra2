@@ -10,7 +10,7 @@ from cmr_rovernet.rovernet_utils import *
 
 class CmdVelSubscriber(Node):
     """
-    This node subscribes to the /drives_controller/cmd_vel topic output by the 
+    This node subscribes to the /controller/drives/axes topic output by the
     drivescontroller node. It will then convert the output to a pre-defined 40-byte 
     format and send the output to the CCB via UART. 
     """
@@ -19,7 +19,7 @@ class CmdVelSubscriber(Node):
         super().__init__('cmd_vel_subscriber')
         self.subscription = self.create_subscription(
             TwistStamped,
-            '/drives_controller/cmd_vel',
+            '/controller/drives/axes',
             self.listener_callback,
             10)
         self.button_subscription = self.create_subscription(
@@ -29,7 +29,7 @@ class CmdVelSubscriber(Node):
             10)
         self.autonomy_subscription = self.create_subscription(
             ControllerReading,
-            '/drives_controller/cmd_buttons',
+            '/controller/drives/buttons',
             self.listener_button_callback,
             10)
         self.subscription  # prevent unused variable warning

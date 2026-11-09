@@ -17,6 +17,9 @@ from collections import deque
 from ament_index_python.packages import get_package_share_directory
 import os
 import json
+from autonomous_typing_package.pose_confidence import (
+    MAX_XY_VARIANCE_M2, xy_variance_is_acceptable,
+)
 
 
 def quat_from_rpy(roll, pitch, yaw):
@@ -42,7 +45,7 @@ def load_key_positions(filename):
 class TypingMission(Node):
 
     STABILITY_WINDOW   = 20
-    VARIANCE_THRESHOLD = 1e-6  # metres² — tight because ArUco gives real units
+    VARIANCE_THRESHOLD = MAX_XY_VARIANCE_M2  # (20 mm)², independently for X and Y
 
     def __init__(self):
         super().__init__('typing_mission')
@@ -145,11 +148,15 @@ class TypingMission(Node):
         Average the tvecs of the 4 corner ArUco tags to get the keyboard
         centre position in camera frame (real metres from ArUco pose estimation).
         """
-        if ids is None:
+        if ids is None or tvecs is None:
+            self.invalidate_reference()
             return False
 
         ids_flat = ids.flatten().tolist()
-        if not self.corner_tag_ids.issubset(set(ids_flat)):
+        if (not self.corner_tag_ids.issubset(set(ids_flat))
+                or len(tvecs) != len(ids_flat)
+                or any(ids_flat.count(tag) != 1 for tag in self.corner_tag_ids)):
+            self.invalidate_reference()
             return False
 
         corner_tvecs = []
@@ -158,9 +165,17 @@ class TypingMission(Node):
                 corner_tvecs.append(tvecs[i][0])  # shape (3,)
 
         centre = np.mean(np.array(corner_tvecs), axis=0)  # (x, y, z) in metres
+        if not np.all(np.isfinite(centre)):
+            self.invalidate_reference()
+            return False
         self.origin_history.append(centre)
         self.reference_tvec = centre
         return True
+
+    def invalidate_reference(self):
+        # Reacquisition needs a new window of consecutive complete detections.
+        self.reference_tvec = None
+        self.origin_history.clear()
 
     # ------------------------------------------------------------------
 
@@ -171,7 +186,7 @@ class TypingMission(Node):
         return float(np.var(history[:, 0])), float(np.var(history[:, 1]))
 
     def is_confident(self, var_x, var_y):
-        return max(var_x, var_y) < self.VARIANCE_THRESHOLD
+        return xy_variance_is_acceptable(var_x, var_y, self.VARIANCE_THRESHOLD)
 
     # ------------------------------------------------------------------
 
@@ -216,20 +231,19 @@ class TypingMission(Node):
         return msg
 
     def publish_key_pose(self, key):
+        if self.reference_tvec is None:
+            return
         var_x, var_y = self.compute_origin_variance()
+        if not self.is_confident(var_x, var_y):
+            return
         msg = self.compute_key_pose_stamped(key, var_x, var_y)
         if msg is None:
             return
         self.pub_pose.publish(msg)
-        if self.is_confident(var_x, var_y):
-            self.get_logger().info(
-                f"High-confidence pose for '{key}' "
-                f"(var_x={var_x:.2e}, var_y={var_y:.2e}). Locking.")
-            self.pose_locked = True
-        else:
-            self.get_logger().debug(
-                f"Still accumulating for '{key}' "
-                f"(var_x={var_x:.2e}, var_y={var_y:.2e}).")
+        self.get_logger().info(
+            f"High-confidence pose for '{key}' "
+            f"(var_x={var_x:.2e}, var_y={var_y:.2e}). Locking.")
+        self.pose_locked = True
 
     # ------------------------------------------------------------------
 
@@ -256,22 +270,26 @@ class TypingMission(Node):
             while True:
                 ret, frame = cap.read()
                 if not ret:
+                    self.invalidate_reference()
                     continue
 
                 rclpy.spin_once(self, timeout_sec=0.0)
 
                 _, ids, rvecs, tvecs = self.detect_and_estimate(frame)
-                self.update_reference_frame(ids, tvecs)
+                fresh_reference = self.update_reference_frame(ids, tvecs)
 
-                if (self.reference_tvec is not None
+                if (fresh_reference
                         and not self.pose_locked
-                        and not self.mission_complete):
+                        and not self.mission_complete
+                        and self._last_coordinator_state in ('', 'WAITING_FOR_LOCK')):
                     self.publish_key_pose(self.hardcoded_key[self.current_key_index])
 
                 # Overlay
                 var_x, var_y = self.compute_origin_variance()
                 if self.mission_complete:
                     status = "DONE"
+                elif not fresh_reference:
+                    status = "WAITING FOR MARKERS"
                 elif self.pose_locked:
                     status = "LOCKED"
                 elif self.is_confident(var_x, var_y):
@@ -282,8 +300,16 @@ class TypingMission(Node):
                              if not self.mission_complete else '-')
                 cv2.putText(
                     frame,
-                    f"Key: {key_label}  {status}  var=({var_x:.1e},{var_y:.1e})",
+                    f"Key: {key_label}  {status}",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2,
+                )
+                variation = (
+                    f"({math.sqrt(var_x) * 1000:.1f}, {math.sqrt(var_y) * 1000:.1f}) mm"
+                    if math.isfinite(var_x) and math.isfinite(var_y) else 'collecting 20 frames'
+                )
+                cv2.putText(
+                    frame, f"X/Y variation: {variation}; limit 20 mm each",
+                    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1,
                 )
 
                 cv2.imshow("Camera Feed", frame)

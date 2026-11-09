@@ -39,6 +39,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <mutex>
 #include <std_msgs/msg/bool.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -587,9 +588,15 @@ bool ServoCalcs::cartesianServoCalcs(
 
     Eigen::JacobiSVD<Eigen::MatrixXd> svd = Eigen::JacobiSVD<Eigen::MatrixXd>(
         jacobian, Eigen::ComputeThinU | Eigen::ComputeThinV);
-    Eigen::MatrixXd matrix_s = svd.singularValues().asDiagonal();
-    Eigen::MatrixXd pseudo_inverse =
-        svd.matrixV() * matrix_s.inverse() * svd.matrixU().transpose();
+    // Eigen's solve() applies the SVD threshold to near-zero singular values.
+    // Directly inverting the diagonal singular-value matrix can create inf/NaN
+    // at singular or ill-conditioned physical poses.
+    Eigen::MatrixXd pseudo_inverse = svd.solve(
+        Eigen::MatrixXd::Identity(jacobian.rows(), jacobian.rows()));
+    if (!pseudo_inverse.allFinite()) {
+        RCLCPP_ERROR(LOGGER, "Jacobian pseudoinverse is non-finite; skipping command");
+        return false;
+    }
 
     // Convert from cartesian commands to joint commands
     // Use an IK solver plugin if we have one, otherwise use inverse Jacobian.
@@ -638,9 +645,14 @@ bool ServoCalcs::cartesianServoCalcs(
         moveit_msgs::msg::MoveItErrorCodes err;
         kinematics::KinematicsQueryOptions opts;
         opts.return_approximate_solution = true;
-        if (ik_solver_->searchPositionIK(next_pose, internal_joint_state_.position,
-                                         parameters_->publish_period / 2.0, solution,
-                                         err, opts)) {
+        const bool ik_succeeded = ik_solver_->searchPositionIK(
+            next_pose, internal_joint_state_.position,
+            parameters_->publish_period / 2.0, solution, err, opts);
+        bool solution_is_finite = ik_succeeded && solution.size() == num_joints_;
+        for (const double value : solution) {
+            solution_is_finite = solution_is_finite && std::isfinite(value);
+        }
+        if (solution_is_finite) {
             // find the difference in joint positions that will get us to the desired
             // pose
             for (size_t i = 0; i < num_joints_; ++i) {
@@ -648,23 +660,33 @@ bool ServoCalcs::cartesianServoCalcs(
                     solution.at(i) - internal_joint_state_.position.at(i);
             }
         } else {
-            RCLCPP_WARN(
-                LOGGER,
-                "Could not find IK solution for requested motion, got error code %d",
+            RCLCPP_WARN_THROTTLE(
+                LOGGER, *node_->get_clock(), ROS_LOG_THROTTLE_PERIOD,
+                "KDL returned no finite IK solution (error %d); using the "
+                "thresholded differential Jacobian solution",
                 err.val);
-            return false;
+            delta_theta_ = pseudo_inverse * delta_x;
         }
     } else {
         // no supported IK plugin, use inverse Jacobian
         delta_theta_ = pseudo_inverse * delta_x;
     }
 
-    delta_theta_ *= velocityScalingFactorForSingularity(
+    const double singularity_scale = velocityScalingFactorForSingularity(
         joint_model_group_, delta_x, svd, pseudo_inverse,
         parameters_->hard_stop_singularity_threshold,
         parameters_->lower_singularity_threshold,
         parameters_->leaving_singularity_threshold_multiplier, *node_->get_clock(),
         current_state_, status_);
+    if (!std::isfinite(singularity_scale) || !delta_theta_.isFinite().all()) {
+        RCLCPP_ERROR(LOGGER, "IK update is non-finite; skipping command");
+        return false;
+    }
+    delta_theta_ *= singularity_scale;
+    if (!delta_theta_.isFinite().all()) {
+        RCLCPP_ERROR(LOGGER, "Scaled IK update is non-finite; skipping command");
+        return false;
+    }
 
     return internalServoUpdate(delta_theta_, joint_trajectory,
                                ServoType::CARTESIAN_SPACE);

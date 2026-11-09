@@ -9,6 +9,7 @@ def generate_launch_description():
     camera_index  = LaunchConfiguration('camera_index')
     camera_device = LaunchConfiguration('camera_device')
     marker_size   = LaunchConfiguration('aruco_marker_size_m')
+    enable_motion = LaunchConfiguration('enable_motion')
 
     # Static TF: where the camera sits relative to the end effector.
     # The camera moves WITH the arm, so this parent is end_effector (not base_link).
@@ -38,6 +39,8 @@ def generate_launch_description():
         DeclareLaunchArgument('camera_device',       default_value=''),
         DeclareLaunchArgument('aruco_marker_size_m', default_value='0.03',
                               description='Physical side length of ArUco markers in metres'),
+        DeclareLaunchArgument('enable_motion', default_value='true',
+                              description='Publish Servo commands; false previews targets only'),
         camera_tf,
         Node(
             package='autonomous_typing_package',
@@ -56,5 +59,6 @@ def generate_launch_description():
             executable='arm_coordinator',
             name='arm_coordinator',
             output='screen',
+            parameters=[{'enable_motion': enable_motion}],
         ),
     ])

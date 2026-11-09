@@ -11,6 +11,9 @@ from std_msgs.msg import String
 import tf2_ros
 # Importing this module registers PoseStamped with the TF2 Python converter.
 import tf2_geometry_msgs
+from autonomous_typing_package.pose_confidence import (
+    MAX_XY_VARIANCE_M2, xy_variance_is_acceptable,
+)
 
 
 class State(Enum):
@@ -25,7 +28,7 @@ class State(Enum):
 class ArmCoordinator(Node):
     PREAPPROACH_OFFSET_Z = 0.05
     PRESS_OFFSET_Z = -0.003
-    VARIANCE_THRESHOLD = 2.0
+    VARIANCE_THRESHOLD = MAX_XY_VARIANCE_M2
     IDLE_DURATION = 1.0  # seconds to pause in IDLE before accepting next key
 
     STATE_DURATIONS = {
@@ -52,6 +55,7 @@ class ArmCoordinator(Node):
         self.declare_parameter("angular_gain", 2.0)
         self.declare_parameter("max_angular_command", 0.5)
         self.declare_parameter("position_tolerance", 0.01)
+        self.declare_parameter("enable_motion", True)
 
         self.target_frame = self.get_parameter("target_frame").value
         self.ee_frame = self.get_parameter("ee_frame").value
@@ -63,6 +67,7 @@ class ArmCoordinator(Node):
         self.angular_gain = self.get_parameter("angular_gain").value
         self.max_angular_command = self.get_parameter("max_angular_command").value
         self.position_tolerance = self.get_parameter("position_tolerance").value
+        self.enable_motion = bool(self.get_parameter("enable_motion").value)
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -99,7 +104,8 @@ class ArmCoordinator(Node):
         self.get_logger().info(
             "Arm coordinator started; "
             f"waiting for high-confidence key pose in target frame '{self.target_frame}'. "
-            f"Servo twists will command '{self.ee_frame}'."
+            f"Servo twists will command '{self.ee_frame}'. "
+            f"Motion enabled: {self.enable_motion}."
         )
 
     def key_callback(self, msg: PoseWithCovarianceStamped):
@@ -108,7 +114,7 @@ class ArmCoordinator(Node):
 
         var_x = msg.pose.covariance[0]
         var_y = msg.pose.covariance[7]
-        if max(var_x, var_y) > self.variance_threshold:
+        if not xy_variance_is_acceptable(var_x, var_y, self.variance_threshold):
             self.get_logger().debug(
                 f"Low confidence (var_x={var_x:.3f}, var_y={var_y:.3f}), still waiting."
             )
@@ -122,6 +128,10 @@ class ArmCoordinator(Node):
             pose_in_base = pose_in_camera
         else:
             try:
+                # Image processing and joint-state publication run at different
+                # rates.  Use the newest complete TF chain instead of asking TF
+                # to extrapolate a few milliseconds into the future.
+                pose_in_camera.header.stamp = rclpy.time.Time().to_msg()
                 pose_in_base = self.tf_buffer.transform(
                     pose_in_camera,
                     self.target_frame,
@@ -182,6 +192,8 @@ class ArmCoordinator(Node):
 
     def _publish_target_and_servo_command(self, pose: PoseStamped):
         self._publish_target_pose(pose)
+        if not self.enable_motion:
+            return
         ee_transform = self._lookup_ee_transform()
         if ee_transform is None:
             self._publish_zero_twist()
@@ -264,6 +276,8 @@ class ArmCoordinator(Node):
         return max(-self.max_angular_command, min(self.max_angular_command, command))
 
     def _publish_zero_twist(self):
+        if not self.enable_motion:
+            return
         self.servo_twist_pub.publish(self._zero_twist_msg())
 
     def _zero_twist_msg(self) -> TwistStamped:

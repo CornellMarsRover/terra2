@@ -103,7 +103,8 @@ std::map<Button, double> BUTTON_DEFAULTS;
  */
 bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& buttons,
                      std::unique_ptr<geometry_msgs::msg::TwistStamped>& twist,
-                     std::unique_ptr<control_msgs::msg::JointJog>& joint)
+                     std::unique_ptr<control_msgs::msg::JointJog>& joint,
+                     bool& right_trigger_initialized)
 {
     const auto axis = [&axes](std::size_t index) -> double {
         return index < axes.size() ? axes[index] : 0.0;
@@ -113,7 +114,8 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     };
 
     // The direct USB DualSense reports six axes:
-    // left X/Y, right X/Y, L2, R2. Its triggers rest at 0.0. The existing
+    // left X/Y, right X/Y, L2, R2. Its triggers rest at +1.0 after their
+    // first event and reach -1.0 when fully pressed. The existing
     // competition/UDP controller message uses the eight-axis Xbox layout and
     // its triggers rest at 1.0. Handle both without indexing past the message.
     const bool dualsense_layout = axes.size() == 6;
@@ -147,8 +149,14 @@ bool convertJoyToCmd(const std::vector<float>& axes, const std::vector<int>& but
     twist->twist.linear.z = axis(right_stick_y);
     twist->twist.linear.x = axis(right_stick_x);
 
-    const double lin_forward_right = dualsense_layout
-                                         ? -axis(RIGHT_TRIGGER)
+    // SDL initially reports 0 for an untouched trigger until its first event.
+    // Keep that initial value neutral without losing the actual halfway point
+    // (also 0) once the trigger has started reporting.
+    if (axis(RIGHT_TRIGGER) != 0.0) {
+        right_trigger_initialized = true;
+    }
+    const double lin_forward_right = dualsense_layout && !right_trigger_initialized
+                                         ? 0.0
                                          : 0.5 * (axis(RIGHT_TRIGGER) -
                                                   AXIS_DEFAULTS.at(RIGHT_TRIGGER));
     const double lin_backward_r1 = button(RIGHT_BUMPER);
@@ -210,7 +218,8 @@ class JoyToServoPub : public rclcpp::Node
         updateCmdFrame(frame_to_publish_, msg->buttons);
 
         // Convert the joystick message to Twist or JointJog and publish
-        if (convertJoyToCmd(msg->axes, msg->buttons, twist_msg, joint_msg)) {
+        if (convertJoyToCmd(msg->axes, msg->buttons, twist_msg, joint_msg,
+                            right_trigger_initialized_)) {
             // publish the TwistStamped
             twist_msg->header.frame_id = frame_to_publish_;
             twist_msg->header.stamp = this->now();
@@ -230,6 +239,7 @@ class JoyToServoPub : public rclcpp::Node
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr servo_start_client_;
 
     std::string frame_to_publish_;
+    bool right_trigger_initialized_ = false;
 };  // class JoyToServoPub
 
 }  // namespace moveit_servo

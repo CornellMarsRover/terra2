@@ -1,335 +1,188 @@
 #!/usr/bin/env python3
 
-import copy
+import json
 import math
-from enum import Enum, auto
+import os
 
+from ament_index_python.packages import get_package_share_directory
+from geometry_msgs.msg import TwistStamped
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, TwistStamped
-from std_msgs.msg import String
-import tf2_ros
-# Importing this module registers PoseStamped with the TF2 Python converter.
-import tf2_geometry_msgs
-from autonomous_typing_package.pose_confidence import (
-    MAX_XY_VARIANCE_M2, xy_variance_is_acceptable,
-)
-
-
-class State(Enum):
-    WAITING_FOR_LOCK = auto()
-    MOVING_TO_PREAPPROACH = auto()
-    APPROACHING = auto()
-    PRESSING = auto()
-    RETRACTING = auto()
-    IDLE = auto()
 
 
 class ArmCoordinator(Node):
-    PREAPPROACH_OFFSET_Z = 0.05
-    PRESS_OFFSET_Z = -0.003
-    VARIANCE_THRESHOLD = MAX_XY_VARIANCE_M2
-    IDLE_DURATION = 1.0  # seconds to pause in IDLE before accepting next key
-
-    STATE_DURATIONS = {
-        State.MOVING_TO_PREAPPROACH: 3.0,
-        State.APPROACHING: 2.0,
-        State.PRESSING: 0.5,
-        State.RETRACTING: 2.0,
-    }
+    """Run a fixed, open-loop A -> C -> M -> R typing sequence."""
 
     def __init__(self):
         super().__init__("arm_coordinator")
 
-        self.declare_parameter("target_frame", "base_link")
-        self.declare_parameter("key_pose_topic", "/key_location")
-        self.declare_parameter("target_pose_topic", "/target_pose")
-        self.declare_parameter("state_topic", "/coordinator_state")
         self.declare_parameter("servo_twist_topic", "/servo_node/delta_twist_cmds")
-        self.declare_parameter("ee_frame", "end_effector")
-        self.declare_parameter("preapproach_offset_z", self.PREAPPROACH_OFFSET_Z)
-        self.declare_parameter("press_offset_z", self.PRESS_OFFSET_Z)
-        self.declare_parameter("variance_threshold", self.VARIANCE_THRESHOLD)
-        self.declare_parameter("linear_gain", 2.0)
-        self.declare_parameter("max_linear_command", 0.35)
-        self.declare_parameter("angular_gain", 2.0)
-        self.declare_parameter("max_angular_command", 0.5)
-        self.declare_parameter("position_tolerance", 0.01)
+        self.declare_parameter("text", "CMR")
+        self.declare_parameter("key_offset_scale", 3.0)
+        self.declare_parameter("press_depth_m", 0.0762)  # 3 inches
+        self.declare_parameter("command_magnitude", 0.05)
+        self.declare_parameter("servo_linear_scale_mps", 0.8)
+        self.declare_parameter("start_delay_s", 2.0)
+        self.declare_parameter("settle_time_s", 0.3)
         self.declare_parameter("enable_motion", True)
 
-        self.target_frame = self.get_parameter("target_frame").value
-        self.ee_frame = self.get_parameter("ee_frame").value
-        self.preapproach_offset_z = self.get_parameter("preapproach_offset_z").value
-        self.press_offset_z = self.get_parameter("press_offset_z").value
-        self.variance_threshold = self.get_parameter("variance_threshold").value
-        self.linear_gain = self.get_parameter("linear_gain").value
-        self.max_linear_command = self.get_parameter("max_linear_command").value
-        self.angular_gain = self.get_parameter("angular_gain").value
-        self.max_angular_command = self.get_parameter("max_angular_command").value
-        self.position_tolerance = self.get_parameter("position_tolerance").value
+        self.text = str(self.get_parameter("text").value).upper()
+        self.key_offset_scale = float(
+            self.get_parameter("key_offset_scale").value
+        )
+        self.press_depth_m = float(self.get_parameter("press_depth_m").value)
+        self.command_magnitude = float(
+            self.get_parameter("command_magnitude").value
+        )
+        self.servo_linear_scale_mps = float(
+            self.get_parameter("servo_linear_scale_mps").value
+        )
+        self.start_delay_s = float(self.get_parameter("start_delay_s").value)
+        self.settle_time_s = float(self.get_parameter("settle_time_s").value)
         self.enable_motion = bool(self.get_parameter("enable_motion").value)
 
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-
-        self.state = State.WAITING_FOR_LOCK
-        self.locked_pose = None
-        self.state_start = None
-
-        self.target_pose_pub = self.create_publisher(
-            PoseStamped,
-            self.get_parameter("target_pose_topic").value,
-            10,
+        key_file = os.path.join(
+            get_package_share_directory("autonomous_typing_package"),
+            "key_position.json",
         )
-        self.state_pub = self.create_publisher(
-            String,
-            self.get_parameter("state_topic").value,
-            10,
-        )
-        self.servo_twist_pub = self.create_publisher(
+        with open(key_file, "r", encoding="utf-8") as stream:
+            self.key_positions = json.load(stream)
+
+        missing = [key for key in "A" + self.text if key not in self.key_positions]
+        if missing:
+            raise ValueError(f"Keys missing from key_position.json: {missing}")
+        if self.press_depth_m <= 0.0:
+            raise ValueError("press_depth_m must be positive")
+        if self.key_offset_scale <= 0.0:
+            raise ValueError("key_offset_scale must be positive")
+        if not 0.0 < self.command_magnitude <= 1.0:
+            raise ValueError("command_magnitude must be in (0, 1]")
+        if self.servo_linear_scale_mps <= 0.0:
+            raise ValueError("servo_linear_scale_mps must be positive")
+
+        self.segments = self.build_segments()
+        self.segment_index = -1
+        self.segment_started_at = None
+        self.settle_started_at = None
+        self.started_at = self.get_clock().now()
+        self.done = False
+
+        self.twist_pub = self.create_publisher(
             TwistStamped,
-            self.get_parameter("servo_twist_topic").value,
+            str(self.get_parameter("servo_twist_topic").value),
             10,
         )
-
-        self.key_sub = self.create_subscription(
-            PoseWithCovarianceStamped,
-            self.get_parameter("key_pose_topic").value,
-            self.key_callback,
-            10,
-        )
-
-        self.timer = self.create_timer(0.1, self.state_machine_tick)
+        self.timer = self.create_timer(0.05, self.tick)
 
         self.get_logger().info(
-            "Arm coordinator started; "
-            f"waiting for high-confidence key pose in target frame '{self.target_frame}'. "
-            f"Servo twists will command '{self.ee_frame}'. "
-            f"Motion enabled: {self.enable_motion}."
+            f"Starting hardcoded '{self.text}' sequence from A in "
+            f"{self.start_delay_s:.1f}s; press depth={self.press_depth_m:.4f}m."
         )
 
-    def key_callback(self, msg: PoseWithCovarianceStamped):
-        if self.state != State.WAITING_FOR_LOCK:
-            return
-
-        var_x = msg.pose.covariance[0]
-        var_y = msg.pose.covariance[7]
-        if not xy_variance_is_acceptable(var_x, var_y, self.variance_threshold):
-            self.get_logger().debug(
-                f"Low confidence (var_x={var_x:.3f}, var_y={var_y:.3f}), still waiting."
+    def build_segments(self):
+        segments = []
+        previous_key = "A"
+        for key in self.text:
+            previous = self.key_positions[previous_key]
+            target = self.key_positions[key]
+            dx = (
+                (float(target["x"]) - float(previous["x"]))
+                * 0.01
+                * self.key_offset_scale
             )
+            dy = (
+                (float(target["y"]) - float(previous["y"]))
+                * 0.01
+                * self.key_offset_scale
+            )
+            segments.append(self.make_segment(f"MOVE_{previous_key}_TO_{key}", dx, dy, 0.0))
+            segments.append(self.make_segment(f"PRESS_{key}", 0.0, 0.0, -self.press_depth_m))
+            segments.append(self.make_segment(f"RETRACT_{key}", 0.0, 0.0, self.press_depth_m))
+            previous_key = key
+        return segments
+
+    def make_segment(self, name, dx, dy, dz):
+        distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        speed = self.command_magnitude * self.servo_linear_scale_mps
+        duration = distance / speed
+        direction = (dx / distance, dy / distance, dz / distance)
+        return {
+            "name": name,
+            "command": tuple(value * self.command_magnitude for value in direction),
+            "duration": duration,
+            "offset": (dx, dy, dz),
+        }
+
+    def tick(self):
+        if self.done:
+            self.publish_zero()
             return
 
-        pose_in_camera = PoseStamped()
-        pose_in_camera.header = msg.header
-        pose_in_camera.pose = msg.pose.pose
+        if self.elapsed_since(self.started_at) < self.start_delay_s:
+            self.publish_zero()
+            return
 
-        if pose_in_camera.header.frame_id == self.target_frame:
-            pose_in_base = pose_in_camera
-        else:
-            try:
-                # Image processing and joint-state publication run at different
-                # rates.  Use the newest complete TF chain instead of asking TF
-                # to extrapolate a few milliseconds into the future.
-                pose_in_camera.header.stamp = rclpy.time.Time().to_msg()
-                pose_in_base = self.tf_buffer.transform(
-                    pose_in_camera,
-                    self.target_frame,
-                    timeout=rclpy.duration.Duration(seconds=0.5),
-                )
-            except Exception as e:
-                self.get_logger().warn(f"TF transform failed: {e}")
-                return
+        if self.segment_started_at is None:
+            self.start_next_segment()
+            return
 
-        self.locked_pose = pose_in_base
+        segment = self.segments[self.segment_index]
+        if self.settle_started_at is None:
+            if self.elapsed_since(self.segment_started_at) < segment["duration"]:
+                self.publish_command(segment["command"])
+            else:
+                self.publish_zero()
+                self.settle_started_at = self.get_clock().now()
+        elif self.elapsed_since(self.settle_started_at) >= self.settle_time_s:
+            self.start_next_segment()
+
+    def start_next_segment(self):
+        self.segment_index += 1
+        if self.segment_index >= len(self.segments):
+            self.done = True
+            self.publish_zero()
+            self.get_logger().info("Hardcoded typing sequence complete.")
+            return
+
+        self.segment_started_at = self.get_clock().now()
+        self.settle_started_at = None
+        segment = self.segments[self.segment_index]
+        dx, dy, dz = segment["offset"]
         self.get_logger().info(
-            f"Pose locked in {self.target_frame}: "
-            f"x={pose_in_base.pose.position.x:.3f} "
-            f"y={pose_in_base.pose.position.y:.3f} "
-            f"z={pose_in_base.pose.position.z:.3f}"
-        )
-        self._transition(State.MOVING_TO_PREAPPROACH)
-
-    def state_machine_tick(self):
-        self._publish_state_name()
-
-        if self.state == State.WAITING_FOR_LOCK:
-            self._publish_zero_twist()
-            return
-
-        if self.locked_pose is None:
-            self.get_logger().warn("State machine active but locked_pose is None")
-            self._publish_zero_twist()
-            self._transition(State.WAITING_FOR_LOCK)
-            return
-
-        if self.state == State.MOVING_TO_PREAPPROACH:
-            self._publish_target_and_servo_command(self._get_preapproach_pose())
-            if self._state_elapsed() >= self.STATE_DURATIONS[State.MOVING_TO_PREAPPROACH]:
-                self._transition(State.APPROACHING)
-
-        elif self.state == State.APPROACHING:
-            self._publish_target_and_servo_command(self._get_approach_pose())
-            if self._state_elapsed() >= self.STATE_DURATIONS[State.APPROACHING]:
-                self._transition(State.PRESSING)
-
-        elif self.state == State.PRESSING:
-            self._publish_target_and_servo_command(self._get_press_pose())
-            if self._state_elapsed() >= self.STATE_DURATIONS[State.PRESSING]:
-                self._transition(State.RETRACTING)
-
-        elif self.state == State.RETRACTING:
-            self._publish_target_and_servo_command(self._get_preapproach_pose())
-            if self._state_elapsed() >= self.STATE_DURATIONS[State.RETRACTING]:
-                self._transition(State.IDLE)
-
-        elif self.state == State.IDLE:
-            self._publish_zero_twist()
-            # After a short pause, reset and wait for the next key from the mission node
-            if self._state_elapsed() >= self.IDLE_DURATION:
-                self.locked_pose = None
-                self._transition(State.WAITING_FOR_LOCK)
-
-    def _publish_target_and_servo_command(self, pose: PoseStamped):
-        self._publish_target_pose(pose)
-        if not self.enable_motion:
-            return
-        ee_transform = self._lookup_ee_transform()
-        if ee_transform is None:
-            self._publish_zero_twist()
-            return
-        self.servo_twist_pub.publish(
-            self._make_servo_twist(pose, ee_transform)
+            f"{segment['name']}: offset=({dx:.4f}, {dy:.4f}, {dz:.4f})m, "
+            f"duration={segment['duration']:.2f}s"
         )
 
-    def _publish_target_pose(self, pose: PoseStamped):
-        pose.header.stamp = self.get_clock().now().to_msg()
-        self.target_pose_pub.publish(pose)
-
-    def _lookup_ee_transform(self):
-        try:
-            return self.tf_buffer.lookup_transform(
-                self.target_frame,
-                self.ee_frame,
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.05),
-            )
-        except Exception as exc:
-            self.get_logger().warn(
-                f"Could not look up {self.target_frame}->{self.ee_frame}: {exc}",
-                throttle_duration_sec=1.0,
-            )
-            return None
-
-    def _make_servo_twist(self, target_pose: PoseStamped, ee_transform) -> TwistStamped:
-        current_pos = ee_transform.transform.translation
-        current_rot = ee_transform.transform.rotation
-
-        error_x = target_pose.pose.position.x - current_pos.x
-        error_y = target_pose.pose.position.y - current_pos.y
-        error_z = target_pose.pose.position.z - current_pos.z
-
-        msg = self._zero_twist_msg()
-
-        if not (
-            abs(error_x) < self.position_tolerance
-            and abs(error_y) < self.position_tolerance
-            and abs(error_z) < self.position_tolerance
-        ):
-            msg.twist.linear.x = self._bounded_linear_command(error_x)
-            msg.twist.linear.y = self._bounded_linear_command(error_y)
-            msg.twist.linear.z = self._bounded_linear_command(error_z)
-
-        # Angular correction: drive end effector toward target orientation
-        target_q = target_pose.pose.orientation
-        ax, ay, az = self._quaternion_error_to_angular(target_q, current_rot)
-        msg.twist.angular.x = self._bounded_angular_command(ax)
-        msg.twist.angular.y = self._bounded_angular_command(ay)
-        msg.twist.angular.z = self._bounded_angular_command(az)
-
-        return msg
-
-    @staticmethod
-    def _quaternion_error_to_angular(q_target, q_current):
-        """Return angular error [x, y, z] as q_error = q_target * conj(q_current)."""
-        tw, tx, ty, tz = q_target.w, q_target.x, q_target.y, q_target.z
-        cw, cx, cy, cz = q_current.w, q_current.x, q_current.y, q_current.z
-
-        # q_error = q_target * conj(q_current)
-        ew = tw * cw + tx * cx + ty * cy + tz * cz
-        ex = -tw * cx + tx * cw - ty * cz + tz * cy
-        ey = -tw * cy + tx * cz + ty * cw - tz * cx
-        ez = -tw * cz - tx * cy + ty * cx + tz * cw
-
-        # Take the shorter arc
-        if ew < 0:
-            ex, ey, ez = -ex, -ey, -ez
-
-        return ex, ey, ez
-
-    def _bounded_linear_command(self, error: float) -> float:
-        command = self.linear_gain * error
-        return max(-self.max_linear_command, min(self.max_linear_command, command))
-
-    def _bounded_angular_command(self, error: float) -> float:
-        command = self.angular_gain * error
-        return max(-self.max_angular_command, min(self.max_angular_command, command))
-
-    def _publish_zero_twist(self):
+    def publish_command(self, command):
         if not self.enable_motion:
             return
-        self.servo_twist_pub.publish(self._zero_twist_msg())
+        msg = self.zero_twist()
+        msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z = command
+        self.twist_pub.publish(msg)
 
-    def _zero_twist_msg(self) -> TwistStamped:
+    def publish_zero(self):
+        if self.enable_motion:
+            self.twist_pub.publish(self.zero_twist())
+
+    def zero_twist(self):
         msg = TwistStamped()
+        msg.header.frame_id = "base_link"
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = self.target_frame
         return msg
 
-    def _get_preapproach_pose(self) -> PoseStamped:
-        pose = self._copy_locked_pose()
-        pose.pose.position.z += self.preapproach_offset_z
-        return pose
-
-    def _get_approach_pose(self) -> PoseStamped:
-        return self._copy_locked_pose()
-
-    def _get_press_pose(self) -> PoseStamped:
-        pose = self._copy_locked_pose()
-        pose.pose.position.z += self.press_offset_z
-        return pose
-
-    def _copy_locked_pose(self) -> PoseStamped:
-        pose = copy.deepcopy(self.locked_pose)
-        pose.header.frame_id = self.target_frame
-        pose.header.stamp = self.get_clock().now().to_msg()
-        return pose
-
-    def _transition(self, new_state: State):
-        self.get_logger().info(f"State: {self.state.name} -> {new_state.name}")
-        self.state = new_state
-        self.state_start = self.get_clock().now()
-
-    def _state_elapsed(self) -> float:
-        if self.state_start is None:
-            return 0.0
-        delta = self.get_clock().now() - self.state_start
-        return delta.nanoseconds / 1e9
-
-    def _publish_state_name(self):
-        msg = String()
-        msg.data = self.state.name
-        self.state_pub.publish(msg)
+    def elapsed_since(self, stamp):
+        return (self.get_clock().now() - stamp).nanoseconds / 1e9
 
 
-def main():
-    rclpy.init()
+def main(args=None):
+    rclpy.init(args=args)
     node = ArmCoordinator()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
+        node.publish_zero()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

@@ -253,6 +253,16 @@ def query_moteus_sync(controller: moteus.Controller, timeout_s: float = 0.2):
     return future.result(timeout=timeout_s)
 
 
+def cycle_moteus_sync(transport, commands, timeout_s: float = 0.25):
+    """Run one batched moteus transport cycle on the shared asyncio loop."""
+    global _moteus_loop
+    if _moteus_loop is None:
+        raise RuntimeError("Moteus loop not initialized. Call init_moteus_loop() first!")
+
+    future = asyncio.run_coroutine_threadsafe(transport.cycle(commands), _moteus_loop)
+    return future.result(timeout=timeout_s)
+
+
 def send_moteus_command_sync(
     controller: moteus.Controller,
     motor: int,

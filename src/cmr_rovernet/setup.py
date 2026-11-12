@@ -29,6 +29,7 @@ setup(
     entry_points={
         "console_scripts": [
             "armnet_node = cmr_rovernet.armnet:main",
+            "direct_arm_teleop_node = cmr_rovernet.direct_arm_teleop:main",
             # PHOBOS_APPEND
             'drivesnet_node = cmr_rovernet.drivesnet:main',
             'usama_control_testing_node = cmr_rovernet.usama_control_testing:ros_main',

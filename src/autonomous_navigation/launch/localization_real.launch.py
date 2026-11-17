@@ -9,7 +9,7 @@ def generate_launch_description():
     )
     return launch.LaunchDescription([
         launch_ros.actions.Node(
-            package='cmr_rovernet',
+            package='cmr_rovernet_cpp',
             executable='drive_command_mux',
             name='drive_command_mux',
             parameters=[{'active_source': 'autonomy'}],
@@ -17,7 +17,7 @@ def generate_launch_description():
 
         # The same backend consumes the mux-selected command in every mode.
         launch_ros.actions.Node(
-            package='cmr_rovernet',
+            package='cmr_rovernet_cpp',
             executable='usama_control_testing_node',
             name='drivesnet',
             output='screen',
@@ -37,7 +37,7 @@ def generate_launch_description():
 
         # Start state machine node
         launch_ros.actions.Node(
-            package='autonomous_navigation',
+            package='autonomous_navigation_cpp',
             executable='state_machine',
             name='state_machine',
             output='screen',
@@ -49,21 +49,21 @@ def generate_launch_description():
             period=1.0,
             actions=[
                 launch_ros.actions.Node(
-                    package='autonomous_navigation',
+                    package='autonomous_navigation_cpp',
                     executable='new_kalman',
                     name='new_kalman',
                     output='screen',
                     parameters=[{}]
                 ),
                 launch_ros.actions.Node(
-                    package='autonomous_navigation',
+                    package='autonomous_navigation_cpp',
                     executable='costmap',
                     name='costmap',
                     output='screen',
                     parameters=[{'real': True, 'use_sim_time': False}]
                 ),
                 launch_ros.actions.Node(
-                    package='autonomous_navigation',
+                    package='autonomous_navigation_cpp',
                     executable='local_planner',
                     name='local_planner',
                     output='screen',
@@ -86,7 +86,7 @@ def generate_launch_description():
             period=30.0,
             actions=[
                 launch_ros.actions.Node(
-                    package='autonomous_navigation',
+                    package='autonomous_navigation_cpp',
                     executable='controller',
                     name='controller',
                     output='screen',

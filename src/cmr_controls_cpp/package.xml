@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>cmr_controls_cpp</name>
+  <version>0.0.0</version>
+  <description>C++ port of cmr_controls (swerve_controller_node, arm_controller_node) using the vendored moteus C++ client over fdcanusb. Drop-in replacement: same executable, node and topic names.</description>
+  <maintainer email="team@cornellmarsrover.org">CMR</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>cmr_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>moteus_cpp_vendor</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

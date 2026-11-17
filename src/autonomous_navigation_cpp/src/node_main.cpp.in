@@ -1,0 +1,59 @@
+// Standalone executable for one composable node of this package. Same shape
+// as rclcpp_components' generated main, but a constructor failure (bad
+// parameter, missing waypoints file, ...) is reported as FATAL and the
+// process exits with status 1 instead of aborting on an uncaught exception.
+#include <exception>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "class_loader/class_loader.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_components/node_factory.hpp"
+#include "rclcpp_components/node_factory_template.hpp"
+
+int main(int argc, char * argv[])
+{
+  auto args = rclcpp::init_and_remove_ros_arguments(argc, argv);
+  rclcpp::Logger logger = rclcpp::get_logger("@NAV_EXECUTABLE@");
+  int rc = 0;
+  {
+    rclcpp::executors::SingleThreadedExecutor exec;
+    rclcpp::NodeOptions options;
+    options.arguments(args);
+    std::vector<rclcpp_components::NodeInstanceWrapper> node_wrappers;
+
+    const std::string library_name = "@NAV_LIBRARY@";
+    const std::string class_name = "rclcpp_components::NodeFactoryTemplate<@NAV_PLUGIN@>";
+    try {
+      // Intentionally never unloaded: node code must outlive the wrappers.
+      auto loader = new class_loader::ClassLoader(library_name);
+      for (const auto & clazz : loader->getAvailableClasses<rclcpp_components::NodeFactory>()) {
+        if (clazz == class_name) {
+          auto node_factory = loader->createInstance<rclcpp_components::NodeFactory>(clazz);
+          auto wrapper = node_factory->create_node_instance(options);
+          node_wrappers.push_back(wrapper);
+          exec.add_node(wrapper.get_node_base_interface());
+        }
+      }
+      if (node_wrappers.empty()) {
+        RCLCPP_FATAL(logger, "%s not found in %s", class_name.c_str(), library_name.c_str());
+        rc = 1;
+      } else {
+        exec.spin();
+      }
+    } catch (const std::exception & ex) {
+      RCLCPP_FATAL(logger, "%s", ex.what());
+      rc = 1;
+    }
+    for (auto & wrapper : node_wrappers) {
+      auto node = wrapper.get_node_base_interface();
+      if (node->get_associated_with_executor_atomic().load()) {
+        exec.remove_node(node);
+      }
+    }
+    node_wrappers.clear();
+  }
+  rclcpp::shutdown();
+  return rc;
+}

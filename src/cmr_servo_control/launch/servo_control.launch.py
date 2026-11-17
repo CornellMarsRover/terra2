@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package='cmr_servo_control',
+            package='cmr_servo_control_cpp',
             executable='arm_servo_control_node',
             output='screen',
             parameters=[

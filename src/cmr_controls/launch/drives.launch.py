@@ -13,13 +13,13 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('active_source', default_value='teleop'),
         Node(
-            package='cmr_rovernet',
+            package='cmr_rovernet_cpp',
             executable='drive_command_mux',
             name='drive_command_mux',
             parameters=[{'active_source': LaunchConfiguration('active_source')}],
         ),
         Node(
-            package='cmr_rovernet',
+            package='cmr_rovernet_cpp',
             executable='usama_control_testing_node',
             name='drivesnet',
             output='screen',

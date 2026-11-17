@@ -94,7 +94,7 @@ def generate_launch_description():
     )
 
     controller_remote = Node(
-        package="cmr_controller_remote",
+        package="cmr_controller_remote_cpp",
         executable="connect_node",
         arguments=[],
         condition=IfCondition(enable_controller),

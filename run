@@ -70,12 +70,13 @@ set -u
 if [[ "$mode" == setup ]]; then
   [[ -f /etc/ros/rosdep/sources.list.d/20-default.list ]] || sudo rosdep init
   rosdep update
-  paths=(src/{cmr_msgs,cmr_utils,cmr_fabric,cmr_controller_remote,cmr_rovernet,cmr_zed,astronaut_autonomy,autonomous_navigation})
+  paths=(src/{cmr_msgs,cmr_utils,cmr_fabric,cmr_controller_remote,cmr_rovernet,cmr_zed,astronaut_autonomy,autonomous_navigation,moteus_cpp_vendor,cmr_controller_remote_cpp,cmr_rovernet_cpp,cmr_zed_cpp,autonomous_navigation_cpp})
   exec rosdep install --from-paths "${paths[@]}" --ignore-src -r -y "$@"
 fi
 if [[ "$mode" == build ]]; then
   exec colcon build --symlink-install --packages-up-to \
-    cmr_fabric cmr_controller_remote cmr_rovernet cmr_zed astronaut_autonomy autonomous_navigation "$@"
+    cmr_fabric cmr_controller_remote cmr_rovernet cmr_zed astronaut_autonomy autonomous_navigation \
+    cmr_controller_remote_cpp cmr_rovernet_cpp cmr_zed_cpp autonomous_navigation_cpp "$@"
 fi
 if [[ ! -f install/setup.bash ]]; then
   echo "Workspace is not built. Run: ./run build" >&2

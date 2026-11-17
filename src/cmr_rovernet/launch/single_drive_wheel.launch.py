@@ -8,7 +8,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             Node(
-                package="cmr_controller_remote",
+                package="cmr_controller_remote_cpp",
                 executable="connect_node",
                 name="controller_connect",
                 parameters=[
@@ -19,7 +19,7 @@ def generate_launch_description():
                 ],
             ),
             Node(
-                package="cmr_rovernet",
+                package="cmr_rovernet_cpp",
                 executable="single_drive_wheel_control_node",
                 name="single_drive_wheel_control",
                 parameters=[

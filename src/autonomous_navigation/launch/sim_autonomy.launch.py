@@ -4,14 +4,14 @@ import launch_ros.actions
 def generate_launch_description():
     return launch.LaunchDescription([
         launch_ros.actions.Node(
-            package='cmr_rovernet',
+            package='cmr_rovernet_cpp',
             executable='drive_command_mux',
             name='drive_command_mux',
             parameters=[{'active_source': 'autonomy'}],
         ),
         # Start state_machine & object detection nodes first
         launch_ros.actions.Node(
-            package='autonomous_navigation',
+            package='autonomous_navigation_cpp',
             executable='state_machine',
             name='state_machine',
             output='screen',
@@ -43,7 +43,7 @@ def generate_launch_description():
             period=2.0,
             actions=[
                 launch_ros.actions.Node(
-                    package='autonomous_navigation',
+                    package='autonomous_navigation_cpp',
                     executable='costmap',
                     name='costmap',
                     output='screen',
@@ -57,7 +57,7 @@ def generate_launch_description():
             period=4.0,
             actions=[
                 launch_ros.actions.Node(
-                    package='autonomous_navigation',
+                    package='autonomous_navigation_cpp',
                     executable='local_planner',
                     name='local_planner',
                     output='screen',
@@ -70,7 +70,7 @@ def generate_launch_description():
             period=6.0,
             actions=[
                 launch_ros.actions.Node(
-                    package='autonomous_navigation',
+                    package='autonomous_navigation_cpp',
                     executable='controller',
                     name='controller',
                     output='screen',
